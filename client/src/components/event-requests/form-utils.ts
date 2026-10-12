@@ -7,8 +7,18 @@
  * 3. Simplify the performSubmit function
  */
 
-import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
+import {
+  hasActiveSandwichRange,
+  hasActiveSandwichTypes,
+  parseSandwichTypeEntries,
+  sumSandwichTypeQuantities,
+} from '@shared/sandwich-count-utils';
 import type { EventFormData } from './form-sections/types';
+
+// Re-exported so existing importers keep pulling it from form-utils while the
+// implementation lives in shared/ (the server-side heal migration and display
+// helpers need the same summing rule).
+export { sumSandwichTypeQuantities };
 export { findMismatchedSavedFields, getDroppedServerFields } from '@/lib/event-save-verification';
 
 /**
@@ -253,24 +263,6 @@ export function buildEventDataForServer(
 }
 
 /**
- * Sum quantities from a sandwichTypes value (array or JSON string).
- */
-export function sumSandwichTypeQuantities(sandwichTypes: unknown): number {
-  if (!sandwichTypes) return 0;
-  try {
-    const parsed =
-      typeof sandwichTypes === 'string' ? JSON.parse(sandwichTypes) : sandwichTypes;
-    if (!Array.isArray(parsed)) return 0;
-    return parsed.reduce(
-      (sum, item) => sum + (Number((item as { quantity?: number })?.quantity) || 0),
-      0,
-    );
-  } catch {
-    return 0;
-  }
-}
-
-/**
  * Determine sandwich mode from existing event data.
  *
  * When estimatedSandwichCount disagrees with a stale sandwichTypes breakdown,
@@ -296,30 +288,7 @@ export function determineSandwichMode(
     return 'range';
   }
 
-  let parsed: unknown[] = [];
-  try {
-    parsed = sandwichTypes
-      ? typeof sandwichTypes === 'string'
-        ? JSON.parse(sandwichTypes)
-        : sandwichTypes
-      : [];
-  } catch {
-    parsed = [];
-  }
-  const hasTypesData = Array.isArray(parsed) && parsed.length > 0;
-  if (!hasTypesData) return 'total';
-
-  const typesTotal = sumSandwichTypeQuantities(parsed);
-  const storedTotal =
-    typeof estimatedSandwichCount === 'number' && estimatedSandwichCount > 0
-      ? estimatedSandwichCount
-      : null;
-
-  if (storedTotal !== null && typesTotal !== storedTotal) {
-    return 'total';
-  }
-
-  return 'types';
+  return hasActiveSandwichTypes(sandwichTypes, estimatedSandwichCount) ? 'types' : 'total';
 }
 
 /**
@@ -339,6 +308,15 @@ export function determineBaselineSandwichMode(
   if (estimatedSandwichCountMin && estimatedSandwichCountMax) {
     return 'range';
   }
+  // Same rule for a stale breakdown: any persisted sandwichTypes counts as
+  // 'types' here even when a disagreeing exact count means the UI opens in
+  // Exact Count. Otherwise the baseline serializes sandwichTypes as null, the
+  // diff sees null === null, and the clear that would remove the stale
+  // breakdown is dropped — leaving 250 turkey + 248 PBJ sitting next to the
+  // exact 500 for the next reader to sum back to 498.
+  if (parseSandwichTypeEntries(sandwichTypes).length > 0) {
+    return 'types';
+  }
   return determineSandwichMode(
     sandwichTypes,
     estimatedSandwichCountMin,
@@ -349,9 +327,84 @@ export function determineBaselineSandwichMode(
 
 /**
  * Determine actual sandwich mode from existing event data.
+ *
+ * Mirrors determineSandwichMode: a breakdown that disagrees with an explicit
+ * actualSandwichCount is stale, so the editor opens on the exact count instead
+ * of re-summing the leftover types over it.
  */
-export function determineActualSandwichMode(actualSandwichTypes: any): 'total' | 'types' {
-  const parsed = actualSandwichTypes ?
-    (typeof actualSandwichTypes === 'string' ? JSON.parse(actualSandwichTypes) : actualSandwichTypes) : [];
-  return Array.isArray(parsed) && parsed.length > 0 ? 'types' : 'total';
+export function determineActualSandwichMode(
+  actualSandwichTypes: any,
+  actualSandwichCount?: number | null,
+): 'total' | 'types' {
+  return hasActiveSandwichTypes(actualSandwichTypes, actualSandwichCount) ? 'types' : 'total';
+}
+
+/**
+ * The five columns that together encode ONE sandwich count. Every save writes
+ * all five (one representation set, the other two nulled) so the DB can never
+ * hold two competing answers.
+ */
+export const SANDWICH_COMPANION_FIELDS = [
+  'estimatedSandwichCount',
+  'sandwichTypes',
+  'estimatedSandwichCountMin',
+  'estimatedSandwichCountMax',
+  'estimatedSandwichRangeType',
+] as const;
+
+/** Normalize a sandwich field to a comparable form across payload/DB shapes. */
+function normalizeSandwichFieldValue(field: string, value: unknown): string {
+  if (field === 'sandwichTypes') {
+    const entries = parseSandwichTypeEntries(value);
+    return entries.length === 0 ? 'null' : JSON.stringify(entries);
+  }
+  if (field === 'estimatedSandwichRangeType') {
+    return value ? String(value) : 'null';
+  }
+  // Numeric columns: absent, null and 0 all mean "no value here".
+  const numeric = Number(value);
+  return value === null || value === undefined || value === '' || !Number.isFinite(numeric) || numeric === 0
+    ? 'null'
+    : String(numeric);
+}
+
+/**
+ * Re-add sandwich fields the diff-based save dropped when the STORED record
+ * still holds a value the payload intends to clear.
+ *
+ * The diff compares the payload against a re-serialization of the form's
+ * opening snapshot, which means it can only ever be as right as the baseline's
+ * inferred sandwich mode. That inference has been the recurring source of the
+ * "500 saves as 498" bug: whenever the baseline resolves to the SAME mode the
+ * user is saving in, the companion clears serialize to null on both sides,
+ * compare equal, and get dropped — so the stale range/breakdown survives in the
+ * DB and later gets summed or averaged back over the exact count.
+ *
+ * This check doesn't infer anything. It compares the intended write against
+ * what the server actually has for these five columns and keeps any field that
+ * genuinely differs, so a clear can never be silently dropped no matter which
+ * mode the baseline picked.
+ */
+export function restoreDroppedSandwichClears(
+  diffedEventData: Record<string, any>,
+  fullEventData: Record<string, any>,
+  storedEvent: Record<string, any> | null | undefined,
+): string[] {
+  const restored: string[] = [];
+  if (!storedEvent) return restored;
+
+  for (const field of SANDWICH_COMPANION_FIELDS) {
+    // Still in the payload — nothing was dropped for this field.
+    if (Object.prototype.hasOwnProperty.call(diffedEventData, field)) continue;
+    if (!Object.prototype.hasOwnProperty.call(fullEventData, field)) continue;
+
+    const intended = normalizeSandwichFieldValue(field, fullEventData[field]);
+    const stored = normalizeSandwichFieldValue(field, storedEvent[field]);
+    if (intended !== stored) {
+      diffedEventData[field] = fullEventData[field];
+      restored.push(field);
+    }
+  }
+
+  return restored;
 }

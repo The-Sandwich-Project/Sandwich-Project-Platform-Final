@@ -61,6 +61,7 @@ import {
   getDroppedServerFields,
   determineSandwichMode,
   determineBaselineSandwichMode,
+  restoreDroppedSandwichClears,
   determineActualSandwichMode,
 } from './form-utils';
 
@@ -463,7 +464,9 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       (sourceEvent as any)?.estimatedSandwichCountMax,
       sourceEvent.estimatedSandwichCount,
     ));
-    setActualSandwichMode(determineActualSandwichMode(sourceEvent?.actualSandwichTypes));
+    setActualSandwichMode(
+      determineActualSandwichMode(sourceEvent?.actualSandwichTypes, sourceEvent?.actualSandwichCount),
+    );
     const hasAttendeeBreakdown = ((sourceEvent as any)?.adultCount || 0) > 0 || ((sourceEvent as any)?.childrenCount || 0) > 0;
     setAttendeeMode(hasAttendeeBreakdown ? 'breakdown' : 'total');
     setShowCompletedDetails(sourceEvent?.status === 'completed');
@@ -666,7 +669,9 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
           (eventRequest as any)?.estimatedSandwichCountMax,
           eventRequest?.estimatedSandwichCount,
         ));
-        setActualSandwichMode(determineActualSandwichMode(eventRequest?.actualSandwichTypes));
+        setActualSandwichMode(
+          determineActualSandwichMode(eventRequest?.actualSandwichTypes, eventRequest?.actualSandwichCount),
+        );
         const hasBreakdown = ((eventRequest as any)?.adultCount || 0) > 0 || ((eventRequest as any)?.childrenCount || 0) > 0;
         setAttendeeMode(hasBreakdown ? 'breakdown' : 'total');
         setShowCompletedDetails(eventRequest?.status === 'completed');
@@ -1078,6 +1083,9 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       // WITHOUT fieldOverrides so a value just entered this session (e.g. the
       // standby follow-up date) correctly registers as a change.
       if (originalFormDataRef.current) {
+        // Snapshot the sandwich payload BEFORE the diff so a dropped clear can
+        // be reinstated below by comparing against the stored record.
+        const fullSandwichPayload = { ...eventData };
         // The baseline MUST be serialized from what is PHYSICALLY stored, not
         // the preferred UI mode. determineBaselineSandwichMode treats any
         // persisted min/max as 'range' even when a disagreeing exact count means
@@ -1093,6 +1101,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         );
         const baselineActualSandwichMode = determineActualSandwichMode(
           originalFormDataRef.current.actualSandwichTypes,
+          originalFormDataRef.current.actualSandwichCount,
         );
         const baselineData = buildEventDataForServer(originalFormDataRef.current as any, {
           mode,
@@ -1122,6 +1131,23 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         }
         if (omittedFields.length > 0) {
           logger.log(`🧮 Diff-based save: omitted ${omittedFields.length} unchanged field(s):`, omittedFields.join(', '));
+        }
+
+        // The five sandwich columns encode ONE number, so a dropped companion
+        // clear doesn't just skip a write — it leaves a second, competing
+        // answer in the DB that later gets averaged or summed back over the
+        // exact count. Compare them against what the server actually holds and
+        // put back any clear the mode-inferred baseline dropped.
+        const restoredSandwichFields = restoreDroppedSandwichClears(
+          eventData,
+          fullSandwichPayload,
+          eventRequest as any,
+        );
+        if (restoredSandwichFields.length > 0) {
+          logger.log(
+            `🥪 Diff-based save: reinstated ${restoredSandwichFields.length} sandwich field(s) the diff dropped:`,
+            restoredSandwichFields.join(', '),
+          );
         }
       }
 

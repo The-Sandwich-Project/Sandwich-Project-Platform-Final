@@ -16,7 +16,10 @@ import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { parseDateOnly, getTodayString, toDateOnlyString } from '@shared/date-utils';
 import { isValidTransition, getTransitionError, requiresReason, getReasonField, getReasonSatisfyingFields, getScheduledDateDefault, type EventStatus } from '@shared/event-status-workflow';
-import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
+import {
+  parseSandwichCountInput,
+  normalizeSandwichTypesForStorage,
+} from '@shared/sandwich-count-utils';
 import { eventRequestPatchSchema } from '@shared/event-request-patch';
 import { requirePermission } from '../middleware/auth';
 import { isAuthenticated } from '../auth';
@@ -300,6 +303,24 @@ const parseStaffingColumn = (staffing: string | undefined): StaffingResult => {
   }
 
   return result;
+};
+
+/**
+ * Coerce the sandwich breakdown columns to real JSONB arrays (or NULL) in place.
+ *
+ * The client sends these as JSON.stringify()'d strings, and a string written to
+ * a jsonb column is stored as a JSON scalar, not an array. The client's parsers
+ * accept both shapes so the app never noticed, but SQL does not: any query using
+ * jsonb_array_length()/jsonb_array_elements() fails on those rows with "cannot
+ * get array length of a scalar". Normalizing on every write keeps one shape in
+ * the column. Only touches keys that are actually present in the update.
+ */
+const normalizeSandwichTypeColumns = (updates: Record<string, any>): void => {
+  for (const field of ['sandwichTypes', 'actualSandwichTypes']) {
+    if (Object.prototype.hasOwnProperty.call(updates, field)) {
+      updates[field] = normalizeSandwichTypesForStorage(updates[field]);
+    }
+  }
 };
 
 // Parse sandwich types from Google Sheets
@@ -2422,6 +2443,9 @@ router.patch(
         processedUpdates.lastContactAttempt = new Date();
       }
 
+      // Same jsonb normalization as the main PATCH path.
+      normalizeSandwichTypeColumns(processedUpdates);
+
       // Always update the updatedAt timestamp
       let updatedEventRequest = await storage.updateEventRequest(id, {
         ...processedUpdates,
@@ -3024,6 +3048,12 @@ router.patch(
         }
       }
 
+      // The client stringifies sandwich breakdowns before sending them, so
+      // these arrive as JSON strings. Writing a string into a jsonb column
+      // stores a scalar, not an array — normalize so the column holds one
+      // shape and SQL can read it.
+      normalizeSandwichTypeColumns(processedUpdates);
+
       let updatedEventRequest;
       {
         // Some columns exist in the Drizzle schema but not on the current
@@ -3576,6 +3606,9 @@ router.put(
           processedUpdates.volunteersNeeded = assignedVolunteerCount;
         }
       }
+
+      // Same jsonb normalization as the main PATCH path.
+      normalizeSandwichTypeColumns(processedUpdates);
 
       // Always update the updatedAt timestamp
       let updatedEventRequest = await storage.updateEventRequest(id, {

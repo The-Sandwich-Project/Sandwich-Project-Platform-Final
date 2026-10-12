@@ -11,7 +11,7 @@ import { ScheduledCardEnhanced } from '../cards/ScheduledCardEnhanced';
 import { RescheduleDialog } from '../dialogs/RescheduleDialog';
 import { DuplicateEventDialog } from '../dialogs/DuplicateEventDialog';
 import { parseSandwichTypes, stringifySandwichTypes } from '@/lib/sandwich-utils';
-import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
+import { hasActiveSandwichRange, hasActiveSandwichTypes } from '@shared/sandwich-count-utils';
 import { useConfirmation } from '@/components/ui/confirmation-dialog';
 import type { EventRequest } from '@shared/schema';
 import { ScheduledSpreadsheetView } from '../views/ScheduledSpreadsheetView';
@@ -157,7 +157,14 @@ export const ScheduledTab: React.FC = () => {
       const eventRequest = eventRequests.find(req => req.id === id);
       if (eventRequest) {
         const existingSandwichTypes = parseSandwichTypes(eventRequest.sandwichTypes) || [];
-        const hasTypesData = existingSandwichTypes.length > 0;
+        // A breakdown that disagrees with the exact count is stale leftover
+        // data. Opening it in "types" mode would re-sum it over the count the
+        // user actually entered on save (exact 500 → 250 turkey + 248 PBJ →
+        // saved back as 498), so treat it as absent and open on the count.
+        const hasTypesData = hasActiveSandwichTypes(
+          eventRequest.sandwichTypes,
+          eventRequest.estimatedSandwichCount,
+        );
         const hasRangeData = hasActiveSandwichRange(
           (eventRequest as any).estimatedSandwichCountMin,
           (eventRequest as any).estimatedSandwichCountMax,
