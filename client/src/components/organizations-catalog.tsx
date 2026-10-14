@@ -521,6 +521,17 @@ export default function GroupCatalog({
 
   const allOrganizations: OrganizationContact[] = Array.from(uniqueOrganizationsMap.values());
 
+  // Hosting history belongs to the organization, not to a single entry. Each entry
+  // only knows about its own event, so a declined request would otherwise place an
+  // organization that has hosted before under "Never Hosted".
+  const organizationsWithHostingHistory = new Set<string>(
+    allOrganizations
+      .filter((org) => org.hasHostedEvent || (org.actualSandwichTotal ?? 0) > 0)
+      .map((org) => org.organizationName)
+  );
+  const hasHostingHistory = (org: OrganizationContact) =>
+    organizationsWithHostingHistory.has(org.organizationName);
+
   // Filter all organizations uniformly (no separation between active/historical)
   const filteredActiveGroups = allOrganizations.filter((org) => {
     // Search logic based on scope
@@ -565,12 +576,10 @@ export default function GroupCatalog({
     // Hosted events filter
     // "Never Hosted" = organizations that were declined/cancelled (they engaged but never hosted)
     // "Has Hosted" = organizations with completed events or collection data
-    // CRITICAL: If actualSandwichTotal > 0, they DEFINITELY hosted - exclude from "Never Hosted"
     const matchesHosted = filters.hostedEvents.length === 0 ||
-      (filters.hostedEvents.includes('hosted') && (org.hasHostedEvent || (org.actualSandwichTotal && org.actualSandwichTotal > 0))) ||
-      (filters.hostedEvents.includes('not-hosted') && 
-        !org.hasHostedEvent && 
-        (!org.actualSandwichTotal || org.actualSandwichTotal === 0) && 
+      (filters.hostedEvents.includes('hosted') && hasHostingHistory(org)) ||
+      (filters.hostedEvents.includes('not-hosted') &&
+        !hasHostingHistory(org) &&
         ['declined', 'cancelled'].includes(org.status));
 
     return matchesSearch && matchesCategory && matchesStatus && matchesDateStart && matchesDateEnd && matchesHosted;
@@ -801,7 +810,7 @@ export default function GroupCatalog({
         org.email || '',
         org.phone || '',
         org.status || '',
-        org.hasHostedEvent || (org.actualSandwichTotal && org.actualSandwichTotal > 0) ? 'Yes' : 'No',
+        hasHostingHistory(org) ? 'Yes' : 'No',
         org.eventDate ? formatDateForDisplay(org.eventDate) : '',
         org.totalRequests ?? '',
         org.totalSandwiches ?? '',
@@ -1042,10 +1051,9 @@ export default function GroupCatalog({
               label: 'Event History',
               type: 'tags',
               options: [
-                { value: 'hosted', label: 'Has Hosted', count: allOrganizations.filter(o => o.hasHostedEvent || (o.actualSandwichTotal && o.actualSandwichTotal > 0)).length },
-                { value: 'not-hosted', label: 'Never Hosted', count: allOrganizations.filter(o => 
-                  !o.hasHostedEvent && 
-                  (!o.actualSandwichTotal || o.actualSandwichTotal === 0) &&
+                { value: 'hosted', label: 'Has Hosted', count: allOrganizations.filter(o => hasHostingHistory(o)).length },
+                { value: 'not-hosted', label: 'Never Hosted', count: allOrganizations.filter(o =>
+                  !hasHostingHistory(o) &&
                   ['declined', 'cancelled'].includes(o.status)
                 ).length },
               ],
