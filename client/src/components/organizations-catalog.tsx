@@ -164,7 +164,9 @@ export default function GroupCatalog({
   const [searchScope, setSearchScope] = useState<'all' | 'organization' | 'department'>('all');
   const [sortBy, setSortBy] = useState('groupName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [viewMode, setViewMode] = useState<'aggregated' | 'individual'>('aggregated');
+  // The aggregated view collapsed organizations into each other and lost roughly
+  // half the catalog, so the catalog always requests individual cards.
+  const viewMode = 'individual' as const;
 
   // Consolidated filter state
   const [filters, setFilters] = useState({
@@ -723,7 +725,7 @@ export default function GroupCatalog({
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, searchScope, filters, sortBy, sortOrder, viewMode]);
+  }, [searchTerm, searchScope, filters, sortBy, sortOrder]);
 
   // Handle scroll to show/hide back to top button
   useEffect(() => {
@@ -1128,39 +1130,8 @@ export default function GroupCatalog({
             </Button>
           </div>
 
-          {/* Row 2: View Mode and Per Page */}
-          <div className="flex flex-wrap gap-3 items-center justify-between">
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600 hidden sm:inline">View:</span>
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                <button
-                  onClick={() => setViewMode('aggregated')}
-                  aria-pressed={viewMode === 'aggregated'}
-                  className={`px-4 py-2 text-sm font-medium transition-colors min-h-[44px] ${
-                    viewMode === 'aggregated'
-                      ? 'bg-[#236383] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                  title="Group events by organization + department + contact"
-                >
-                  Grouped
-                </button>
-                <button
-                  onClick={() => setViewMode('individual')}
-                  aria-pressed={viewMode === 'individual'}
-                  className={`px-4 py-2 text-sm font-medium transition-colors min-h-[44px] ${
-                    viewMode === 'individual'
-                      ? 'bg-[#236383] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                  title="Show each event as its own card"
-                >
-                  Individual
-                </button>
-              </div>
-            </div>
-
+          {/* Row 2: Per Page */}
+          <div className="flex flex-wrap gap-3 items-center justify-end">
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Per page:</span>
               <select
