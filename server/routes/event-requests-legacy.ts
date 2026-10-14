@@ -1611,28 +1611,28 @@ router.get(
       }
 
       // Get events - include deleted ones if requested
-      let eventRequests: Awaited<ReturnType<typeof storage.getAllEventRequests>>;
+      let events: Awaited<ReturnType<typeof storage.getAllEventRequests>>;
       if (includeDeleted) {
         // Query directly from database to include deleted events
         const allEvents = await db
           .select()
           .from(eventRequests)
           .orderBy(desc(eventRequests.createdAt));
-        eventRequests = allEvents as any;
+        events = allEvents as any;
       } else {
-        eventRequests = await storage.getAllEventRequests();
+        events = await storage.getAllEventRequests();
       }
 
       // Filter by status first if provided
       if (statusParam && statusParam !== 'all') {
         const statuses = statusParam.split(',').map(s => s.trim()).filter(Boolean);
         if (statuses.length > 0) {
-          eventRequests = eventRequests.filter(event => statuses.includes(event.status));
+          events = events.filter(event => statuses.includes(event.status));
         }
       }
 
       // Search across multiple fields
-      const searchResults = eventRequests.filter(event => {
+      const searchResults = events.filter(event => {
         const searchableFields = [
           event.organizationName,
           event.firstName,
