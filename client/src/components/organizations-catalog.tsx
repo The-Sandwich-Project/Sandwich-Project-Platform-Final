@@ -164,7 +164,9 @@ export default function GroupCatalog({
   const [searchScope, setSearchScope] = useState<'all' | 'organization' | 'department'>('all');
   const [sortBy, setSortBy] = useState('groupName');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [viewMode, setViewMode] = useState<'aggregated' | 'individual'>('aggregated');
+  // The aggregated view collapsed organizations into each other and lost roughly
+  // half the catalog, so the catalog always requests individual cards.
+  const viewMode = 'individual' as const;
 
   // Consolidated filter state
   const [filters, setFilters] = useState({
@@ -506,16 +508,29 @@ export default function GroupCatalog({
   });
 
   // Deduplicate by creating unique key from organization + department + contact + email
-  // Include department to ensure cards with different departments are preserved
+  // Include department to ensure cards with different departments are preserved.
+  // The event ID keeps repeat events from the same contact as separate entries;
+  // collection-only entries have no event ID and fall back to one entry per contact.
   const uniqueOrganizationsMap = new Map<string, OrganizationContact>();
   allContactsAndDepartments.forEach((org: any) => {
-    const uniqueKey = `${org.organizationName}|${org.department || ''}|${org.contactName}|${org.email || 'no-email'}`;
+    const uniqueKey = `${org.organizationName}|${org.department || ''}|${org.contactName}|${org.email || 'no-email'}|${org.linkedEventId ?? 'no-event'}`;
     if (!uniqueOrganizationsMap.has(uniqueKey)) {
       uniqueOrganizationsMap.set(uniqueKey, org);
     }
   });
 
   const allOrganizations: OrganizationContact[] = Array.from(uniqueOrganizationsMap.values());
+
+  // Hosting history belongs to the organization, not to a single entry. Each entry
+  // only knows about its own event, so a declined request would otherwise place an
+  // organization that has hosted before under "Never Hosted".
+  const organizationsWithHostingHistory = new Set<string>(
+    allOrganizations
+      .filter((org) => org.hasHostedEvent || (org.actualSandwichTotal ?? 0) > 0)
+      .map((org) => org.organizationName)
+  );
+  const hasHostingHistory = (org: OrganizationContact) =>
+    organizationsWithHostingHistory.has(org.organizationName);
 
   // Filter all organizations uniformly (no separation between active/historical)
   const filteredActiveGroups = allOrganizations.filter((org) => {
@@ -561,12 +576,10 @@ export default function GroupCatalog({
     // Hosted events filter
     // "Never Hosted" = organizations that were declined/cancelled (they engaged but never hosted)
     // "Has Hosted" = organizations with completed events or collection data
-    // CRITICAL: If actualSandwichTotal > 0, they DEFINITELY hosted - exclude from "Never Hosted"
     const matchesHosted = filters.hostedEvents.length === 0 ||
-      (filters.hostedEvents.includes('hosted') && (org.hasHostedEvent || (org.actualSandwichTotal && org.actualSandwichTotal > 0))) ||
-      (filters.hostedEvents.includes('not-hosted') && 
-        !org.hasHostedEvent && 
-        (!org.actualSandwichTotal || org.actualSandwichTotal === 0) && 
+      (filters.hostedEvents.includes('hosted') && hasHostingHistory(org)) ||
+      (filters.hostedEvents.includes('not-hosted') &&
+        !hasHostingHistory(org) &&
         ['declined', 'cancelled'].includes(org.status));
 
     return matchesSearch && matchesCategory && matchesStatus && matchesDateStart && matchesDateEnd && matchesHosted;
@@ -723,7 +736,7 @@ export default function GroupCatalog({
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, searchScope, filters, sortBy, sortOrder, viewMode]);
+  }, [searchTerm, searchScope, filters, sortBy, sortOrder]);
 
   // Handle scroll to show/hide back to top button
   useEffect(() => {
@@ -797,7 +810,7 @@ export default function GroupCatalog({
         org.email || '',
         org.phone || '',
         org.status || '',
-        org.hasHostedEvent || (org.actualSandwichTotal && org.actualSandwichTotal > 0) ? 'Yes' : 'No',
+        hasHostingHistory(org) ? 'Yes' : 'No',
         org.eventDate ? formatDateForDisplay(org.eventDate) : '',
         org.totalRequests ?? '',
         org.totalSandwiches ?? '',
@@ -1038,10 +1051,9 @@ export default function GroupCatalog({
               label: 'Event History',
               type: 'tags',
               options: [
-                { value: 'hosted', label: 'Has Hosted', count: allOrganizations.filter(o => o.hasHostedEvent || (o.actualSandwichTotal && o.actualSandwichTotal > 0)).length },
-                { value: 'not-hosted', label: 'Never Hosted', count: allOrganizations.filter(o => 
-                  !o.hasHostedEvent && 
-                  (!o.actualSandwichTotal || o.actualSandwichTotal === 0) &&
+                { value: 'hosted', label: 'Has Hosted', count: allOrganizations.filter(o => hasHostingHistory(o)).length },
+                { value: 'not-hosted', label: 'Never Hosted', count: allOrganizations.filter(o =>
+                  !hasHostingHistory(o) &&
                   ['declined', 'cancelled'].includes(o.status)
                 ).length },
               ],
@@ -1128,39 +1140,8 @@ export default function GroupCatalog({
             </Button>
           </div>
 
-          {/* Row 2: View Mode and Per Page */}
-          <div className="flex flex-wrap gap-3 items-center justify-between">
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600 hidden sm:inline">View:</span>
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                <button
-                  onClick={() => setViewMode('aggregated')}
-                  aria-pressed={viewMode === 'aggregated'}
-                  className={`px-4 py-2 text-sm font-medium transition-colors min-h-[44px] ${
-                    viewMode === 'aggregated'
-                      ? 'bg-[#236383] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                  title="Group events by organization + department + contact"
-                >
-                  Grouped
-                </button>
-                <button
-                  onClick={() => setViewMode('individual')}
-                  aria-pressed={viewMode === 'individual'}
-                  className={`px-4 py-2 text-sm font-medium transition-colors min-h-[44px] ${
-                    viewMode === 'individual'
-                      ? 'bg-[#236383] text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                  title="Show each event as its own card"
-                >
-                  Individual
-                </button>
-              </div>
-            </div>
-
+          {/* Row 2: Per Page */}
+          <div className="flex flex-wrap gap-3 items-center justify-end">
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Per page:</span>
               <select
