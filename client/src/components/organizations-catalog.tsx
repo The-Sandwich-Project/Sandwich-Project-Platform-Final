@@ -508,10 +508,12 @@ export default function GroupCatalog({
   });
 
   // Deduplicate by creating unique key from organization + department + contact + email
-  // Include department to ensure cards with different departments are preserved
+  // Include department to ensure cards with different departments are preserved.
+  // The event ID keeps repeat events from the same contact as separate entries;
+  // collection-only entries have no event ID and fall back to one entry per contact.
   const uniqueOrganizationsMap = new Map<string, OrganizationContact>();
   allContactsAndDepartments.forEach((org: any) => {
-    const uniqueKey = `${org.organizationName}|${org.department || ''}|${org.contactName}|${org.email || 'no-email'}`;
+    const uniqueKey = `${org.organizationName}|${org.department || ''}|${org.contactName}|${org.email || 'no-email'}|${org.linkedEventId ?? 'no-event'}`;
     if (!uniqueOrganizationsMap.has(uniqueKey)) {
       uniqueOrganizationsMap.set(uniqueKey, org);
     }
