@@ -123,6 +123,8 @@ interface CompletedCardProps {
   onFollowUp1Day: () => void;
   onFollowUp1Month: () => void;
   onViewCollectionLog?: () => void;
+  /** Count from linked collection log entries; null when none are linked, undefined while loading. */
+  loggedSandwiches?: { count: number; entries: number } | null;
   onReschedule: () => void;
   onDuplicate?: () => void;
   onAssignTspContact: () => void;
@@ -1649,6 +1651,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
   onFollowUp1Day,
   onFollowUp1Month,
   onViewCollectionLog,
+  loggedSandwiches,
   onReschedule,
   onDuplicate,
   onAssignTspContact,
@@ -2537,6 +2540,35 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                       return <span className="text-gray-400 italic">not set</span>;
                     })()}
                   </strong>
+                </span>
+                <span className="text-gray-400">·</span>
+                {/* Logged = linked collection log entries, the source of truth for counts */}
+                <span className="text-gray-700">
+                  Logged{' '}
+                  {loggedSandwiches === undefined ? (
+                    <span className="text-gray-400">—</span>
+                  ) : loggedSandwiches ? (
+                    <button
+                      type="button"
+                      onClick={onViewCollectionLog}
+                      disabled={!onViewCollectionLog}
+                      className="font-semibold text-[#236383] hover:underline disabled:no-underline"
+                      title="From the collection log"
+                    >
+                      {loggedSandwiches.count.toLocaleString()}
+                    </button>
+                  ) : onViewCollectionLog ? (
+                    <button
+                      type="button"
+                      onClick={onViewCollectionLog}
+                      className="italic text-gray-400 hover:text-[#236383] hover:underline"
+                      title="Find this event's collection log entry"
+                    >
+                      not linked
+                    </button>
+                  ) : (
+                    <span className="italic text-gray-400">not linked</span>
+                  )}
                 </span>
                 <span className="text-gray-400">·</span>
                 <span className="text-gray-700">

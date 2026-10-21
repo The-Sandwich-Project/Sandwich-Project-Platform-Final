@@ -9,6 +9,7 @@ import { CompletedCard } from '../cards/CompletedCard';
 import { DuplicateEventDialog } from '../dialogs/DuplicateEventDialog';
 import { EventListSkeleton } from '../EventCardSkeleton';
 import { EventListBatchProviders } from '../EventListBatchProviders';
+import { useLinkedCollectionTotals } from '../hooks/useLinkedCollectionTotals';
 import type { EventRequest } from '@shared/schema';
 
 export const CompletedTab: React.FC = () => {
@@ -45,6 +46,9 @@ export const CompletedTab: React.FC = () => {
   } = useEventDialogState();
 
   const completedRequests = filterRequestsByStatus('completed') || [];
+  const { data: loggedTotals } = useLinkedCollectionTotals(
+    completedRequests.map((r) => r.id)
+  );
 
   return (
     <>
@@ -68,6 +72,7 @@ export const CompletedTab: React.FC = () => {
           <CompletedCard
             key={request.id}
             request={request}
+            loggedSandwiches={loggedTotals ? loggedTotals[request.id] ?? null : undefined}
             resolveUserName={resolveUserName}
             onView={() => {
               setSelectedEventRequest(request);

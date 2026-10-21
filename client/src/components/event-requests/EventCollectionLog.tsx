@@ -1,8 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, X } from 'lucide-react';
+import { Calendar, CheckCircle, Link2, Unlink, X } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { LINKED_COLLECTION_TOTALS_KEY } from './hooks/useLinkedCollectionTotals';
 import type { EventRequest, SandwichCollection } from '@shared/schema';
 import {
   calculateGroupSandwiches,
@@ -12,9 +15,12 @@ import { parseCollectionDate } from '@/lib/date-utils';
 
 // Event Collection Log Component
 //
-// Read-only view of the sandwich collections linked to a single event request
-// (via sandwich_collections.eventRequestId). Counts use the centralized
-// analytics-utils formula — the single source of truth for sandwich totals.
+// The sandwich collections linked to a single event request (via
+// sandwich_collections.eventRequestId). Admins also see suggested matches —
+// unlinked entries dated the event day or the day after with a similar group or
+// host name — and can link or unlink entries. The count shown for the event is
+// the matching group's share of each entry, not the whole entry, since one
+// "Groups" entry can hold several organizations.
 interface EventCollectionLogProps {
   eventRequest: EventRequest | null;
   isVisible: boolean;
@@ -25,6 +31,46 @@ interface EventCollectionLogProps {
 function recordTotal(collection: SandwichCollection): number {
   return (collection.individualSandwiches || 0) + calculateGroupSandwiches(collection);
 }
+
+/** Shape returned by GET /api/event-requests/:id/collection-matches. */
+interface CollectionMatch {
+  collectionId: number;
+  collectionDate: string;
+  hostName: string;
+  entryTotal: number;
+  groups: Array<{ name: string; department?: string; count: number }>;
+  eventCount: number;
+  countBasis: 'matched_groups' | 'host' | 'single_group' | 'all_groups';
+  score: number;
+  matchedGroupNames: string[];
+}
+
+interface CollectionMatchesResponse {
+  linked: CollectionMatch[];
+  suggestions: CollectionMatch[];
+  canLink: boolean;
+  searchWindow: { start: string; end: string } | null;
+}
+
+function formatShortDate(dateString: string): string {
+  const d = parseCollectionDate(dateString);
+  return d
+    ? d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    : dateString;
+}
+
+function matchStrength(score: number): { label: string; className: string } {
+  if (score >= 0.99) return { label: 'Exact name', className: 'bg-green-100 text-green-800' };
+  if (score >= 0.85) return { label: 'Close name', className: 'bg-teal-100 text-teal-800' };
+  return { label: 'Possible', className: 'bg-amber-100 text-amber-800' };
+}
+
+const COUNT_BASIS_NOTE: Record<CollectionMatch['countBasis'], string | null> = {
+  matched_groups: null,
+  host: null,
+  single_group: null,
+  all_groups: 'No group name matched, so all groups in this entry are counted',
+};
 
 const TYPE_LABELS: Array<{ key: 'deli' | 'turkey' | 'ham' | 'pbj'; label: string }> = [
   { key: 'deli', label: 'Deli' },
@@ -45,12 +91,70 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
     enabled: isVisible && !!eventRequest?.id,
   });
 
+  const matchesKey = `/api/event-requests/${eventRequest?.id}/collection-matches`;
+  const { data: matches, isLoading: matchesLoading } = useQuery<CollectionMatchesResponse>({
+    queryKey: [matchesKey],
+    enabled: isVisible && !!eventRequest?.id,
+  });
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const refreshAfterLinkChange = () => {
+    queryClient.invalidateQueries({ queryKey: [matchesKey] });
+    queryClient.invalidateQueries({
+      queryKey: [`/api/sandwich-collections?eventRequestId=${eventRequest?.id}`],
+    });
+    queryClient.invalidateQueries({
+      predicate: (q) => q.queryKey[0] === LINKED_COLLECTION_TOTALS_KEY,
+    });
+  };
+
+  const linkMutation = useMutation({
+    mutationFn: (collectionId: number) =>
+      apiRequest('POST', `/api/event-requests/${eventRequest?.id}/collections/${collectionId}/link`),
+    onSuccess: () => {
+      refreshAfterLinkChange();
+      toast({ title: 'Linked', description: 'Collection entry linked to this event.' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not link',
+        description: error?.message || 'Failed to link collection entry.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: (collectionId: number) =>
+      apiRequest('DELETE', `/api/event-requests/${eventRequest?.id}/collections/${collectionId}/link`),
+    onSuccess: () => {
+      refreshAfterLinkChange();
+      toast({ title: 'Unlinked', description: 'Collection entry is no longer linked to this event.' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Could not unlink',
+        description: error?.message || 'Failed to unlink collection entry.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const collections = Array.isArray(collectionsData) ? collectionsData : [];
+  const linkedById = new Map((matches?.linked ?? []).map((m) => [m.collectionId, m]));
+  const suggestions = matches?.suggestions ?? [];
+  const canLink = !!matches?.canLink;
+  const linkBusy = linkMutation.isPending || unlinkMutation.isPending;
 
   if (!isVisible || !eventRequest) return null;
 
+  // The event's share of each entry (matching group only), falling back to the
+  // whole entry while match data is loading.
   const totalSandwiches = collections.reduce(
-    (sum, collection) => sum + recordTotal(collection),
+    (sum, collection) =>
+      sum + (linkedById.get(collection.id)?.eventCount ?? recordTotal(collection)),
     0
   );
 
@@ -94,7 +198,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                 <div className="flex items-center space-x-2">
                   <span className="text-2xl">🥪</span>
                   <div>
-                    <p className="text-sm text-[#236383]">Total Sandwiches</p>
+                    <p className="text-sm text-[#236383]">Sandwiches Logged</p>
                     <p className="text-2xl font-bold text-brand-primary">
                       {totalSandwiches.toLocaleString()}
                     </p>
@@ -124,7 +228,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                   <div>
                     <p className="text-sm text-[#236383]">Status</p>
                     <p className="text-sm font-medium text-green-600">
-                      {collections.length > 0 ? 'Active' : 'No Collections'}
+                      {collections.length > 0 ? 'Linked' : 'Not linked'}
                     </p>
                   </div>
                 </div>
@@ -165,9 +269,44 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                             variant="secondary"
                             className="bg-brand-primary text-white self-start sm:self-auto"
                           >
-                            {recordTotal(collection).toLocaleString()} sandwiches
+                            {(linkedById.get(collection.id)?.eventCount ?? recordTotal(collection)).toLocaleString()} sandwiches
                           </Badge>
+                          {canLink && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs text-gray-500 hover:text-red-600 sm:ml-auto self-start"
+                              disabled={linkBusy}
+                              onClick={() => {
+                                if (window.confirm('Unlink this collection entry from the event?')) {
+                                  unlinkMutation.mutate(collection.id);
+                                }
+                              }}
+                            >
+                              <Unlink className="w-3 h-3 mr-1" />
+                              Unlink
+                            </Button>
+                          )}
                         </div>
+
+                        {/* Event's share vs whole entry (a Groups entry can hold several orgs) */}
+                        {(() => {
+                          const match = linkedById.get(collection.id);
+                          if (!match) return null;
+                          const note = COUNT_BASIS_NOTE[match.countBasis];
+                          if (match.eventCount === match.entryTotal && !note) return null;
+                          return (
+                            <div className="ml-0 sm:ml-8 pl-7 sm:pl-0">
+                              <p className="text-xs text-gray-500">
+                                {match.matchedGroupNames.length > 0
+                                  ? `Counted: ${match.matchedGroupNames.join(', ')}. `
+                                  : ''}
+                                Whole entry: {match.entryTotal.toLocaleString()} sandwiches.
+                                {note ? ` ${note}.` : ''}
+                              </p>
+                            </div>
+                          );
+                        })()}
 
                         {/* Host */}
                         {collection.hostName && (
@@ -200,9 +339,79 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-[#236383] mb-4">
-                No collections recorded for this event yet.
+              <p className="text-[#236383] mb-2">
+                No collection log entry is linked to this event yet.
               </p>
+              {!matchesLoading && !canLink && (
+                <p className="text-sm text-gray-500">An admin can link the matching entry.</p>
+              )}
+            </div>
+          )}
+
+          {/* Suggested matches (admins only) */}
+          {canLink && (
+            <div className="mt-6 space-y-3">
+              <h3 className="text-sm font-semibold">Suggested matches</h3>
+              {matches?.searchWindow ? (
+                <p className="text-xs text-gray-500">
+                  Unlinked entries from {formatShortDate(matches.searchWindow.start)} to{' '}
+                  {formatShortDate(matches.searchWindow.end)} with a group or host name similar to{' '}
+                  <strong>{eventRequest.organizationName}</strong>. Check the name and date before linking.
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  This event has no date, so there's nothing to match against.
+                </p>
+              )}
+              {suggestions.length === 0 && matches?.searchWindow && (
+                <p className="text-sm text-gray-500 italic">No likely matches found.</p>
+              )}
+              {suggestions.map((s) => {
+                const strength = matchStrength(s.score);
+                const note = COUNT_BASIS_NOTE[s.countBasis];
+                return (
+                  <Card key={s.collectionId} className="p-4 border-dashed">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-sm">{formatShortDate(s.collectionDate)}</span>
+                          <Badge variant="secondary" className={strength.className}>
+                            {strength.label}
+                          </Badge>
+                          <Badge variant="secondary" className="bg-brand-primary text-white">
+                            {s.eventCount.toLocaleString()} sandwiches
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-[#236383]">
+                          <strong>Host:</strong> {s.hostName}
+                        </p>
+                        {s.groups.length > 0 && (
+                          <p className="text-sm text-gray-600">
+                            <strong>Groups:</strong>{' '}
+                            {s.groups
+                              .map((g) => `${g.name || 'Unnamed'}${g.department ? ` (${g.department})` : ''}: ${g.count.toLocaleString()}`)
+                              .join(' · ')}
+                          </p>
+                        )}
+                        {(s.eventCount !== s.entryTotal || note) && (
+                          <p className="text-xs text-gray-500">
+                            Whole entry: {s.entryTotal.toLocaleString()} sandwiches.{note ? ` ${note}.` : ''}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-[#007e8c] hover:bg-[#236383] text-white self-start"
+                        disabled={linkBusy}
+                        onClick={() => linkMutation.mutate(s.collectionId)}
+                      >
+                        <Link2 className="w-4 h-4 mr-1" />
+                        Link
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

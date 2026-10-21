@@ -19,6 +19,7 @@
  * - audit.ts - Audit log retrieval
  * - conflicts.ts - Conflict detection and returning org checks
  * - lifecycle.ts - Lifecycle status updates (schedule calls, MLK Day, auto-complete)
+ * - collections.ts - Linking collection log entries to events
  *
  * The legacy file (../event-requests-legacy.ts) still contains:
  * - Google Sheets IMPORT endpoint (CRITICAL)
@@ -48,6 +49,7 @@ import syncRouter from './sync';
 import auditRouter from './audit';
 import conflictsRouter from './conflicts';
 import lifecycleRouter from './lifecycle';
+import collectionsRouter from './collections';
 
 const router = Router();
 
@@ -94,6 +96,7 @@ router.use('/', syncRouter);
 router.use('/', auditRouter);
 router.use('/', conflictsRouter);
 router.use('/', lifecycleRouter);
+router.use('/', collectionsRouter);
 
 export default router;
 
@@ -108,4 +111,5 @@ export {
   auditRouter,
   conflictsRouter,
   lifecycleRouter,
+  collectionsRouter,
 };
