@@ -50,6 +50,34 @@ describe('matchCollection', () => {
     expect(match.matchedGroupNames).toEqual(['First Baptist Church']);
   });
 
+  it('credits only the exact troop when similar troops share an entry', () => {
+    const match = matchCollection(
+      entry({
+        groupCollections: [
+          { name: 'Girl Scout Troop 123', count: 300 },
+          { name: 'Girl Scout Troop 456', count: 500 },
+        ],
+      }),
+      'Girl Scout Troop 123'
+    );
+    expect(match.eventCount).toBe(300);
+    expect(match.matchedGroupNames).toEqual(['Girl Scout Troop 123']);
+  });
+
+  it('counts only the best near-match when none is exact', () => {
+    const match = matchCollection(
+      entry({
+        groupCollections: [
+          { name: 'Northside Hospital Atlanta', count: 100 },
+          { name: 'Northside Church', count: 400 },
+        ],
+      }),
+      'Northside Hospital'
+    );
+    expect(match.matchedGroupNames).toEqual(['Northside Hospital Atlanta']);
+    expect(match.eventCount).toBe(100);
+  });
+
   it('counts the whole entry when the host is the organization', () => {
     const match = matchCollection(
       entry({

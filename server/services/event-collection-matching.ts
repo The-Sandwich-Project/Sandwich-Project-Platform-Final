@@ -22,6 +22,15 @@ import { APP_TIMEZONE } from '@shared/date-utils';
 /** Minimum name similarity for a collection entry to be suggested. */
 export const MATCH_THRESHOLD = 0.75;
 
+/** Score treated as an exact name match (identical after canonicalization). */
+const EXACT_SCORE = 0.99;
+
+/**
+ * When no group matches exactly, groups scoring within this margin of the best
+ * one are counted together (e.g. an org split across two department lines).
+ */
+const NEAR_TIE_MARGIN = 0.05;
+
 export interface CollectionGroup {
   name: string;
   department?: string;
@@ -123,7 +132,22 @@ export function matchCollection(
   const hostScore = nameScore(organizationName, collection.hostName);
   const score = Math.max(hostScore, ...groupScores, 0);
 
-  const matched = groups.filter((_, i) => groupScores[i] >= MATCH_THRESHOLD);
+  // Which groups count toward the event. Passing the suggestion threshold isn't
+  // enough on its own: "Girl Scout Troop 456" clears it for "Girl Scout Troop
+  // 123", so a shared entry would credit both troops to one event. Exact matches
+  // win outright; otherwise only the best-scoring group(s) count.
+  const bestGroupScore = Math.max(0, ...groupScores);
+  const exactIdx = groupScores
+    .map((score, i) => (score >= EXACT_SCORE ? i : -1))
+    .filter((i) => i >= 0);
+  const matched =
+    exactIdx.length > 0
+      ? exactIdx.map((i) => groups[i])
+      : groups.filter(
+          (_, i) =>
+            groupScores[i] >= MATCH_THRESHOLD &&
+            groupScores[i] >= bestGroupScore - NEAR_TIE_MARGIN
+        );
 
   let eventCount: number;
   let countBasis: CountBasis;

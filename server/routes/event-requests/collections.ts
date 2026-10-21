@@ -10,12 +10,12 @@
  */
 
 import { Router } from 'express';
+import type { NextFunction, Response } from 'express';
 import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { db } from '../../db';
 import { storage } from '../../storage-wrapper';
 import { sandwichCollections, eventRequests } from '@shared/schema';
 import { isAuthenticated } from '../../auth';
-import { requirePermission } from '../../middleware/auth';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { AuditLogger } from '../../audit-logger';
 import { QueryOptimizer } from '../../performance/query-optimizer';
@@ -30,6 +30,23 @@ import {
 const router = Router();
 
 const MAX_TOTALS_IDS = 500;
+
+/**
+ * Who may link/unlink: admins, per the unified permission check. The same check
+ * drives `canLink` in the matches response, so the UI and the server agree
+ * (requirePermission passes every role='admin' user regardless of their
+ * explicit permissions, which could disagree with what the UI shows).
+ */
+function canLinkCollections(req: AuthenticatedRequest): boolean {
+  return hasPermission(req.user, 'ADMIN_ACCESS');
+}
+
+function requireLinkPermission(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!canLinkCollections(req)) {
+    return res.status(403).json({ message: 'Only admins can link collection entries' });
+  }
+  next();
+}
 
 function auditContext(req: AuthenticatedRequest) {
   return {
@@ -109,7 +126,7 @@ router.get('/:id(\\d+)/collection-matches', isAuthenticated, async (req: Authent
     const linkedRows = await storage.getSandwichCollectionsByEventRequestId(id);
     const linked = linkedRows.map((c) => matchCollection(c, organizationName));
 
-    const canLink = hasPermission(req.user, 'ADMIN_ACCESS');
+    const canLink = canLinkCollections(req);
     const eventDate = event.scheduledEventDate || event.desiredEventDate;
     const window = getCollectionDateWindow(eventDate);
 
@@ -150,7 +167,7 @@ router.get('/:id(\\d+)/collection-matches', isAuthenticated, async (req: Authent
 router.post(
   '/:id(\\d+)/collections/:collectionId(\\d+)/link',
   isAuthenticated,
-  requirePermission('ADMIN_ACCESS'),
+  requireLinkPermission,
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = Number(req.params.id);
@@ -171,11 +188,26 @@ router.post(
         });
       }
 
+      // Only write if the entry is still in the state we just checked, so two
+      // admins linking at once can't silently overwrite each other.
       const [updated] = await db
         .update(sandwichCollections)
         .set({ eventRequestId: id })
-        .where(eq(sandwichCollections.id, collectionId))
+        .where(
+          and(
+            eq(sandwichCollections.id, collectionId),
+            isNull(sandwichCollections.deletedAt),
+            collection.eventRequestId
+              ? eq(sandwichCollections.eventRequestId, collection.eventRequestId)
+              : isNull(sandwichCollections.eventRequestId)
+          )
+        )
         .returning();
+      if (!updated) {
+        return res.status(409).json({
+          message: 'This collection entry changed while you were linking it. Refresh and try again.',
+        });
+      }
 
       QueryOptimizer.invalidateCache('sandwich-collections');
       await AuditLogger.logUpdate(
@@ -201,7 +233,7 @@ router.post(
 router.delete(
   '/:id(\\d+)/collections/:collectionId(\\d+)/link',
   isAuthenticated,
-  requirePermission('ADMIN_ACCESS'),
+  requireLinkPermission,
   async (req: AuthenticatedRequest, res) => {
     try {
       const id = Number(req.params.id);
@@ -212,10 +244,23 @@ router.delete(
         return res.status(404).json({ message: 'That collection entry is not linked to this event' });
       }
 
-      await db
+      // Conditional on the link still pointing at this event, so a delayed
+      // request can't clear a newer link to a different event.
+      const cleared = await db
         .update(sandwichCollections)
         .set({ eventRequestId: null })
-        .where(eq(sandwichCollections.id, collectionId));
+        .where(
+          and(
+            eq(sandwichCollections.id, collectionId),
+            eq(sandwichCollections.eventRequestId, id)
+          )
+        )
+        .returning({ id: sandwichCollections.id });
+      if (cleared.length === 0) {
+        return res.status(409).json({
+          message: 'This collection entry changed while you were unlinking it. Refresh and try again.',
+        });
+      }
 
       QueryOptimizer.invalidateCache('sandwich-collections');
       await AuditLogger.logUpdate(
