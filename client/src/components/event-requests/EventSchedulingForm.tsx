@@ -63,6 +63,7 @@ import {
   determineBaselineSandwichMode,
   determineActualSandwichMode,
   resolveEstimatedAttendance,
+  normalizeDraftAttendance,
 } from './form-utils';
 
 // ────────────────────────────────────────────────────────────────────────
@@ -601,8 +602,13 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
               const currentServerData = buildFormDataFromEventRequest(
                 eventRequest, formatDateForInput, getPickupDateTimeForInput, parsePostgresArray
               );
+              // Both halves of the draft are normalized so a draft written
+              // before estimatedAttendance absorbed volunteerCount doesn't read
+              // as a server-side attendance change and lose the user's edit.
               const { mergedData, conflicts, serverUpdates, userChangesPreserved } = intelligentMergeFormData(
-                savedData.formData, savedData.originalServerData, currentServerData
+                normalizeDraftAttendance(savedData.formData),
+                normalizeDraftAttendance(savedData.originalServerData),
+                currentServerData
               );
 
               // Same status-override rule as the no-recovery branch: when the dialog

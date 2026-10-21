@@ -45,6 +45,30 @@ export function resolveEstimatedAttendance(
 }
 
 /**
+ * Bring a persisted auto-save draft snapshot into the current attendance shape.
+ *
+ * Drafts written before estimatedAttendance became the single attendance value
+ * carry a parallel `volunteerCount`, and their `estimatedAttendance` was
+ * initialized to 0 instead of falling back to the legacy column. Merging such a
+ * snapshot as-is makes that fallback look like a concurrent SERVER edit, so the
+ * merge resolves it as a conflict and discards the user's unsaved estimate.
+ *
+ * Must be applied to BOTH halves of a draft — the user's copy and its original
+ * server snapshot — so "what the user actually changed" is still computed from
+ * two values in the same representation. Normalizing only one half would turn
+ * an untouched draft value into an apparent edit (or vice versa).
+ *
+ * A no-op for drafts saved after the change: they have no `volunteerCount`.
+ */
+export function normalizeDraftAttendance(snapshot: any): any {
+  if (!snapshot || typeof snapshot !== 'object' || !('volunteerCount' in snapshot)) {
+    return snapshot;
+  }
+  const { volunteerCount, ...rest } = snapshot;
+  return { ...rest, estimatedAttendance: resolveEstimatedAttendance(snapshot) };
+}
+
+/**
  * Build the event data payload for the server from form state.
  *
  * This is the SINGLE place where form fields are mapped to server fields.
