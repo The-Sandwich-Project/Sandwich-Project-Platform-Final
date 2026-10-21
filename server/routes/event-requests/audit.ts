@@ -7,12 +7,11 @@
 
 import { Router } from 'express';
 import { db } from '../../db';
-import { storage } from '../../storage-wrapper';
-import { auditLogs, type EventRequest } from '@shared/schema';
+import { auditLogs, eventRequests, users, type EventRequest } from '@shared/schema';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { isAuthenticated } from '../../auth';
-import { and, or, eq, desc, sql } from 'drizzle-orm';
+import { and, or, eq, desc, sql, inArray, isNull } from 'drizzle-orm';
 import { logger } from '../../middleware/logger';
 import { safeJsonParse } from '../../utils/safe-json';
 
@@ -117,18 +116,57 @@ router.get('/audit-logs', isAuthenticated, async (req, res) => {
       .offset(offset);
 
 
-    // Get users for enriching the audit log data
-    const allUsers = await storage.getAllUsers();
-    // Normalize keys to string
-    const userMap = new Map(allUsers.map((u) => [String(u.id), u]));
-
-    // Get all event requests for enriching audit data
-    const allEventRequests = await storage.getAllEventRequests();
-    const eventMap = new Map(allEventRequests.map((e) => [String(e.id), e]));
-
     // Helper to pull from camelCase or snake_case
     const getField = (row: Record<string, unknown>, camel: string, snake: string) =>
       row[camel] !== undefined ? row[camel] : row[snake];
+
+    // Enrich only records referenced by this page of audit history.
+    const referencedUserIds = new Set<string>();
+    const referencedEventIds = new Set<number>();
+    for (const log of rawLogs) {
+      const actorId = getField(log, 'userId', 'user_id');
+      if (actorId !== null && actorId !== undefined && String(actorId) !== '') {
+        referencedUserIds.add(String(actorId));
+      }
+
+      const tableName = String(getField(log, 'tableName', 'table_name'));
+      const recordId = String(getField(log, 'recordId', 'record_id'));
+      if (tableName === 'users' || tableName === 'user_management') {
+        // User-management entries need both the actor and the affected user.
+        referencedUserIds.add(recordId);
+      } else if (tableName === 'event_requests' && /^[1-9]\d*$/.test(recordId)) {
+        const eventId = Number(recordId);
+        if (Number.isSafeInteger(eventId) && eventId <= 2147483647) {
+          referencedEventIds.add(eventId);
+        }
+      }
+    }
+
+    const [referencedUsers, referencedEvents] = await Promise.all([
+      referencedUserIds.size > 0
+        ? db.select({
+            id: users.id,
+            email: users.email,
+            preferredEmail: users.preferredEmail,
+            displayName: users.displayName,
+            firstName: users.firstName,
+            lastName: users.lastName,
+          }).from(users).where(inArray(users.id, [...referencedUserIds]))
+        : Promise.resolve([]),
+      referencedEventIds.size > 0
+        ? db.select({
+            id: eventRequests.id,
+            organizationName: eventRequests.organizationName,
+            firstName: eventRequests.firstName,
+            lastName: eventRequests.lastName,
+          }).from(eventRequests).where(and(
+            inArray(eventRequests.id, [...referencedEventIds]),
+            isNull(eventRequests.deletedAt)
+          ))
+        : Promise.resolve([]),
+    ]);
+    const userMap = new Map(referencedUsers.map((u) => [String(u.id), u]));
+    const eventMap = new Map(referencedEvents.map((e) => [String(e.id), e]));
 
     // Transform raw logs to the expected format
     // Filter out internal tracking entries that aren't useful for end users
