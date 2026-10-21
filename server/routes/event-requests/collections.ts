@@ -14,7 +14,7 @@
 import { Router } from 'express';
 import type { NextFunction, Response } from 'express';
 import { z } from 'zod';
-import { and, eq, gte, inArray, isNull, lte, notInArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { db } from '../../db';
 import { storage } from '../../storage-wrapper';
 import { eventCollectionLinks, eventRequests, sandwichCollections } from '@shared/schema';
@@ -32,7 +32,10 @@ import {
   effectiveLinks,
   getCollectionDateWindow,
   getCollectionGroups,
+  groupLabel,
   rankSuggestions,
+  resolveLinks,
+  type CollectionGroup,
 } from '../../services/event-collection-matching';
 
 const router = Router();
@@ -88,6 +91,48 @@ async function loadLinksByCollection(collectionIds: number[]): Promise<Map<numbe
     byCollection.set(row.collectionId, list);
   }
   return byCollection;
+}
+
+/** Index a link is parked at when its group is gone: unique, never a real group. */
+const parkedIndex = (linkId: number) => -1_000_000 - linkId;
+
+/**
+ * Re-point an entry's stored links at the groups they resolve to now.
+ *
+ * If an entry is edited and its groups reordered, stored indexes drift from the
+ * real groups, and checks (which resolve by label) would disagree with writes
+ * (which use stored indexes). Re-pointing first keeps both on the same indexes.
+ * Links whose group is gone are parked at a unique negative index, where they
+ * still show as missing but don't block anyone from linking that position. Two
+ * passes avoid tripping the unique (collection, group) index mid-update.
+ */
+async function syncStoredIndexes(
+  collectionId: number,
+  groups: CollectionGroup[]
+): Promise<EventCollectionLink[]> {
+  const links = (await loadLinksByCollection([collectionId])).get(collectionId) ?? [];
+  const moves = resolveLinks(groups, links)
+    .map(({ link, group }) => ({
+      link,
+      target: group ? group.index : parkedIndex(link.id),
+      label: group ? groupLabel(group) : link.groupName,
+    }))
+    .filter((m) => m.target !== m.link.groupIndex);
+  if (moves.length === 0) return links;
+
+  for (const m of moves) {
+    await db
+      .update(eventCollectionLinks)
+      .set({ groupIndex: -1_000_000_000 - m.link.id })
+      .where(eq(eventCollectionLinks.id, m.link.id));
+  }
+  for (const m of moves) {
+    await db
+      .update(eventCollectionLinks)
+      .set({ groupIndex: m.target, groupName: m.label })
+      .where(eq(eventCollectionLinks.id, m.link.id));
+  }
+  return (await loadLinksByCollection([collectionId])).get(collectionId) ?? [];
 }
 
 /**
@@ -149,7 +194,7 @@ router.get('/linked-collection-totals', isAuthenticated, async (req, res) => {
       const links = effectiveLinks(collection, linksByCollection.get(collection.id) ?? []);
       const eventIds = new Set(links.map((l) => l.eventRequestId).filter((id) => wanted.has(id)));
       for (const eventId of eventIds) {
-        const { count } = countForLinks(collection, links.filter((l) => l.eventRequestId === eventId));
+        const { count } = countForLinks(collection, links, eventId);
         const current = totals[eventId] || { count: 0, entries: 0 };
         totals[eventId] = { count: current.count + count, entries: current.entries + 1 };
       }
@@ -252,7 +297,7 @@ router.put(
         return res.status(400).json({ message: 'That group is not in this collection entry' });
       }
 
-      const tableLinks = (await loadLinksByCollection([collectionId])).get(collectionId) ?? [];
+      const tableLinks = await syncStoredIndexes(collectionId, groups);
       const before = describeEntry(collection, event.organizationName || '', tableLinks, id);
       const others = effectiveLinks(collection, tableLinks).filter((l) => l.eventRequestId !== id);
 
@@ -267,50 +312,51 @@ router.put(
       const takenIndexes = new Set(
         before.groups.filter((g) => g.linkedEventId !== null && g.linkedEventId !== id).map((g) => g.index)
       );
-      const taken = groupIndexes.filter((i) => takenIndexes.has(i));
-      if (!wholeEntry && taken.length > 0) {
+      if (!wholeEntry && groupIndexes.some((i) => takenIndexes.has(i))) {
         return res.status(409).json({ message: 'One of those groups is already linked to another event.' });
       }
 
       const desired = wholeEntry
         ? [{ groupIndex: WHOLE_ENTRY, groupName: null as string | null }]
-        : groupIndexes.map((i) => ({ groupIndex: i, groupName: groups.find((g) => g.index === i)!.name }));
+        : groupIndexes.map((i) => ({ groupIndex: i, groupName: groupLabel(groups.find((g) => g.index === i)!) }));
       const desiredIndexes = desired.map((d) => d.groupIndex);
+      const mineBefore = tableLinks.filter((l) => l.eventRequestId === id);
 
-      // Drop this event's picks that are no longer wanted, then add the new
-      // ones. The unique (collection, group) index rejects a group another
-      // event grabbed in the meantime; that surfaces as a 409 below.
-      await db
-        .delete(eventCollectionLinks)
-        .where(
-          and(
-            eq(eventCollectionLinks.collectionId, collectionId),
-            eq(eventCollectionLinks.eventRequestId, id),
-            notInArray(eventCollectionLinks.groupIndex, desiredIndexes)
-          )
-        );
-      await db
-        .insert(eventCollectionLinks)
-        .values(
-          desired.map((d) => ({
-            eventRequestId: id,
-            collectionId,
-            groupIndex: d.groupIndex,
-            groupName: d.groupName,
-            createdBy: req.user?.id ?? null,
-          }))
-        )
-        .onConflictDoNothing();
-
-      const after = (await loadLinksByCollection([collectionId])).get(collectionId) ?? [];
-      const lost = desiredIndexes.filter(
-        (i) => !after.some((l) => l.groupIndex === i && l.eventRequestId === id)
-      );
-      if (lost.length > 0) {
+      // Add new picks first. If any lands on a row another event holds, undo
+      // what this request added and stop, so a rejected save leaves the
+      // previous links exactly as they were.
+      const toAdd = desired.filter((d) => !mineBefore.some((l) => l.groupIndex === d.groupIndex));
+      const added = toAdd.length
+        ? await db
+            .insert(eventCollectionLinks)
+            .values(
+              toAdd.map((d) => ({
+                eventRequestId: id,
+                collectionId,
+                groupIndex: d.groupIndex,
+                groupName: d.groupName,
+                createdBy: req.user?.id ?? null,
+              }))
+            )
+            .onConflictDoNothing()
+            .returning({ id: eventCollectionLinks.id })
+        : [];
+      if (added.length < toAdd.length) {
+        if (added.length > 0) {
+          await db.delete(eventCollectionLinks).where(inArray(eventCollectionLinks.id, added.map((a) => a.id)));
+        }
         return res.status(409).json({
-          message: 'Another link was saved on this entry at the same time. Refresh and try again.',
+          message: 'One of those groups was just linked to another event. Refresh and try again.',
         });
       }
+
+      // Then drop this event's picks that are no longer wanted (including any
+      // parked ones whose group is gone — the admin has re-picked).
+      const dropIds = mineBefore.filter((l) => !desiredIndexes.includes(l.groupIndex)).map((l) => l.id);
+      if (dropIds.length > 0) {
+        await db.delete(eventCollectionLinks).where(inArray(eventCollectionLinks.id, dropIds));
+      }
+
       // An older whole-entry link to this event moves into the table now that
       // the new picks are saved.
       if (collection.eventRequestId === id) {
@@ -320,19 +366,7 @@ router.put(
           .where(and(eq(sandwichCollections.id, collectionId), eq(sandwichCollections.eventRequestId, id)));
       }
 
-      // Refresh name snapshots on picks that were kept from before.
-      for (const d of desired) {
-        await db
-          .update(eventCollectionLinks)
-          .set({ groupName: d.groupName })
-          .where(
-            and(
-              eq(eventCollectionLinks.collectionId, collectionId),
-              eq(eventCollectionLinks.eventRequestId, id),
-              eq(eventCollectionLinks.groupIndex, d.groupIndex)
-            )
-          );
-      }
+      const after = (await loadLinksByCollection([collectionId])).get(collectionId) ?? [];
 
       QueryOptimizer.invalidateCache('sandwich-collections');
       await AuditLogger.logUpdate(

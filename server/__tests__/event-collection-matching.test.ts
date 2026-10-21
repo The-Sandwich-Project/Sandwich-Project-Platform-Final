@@ -5,7 +5,7 @@ import {
   getCollectionDateWindow,
   getCollectionGroups,
   rankSuggestions,
-  resolveLinkedGroup,
+  resolveLinks,
   suggestGroups,
   type CollectionLike,
   type LinkLike,
@@ -78,12 +78,12 @@ describe('suggestGroups', () => {
 
 describe('countForLinks', () => {
   it('counts only the picked groups', () => {
-    expect(countForLinks(twoTroops, [link(10, 0, 'Girl Scout Troop 123')]).count).toBe(300);
+    expect(countForLinks(twoTroops, [link(10, 0, 'Girl Scout Troop 123')], 10).count).toBe(300);
   });
 
   it('counts the whole entry, individual sandwiches included', () => {
     const e = entry({ individualSandwiches: 120, groupCollections: [{ name: 'Team A', count: 80 }] });
-    expect(countForLinks(e, [link(10, WHOLE_ENTRY)])).toMatchObject({ count: 200, wholeEntry: true });
+    expect(countForLinks(e, [link(10, WHOLE_ENTRY)], 10)).toMatchObject({ count: 200, wholeEntry: true });
   });
 
   it('finds a linked group by name after the entry is reordered', () => {
@@ -93,20 +93,52 @@ describe('countForLinks', () => {
         { name: 'Girl Scout Troop 123', count: 300 },
       ],
     });
-    const group = resolveLinkedGroup(getCollectionGroups(reordered), { groupIndex: 0, groupName: 'Girl Scout Troop 123' });
+    const [{ group }] = resolveLinks(getCollectionGroups(reordered), [link(10, 0, 'Girl Scout Troop 123')]);
     expect(group?.count).toBe(300);
   });
 
   it('flags a linked group that no longer exists instead of counting a stranger', () => {
     const edited = entry({ groupCollections: [{ name: 'Roswell Rotary', count: 40 }] });
-    expect(countForLinks(edited, [link(10, 0, 'Girl Scout Troop 123')])).toMatchObject({
+    expect(countForLinks(edited, [link(10, 0, 'Girl Scout Troop 123')], 10)).toMatchObject({
       count: 0,
       hasMissingGroup: true,
     });
   });
 });
 
+describe('department rows of one organization', () => {
+  const acme = (groups: Array<{ department: string; count: number }>) =>
+    entry({ groupCollections: groups.map((g) => ({ name: 'Acme', ...g })) });
+
+  it('keeps each department link on its own row after a reorder', () => {
+    const swapped = acme([
+      { department: 'Sales', count: 50 },
+      { department: 'Engineering', count: 200 },
+    ]);
+    const links = [link(10, 0, 'Acme (Engineering)'), link(20, 1, 'Acme (Sales)')];
+    expect(countForLinks(swapped, links, 10).count).toBe(200);
+    expect(countForLinks(swapped, links, 20).count).toBe(50);
+  });
+
+  it('marks a deleted department missing instead of counting another one twice', () => {
+    const salesOnly = acme([{ department: 'Sales', count: 50 }]);
+    const links = [link(10, 0, 'Acme (Engineering)'), link(10, 1, 'Acme (Sales)')];
+    expect(countForLinks(salesOnly, links, 10)).toMatchObject({ count: 50, hasMissingGroup: true });
+  });
+});
+
 describe('describeEntry', () => {
+  it('never pre-ticks a group another event already holds', () => {
+    const view = describeEntry(
+      twoTroops,
+      'Girl Scout Troop',
+      [link(20, 0, 'Girl Scout Troop 123')],
+      10
+    );
+    expect(view.suggestedGroupIndexes).not.toContain(0);
+    expect(view.suggestWholeEntry).toBe(false);
+  });
+
   it('lets two events each link their own group in one entry', () => {
     const links = [link(10, 0, 'Girl Scout Troop 123'), link(20, 1, 'Girl Scout Troop 456')];
     const forTroop123 = describeEntry(twoTroops, 'Girl Scout Troop 123', links, 10);

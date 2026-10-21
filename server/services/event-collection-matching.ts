@@ -164,22 +164,57 @@ export function suggestGroups(collection: CollectionLike, organizationName: stri
 }
 
 /**
- * Find the group a link points at. The index is trusted while the name still
- * matches the snapshot; if the entry was edited and reordered, fall back to a
- * unique name match. Returns null when the group can't be found any more.
+ * How a group is identified in a link's snapshot: its name, qualified by its
+ * department so two rows for the same organization stay distinct.
  */
-export function resolveLinkedGroup(
+export function groupLabel(group: Pick<CollectionGroup, 'name' | 'department'>): string {
+  return group.department ? `${group.name} (${group.department})` : group.name;
+}
+
+function labelKey(label: string): string {
+  return canonicalizeOrgName(label);
+}
+
+/**
+ * Match each group link on an entry to a current group, one-to-one.
+ *
+ * A link's index is trusted while the group there still carries the snapshot
+ * label; if the entry was edited and reordered, the link falls back to the one
+ * unclaimed group with that label. A link whose group is gone, or whose label
+ * is ambiguous, resolves to null — it is never allowed to land on a group
+ * another link already claimed, so nothing is counted twice.
+ */
+export function resolveLinks<L extends LinkLike>(
   groups: CollectionGroup[],
-  link: Pick<LinkLike, 'groupIndex' | 'groupName'>
-): CollectionGroup | null {
-  const byIndex = groups.find((g) => g.index === link.groupIndex);
-  if (!link.groupName) return byIndex ?? null;
+  links: L[]
+): Array<{ link: L; group: CollectionGroup | null }> {
+  const groupLinks = links.filter((l) => l.groupIndex !== WHOLE_ENTRY);
+  const resolved = new Map<L, CollectionGroup | null>();
+  const claimed = new Set<number>();
 
-  const snapshot = canonicalizeOrgName(link.groupName);
-  if (byIndex && canonicalizeOrgName(byIndex.name) === snapshot) return byIndex;
+  // Pass 1: links still pointing at their own group.
+  for (const link of groupLinks) {
+    const atIndex = groups.find((g) => g.index === link.groupIndex);
+    if (!atIndex || claimed.has(atIndex.index)) continue;
+    if (!link.groupName || labelKey(groupLabel(atIndex)) === labelKey(link.groupName)) {
+      resolved.set(link, atIndex);
+      claimed.add(atIndex.index);
+    }
+  }
 
-  const byName = groups.filter((g) => canonicalizeOrgName(g.name) === snapshot);
-  return byName.length === 1 ? byName[0] : null;
+  // Pass 2: moved groups, by unique unclaimed label.
+  for (const link of groupLinks) {
+    if (resolved.has(link)) continue;
+    const key = link.groupName ? labelKey(link.groupName) : null;
+    const candidates = key
+      ? groups.filter((g) => !claimed.has(g.index) && labelKey(groupLabel(g)) === key)
+      : [];
+    const group = candidates.length === 1 ? candidates[0] : null;
+    resolved.set(link, group);
+    if (group) claimed.add(group.index);
+  }
+
+  return groupLinks.map((link) => ({ link, group: resolved.get(link) ?? null }));
 }
 
 export interface LinkedCount {
@@ -190,20 +225,23 @@ export interface LinkedCount {
   hasMissingGroup: boolean;
 }
 
-/** Sandwiches an event gets from one entry, given that event's links to it. */
-export function countForLinks(collection: CollectionLike, links: LinkLike[]): LinkedCount {
-  if (links.some((l) => l.groupIndex === WHOLE_ENTRY)) {
+/**
+ * Sandwiches an event gets from one entry. Takes every link on the entry, not
+ * just the event's, so groups are resolved one-to-one across events.
+ */
+export function countForLinks(collection: CollectionLike, links: LinkLike[], eventId: number): LinkedCount {
+  const mine = links.filter((l) => l.eventRequestId === eventId);
+  if (mine.some((l) => l.groupIndex === WHOLE_ENTRY)) {
     return { count: getEntryTotal(collection), countedGroupNames: [], wholeEntry: true, hasMissingGroup: false };
   }
-  const groups = getCollectionGroups(collection);
   let count = 0;
   let hasMissingGroup = false;
   const countedGroupNames: string[] = [];
-  for (const link of links) {
-    const group = resolveLinkedGroup(groups, link);
+  for (const { link, group } of resolveLinks(getCollectionGroups(collection), links)) {
+    if (link.eventRequestId !== eventId) continue;
     if (group) {
       count += group.count;
-      countedGroupNames.push(group.name);
+      countedGroupNames.push(groupLabel(group));
     } else {
       hasMissingGroup = true;
     }
@@ -252,21 +290,23 @@ export function describeEntry(
 ): EntryView {
   const links = effectiveLinks(collection, tableLinks);
   const groups = getCollectionGroups(collection);
-  const mine = links.filter((l) => l.eventRequestId === eventId);
   const whole = links.find((l) => l.groupIndex === WHOLE_ENTRY);
 
   const linkedEventByIndex = new Map<number, number>();
-  for (const link of links) {
-    if (link.groupIndex === WHOLE_ENTRY) continue;
-    const group = resolveLinkedGroup(groups, link);
+  for (const { link, group } of resolveLinks(groups, links)) {
     if (group) linkedEventByIndex.set(group.index, link.eventRequestId);
   }
-
-  const mineResolved = mine
-    .filter((l) => l.groupIndex !== WHOLE_ENTRY)
-    .map((l) => resolveLinkedGroup(groups, l))
-    .filter((g): g is CollectionGroup => !!g)
+  const mineResolved = groups
+    .filter((g) => linkedEventByIndex.get(g.index) === eventId)
     .map((g) => g.index);
+
+  // Never pre-pick something another event already holds — the save would fail.
+  const suggestion = suggestGroups(collection, organizationName);
+  const heldByOthers = (g: CollectionGroup) => {
+    const owner = linkedEventByIndex.get(g.index);
+    return owner !== undefined && owner !== eventId;
+  };
+  const othersHoldAny = groups.some(heldByOthers) || (!!whole && whole.eventRequestId !== eventId);
 
   return {
     collectionId: collection.id,
@@ -278,8 +318,12 @@ export function describeEntry(
     wholeEntryLinkedEventId: whole?.eventRequestId ?? null,
     linkedGroupIndexes: mineResolved,
     legacyLink: tableLinks.length === 0 && collection.eventRequestId === eventId,
-    ...suggestGroups(collection, organizationName),
-    ...countForLinks(collection, mine),
+    score: suggestion.score,
+    suggestedGroupIndexes: suggestion.suggestedGroupIndexes.filter(
+      (i) => !heldByOthers(groups.find((g) => g.index === i)!)
+    ),
+    suggestWholeEntry: suggestion.suggestWholeEntry && !othersHoldAny,
+    ...countForLinks(collection, links, eventId),
   };
 }
 
