@@ -1,3 +1,4 @@
+import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import {
   users,
   projects,
@@ -4245,7 +4246,7 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .insert(eventRequests)
       .values({
-        ...insertEventRequest,
+        ...normalizeToolkitPatch(insertEventRequest),
         updatedAt: new Date(),
       })
       .returning();
@@ -4256,7 +4257,11 @@ export class DatabaseStorage implements IStorage {
     id: number,
     updates: Partial<EventRequest> & { expectedVersion?: Date }
   ): Promise<EventRequest | undefined> {
-    const { expectedVersion, ...updateData } = updates;
+    const { expectedVersion, ...rawUpdateData } = updates;
+    const previousToolkit = typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus
+      ? await this.getEventRequest(id)
+      : undefined;
+    const updateData = normalizeToolkitPatch(rawUpdateData, previousToolkit);
 
     // DEBUG: Log incoming updates for speaker assignment debugging
     logger.info(`[DB updateEventRequest] Event ${id} - Received update keys: ${Object.keys(updateData).join(', ')}`);

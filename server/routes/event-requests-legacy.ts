@@ -1,3 +1,4 @@
+import { normalizeToolkitPatch, isToolkitSent } from '@shared/toolkit-state';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage-wrapper';
@@ -1871,7 +1872,7 @@ router.post(
 
       let validatedData;
       try {
-        validatedData = insertEventRequestSchema.parse(requestData);
+        validatedData = insertEventRequestSchema.parse(normalizeToolkitPatch(requestData));
       } catch (validationError: unknown) {
         const zodError = validationError instanceof z.ZodError ? validationError : null;
         const errorDetails = zodError
@@ -2385,11 +2386,11 @@ router.patch(
       }
 
       // Process pickup time fields for data migration
-      const processedUpdates = processPickupTimeFields(updates, originalEvent);
+      const processedUpdates = normalizeToolkitPatch(processPickupTimeFields(updates, originalEvent), originalEvent);
 
       // Automatically assign the current user as TSP contact if toolkit is being marked as sent
       // This auto-assignment happens silently (no email) since toolkit sending happens later in workflow
-      if ((processedUpdates.toolkitSent === true || processedUpdates.toolkitStatus === 'sent') &&
+      if (processedUpdates.toolkitSent === true &&
           !originalEvent.tspContact &&
           req.user?.id) {
         processedUpdates.tspContact = req.user.id;
@@ -2397,8 +2398,8 @@ router.patch(
       }
 
       // Automatically increment contactAttempts when toolkit is marked as sent (if not already sent)
-      if ((processedUpdates.toolkitSent === true || processedUpdates.toolkitStatus === 'sent') &&
-          !originalEvent.toolkitSent) {
+      if (processedUpdates.toolkitSent === true &&
+          !isToolkitSent(originalEvent)) {
         const existingLog = Array.isArray(originalEvent.contactAttemptsLog)
           ? (originalEvent.contactAttemptsLog as any[])
           : [];
@@ -2667,7 +2668,7 @@ router.patch(
       const pickupProcessedUpdates = processPickupTimeFields(updates, originalEvent);
 
       // Process timestamp fields to ensure they're proper Date objects
-      const processedUpdates = { ...pickupProcessedUpdates };
+      const processedUpdates = normalizeToolkitPatch({ ...pickupProcessedUpdates }, originalEvent);
 
       // Convert timestamp fields that might come as strings to Date objects
       // (shared list — see EVENT_REQUEST_TIMESTAMP_FIELDS at the top of this file)
@@ -2876,7 +2877,7 @@ router.patch(
 
       // Automatically assign the current user as TSP contact if toolkit is being marked as sent
       // This auto-assignment happens silently (no email) since toolkit sending happens later in workflow
-      if ((processedUpdates.toolkitSent === true || processedUpdates.toolkitStatus === 'sent') &&
+      if (processedUpdates.toolkitSent === true &&
           !originalEvent.tspContact &&
           req.user?.id) {
         processedUpdates.tspContact = req.user.id;
@@ -2885,8 +2886,8 @@ router.patch(
 
       // Automatically increment contactAttempts when toolkit is marked as sent (if not already sent)
       // This ensures toolkit sending counts as a contact attempt
-      if ((processedUpdates.toolkitSent === true || processedUpdates.toolkitStatus === 'sent') &&
-          !originalEvent.toolkitSent) {
+      if (processedUpdates.toolkitSent === true &&
+          !isToolkitSent(originalEvent)) {
         const existingLog = Array.isArray(originalEvent.contactAttemptsLog)
           ? (originalEvent.contactAttemptsLog as any[])
           : [];
@@ -3267,7 +3268,7 @@ router.put(
       const pickupProcessedUpdates = processPickupTimeFields(updates, originalEvent);
 
       // Process ALL date/timestamp fields to ensure they're proper Date objects
-      const processedUpdates = { ...pickupProcessedUpdates };
+      const processedUpdates = normalizeToolkitPatch({ ...pickupProcessedUpdates }, originalEvent);
 
       // Convert timestamp fields that might come as strings to Date objects
       // (shared list — see EVENT_REQUEST_TIMESTAMP_FIELDS at the top of this file)

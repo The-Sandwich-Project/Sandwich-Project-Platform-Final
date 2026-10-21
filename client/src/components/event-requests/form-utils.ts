@@ -1,3 +1,4 @@
+import { normalizeToolkitPatch } from '@shared/toolkit-state';
 /**
  * EventSchedulingForm - Utility Functions
  *
@@ -167,8 +168,10 @@ export function buildEventDataForServer(
     isDhlVan: formData.selfTransport ? false : !!formData.isDhlVan,
 
     // Toolkit
-    toolkitSent: formData.toolkitSent || false,
-    toolkitStatus: formData.toolkitStatus || null,
+    ...normalizeToolkitPatch({
+      toolkitSent: formData.toolkitSent || false,
+      toolkitStatus: formData.toolkitStatus || null,
+    }),
     toolkitSentDate: serializeDateToISO(formData.toolkitSentDate),
 
     // Corporate priority
