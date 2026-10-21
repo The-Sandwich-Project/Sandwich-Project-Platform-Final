@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { EventListSkeleton } from '../EventCardSkeleton';
 import { EventListBatchProviders } from '../EventListBatchProviders';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
+import { buildAttendancePatch } from '../form-utils';
 import type { EventRequest } from '@shared/schema';
 
 export const InProcessTab: React.FC = () => {
@@ -252,7 +253,9 @@ export const InProcessTab: React.FC = () => {
               attendanceAdults: adults,
               attendanceTeens: teens,
               attendanceKids: kids,
-              estimatedAttendance: total > 0 ? total : null,
+              // Clearing the breakdown must clear the legacy mirror too, or the
+              // next read falls back to it and resurrects the cleared total.
+              ...buildAttendancePatch(total),
             },
           });
         } else {

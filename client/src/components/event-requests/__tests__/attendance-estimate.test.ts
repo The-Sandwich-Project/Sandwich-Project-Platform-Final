@@ -7,6 +7,7 @@ import {
   determineActualSandwichMode,
   resolveEstimatedAttendance,
   normalizeDraftAttendance,
+  buildAttendancePatch,
 } from '../form-utils';
 
 /**
@@ -378,6 +379,99 @@ describe('reopening an event after an attendance estimate was saved', () => {
     expect(reopened.adultCount).toBe(10);
     expect(reopened.childrenCount).toBe(5);
     expect(reopened.kidsAgeRange).toBe('6-10');
+  });
+});
+
+/**
+ * Inline attendance-breakdown edits on the Scheduled / In Process tabs.
+ *
+ * These paths write estimatedAttendance directly, outside the scheduling form.
+ * They used to leave `volunteerCount` untouched, so clearing the breakdown
+ * produced `{ estimatedAttendance: null, volunteerCount: 30 }` — a state that is
+ * indistinguishable from a genuine legacy-only record, which made the resolver
+ * resurrect the cleared total the next time the form opened.
+ */
+describe('inline attendance-breakdown edits', () => {
+  /** Mirror of the attendanceBreakdown branch in ScheduledTab / InProcessTab. */
+  function inlineBreakdownSave(editingValue: string) {
+    const [adults, teens, kids] = editingValue.split(',').map((v) => {
+      const parsed = parseInt(v);
+      return isNaN(parsed) ? null : parsed;
+    });
+    const total = (adults || 0) + (teens || 0) + (kids || 0);
+    return {
+      attendanceAdults: adults,
+      attendanceTeens: teens,
+      attendanceKids: kids,
+      ...buildAttendancePatch(total),
+    };
+  }
+
+  it('writes the breakdown total to both columns', () => {
+    const patch = inlineBreakdownSave('10,2,3');
+    expect(patch.estimatedAttendance).toBe(15);
+    expect(patch.volunteerCount).toBe(15);
+    expect(patch.attendanceAdults).toBe(10);
+    expect(patch.attendanceTeens).toBe(2);
+    expect(patch.attendanceKids).toBe(3);
+  });
+
+  it('clears the legacy mirror alongside the estimate', () => {
+    for (const cleared of [',,', '0,0,0']) {
+      const patch = inlineBreakdownSave(cleared);
+      expect(patch.estimatedAttendance).toBeNull();
+      expect(patch.volunteerCount).toBeNull();
+    }
+  });
+
+  it('reopens the scheduling form empty after an inline clear', () => {
+    // Record started with both columns at 30, then was cleared inline.
+    const patch = inlineBreakdownSave(',,');
+    const record = { estimatedAttendance: 30, volunteerCount: 30, ...patch };
+
+    expect(initFormDataFromRecord(record).estimatedAttendance).toBe(0);
+  });
+
+  it('would have resurrected the cleared total if the mirror were left behind', () => {
+    // The pre-fix shape: estimate cleared, legacy mirror stranded at 30.
+    expect(initFormDataFromRecord({ estimatedAttendance: null, volunteerCount: 30 })).toHaveProperty(
+      'estimatedAttendance',
+      30,
+    );
+  });
+
+  it('reopens the scheduling form on the new total after an inline edit', () => {
+    const record = { estimatedAttendance: 30, volunteerCount: 30, ...inlineBreakdownSave('10,2,3') };
+    expect(initFormDataFromRecord(record).estimatedAttendance).toBe(15);
+  });
+
+  it('survives a round trip back through a full-form save', () => {
+    const record = { estimatedAttendance: 30, volunteerCount: 30, ...inlineBreakdownSave(',,') };
+    const reopened = initFormDataFromRecord(record);
+    const payload = buildEventDataForServer(reopened, saveOptions);
+
+    expect(payload.estimatedAttendance).toBeNull();
+    expect(payload.volunteerCount).toBeNull();
+  });
+});
+
+describe('buildAttendancePatch', () => {
+  it('sets both columns from one value', () => {
+    expect(buildAttendancePatch(40)).toEqual({ estimatedAttendance: 40, volunteerCount: 40 });
+    expect(buildAttendancePatch('40')).toEqual({ estimatedAttendance: 40, volunteerCount: 40 });
+  });
+
+  it('treats zero, blank and missing as a clear of both columns', () => {
+    for (const empty of [0, '0', '', '   ', null, undefined, 'not a number']) {
+      expect(buildAttendancePatch(empty)).toEqual({ estimatedAttendance: null, volunteerCount: null });
+    }
+  });
+
+  it('never returns one column populated and the other empty', () => {
+    for (const value of [0, 1, 40, '', null, undefined]) {
+      const { estimatedAttendance, volunteerCount } = buildAttendancePatch(value);
+      expect(estimatedAttendance).toBe(volunteerCount);
+    }
   });
 });
 

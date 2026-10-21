@@ -45,6 +45,23 @@ export function resolveEstimatedAttendance(
 }
 
 /**
+ * Build the attendance columns for a PATCH body.
+ *
+ * EVERY write of estimatedAttendance must go through this. The legacy
+ * `volunteerCount` mirror has to move with it — especially on a CLEAR, because
+ * `{ estimatedAttendance: null, volunteerCount: 30 }` is indistinguishable from
+ * a genuine legacy-only record, so a stale mirror makes the next read resurrect
+ * the value the user just cleared. 0 and blank both clear.
+ */
+export function buildAttendancePatch(value: unknown): {
+  estimatedAttendance: number | null;
+  volunteerCount: number | null;
+} {
+  const total = parseInt(String(value ?? '').trim() || '0', 10) || null;
+  return { estimatedAttendance: total, volunteerCount: total };
+}
+
+/**
  * Bring a persisted auto-save draft snapshot into the current attendance shape.
  *
  * Drafts written before estimatedAttendance became the single attendance value
@@ -94,11 +111,6 @@ export function buildEventDataForServer(
     : mode === 'schedule'
       ? (formData.status || 'scheduled')
       : (formData.status || eventRequestStatus || 'new');
-
-  // Estimated attendance has exactly one home in form state. Resolve it once so
-  // the authoritative column and its legacy mirror (volunteerCount, below)
-  // cannot disagree. Empty clears both.
-  const estimatedAttendance = parseInt(formData.estimatedAttendance?.toString() || '0') || null;
 
   const eventData: Record<string, any> = {
     // Status logic: different handling per mode (all resolve via resolvedStatus)
@@ -150,7 +162,6 @@ export function buildEventDataForServer(
         : null;
     })(),
     volunteersNeeded: parseInt(formData.volunteersNeeded?.toString() || '0') || 0,
-    estimatedAttendance,
 
     // Contacts
     tspContact: formData.tspContact || null,
@@ -264,11 +275,12 @@ export function buildEventDataForServer(
   }
 
   // Attendee counts.
-  // volunteerCount is a read-compatibility mirror of estimatedAttendance for
-  // older consumers of the legacy column (impact reports, large-event
-  // logistics modal). It is DERIVED here and must never be written from an
-  // input — that is what let the two columns drift apart.
-  eventData.volunteerCount = estimatedAttendance;
+  // estimatedAttendance has exactly one home in form state, and both columns it
+  // maps to come from the one writer. volunteerCount is a read-compatibility
+  // mirror for older consumers of the legacy column (impact reports,
+  // large-event logistics modal) and must never be written from an input —
+  // that is what let the two columns drift apart.
+  Object.assign(eventData, buildAttendancePatch(formData.estimatedAttendance));
   eventData.adultCount = formData.adultCount || 0;
   eventData.childrenCount = formData.childrenCount || 0;
   eventData.kidsAgeRange = formData.kidsAgeRange || null;
