@@ -26,6 +26,25 @@ export function serializeDateToISO(dateString: string): string | null {
 }
 
 /**
+ * Resolve the authoritative estimated attendance for an existing event record.
+ *
+ * `estimatedAttendance` is the authoritative column. `volunteerCount` is the
+ * legacy column the attendance input used to write in parallel, so records
+ * saved before that duplication was removed can carry the count there with
+ * `estimatedAttendance` still empty. Fall back to it on READ only — nothing
+ * writes `volunteerCount` on its own any more (see buildEventDataForServer).
+ *
+ * When the two columns disagree, `estimatedAttendance` wins.
+ */
+export function resolveEstimatedAttendance(
+  event: { estimatedAttendance?: number | null; volunteerCount?: number | null } | null | undefined,
+): number {
+  const estimated = Number(event?.estimatedAttendance) || 0;
+  if (estimated > 0) return estimated;
+  return Number(event?.volunteerCount) || 0;
+}
+
+/**
  * Build the event data payload for the server from form state.
  *
  * This is the SINGLE place where form fields are mapped to server fields.
@@ -51,6 +70,11 @@ export function buildEventDataForServer(
     : mode === 'schedule'
       ? (formData.status || 'scheduled')
       : (formData.status || eventRequestStatus || 'new');
+
+  // Estimated attendance has exactly one home in form state. Resolve it once so
+  // the authoritative column and its legacy mirror (volunteerCount, below)
+  // cannot disagree. Empty clears both.
+  const estimatedAttendance = parseInt(formData.estimatedAttendance?.toString() || '0') || null;
 
   const eventData: Record<string, any> = {
     // Status logic: different handling per mode (all resolve via resolvedStatus)
@@ -102,7 +126,7 @@ export function buildEventDataForServer(
         : null;
     })(),
     volunteersNeeded: parseInt(formData.volunteersNeeded?.toString() || '0') || 0,
-    estimatedAttendance: parseInt(formData.estimatedAttendance?.toString() || '0') || null,
+    estimatedAttendance,
 
     // Contacts
     tspContact: formData.tspContact || null,
@@ -215,8 +239,12 @@ export function buildEventDataForServer(
     eventData.estimatedSandwichRangeType = null;
   }
 
-  // Attendee counts
-  eventData.volunteerCount = formData.volunteerCount || 0;
+  // Attendee counts.
+  // volunteerCount is a read-compatibility mirror of estimatedAttendance for
+  // older consumers of the legacy column (impact reports, large-event
+  // logistics modal). It is DERIVED here and must never be written from an
+  // input — that is what let the two columns drift apart.
+  eventData.volunteerCount = estimatedAttendance;
   eventData.adultCount = formData.adultCount || 0;
   eventData.childrenCount = formData.childrenCount || 0;
   eventData.kidsAgeRange = formData.kidsAgeRange || null;

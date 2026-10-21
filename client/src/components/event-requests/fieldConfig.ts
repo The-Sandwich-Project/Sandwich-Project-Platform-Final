@@ -98,7 +98,8 @@ export const DEFAULT_FORM_DATA = {
   volunteersNeeded: 0,
 
   // Attendee counts
-  volunteerCount: 0,
+  // No volunteerCount here: the server column is derived from
+  // estimatedAttendance by buildEventDataForServer, not held in form state.
   estimatedAttendance: 0,
   adultCount: 0,
   childrenCount: 0,

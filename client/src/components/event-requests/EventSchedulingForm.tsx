@@ -62,6 +62,7 @@ import {
   determineSandwichMode,
   determineBaselineSandwichMode,
   determineActualSandwichMode,
+  resolveEstimatedAttendance,
 } from './form-utils';
 
 // ────────────────────────────────────────────────────────────────────────
@@ -190,8 +191,9 @@ function buildFormDataFromEventRequest(
     estimatedSandwichCountMin: (eventRequest as any)?.estimatedSandwichCountMin || 0,
     estimatedSandwichCountMax: (eventRequest as any)?.estimatedSandwichCountMax || 0,
     rangeSandwichType: (eventRequest as any)?.estimatedSandwichRangeType || '',
-    volunteerCount: (eventRequest as any)?.volunteerCount || 0,
-    estimatedAttendance: (eventRequest as any)?.estimatedAttendance || 0,
+    // Single home for estimated attendance. Legacy records that only populated
+    // the old volunteerCount column still open with their count.
+    estimatedAttendance: resolveEstimatedAttendance(eventRequest as any),
     adultCount: (eventRequest as any)?.adultCount || 0,
     childrenCount: (eventRequest as any)?.childrenCount || 0,
     kidsAgeRange: (eventRequest as any)?.kidsAgeRange || '',
@@ -297,7 +299,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     tspContact: '', customTspContact: '', message: '', schedulingNotes: '',
     planningNotes: '', nextAction: '', driverInstructions: '', volunteerInstructions: '',
     totalSandwichCount: 0, estimatedSandwichCountMin: 0,
-    estimatedSandwichCountMax: 0, rangeSandwichType: '', volunteerCount: 0,
+    estimatedSandwichCountMax: 0, rangeSandwichType: '',
     estimatedAttendance: 0, adultCount: 0, childrenCount: 0, kidsAgeRange: '',
     status: 'new', toolkitSent: false, toolkitSentDate: '', toolkitStatus: 'not_sent',
     socialMediaPostRequested: false, socialMediaPostRequestedDate: '',
