@@ -166,25 +166,45 @@ export function MessageComposer({
     });
 
     try {
-      // Use direct fetch to include attachments
-      const response = await fetch('/api/messaging/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          recipientIds: selectedRecipients,
-          content: content.trim(),
-          contextType,
-          contextId,
-          contextTitle,
-          attachments: attachments.length > 0 ? attachments : undefined,
-        }),
-      });
+      // Event messages go to each recipient's Team Chat DM, where people
+      // actually look. Other contexts still use the legacy messaging inbox.
+      const sendsToTeamChat = contextType === 'event';
+      const response = sendsToTeamChat
+        ? await fetch('/api/stream/context-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              recipientIds: selectedRecipients,
+              content: content.trim(),
+              contextTitle,
+              linkPath: contextId
+                ? `/dashboard?section=event-requests&eventId=${contextId}`
+                : undefined,
+              attachments: attachments.length > 0 ? attachments : undefined,
+            }),
+          })
+        : await fetch('/api/messaging/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              recipientIds: selectedRecipients,
+              content: content.trim(),
+              contextType,
+              contextId,
+              contextTitle,
+              attachments: attachments.length > 0 ? attachments : undefined,
+            }),
+          });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to send message');
+        throw new Error(error.message || error.error || 'Failed to send message');
       }
+
+      const result = await response.json().catch(() => ({}));
+      const failedCount: number = Array.isArray(result?.failed) ? result.failed.length : 0;
 
       setContent('');
       setSelectedRecipients([]);
@@ -192,7 +212,12 @@ export function MessageComposer({
       onSent?.();
 
       toast({
-        description: 'Message sent successfully',
+        description: sendsToTeamChat
+          ? failedCount > 0
+            ? `Sent to Team Chat DMs, but ${failedCount} recipient(s) couldn't be reached`
+            : 'Sent to Team Chat direct messages'
+          : 'Message sent successfully',
+        variant: failedCount > 0 ? 'destructive' : undefined,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/messages'] }); // Refresh messages
     } catch (error) {
@@ -228,6 +253,11 @@ export function MessageComposer({
           <Badge variant="secondary" className="w-fit">
             {contextType.charAt(0).toUpperCase() + contextType.slice(1)} Message
           </Badge>
+        )}
+        {contextType === 'event' && (
+          <p className="text-xs text-gray-500">
+            Each person gets this in their Team Chat direct messages with you.
+          </p>
         )}
       </CardHeader>
       <CardContent className="space-y-4">
