@@ -13,6 +13,7 @@ import {
 } from './sheets-write-guard';
 import { geocodeAddress } from './utils/geocoding';
 import { detectDateFlexibility } from './utils/date-flexibility-detection';
+import { normalizeSheetStatus } from './utils/sheet-status';
 
 export interface EventRequestSheetRow {
   externalId: string;
@@ -294,25 +295,31 @@ export class EventRequestsGoogleSheetsService {
 
     return {
       externalId: row.externalId,
-      organizationName: row.organizationName,
+      // Match manual entry: trimmed org name, and null (not '') for a missing
+      // email/phone so every origin stores "no value" the same way.
+      organizationName: row.organizationName?.trim(),
       firstName: firstName,
       lastName: lastName,
-      email: row.email,
-      phone: row.phone,
+      email: row.email?.trim() || null,
+      phone: row.phone?.trim() || null,
       department: row.department,
       eventAddress: row.eventLocation,
       desiredEventDate: this.parseExcelDate(row.desiredEventDate, 'desired event date'),
       status: (() => {
         // CRITICAL FIX: Only assign status for NEW imports, never for existing records
         // This function should only be called for genuinely new records
-        
-        // If status exists in sheet and is not empty, use it
-        if (
-          row.status &&
-          row.status.trim() &&
-          row.status.trim().toLowerCase() !== 'new'
-        ) {
-          return row.status.trim();
+
+        // If the sheet has a recognizable status other than "new", use its
+        // canonical form ("In Process" -> "in_process"). Unrecognized text is
+        // ignored rather than stored, since the app can't filter or display it.
+        const sheetStatus = normalizeSheetStatus(row.status);
+        if (sheetStatus && sheetStatus !== 'new') {
+          return sheetStatus;
+        }
+        if (row.status && row.status.trim() && !sheetStatus) {
+          logger.warn(
+            `Unrecognized status "${row.status.trim()}" in sheet row ${row.rowIndex}; using default`
+          );
         }
 
         // For events without status, check if it's a past event
@@ -340,6 +347,10 @@ export class EventRequestsGoogleSheetsService {
       organizationExists: row.duplicateCheck === 'Yes',
       duplicateNotes: row.notes,
       createdAt: submissionDate, // Map Google Sheet submission date to createdAt
+      // Every creation path records when the current status began. For imports
+      // that's the submission time, so a past event imported as 'completed'
+      // isn't counted as "completed this week" by the digests.
+      statusChangedAt: submissionDate,
     };
   }
 
@@ -538,6 +549,11 @@ export class EventRequestsGoogleSheetsService {
         const flexibilityResult = detectDateFlexibility(eventRequestData.message);
 
         // Ensure dates are valid before saving to database
+        const safeCreatedAt =
+          eventRequestData.createdAt &&
+          !isNaN(new Date(eventRequestData.createdAt).getTime())
+            ? eventRequestData.createdAt
+            : new Date();
         const sanitizedData = {
           ...eventRequestData,
           createdBy: 'google_sheets_sync',
@@ -551,11 +567,8 @@ export class EventRequestsGoogleSheetsService {
             !isNaN(new Date(eventRequestData.desiredEventDate).getTime())
               ? eventRequestData.desiredEventDate
               : null,
-          createdAt:
-            eventRequestData.createdAt &&
-            !isNaN(new Date(eventRequestData.createdAt).getTime())
-              ? eventRequestData.createdAt
-              : new Date(),
+          createdAt: safeCreatedAt,
+          statusChangedAt: safeCreatedAt,
           updatedAt: new Date(),
         };
 
