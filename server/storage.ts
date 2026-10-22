@@ -1,3 +1,4 @@
+import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -3223,7 +3224,7 @@ export class MemStorage implements IStorage {
   ): Promise<EventRequest> {
     const id = this.currentIds.eventRequest++;
     const eventRequest: EventRequest = {
-      ...insertEventRequest,
+      ...normalizeToolkitPatch(insertEventRequest),
       id,
       createdAt: new Date(),
       lastUpdated: new Date(),
@@ -3240,7 +3241,7 @@ export class MemStorage implements IStorage {
     const eventRequest = this.eventRequests.get(id);
     if (!eventRequest) return undefined;
 
-    const updated = { ...eventRequest, ...updates, lastUpdated: new Date() };
+    const updated = { ...eventRequest, ...normalizeToolkitPatch(updates, eventRequest), lastUpdated: new Date() };
     this.eventRequests.set(id, updated);
     return updated;
   }
