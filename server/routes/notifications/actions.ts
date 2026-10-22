@@ -709,7 +709,7 @@ actionsRouter.post('/:id/actions/:actionHistoryId/undo', async (req, res) => {
               .update(eventRequests)
               .set({
                 toolkitSent: false,
-                toolkitStatus: null,
+                toolkitStatus: 'not_sent',
                 updatedAt: new Date()
               })
               .where(eq(eventRequests.id, relatedId))
