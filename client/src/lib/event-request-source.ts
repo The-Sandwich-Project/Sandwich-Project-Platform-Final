@@ -1,5 +1,7 @@
 /**
  * Event request intake source — mutually exclusive:
+ * - Planning sheet (imported from the official planning sheet, either via the
+ *   in-app Planning Sheet Import or the Apps Script push)
  * - Website submission (Google Sheets sync from public form)
  * - Manual entry by an app user (optional channel: phone, email, etc.)
  */
@@ -15,6 +17,7 @@ const MANUAL_ENTRY_CHANNELS: Record<string, string> = {
 };
 
 export type EventRequestSourceIndicator =
+  | { kind: 'planning_sheet' }
   | { kind: 'website' }
   | { kind: 'manual'; channelLabel?: string };
 
@@ -32,13 +35,22 @@ export function getEventRequestSourceIndicator(
   const sheetId = request.googleSheetRowId ?? undefined;
   const createdBy = request.createdBy ?? undefined;
 
+  // Checked first: Apps Script imports (sheets-import-*) come from the
+  // planning sheet, not the public website form.
+  const isFromPlanningSheet =
+    externalId?.startsWith('planning-sheet:') === true ||
+    externalId?.startsWith('sheets-import-') === true ||
+    createdBy === 'google-sheets-import';
+
+  if (isFromPlanningSheet) {
+    return { kind: 'planning_sheet' };
+  }
+
   const isFromWebsite =
     !!sheetId ||
     !!request.lastSyncedAt ||
-    externalId?.startsWith('sheets-import-') === true ||
     externalId?.startsWith('auto-') === true ||
-    createdBy === 'google_sheets_sync' ||
-    createdBy === 'google-sheets-import';
+    createdBy === 'google_sheets_sync';
 
   if (isFromWebsite) {
     return { kind: 'website' };
