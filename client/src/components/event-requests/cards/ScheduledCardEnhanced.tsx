@@ -53,6 +53,7 @@ import {
   HelpCircle,
   User,
   MessageCircle,
+  ClipboardList,
 } from 'lucide-react';
 import {
   formatTime12Hour,
@@ -80,6 +81,7 @@ import { getMissingIntakeInfo } from '@/lib/event-request-validation';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
 import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
 import { MessageComposer } from '@/components/message-composer';
+import { InstructionsSection } from '../form-sections/InstructionsSection';
 import { MlkDayBadge } from '@/components/event-requests/MlkDayBadge';
 import { MissingDriverTimeBadge } from '@/components/event-requests/MissingDriverTimeBadge';
 import { RefrigerationWarningBadge } from '@/components/event-requests/RefrigerationWarningBadge';
@@ -229,6 +231,8 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   const [showSchedulingNotes, setShowSchedulingNotes] = useState(false);
   const [showNotesAndRequirements, setShowNotesAndRequirements] = useState(false);
   const [showMessageDialog, setShowMessageDialog] = useState(false);
+  const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
+  const [instructionsDraft, setInstructionsDraft] = useState({ driverInstructions: '', volunteerInstructions: '' });
   const [showSendSmsDialog, setShowSendSmsDialog] = useState(false);
   const [showSendCorrectionDialog, setShowSendCorrectionDialog] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -308,6 +312,33 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
       });
     },
   });
+
+  const hasInstructions = !!(
+    (request as any).driverInstructions?.trim() || (request as any).volunteerInstructions?.trim()
+  );
+
+  const openInstructionsDialog = () => {
+    setInstructionsDraft({
+      driverInstructions: (request as any).driverInstructions || '',
+      volunteerInstructions: (request as any).volunteerInstructions || '',
+    });
+    setShowInstructionsDialog(true);
+  };
+
+  const saveInstructions = () => {
+    updateFieldsMutation.mutate(
+      {
+        driverInstructions: instructionsDraft.driverInstructions.trim() || null,
+        volunteerInstructions: instructionsDraft.volunteerInstructions.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          setShowInstructionsDialog(false);
+          toast({ description: 'Instructions saved' });
+        },
+      }
+    );
+  };
 
   const toggleDhlVan = (value: boolean) => {
     const payload: Record<string, unknown> = { isDhlVan: value };
@@ -3880,6 +3911,26 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               </TooltipContent>
             </Tooltip>
 
+            {canEdit && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={openInstructionsDialog}
+                    className="border-purple-400 text-purple-700 hover:bg-purple-50"
+                    data-testid="button-edit-instructions"
+                  >
+                    <ClipboardList className="w-4 h-4 mr-1" />
+                    {hasInstructions ? 'Edit Instructions' : 'Add Instructions'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Driver & volunteer instructions (included in reminders)</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
             {/* Group 4 — Event management */}
             <div className="h-6 w-px bg-slate-200 mx-0.5" aria-hidden="true" />
             {!(request.tspContact || request.customTspContact) && canEditTspContact && (
@@ -4288,6 +4339,29 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             onSent={() => setShowMessageDialog(false)}
             onCancel={() => setShowMessageDialog(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Driver / Volunteer Instructions Dialog */}
+      <Dialog open={showInstructionsDialog} onOpenChange={setShowInstructionsDialog}>
+        <DialogContent className="w-[95vw] max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Instructions: {request.organizationName}</DialogTitle>
+          </DialogHeader>
+          <InstructionsSection formData={instructionsDraft as any} setFormData={setInstructionsDraft} />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setShowInstructionsDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={saveInstructions} disabled={updateFieldsMutation.isPending}>
+              {updateFieldsMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-1" />
+              )}
+              Save Instructions
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

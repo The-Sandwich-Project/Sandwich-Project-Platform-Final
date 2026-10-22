@@ -36,6 +36,53 @@ const initializeStreamServer = () => {
   }
 };
 
+// Make sure each app user exists in Stream, registering only the ones that
+// don't. Existing Stream users are never re-upserted, because upsertUser with
+// role 'user' would demote admins. Returns the Stream IDs that exist afterward.
+const ensureStreamUsers = async (
+  client: StreamChat,
+  appUserIds: string[]
+): Promise<Set<string>> => {
+  const streamIds = [...new Set(appUserIds.map((id) => `user_${id}`))];
+  const registered = new Set<string>();
+
+  // queryUsers is paginated (max 100 per page), so look IDs up in bounded
+  // batches; treating one page as complete would re-upsert existing users.
+  for (let i = 0; i < streamIds.length; i += 100) {
+    const batch = streamIds.slice(i, i + 100);
+    const { users: existing } = await client.queryUsers(
+      { id: { $in: batch } },
+      {},
+      { limit: batch.length }
+    );
+    existing.forEach((u) => registered.add(u.id));
+  }
+
+  for (const streamId of streamIds) {
+    if (registered.has(streamId)) continue;
+    try {
+      const appUser = await storage.getUser(streamId.replace(/^user_/, ''));
+      if (!appUser) {
+        logger.warn(`Skipping Stream registration for unknown user ${streamId}`);
+        continue;
+      }
+      await client.upsertUser({
+        id: streamId,
+        name: appUser.firstName && appUser.lastName
+          ? `${appUser.firstName} ${appUser.lastName}`
+          : appUser.email,
+        email: appUser.email,
+        role: 'user',
+      });
+      registered.add(streamId);
+    } catch (upsertError) {
+      logger.error(`Failed to register ${streamId} with Stream Chat:`, upsertError);
+    }
+  }
+
+  return registered;
+};
+
 // Get Stream Chat credentials and generate user token
 streamRoutes.post('/credentials', async (req, res) => {
   try {
@@ -216,29 +263,8 @@ streamRoutes.post('/channels', async (req, res) => {
 
     const streamUserId = `user_${user.id}`;
 
-    // First, ensure all participants are registered with Stream Chat
-    // We need to get user details from the database
-    const { storage } = await import('../storage-wrapper');
-
-    for (const participantId of participants) {
-      try {
-        const participantUser = await storage.getUser(participantId);
-        if (participantUser) {
-          const participantStreamId = `user_${participantId}`;
-          await streamServerClient.upsertUser({
-            id: participantStreamId,
-            name: participantUser.firstName && participantUser.lastName
-              ? `${participantUser.firstName} ${participantUser.lastName}`
-              : participantUser.email,
-            email: participantUser.email,
-            role: 'user',
-          });
-          logger.log(`✅ Registered user ${participantUser.email} with Stream Chat`);
-        }
-      } catch (upsertError) {
-        logger.error(`Failed to upsert participant ${participantId}:`, upsertError);
-      }
-    }
+    // Register any participants who have never opened Team Chat
+    await ensureStreamUsers(streamServerClient, participants);
 
     // Create the channel with all members
     const memberIds = [streamUserId, ...participants.map((p: string) => `user_${p}`)];
@@ -277,6 +303,105 @@ streamRoutes.post('/channels', async (req, res) => {
   } catch (error) {
     logger.error('Channel creation error:', error);
     res.status(500).json({ error: 'Failed to create channel', message: error.message });
+  }
+});
+
+// Send a message about an event (or other record) as a Team Chat DM to each
+// recipient. Each recipient gets it in their 1:1 DM with the sender, so it lands
+// where people already look instead of a separate inbox.
+streamRoutes.post('/context-message', async (req, res) => {
+  try {
+    const user = req.user || req.session?.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { recipientIds, content, contextTitle, linkPath, attachments } = req.body || {};
+
+    if (!Array.isArray(recipientIds) || recipientIds.length === 0) {
+      return res.status(400).json({ error: 'recipientIds array is required' });
+    }
+    const text = typeof content === 'string' ? content.trim() : '';
+    const files: Array<{ name: string; url: string; type: string; size: number }> =
+      Array.isArray(attachments) ? attachments : [];
+    if (!text && files.length === 0) {
+      return res.status(400).json({ error: 'content or attachments required' });
+    }
+
+    if (!streamServerClient) {
+      streamServerClient = initializeStreamServer();
+      if (!streamServerClient) {
+        return res.status(500).json({ error: 'Stream Chat not initialized' });
+      }
+    }
+
+    const senderStreamId = `user_${user.id}`;
+    const recipientStreamIds = [...new Set(recipientIds.map((id: string) => `user_${id}`))]
+      .filter((id) => id !== senderStreamId);
+    if (recipientStreamIds.length === 0) {
+      return res.status(400).json({ error: 'Pick at least one recipient other than yourself' });
+    }
+
+    // Register anyone who has never opened Team Chat
+    const registered = await ensureStreamUsers(
+      streamServerClient,
+      [user.id, ...recipientIds]
+    );
+
+    // Absolute links so they work from Stream's message renderer and notifications
+    const proto = (req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
+    const baseUrl = `${proto}://${req.get('host')}`;
+
+    const lines: string[] = [];
+    if (contextTitle) lines.push(`📅 **Re: ${contextTitle}**`);
+    if (text) lines.push(text);
+    if (typeof linkPath === 'string' && linkPath.startsWith('/')) {
+      lines.push(`[Open event](${baseUrl}${linkPath})`);
+    }
+
+    // Uploaded files live in private storage; link them through the app's
+    // authenticated proxy so only signed-in team members can open them.
+    const streamAttachments = files.map((f) => {
+      const proxied = `${baseUrl}/api/objects/proxy?url=${encodeURIComponent(f.url)}`;
+      return f.type?.startsWith('image/')
+        ? { type: 'image', image_url: proxied, fallback: f.name }
+        : { type: 'file', asset_url: proxied, title: f.name, mime_type: f.type, file_size: f.size };
+    });
+
+    const sent: string[] = [];
+    const failed: string[] = [];
+    for (const recipientStreamId of recipientStreamIds) {
+      const appId = recipientStreamId.replace(/^user_/, '');
+      if (!registered.has(recipientStreamId)) {
+        failed.push(appId);
+        continue;
+      }
+      try {
+        // Distinct (ID-less) channel = the same 1:1 DM the Team Chat UI uses
+        const channel = streamServerClient.channel('messaging', undefined, {
+          members: [senderStreamId, recipientStreamId],
+          created_by_id: senderStreamId,
+        });
+        await channel.create();
+        await channel.sendMessage({
+          text: lines.join('\n\n'),
+          user_id: senderStreamId,
+          attachments: streamAttachments,
+        });
+        sent.push(appId);
+      } catch (sendError) {
+        logger.error(`Failed to send context DM to ${recipientStreamId}:`, sendError);
+        failed.push(appId);
+      }
+    }
+
+    if (sent.length === 0) {
+      return res.status(500).json({ error: 'Message could not be delivered to anyone', failed });
+    }
+    res.json({ sent, failed });
+  } catch (error) {
+    logger.error('Context message error:', error);
+    res.status(500).json({ error: 'Failed to send message', message: error.message });
   }
 });
 
@@ -340,29 +465,11 @@ streamRoutes.post('/channels/:type/:id/members', async (req, res) => {
     // Register any newly added users with Stream before adding them. Only users that exist
     // and upsert successfully are queued for addMembers, so a bad/unknown ID can't fail the
     // whole update or add a non-existent user.
-    const addStreamIds: string[] = [];
-    for (const participantId of add) {
-      const participantStreamId = `user_${participantId}`;
-      if (currentMemberIds.includes(participantStreamId)) continue;
-      try {
-        const participantUser = await storage.getUser(participantId);
-        if (!participantUser) {
-          logger.warn(`Skipping add for unknown user ${participantId}`);
-          continue;
-        }
-        await streamServerClient.upsertUser({
-          id: participantStreamId,
-          name: participantUser.firstName && participantUser.lastName
-            ? `${participantUser.firstName} ${participantUser.lastName}`
-            : participantUser.email,
-          email: participantUser.email,
-          role: 'user',
-        });
-        addStreamIds.push(participantStreamId);
-      } catch (upsertError) {
-        logger.error(`Failed to upsert participant ${participantId}, skipping:`, upsertError);
-      }
-    }
+    const toAdd = add.filter((id) => !currentMemberIds.includes(`user_${id}`));
+    const registered = await ensureStreamUsers(streamServerClient, toAdd);
+    const addStreamIds = toAdd
+      .map((id) => `user_${id}`)
+      .filter((streamId) => registered.has(streamId));
 
     const removeStreamIds = remove
       .map((p) => `user_${p}`)

@@ -497,7 +497,7 @@ function EventOperationalDashboardContent() {
   };
 
   const navigateToEvent = (eventId: number) => {
-    setLocation(`/dashboard?section=event-requests&eventId=${eventId}`);
+    setLocation(`/dashboard?section=event-requests&tab=all&eventId=${eventId}`);
   };
 
   if (isLoading) {

@@ -159,7 +159,7 @@ export async function sendCorporateImmediateCallNotification(
 
     const tspEmail = tspUser.preferredEmail || tspUser.email;
     const tspName = tspUser.displayName || tspUser.firstName || tspEmail.split('@')[0];
-    const eventUrl = `${getAppBaseUrl()}/event-requests-v2?eventId=${eventId}`;
+    const eventUrl = `${getAppBaseUrl()}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
 
     const formattedEventDate = eventDate
       ? new Date(eventDate).toLocaleDateString('en-US', {
@@ -302,7 +302,7 @@ async function sendCorporateDailyReminder(
 
     const tspEmail = tspUser.preferredEmail || tspUser.email;
     const tspName = tspUser.displayName || tspUser.firstName || tspEmail.split('@')[0];
-    const eventUrl = `${getAppBaseUrl()}/event-requests-v2?eventId=${eventId}`;
+    const eventUrl = `${getAppBaseUrl()}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
 
     const formattedEventDate = eventDate
       ? new Date(eventDate).toLocaleDateString('en-US', {

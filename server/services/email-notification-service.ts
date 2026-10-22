@@ -860,7 +860,7 @@ Note: Corporate events may use platforms like Deed or Benevity - be sure to note
   private static getEventUrl(eventId: number): string {
     const baseUrl = getAppBaseUrl();
 
-    return `${baseUrl}/dashboard?section=event-requests&eventId=${eventId}`;
+    return `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
   }
 
   /**

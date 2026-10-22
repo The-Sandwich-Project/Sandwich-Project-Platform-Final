@@ -32,7 +32,6 @@ import {
 } from '@/components/ui/dialog';
 import { apiRequest } from '@/lib/queryClient';
 import { useActivityTracker } from '@/hooks/useActivityTracker';
-import { MessageComposer } from '@/components/message-composer';
 import {
   Upload,
   Image as ImageIcon,
@@ -44,7 +43,6 @@ import {
   Archive,
   Download,
   Plus,
-  MessageCircle,
   FileText,
   RotateCcw,
   Pencil,
@@ -124,7 +122,6 @@ interface PromotionGraphic {
 export default function PromotionGraphics() {
   const { trackView } = useActivityTracker();
   const [selectedGraphic, setSelectedGraphic] = useState<PromotionGraphic | null>(null);
-  const [messageGraphic, setMessageGraphic] = useState<PromotionGraphic | null>(null);
   const [editingGraphic, setEditingGraphic] = useState<PromotionGraphic | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -925,14 +922,6 @@ export default function PromotionGraphics() {
                         <Download className="h-4 w-4 mr-1" />
                         Download
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setMessageGraphic(graphic)}
-                        title="Message about this graphic"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
                       {canUpload && (
                         <Button
                           variant="outline"
@@ -1249,24 +1238,6 @@ export default function PromotionGraphics() {
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Message Composer Dialog */}
-      <Dialog open={!!messageGraphic} onOpenChange={() => setMessageGraphic(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Message About Graphic: {messageGraphic?.title}</DialogTitle>
-          </DialogHeader>
-          {messageGraphic && (
-            <MessageComposer
-              contextType="graphic"
-              contextId={messageGraphic.id.toString()}
-              contextTitle={messageGraphic.title}
-              onSent={() => setMessageGraphic(null)}
-              onCancel={() => setMessageGraphic(null)}
-            />
-          )}
         </DialogContent>
       </Dialog>
     </div>
