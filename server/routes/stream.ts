@@ -319,8 +319,18 @@ streamRoutes.post('/context-message', async (req, res) => {
     // Register anyone who has never opened Team Chat. Existing Stream users are
     // left alone so their Stream role (e.g. admin) isn't overwritten.
     const allStreamIds = [senderStreamId, ...recipientStreamIds];
-    const { users: existing } = await streamServerClient.queryUsers({ id: { $in: allStreamIds } });
-    const registered = new Set(existing.map((u) => u.id));
+    // queryUsers is paginated (max 100 per page), so look IDs up in bounded
+    // batches; treating one page as complete would re-upsert existing users.
+    const registered = new Set<string>();
+    for (let i = 0; i < allStreamIds.length; i += 100) {
+      const batch = allStreamIds.slice(i, i + 100);
+      const { users: existing } = await streamServerClient.queryUsers(
+        { id: { $in: batch } },
+        {},
+        { limit: batch.length }
+      );
+      existing.forEach((u) => registered.add(u.id));
+    }
     for (const streamId of allStreamIds) {
       if (registered.has(streamId)) continue;
       const appUser = await storage.getUser(streamId.replace(/^user_/, ''));

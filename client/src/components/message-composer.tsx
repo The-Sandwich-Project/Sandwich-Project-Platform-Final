@@ -179,7 +179,7 @@ export function MessageComposer({
               content: content.trim(),
               contextTitle,
               linkPath: contextId
-                ? `/dashboard?section=event-requests&eventId=${contextId}`
+                ? `/dashboard?section=event-requests&tab=all&eventId=${contextId}`
                 : undefined,
               attachments: attachments.length > 0 ? attachments : undefined,
             }),
@@ -204,7 +204,19 @@ export function MessageComposer({
       }
 
       const result = await response.json().catch(() => ({}));
-      const failedCount: number = Array.isArray(result?.failed) ? result.failed.length : 0;
+      const failed: string[] = Array.isArray(result?.failed) ? result.failed : [];
+
+      if (failed.length > 0) {
+        // Partial delivery: keep the draft open with only the people who
+        // didn't get it selected, so the sender can retry.
+        setSelectedRecipients(failed);
+        toast({
+          title: `Couldn't reach ${failed.length} recipient(s)`,
+          description: 'Everyone else got it. Your draft is still here with just those people selected — try sending again.',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       setContent('');
       setSelectedRecipients([]);
@@ -212,12 +224,7 @@ export function MessageComposer({
       onSent?.();
 
       toast({
-        description: sendsToTeamChat
-          ? failedCount > 0
-            ? `Sent to Team Chat DMs, but ${failedCount} recipient(s) couldn't be reached`
-            : 'Sent to Team Chat direct messages'
-          : 'Message sent successfully',
-        variant: failedCount > 0 ? 'destructive' : undefined,
+        description: sendsToTeamChat ? 'Sent to Team Chat direct messages' : 'Message sent successfully',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/messages'] }); // Refresh messages
     } catch (error) {
