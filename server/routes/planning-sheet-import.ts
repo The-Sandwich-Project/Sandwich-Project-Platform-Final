@@ -11,6 +11,7 @@ import {
   type PlanningSheetRow,
 } from '../planning-sheet-sync-service';
 import { logger } from '../utils/production-safe-logger';
+import { geocodeEventInBackground } from '../utils/geocode-event';
 import type { AuthenticatedRequest } from '../types/express';
 
 /**
@@ -205,7 +206,8 @@ export interface ImportCandidate {
  * are stored with addedToOfficialSheet = true (they came FROM the sheet).
  */
 export function buildImportedEventRecord(
-  c: ImportCandidate
+  c: ImportCandidate,
+  createdBy: string | null = null
 ): typeof eventRequests.$inferInsert {
   const est = parseSandwichCountInput(c.row.estimateSandwiches);
   const final = parseSandwichCountInput(c.row.finalSandwiches);
@@ -246,6 +248,8 @@ export function buildImportedEventRecord(
     // of the amber "Not on Calendar" action badge.
     addedToOfficialSheet: true,
     addedToOfficialSheetAt: new Date(),
+    // Record who ran the import, like manual entry does.
+    createdBy,
   };
 }
 
@@ -600,10 +604,16 @@ export function createPlanningSheetImportRouter(
             continue;
           }
 
-          toInsert.push(buildImportedEventRecord(c));
+          toInsert.push(
+            buildImportedEventRecord(c, (req as any).user?.id?.toString() ?? null)
+          );
         }
 
-        let created: { id: number; organizationName: string | null }[] = [];
+        let created: {
+          id: number;
+          organizationName: string | null;
+          eventAddress: string | null;
+        }[] = [];
         if (toInsert.length > 0) {
           created = await db
             .insert(eventRequests)
@@ -612,7 +622,10 @@ export function createPlanningSheetImportRouter(
             .returning({
               id: eventRequests.id,
               organizationName: eventRequests.organizationName,
+              eventAddress: eventRequests.eventAddress,
             });
+          // Give imported events a map pin, like every other entry point.
+          for (const ev of created) geocodeEventInBackground(ev.id, ev.eventAddress);
         }
 
         logger.log(
