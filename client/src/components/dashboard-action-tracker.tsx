@@ -139,7 +139,7 @@ const DashboardActionTracker = ({ onNavigate }: DashboardActionTrackerProps) => 
         const eventId = urlParams.get('eventId');
         logger.log('🎯 Navigating to event detail:', eventId);
         // Navigate to event requests with the specific event
-        onNavigate(`event-requests?eventId=${eventId}`);
+        onNavigate(`event-requests?tab=all&eventId=${eventId}`);
         return;
       }
       
@@ -227,7 +227,7 @@ const DashboardActionTracker = ({ onNavigate }: DashboardActionTrackerProps) => 
                 {/* Add more fields as needed */}
                 <div className="pt-2">
                   <a
-                    href={`/dashboard?section=event-requests&eventId=${quickViewEvent.id}`}
+                    href={`/dashboard?section=event-requests&tab=all&eventId=${quickViewEvent.id}`}
                     className="inline-block bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded transition-colors"
                   >
                     View Full Event

@@ -64,11 +64,9 @@ import {
   AlertTriangle,
   Trash2,
   Send,
-  Mail,
   BarChart3,
 } from 'lucide-react';
 import { hasPermission } from '@shared/unified-auth-utils';
-import { MessageComposer } from '@/components/message-composer';
 import { useMessaging } from '@/hooks/useMessaging';
 import { useUserActivityTracking } from '@/hooks/useUserActivityTracking';
 import { logger } from '@/lib/logger';
@@ -129,7 +127,6 @@ export default function SuggestionsPortal() {
   const [selectedSuggestion, setSelectedSuggestion] =
     useState<Suggestion | null>(null);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
-  const [showClarificationDialog, setShowClarificationDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
@@ -332,11 +329,6 @@ export default function SuggestionsPortal() {
 
   const onSubmitSuggestion = (data: SuggestionFormData) => {
     submitSuggestionMutation.mutate(data);
-  };
-
-  const handleRequestClarification = (suggestion: Suggestion) => {
-    setSelectedSuggestion(suggestion);
-    setShowClarificationDialog(true);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -1100,20 +1092,6 @@ export default function SuggestionsPortal() {
                                         size="sm"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleRequestClarification(
-                                            suggestion
-                                          );
-                                        }}
-                                        className="h-8 px-3 text-xs text-purple-700 hover:bg-purple-50 hover:text-purple-800"
-                                      >
-                                        <Mail className="h-3 w-3 mr-1.5" />
-                                        Ask for Details
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
                                           if (
                                             confirm(
                                               'Are you sure you want to delete this suggestion? This action cannot be undone.'
@@ -1148,7 +1126,7 @@ export default function SuggestionsPortal() {
 
       {/* Suggestion Detail Dialog - Simple view only */}
       <Dialog
-        open={!!selectedSuggestion && !showClarificationDialog}
+        open={!!selectedSuggestion}
         onOpenChange={() => setSelectedSuggestion(null)}
       >
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
@@ -1205,65 +1183,6 @@ export default function SuggestionsPortal() {
                 </div>
               </div>
             </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Clarification Request Dialog */}
-      <Dialog
-        open={showClarificationDialog}
-        onOpenChange={setShowClarificationDialog}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-brand-primary" />
-              Request Clarification
-            </DialogTitle>
-            <DialogDescription>
-              Send a message to{' '}
-              {selectedSuggestion?.isAnonymous
-                ? 'the anonymous submitter'
-                : selectedSuggestion?.submitterName}{' '}
-              requesting more details about their suggestion.
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedSuggestion && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">{selectedSuggestion.title}</h4>
-                <p className="text-sm text-gray-600 line-clamp-3">
-                  {selectedSuggestion.description}
-                </p>
-              </div>
-
-              <MessageComposer
-                contextType="suggestion"
-                contextId={String(selectedSuggestion.id)}
-                contextTitle={selectedSuggestion.title}
-                defaultRecipients={
-                  selectedSuggestion.isAnonymous
-                    ? []
-                    : [
-                        {
-                          id: selectedSuggestion.submittedBy,
-                          name: selectedSuggestion.submitterName || 'Unknown',
-                        },
-                      ]
-                }
-                compact={true}
-                onSent={() => {
-                  setShowClarificationDialog(false);
-                  toast({
-                    title: 'Clarification Request Sent',
-                    description:
-                      'The author will be notified and can respond through the messaging system.',
-                  });
-                }}
-                onCancel={() => setShowClarificationDialog(false)}
-              />
-            </div>
           )}
         </DialogContent>
       </Dialog>

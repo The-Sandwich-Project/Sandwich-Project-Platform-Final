@@ -479,7 +479,7 @@ router.get('/search', async (req, res) => {
           sourceType: 'contact',
           sourceLabel: 'Event Request Org',
           organization: contactName || undefined,
-          link: `/dashboard?section=event-requests&eventId=${er.id}`,
+          link: `/dashboard?section=event-requests&tab=all&eventId=${er.id}`,
           matchedField: 'Organization name',
           matchedText: er.organizationName || undefined,
         });
@@ -500,7 +500,7 @@ router.get('/search', async (req, res) => {
           sourceType: 'contact',
           sourceLabel: 'Event Request Contact',
           organization: er.organizationName,
-          link: `/dashboard?section=event-requests&eventId=${er.id}`,
+          link: `/dashboard?section=event-requests&tab=all&eventId=${er.id}`,
           matchedField: contactMatch?.field,
           matchedText: contactMatch?.text,
         });

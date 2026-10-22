@@ -90,7 +90,7 @@ async function sendVolunteerSignupNotification(
 
   try {
     const baseUrl = getAppBaseUrl();
-    const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+    const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
     const volunteerHubUrl = `${baseUrl}/volunteer-hub`;
 
     // Format event date

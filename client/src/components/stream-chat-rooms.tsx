@@ -985,6 +985,25 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
     };
   }, [client, directMessages, groupChats, teamRoomChannels]);
 
+  // A DM someone else starts (e.g. an event-card message) creates a channel this
+  // client isn't watching yet; reload the lists so it shows up without a refresh.
+  useEffect(() => {
+    if (!client || !streamUserId) return;
+
+    const refreshChannelLists = async () => {
+      const { dmChannels, groupChannels } = await loadUserChannels(client, streamUserId);
+      updateUnreadCounts(dmChannels, groupChannels, teamRoomChannels);
+    };
+
+    client.on('notification.added_to_channel', refreshChannelLists);
+    client.on('notification.message_new', refreshChannelLists);
+
+    return () => {
+      client.off('notification.added_to_channel', refreshChannelLists);
+      client.off('notification.message_new', refreshChannelLists);
+    };
+  }, [client, streamUserId, teamRoomChannels]);
+
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
