@@ -454,3 +454,21 @@ describe('diff-based save clears stale range on Range -> Exact Count (500 -> 498
     expect(payload.estimatedSandwichCountMax).toBeNull();
   });
 });
+
+
+describe('Toolkit full-form saves', () => {
+  it.each([
+    ['sent', false, true], ['received_confirmed', false, true],
+    ['not_sent', true, false], ['not_needed', true, false],
+  ])('synchronizes %s with the mirrored checkbox', (status, staleFlag, expected) => {
+    const payload = buildEventDataForServer({
+      ...baseFormData, toolkitStatus: status, toolkitSent: staleFlag,
+    }, {
+      mode: 'schedule', hasEventRequest: true, eventRequestStatus: 'in_process',
+      sandwichMode: 'total', actualSandwichMode: 'total',
+    });
+    expect(payload.toolkitStatus).toBe(status);
+    expect(payload.toolkitSent).toBe(expected);
+    expect(payload.toolkitSentDate).toBeNull();
+  });
+});

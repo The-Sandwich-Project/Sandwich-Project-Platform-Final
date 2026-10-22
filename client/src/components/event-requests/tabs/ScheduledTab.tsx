@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { LayoutGrid, Table2, Download } from 'lucide-react';
 import { EventListBatchProviders } from '../EventListBatchProviders';
 import { EventListSkeleton } from '../EventCardSkeleton';
+import { buildAttendancePatch } from '../form-utils';
 
 export const ScheduledTab: React.FC = () => {
   const { toast } = useToast();
@@ -274,7 +275,9 @@ export const ScheduledTab: React.FC = () => {
             attendanceAdults: adults,
             attendanceTeens: teens,
             attendanceKids: kids,
-            estimatedAttendance: total > 0 ? total : null,
+            // Clearing the breakdown must clear the legacy mirror too, or the
+            // next read falls back to it and resurrects the cleared total.
+            ...buildAttendancePatch(total),
           },
         });
       } else if (editingField === 'partnerOrganizations' || editingField.startsWith('partnerOrg_')) {

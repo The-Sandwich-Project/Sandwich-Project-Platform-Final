@@ -9,3 +9,4 @@
 - [Event lead-time data boundary](event-lead-time-data-boundary.md) — request lead-time analysis is reliable only from late August 2025; older event records were bulk-imported after their event dates.
 - [Weekly monitoring interpretation](weekly-monitoring-interpretation.md) — regional leads; Dunwoody requires Lisa and a separate Marcy-group log, UGA exempt, Collective Learning 275/week estimate.
 - [Historical collection reporting sources](historical-collection-source.md) — current collection logs and older weekly imports disagree on peaks; never mix their totals in one report.
+- [Development query target](development-query-target.md) — the managed development SQL target differs from the workspace app's database; verify the actual app connection before reporting missing records.

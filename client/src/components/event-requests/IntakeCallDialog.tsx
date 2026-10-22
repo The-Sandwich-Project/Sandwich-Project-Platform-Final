@@ -58,6 +58,7 @@ import {
 } from '@/hooks/useDraftPersistence';
 import { EventConflictWarnings, useEventConflicts } from './EventConflictWarnings';
 import { getTrafficConflict } from '@shared/traffic-conflicts';
+import { buildAttendancePatch } from './form-utils';
 
 interface IntakeDraftData {
   checkedItems: string[];
@@ -213,7 +214,8 @@ function buildStructuredUpdates(
   if (participantValue) {
     const n = parseNumberFromText(participantValue);
     if (n !== null) {
-      updates.estimatedAttendance = n;
+      // Keeps the legacy volunteerCount mirror in step with the estimate.
+      Object.assign(updates, buildAttendancePatch(n));
       mapped.push({
         itemId: 'participant_count',
         column: 'estimated attendance',
