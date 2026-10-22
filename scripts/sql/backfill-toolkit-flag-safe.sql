@@ -1,13 +1,16 @@
--- WRITES DATA. Sets toolkit_sent = true only for records that
--- classify-toolkit-conflicts.sql puts in safe_set_flag_true: not soft deleted,
--- status sent/received_confirmed, and whose latest audited toolkit change was a
--- status change (not a deliberate checkbox uncheck).
+-- WRITES DATA. Sets toolkit_sent = true for records that
+-- classify-toolkit-conflicts.sql puts in safe_set_flag_true or
+-- review_no_history: not soft deleted, status sent/received_confirmed, and
+-- either the latest audited toolkit change was a status change or there is no
+-- audited toolkit change at all (created already sent, or predates the audit
+-- log). Deliberate checkbox unchecks and unclear history are excluded.
 --
 -- Touches toolkit_sent only. Dates, senders, contact logs, updated_at and
 -- statuses are left as they are.
 --
 -- Deliberately has no COMMIT. Run it, check the returned rows, then:
---   * row count <= the safe_set_flag_true count from the preview -> COMMIT
+--   * row count <= safe_set_flag_true + review_no_history from the preview
+--     (129 on October 22, 2026) -> COMMIT
 --     (fewer is fine: form saves since #528 deployed fix records on their own)
 --   * anything else, or any doubt -> ROLLBACK
 -- Save the returned IDs before committing; they are the record of this change.
@@ -42,10 +45,13 @@ latest_toolkit_change AS (
   ORDER BY id, timestamp DESC
 ),
 safe AS (
-  SELECT id FROM latest_toolkit_change
-  WHERE NOT (old_flag = 'true' AND new_flag = 'false')
-    AND new_status IN ('sent', 'received_confirmed')
-    AND old_status IS DISTINCT FROM new_status
+  SELECT c.id
+  FROM candidates c
+  LEFT JOIN latest_toolkit_change l ON l.id = c.id
+  WHERE l.id IS NULL
+     OR ((l.old_flag IS DISTINCT FROM 'true' OR l.new_flag IS DISTINCT FROM 'false')
+         AND l.new_status IN ('sent', 'received_confirmed')
+         AND l.old_status IS DISTINCT FROM l.new_status)
 )
 UPDATE event_requests er
 SET toolkit_sent = true
