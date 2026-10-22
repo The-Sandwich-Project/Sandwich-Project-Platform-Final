@@ -32,14 +32,12 @@ import {
   Star,
   CheckCircle,
   AlertCircle,
-  MessageCircle,
   Info,
   Camera,
   Calculator,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import SendKudosButton from '@/components/send-kudos-button';
-import { MessageComposer } from '@/components/message-composer';
 import sandwichLogo from '@assets/LOGOS/Copy of TSP_transparent.png';
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -220,7 +218,6 @@ export default function SandwichCollectionLog() {
   const DUPLICATES_PER_PAGE = 10;
   const [showBatchEdit, setShowBatchEdit] = useState(false);
   const [showSubmitForm, setShowSubmitForm] = useState(false);
-  const [messageCollection, setMessageCollection] = useState<any>(null);
   const [batchEditData, setBatchEditData] = useState({
     hostName: '',
     collectionDate: '',
@@ -3411,22 +3408,6 @@ export default function SandwichCollectionLog() {
                               </TooltipContent>
                             </Tooltip>
                           )}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setMessageCollection(collection)}
-                              aria-label="Message about this collection"
-                              className="h-11 w-11 sm:h-8 sm:w-8 p-0"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Message about this collection
-                          </TooltipContent>
-                        </Tooltip>
                         {canEditCollection(user, collection) && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -4847,26 +4828,6 @@ export default function SandwichCollectionLog() {
               cleanDuplicatesMutation.mutate('og-duplicates')
             }
           />
-        </DialogContent>
-      </Dialog>
-
-      {/* Message Composer Dialog */}
-      <Dialog open={!!messageCollection} onOpenChange={() => setMessageCollection(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Message About Collection: {messageCollection?.hostName}
-            </DialogTitle>
-          </DialogHeader>
-          {messageCollection && (
-            <MessageComposer
-              contextType="collection"
-              contextId={messageCollection.id.toString()}
-              contextTitle={`${messageCollection.hostName} collection`}
-              onSent={() => setMessageCollection(null)}
-              onCancel={() => setMessageCollection(null)}
-            />
-          )}
         </DialogContent>
       </Dialog>
 

@@ -10,12 +10,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   Circle,
   Play,
   CheckCircle2,
@@ -38,7 +32,6 @@ import {
   Building,
   Heart,
   DollarSign,
-  MessageCircle,
 } from 'lucide-react';
 import { Project } from '@shared/schema';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,7 +43,6 @@ import { useProjectQueries } from '../hooks/useProjectQueries';
 import { useProjectMutations } from '../hooks/useProjectMutations';
 import { useProjectContext } from '../context/ProjectContext';
 import SendKudosButton from '@/components/send-kudos-button';
-import { MessageComposer } from '@/components/message-composer';
 
 interface ProjectCardProps {
   project: Project;
@@ -66,7 +58,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
     unarchiveProjectMutation,
   } = useProjectMutations();
   const { setEditingProject, setShowEditDialog } = useProjectContext();
-  const [showMessageDialog, setShowMessageDialog] = React.useState(false);
 
   // Helper functions
   const getStatusIcon = (status: string) => {
@@ -208,7 +199,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
     project.status !== 'archived';
 
   return (
-    <>
     <Card
       className={`group hover:shadow-lg transition-all duration-200 ${
         project.googleSheetRowId ? 'border-l-4 border-l-[#236383]' :
@@ -262,11 +252,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setShowMessageDialog(true)}>
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Message About This Project
-              </DropdownMenuItem>
-
               {userCanEditProject && (
                 <>
                   <DropdownMenuSeparator />
@@ -423,22 +408,5 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
         </div>
       </CardContent>
     </Card>
-
-    {/* Message Composer Dialog */}
-    <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Message About Project: {project.title}</DialogTitle>
-        </DialogHeader>
-        <MessageComposer
-          contextType="project"
-          contextId={project.id.toString()}
-          contextTitle={project.title}
-          onSent={() => setShowMessageDialog(false)}
-          onCancel={() => setShowMessageDialog(false)}
-        />
-      </DialogContent>
-    </Dialog>
-    </>
   );
 };
