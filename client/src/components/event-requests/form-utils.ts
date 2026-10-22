@@ -27,6 +27,66 @@ export function serializeDateToISO(dateString: string): string | null {
 }
 
 /**
+ * Resolve the authoritative estimated attendance for an existing event record.
+ *
+ * `estimatedAttendance` is the authoritative column. `volunteerCount` is the
+ * legacy column the attendance input used to write in parallel, so records
+ * saved before that duplication was removed can carry the count there with
+ * `estimatedAttendance` still empty. Fall back to it on READ only — nothing
+ * writes `volunteerCount` on its own any more (see buildEventDataForServer).
+ *
+ * When the two columns disagree, `estimatedAttendance` wins.
+ */
+export function resolveEstimatedAttendance(
+  event: { estimatedAttendance?: number | null; volunteerCount?: number | null } | null | undefined,
+): number {
+  const estimated = Number(event?.estimatedAttendance) || 0;
+  if (estimated > 0) return estimated;
+  return Number(event?.volunteerCount) || 0;
+}
+
+/**
+ * Build the attendance columns for a PATCH body.
+ *
+ * EVERY write of estimatedAttendance must go through this. The legacy
+ * `volunteerCount` mirror has to move with it — especially on a CLEAR, because
+ * `{ estimatedAttendance: null, volunteerCount: 30 }` is indistinguishable from
+ * a genuine legacy-only record, so a stale mirror makes the next read resurrect
+ * the value the user just cleared. 0 and blank both clear.
+ */
+export function buildAttendancePatch(value: unknown): {
+  estimatedAttendance: number | null;
+  volunteerCount: number | null;
+} {
+  const total = parseInt(String(value ?? '').trim() || '0', 10) || null;
+  return { estimatedAttendance: total, volunteerCount: total };
+}
+
+/**
+ * Bring a persisted auto-save draft snapshot into the current attendance shape.
+ *
+ * Drafts written before estimatedAttendance became the single attendance value
+ * carry a parallel `volunteerCount`, and their `estimatedAttendance` was
+ * initialized to 0 instead of falling back to the legacy column. Merging such a
+ * snapshot as-is makes that fallback look like a concurrent SERVER edit, so the
+ * merge resolves it as a conflict and discards the user's unsaved estimate.
+ *
+ * Must be applied to BOTH halves of a draft — the user's copy and its original
+ * server snapshot — so "what the user actually changed" is still computed from
+ * two values in the same representation. Normalizing only one half would turn
+ * an untouched draft value into an apparent edit (or vice versa).
+ *
+ * A no-op for drafts saved after the change: they have no `volunteerCount`.
+ */
+export function normalizeDraftAttendance(snapshot: any): any {
+  if (!snapshot || typeof snapshot !== 'object' || !('volunteerCount' in snapshot)) {
+    return snapshot;
+  }
+  const { volunteerCount, ...rest } = snapshot;
+  return { ...rest, estimatedAttendance: resolveEstimatedAttendance(snapshot) };
+}
+
+/**
  * Build the event data payload for the server from form state.
  *
  * This is the SINGLE place where form fields are mapped to server fields.
@@ -103,7 +163,6 @@ export function buildEventDataForServer(
         : null;
     })(),
     volunteersNeeded: parseInt(formData.volunteersNeeded?.toString() || '0') || 0,
-    estimatedAttendance: parseInt(formData.estimatedAttendance?.toString() || '0') || null,
 
     // Contacts
     tspContact: formData.tspContact || null,
@@ -218,8 +277,13 @@ export function buildEventDataForServer(
     eventData.estimatedSandwichRangeType = null;
   }
 
-  // Attendee counts
-  eventData.volunteerCount = formData.volunteerCount || 0;
+  // Attendee counts.
+  // estimatedAttendance has exactly one home in form state, and both columns it
+  // maps to come from the one writer. volunteerCount is a read-compatibility
+  // mirror for older consumers of the legacy column (impact reports,
+  // large-event logistics modal) and must never be written from an input —
+  // that is what let the two columns drift apart.
+  Object.assign(eventData, buildAttendancePatch(formData.estimatedAttendance));
   eventData.adultCount = formData.adultCount || 0;
   eventData.childrenCount = formData.childrenCount || 0;
   eventData.kidsAgeRange = formData.kidsAgeRange || null;

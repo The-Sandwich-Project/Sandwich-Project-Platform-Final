@@ -42,7 +42,11 @@ export interface EventFormData {
   estimatedSandwichCountMin: number;
   estimatedSandwichCountMax: number;
   rangeSandwichType: string;
-  volunteerCount: number;
+  /**
+   * Authoritative estimated attendance. The server's legacy `volunteerCount`
+   * column is derived from this in buildEventDataForServer — do not add it back
+   * to form state.
+   */
   estimatedAttendance: number;
   adultCount: number;
   childrenCount: number;

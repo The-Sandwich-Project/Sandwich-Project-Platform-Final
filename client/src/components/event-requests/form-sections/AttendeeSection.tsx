@@ -59,7 +59,6 @@ export const AttendeeSection: React.FC<AttendeeSectionProps> = ({
             onChange={(e) => setFormData((prev: any) => ({
               ...prev,
               estimatedAttendance: parseInt(e.target.value) || 0,
-              volunteerCount: parseInt(e.target.value) || 0,
               adultCount: 0,
               childrenCount: 0,
             }))}
@@ -86,7 +85,6 @@ export const AttendeeSection: React.FC<AttendeeSectionProps> = ({
                 setFormData((prev: any) => ({
                   ...prev,
                   adultCount: adults,
-                  volunteerCount: adults + children,
                   estimatedAttendance: adults + children,
                 }));
               }}
@@ -108,7 +106,6 @@ export const AttendeeSection: React.FC<AttendeeSectionProps> = ({
                 setFormData((prev: any) => ({
                   ...prev,
                   childrenCount: children,
-                  volunteerCount: adults + children,
                   estimatedAttendance: adults + children,
                 }));
               }}

@@ -62,6 +62,8 @@ import {
   determineSandwichMode,
   determineBaselineSandwichMode,
   determineActualSandwichMode,
+  resolveEstimatedAttendance,
+  normalizeDraftAttendance,
 } from './form-utils';
 
 // ────────────────────────────────────────────────────────────────────────
@@ -190,8 +192,9 @@ function buildFormDataFromEventRequest(
     estimatedSandwichCountMin: (eventRequest as any)?.estimatedSandwichCountMin || 0,
     estimatedSandwichCountMax: (eventRequest as any)?.estimatedSandwichCountMax || 0,
     rangeSandwichType: (eventRequest as any)?.estimatedSandwichRangeType || '',
-    volunteerCount: (eventRequest as any)?.volunteerCount || 0,
-    estimatedAttendance: (eventRequest as any)?.estimatedAttendance || 0,
+    // Single home for estimated attendance. Legacy records that only populated
+    // the old volunteerCount column still open with their count.
+    estimatedAttendance: resolveEstimatedAttendance(eventRequest as any),
     adultCount: (eventRequest as any)?.adultCount || 0,
     childrenCount: (eventRequest as any)?.childrenCount || 0,
     kidsAgeRange: (eventRequest as any)?.kidsAgeRange || '',
@@ -297,7 +300,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     tspContact: '', customTspContact: '', message: '', schedulingNotes: '',
     planningNotes: '', nextAction: '', driverInstructions: '', volunteerInstructions: '',
     totalSandwichCount: 0, estimatedSandwichCountMin: 0,
-    estimatedSandwichCountMax: 0, rangeSandwichType: '', volunteerCount: 0,
+    estimatedSandwichCountMax: 0, rangeSandwichType: '',
     estimatedAttendance: 0, adultCount: 0, childrenCount: 0, kidsAgeRange: '',
     status: 'new', toolkitSent: false, toolkitSentDate: '', toolkitStatus: 'not_sent',
     socialMediaPostRequested: false, socialMediaPostRequestedDate: '',
@@ -599,8 +602,13 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
               const currentServerData = buildFormDataFromEventRequest(
                 eventRequest, formatDateForInput, getPickupDateTimeForInput, parsePostgresArray
               );
+              // Both halves of the draft are normalized so a draft written
+              // before estimatedAttendance absorbed volunteerCount doesn't read
+              // as a server-side attendance change and lose the user's edit.
               const { mergedData, conflicts, serverUpdates, userChangesPreserved } = intelligentMergeFormData(
-                savedData.formData, savedData.originalServerData, currentServerData
+                normalizeDraftAttendance(savedData.formData),
+                normalizeDraftAttendance(savedData.originalServerData),
+                currentServerData
               );
 
               // Same status-override rule as the no-recovery branch: when the dialog
