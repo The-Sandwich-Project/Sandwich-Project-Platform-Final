@@ -186,7 +186,7 @@ async function sendReminderEmail(
   if (!process.env.SENDGRID_API_KEY) return false;
 
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/dashboard?section=event-requests&eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
   const ruleInfo = RULE_TYPE_LABELS[ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
 
   try {
@@ -239,7 +239,7 @@ async function sendReminderSMS(
   ruleType: string
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/dashboard?section=event-requests&eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
   const ruleInfo = RULE_TYPE_LABELS[ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
   const message = `TSP Reminder (${ruleInfo.label}): ${orgName} needs attention. View: ${eventUrl}`;
 

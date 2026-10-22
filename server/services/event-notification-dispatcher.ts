@@ -120,7 +120,7 @@ export async function sendTspAssignmentNotification(
   isCorporatePriority: boolean = false
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
 
   // Format date
   const dateStr = eventDate
@@ -274,7 +274,7 @@ export async function sendCorporate24hEscalationSMS(
   organizationName: string
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
 
   const phoneNumber = await getUserSMSNumber(userId);
   if (!phoneNumber) {
@@ -298,7 +298,7 @@ export async function sendEventApproachingSMS(
   daysUntil: number
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
 
   const phoneNumber = await getUserSMSNumber(userId);
   if (!phoneNumber) {
@@ -327,7 +327,7 @@ async function sendEventApproachingEmail(
   if (!user?.email) return false;
 
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
   const dateStr = new Date(eventDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   try {
@@ -396,7 +396,7 @@ export async function sendEventChangedNotification(
   if (!process.env.SENDGRID_API_KEY || changes.length === 0) return 0;
 
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
 
   let sentCount = 0;
 
@@ -500,7 +500,7 @@ export async function sendWeeklyContactReminderEmail(
   if (!user?.email) return false;
 
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
   const userName = user.displayName || user.firstName || 'there';
   const dateStr = eventDate ? new Date(eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'TBD';
 
@@ -575,7 +575,7 @@ export async function sendStandbyFollowupEmail(
   if (!user?.email) return false;
 
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
   const userName = user.displayName || user.firstName || 'there';
 
   try {
@@ -644,7 +644,7 @@ export async function sendStaleEventEscalation(
   if (!process.env.SENDGRID_API_KEY) return 0;
 
   const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
 
   let sentCount = 0;
 
@@ -765,7 +765,7 @@ export async function sendBatchedStaleEventEscalation(
     eventsText += `\n${contact.name} (${contact.email}) - ${contact.events.length} stalled event(s):\n`;
     
     for (const event of contact.events) {
-      const eventUrl = `${baseUrl}/event-requests-v2?eventId=${event.eventId}`;
+      const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.eventId}`;
       eventsHtml += `<li><a href="${eventUrl}">${event.organizationName}</a> - ${event.daysSinceContact} days since contact</li>`;
       eventsText += `  - ${event.organizationName} (${event.daysSinceContact} days): ${eventUrl}\n`;
     }
@@ -823,7 +823,7 @@ export async function sendBatchedStaleEventEscalation(
                   <li>Review if organizations are still responsive</li>
                 </ul>
 
-                <a href="${baseUrl}/event-requests-v2?filter=in_process" class="btn">View All In-Process Events →</a>
+                <a href="${baseUrl}/dashboard?section=event-requests&tab=in_process" class="btn">View All In-Process Events →</a>
 
                 ${EMAIL_FOOTER_HTML}
               </div>

@@ -336,7 +336,7 @@ export default function EventContactDetailPage() {
                       className={canViewEventRequests ? 'cursor-pointer hover:bg-slate-50' : ''}
                       onClick={() => {
                         if (!canViewEventRequests) return;
-                        setLocation(`/dashboard?section=event-requests&eventId=${event.eventId}`);
+                        setLocation(`/dashboard?section=event-requests&tab=all&eventId=${event.eventId}`);
                       }}
                     >
                       <TableCell className="font-medium">

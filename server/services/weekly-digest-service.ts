@@ -353,7 +353,7 @@ function getUrgencyIndicator(urgency: 'high' | 'medium' | 'low'): string {
  * Render a single event row for the email
  */
 function renderEventRow(event: DigestEventSummary, baseUrl: string): string {
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${event.eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.eventId}`;
   const urgencyIcon = getUrgencyIndicator(event.urgency);
   const statusColor = getStatusColor(event.status);
 
@@ -384,7 +384,7 @@ function renderEventRow(event: DigestEventSummary, baseUrl: string): string {
  * Render completed event row (simpler)
  */
 function renderCompletedRow(event: DigestEventSummary, baseUrl: string): string {
-  const eventUrl = `${baseUrl}/event-requests-v2?eventId=${event.eventId}`;
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.eventId}`;
 
   return `
     <tr style="border-bottom: 1px solid #E5E7EB;">
@@ -403,7 +403,7 @@ function renderCompletedRow(event: DigestEventSummary, baseUrl: string): string 
  */
 export function buildDigestEmailHtml(data: WeeklyDigestData): string {
   const baseUrl = getAppBaseUrl();
-  const dashboardUrl = `${baseUrl}/event-requests-v2`;
+  const dashboardUrl = `${baseUrl}/dashboard?section=event-requests`;
 
   // Sort active events by urgency
   const sortedActive = [...data.activeEvents].sort((a, b) => {
@@ -509,7 +509,7 @@ export function buildDigestEmailHtml(data: WeeklyDigestData): string {
                       </thead>
                       <tbody>
                         ${data.upcomingContactNeeded.map((e) => {
-                          const eventUrl = `${baseUrl}/event-requests-v2?eventId=${e.eventId}`;
+                          const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${e.eventId}`;
                           return `
                             <tr style="border-bottom: 1px solid #DBEAFE;">
                               <td style="padding: 10px 8px; vertical-align: top;">
@@ -707,7 +707,7 @@ export function buildDigestEmailText(data: WeeklyDigestData): string {
       if (event.contactName) text += `  Contact: ${event.contactName}\n`;
       if (event.contactPhone) text += `  Phone: ${event.contactPhone}\n`;
       if (event.contactEmail) text += `  Email: ${event.contactEmail}\n`;
-      text += `  View: ${baseUrl}/event-requests-v2?eventId=${event.eventId}\n\n`;
+      text += `  View: ${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.eventId}\n\n`;
     }
   }
 
@@ -722,7 +722,7 @@ export function buildDigestEmailText(data: WeeklyDigestData): string {
         text += `• ${event.organizationName} (${event.status})\n`;
         text += `  Date: ${formatDate(event.eventDate)}\n`;
         text += `  Action: ${event.nextAction}\n`;
-        text += `  View: ${baseUrl}/event-requests-v2?eventId=${event.eventId}\n\n`;
+        text += `  View: ${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.eventId}\n\n`;
       }
     }
 
@@ -748,7 +748,7 @@ export function buildDigestEmailText(data: WeeklyDigestData): string {
     text += `\n`;
   }
 
-  text += `\nView your full dashboard: ${baseUrl}/event-requests-v2\n\n`;
+  text += `\nView your full dashboard: ${baseUrl}/dashboard?section=event-requests\n\n`;
   text += `---\nThe Sandwich Project - Fighting food insecurity one sandwich at a time\n`;
 
   return text;
