@@ -23,5 +23,7 @@ export function normalizeSheetStatus(raw: string | null | undefined): EventStatu
   const key = raw.trim().toLowerCase().replace(/[\s-]+/g, '_');
   if (!key) return null;
   if ((EVENT_STATUSES as readonly string[]).includes(key)) return key as EventStatus;
-  return STATUS_ALIASES[key] ?? null;
+  // Own keys only: an inherited key like "constructor" or "__proto__" must not
+  // be returned as a status.
+  return Object.prototype.hasOwnProperty.call(STATUS_ALIASES, key) ? STATUS_ALIASES[key] : null;
 }

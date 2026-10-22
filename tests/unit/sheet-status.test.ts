@@ -16,7 +16,19 @@ describe('normalizeSheetStatus', () => {
     expect(normalizeSheetStatus(raw)).toBe(expected);
   });
 
-  it.each([[''], ['   '], [null], [undefined], ['Maybe?'], ['contact_completed']])(
+  it.each([
+    [''],
+    ['   '],
+    [null],
+    [undefined],
+    ['Maybe?'],
+    ['contact_completed'],
+    // Inherited Object.prototype keys must not be treated as aliases.
+    ['constructor'],
+    ['__proto__'],
+    ['toString'],
+    ['hasOwnProperty'],
+  ])(
     'returns null for unrecognized value %p',
     (raw) => {
       expect(normalizeSheetStatus(raw as string | null | undefined)).toBeNull();
