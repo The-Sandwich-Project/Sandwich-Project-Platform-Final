@@ -11,7 +11,7 @@ import {
   type PlanningSheetRow,
 } from '../planning-sheet-sync-service';
 import { logger } from '../utils/production-safe-logger';
-import { geocodeEventInBackground } from '../utils/geocode-event';
+import { geocodeEventsInBackground } from '../utils/geocode-event';
 import type { AuthenticatedRequest } from '../types/express';
 
 /**
@@ -625,7 +625,8 @@ export function createPlanningSheetImportRouter(
               eventAddress: eventRequests.eventAddress,
             });
           // Give imported events a map pin, like every other entry point.
-          for (const ev of created) geocodeEventInBackground(ev.id, ev.eventAddress);
+          // Paced one at a time in the background (see geocodeEventsInBackground).
+          geocodeEventsInBackground(created);
         }
 
         logger.log(

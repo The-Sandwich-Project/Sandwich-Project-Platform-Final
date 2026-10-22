@@ -564,7 +564,9 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       .from(eventRequests)
       .where(
         and(
-          sql`LOWER(${eventRequests.organizationName}) = LOWER(${data['Group Name']})`,
+          // Trim both sides: the name is stored trimmed, so an untrimmed resend
+          // (or an older record saved with stray spaces) must still match.
+          sql`LOWER(TRIM(${eventRequests.organizationName})) = LOWER(TRIM(${data['Group Name']}))`,
           // Check if either scheduledEventDate or desiredEventDate matches the target date
           or(
             sql`DATE(${eventRequests.scheduledEventDate}) = DATE(${eventDate.toISOString()})`,
