@@ -28,6 +28,8 @@ interface ContactInfoSectionProps extends FormSectionProps {
   isComplete?: boolean;
   /** Whether the form is in create mode (manual entry) */
   isCreateMode?: boolean;
+  /** Show "How did this request come in?". Defaults to create mode only. */
+  showRequestSourcePicker?: boolean;
 }
 
 export const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
@@ -37,6 +39,7 @@ export const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
   onToggle,
   isComplete,
   isCreateMode,
+  showRequestSourcePicker,
 }) => {
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -56,7 +59,7 @@ export const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
 
       {isExpanded && (
         <div className="p-4 border-t bg-[#e6f2f5] grid grid-cols-1 md:grid-cols-2 gap-4">
-          {isCreateMode && (
+          {(showRequestSourcePicker ?? isCreateMode) && (
             <div className="md:col-span-2">
               <Label htmlFor="manualEntrySource" className="text-sm font-semibold">
                 How did this request come in? <span className="text-slate-500 font-normal">(recommended)</span>
