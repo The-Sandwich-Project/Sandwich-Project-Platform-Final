@@ -932,6 +932,32 @@ export const sandwichCollections = pgTable('sandwich_collections', {
   eventRequestId: integer('event_request_id'), // Links collection to event request
 });
 
+// Per-group links between collection entries and event requests. One entry can
+// hold several groups that each had their own event, so links are per group:
+// groupIndex points into the entry's groups, and -1 means the whole entry.
+// groupName snapshots the name so a reordered entry can still be resolved.
+export const eventCollectionLinks = pgTable(
+  'event_collection_links',
+  {
+    id: serial('id').primaryKey(),
+    eventRequestId: integer('event_request_id').notNull(),
+    collectionId: integer('collection_id').notNull(),
+    groupIndex: integer('group_index').notNull(),
+    groupName: text('group_name'),
+    createdBy: varchar('created_by'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    collectionGroupUnique: uniqueIndex('event_collection_links_collection_group_unique').on(
+      table.collectionId,
+      table.groupIndex
+    ),
+    eventIdx: index('idx_event_collection_links_event').on(table.eventRequestId),
+  })
+);
+
+export type EventCollectionLink = typeof eventCollectionLinks.$inferSelect;
+
 // Authoritative weekly collections from Scott's Excel tracking system
 // This is the source of truth for analytics and reporting (2020-2025)
 // Imported from "New Sandwich Totals Scott" Excel file with weekly aggregated data

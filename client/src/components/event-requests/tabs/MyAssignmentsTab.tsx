@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { EventRequest } from '@shared/schema';
+import { useLinkedCollectionTotals } from '../hooks/useLinkedCollectionTotals';
 
 export const MyAssignmentsTab: React.FC = () => {
   const { toast } = useToast();
@@ -128,6 +129,11 @@ export const MyAssignmentsTab: React.FC = () => {
   };
 
   const myAssignments = filterRequestsByStatus('my_assignments');
+  const { data: loggedTotals } = useLinkedCollectionTotals(
+    myAssignments
+      .filter((r: EventRequest) => r.status === 'completed')
+      .map((r: EventRequest) => r.id)
+  );
 
   const toggleStatusFilter = (status: string) => {
     setMyAssignmentsStatusFilter((prev) =>
@@ -412,6 +418,7 @@ export const MyAssignmentsTab: React.FC = () => {
         return (
           <CompletedCard
             {...commonProps}
+            loggedSandwiches={loggedTotals ? loggedTotals[request.id] ?? null : undefined}
             onView={() => {
               setSelectedEventRequest(request);
               setIsEditing(false);
