@@ -28,6 +28,7 @@ import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getUnfilledCounts, getVolunteerCount, getTotalDriverCount } from '../utils/assignment-utils';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
 import { isEligibleForRole, getIneligibilityReason, type EventRole } from '../../shared/event-role-eligibility';
+import { dedupeVolunteerHubEvents } from '../utils/volunteer-hub-dedupe';
 
 const router = Router();
 
@@ -39,44 +40,6 @@ const COORDINATOR_EMAILS = [
 const ACTIVE_SIGNUP_STATUSES = ['pending', 'confirmed', 'assigned'];
 
 type VolunteerHubEventRow = typeof eventRequests.$inferSelect;
-
-/** Prefer active scheduled records when sheet sync created duplicate rows. */
-function pickVolunteerHubDuplicate(a: VolunteerHubEventRow, b: VolunteerHubEventRow): VolunteerHubEventRow {
-  const activeStatuses = new Set(['scheduled', 'rescheduled']);
-  const aActive = activeStatuses.has(a.status);
-  const bActive = activeStatuses.has(b.status);
-  if (aActive !== bActive) return aActive ? a : b;
-  const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-  const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-  if (aTime !== bTime) return aTime > bTime ? a : b;
-  return a.id > b.id ? a : b;
-}
-
-/** Collapse duplicate hub rows (same googleSheetRowId) so calendar days don't list one event twice. */
-function dedupeVolunteerHubEvents(events: VolunteerHubEventRow[]): VolunteerHubEventRow[] {
-  const byId = new Map<number, VolunteerHubEventRow>();
-  const bySheetRow = new Map<string, VolunteerHubEventRow>();
-
-  for (const event of events) {
-    const sheetKey = event.googleSheetRowId?.trim();
-    if (sheetKey) {
-      const existing = bySheetRow.get(sheetKey);
-      if (existing) {
-        const keep = pickVolunteerHubDuplicate(existing, event);
-        byId.delete(existing.id);
-        byId.set(keep.id, keep);
-        bySheetRow.set(sheetKey, keep);
-        continue;
-      }
-      bySheetRow.set(sheetKey, event);
-    }
-    if (!byId.has(event.id)) {
-      byId.set(event.id, event);
-    }
-  }
-
-  return Array.from(byId.values());
-}
 
 /**
  * Whether an event is a genuine volunteer opportunity that belongs on the hub.
