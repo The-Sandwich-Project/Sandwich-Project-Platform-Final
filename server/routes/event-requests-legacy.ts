@@ -70,6 +70,7 @@ function applyVanPurposeNormalization(updates: Record<string, any>): { error?: s
 import { safeJsonParse } from '../utils/safe-json';
 import { getUndefinedColumn, dropColumnKey, classifyDbError, parsePgError } from '../utils/pg-error-utils';
 import { geocodeAddress } from '../utils/geocoding';
+import { geocodeEventInBackground } from '../utils/geocode-event';
 import { rateLimiter } from '../utils/rate-limiter';
 import { getEffectiveEventDate, getAssignmentUrgentGaps, daysSinceSubmitted, daysUntilEventDate } from '../../shared/event-validation-utils';
 import { filterEventsByWeekScope, parseWeekScopeOffset } from '../lib/event-week-filter';
@@ -563,7 +564,9 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       .from(eventRequests)
       .where(
         and(
-          sql`LOWER(${eventRequests.organizationName}) = LOWER(${data['Group Name']})`,
+          // Trim both sides: the name is stored trimmed, so an untrimmed resend
+          // (or an older record saved with stray spaces) must still match.
+          sql`LOWER(TRIM(${eventRequests.organizationName})) = LOWER(TRIM(${data['Group Name']}))`,
           // Check if either scheduledEventDate or desiredEventDate matches the target date
           or(
             sql`DATE(${eventRequests.scheduledEventDate}) = DATE(${eventDate.toISOString()})`,
@@ -671,16 +674,20 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     // Build the event request data
     const eventRequestData = {
       // Required fields
-      organizationName: data['Group Name'],
+      organizationName: data['Group Name']?.trim(),
+      // Fill the requested date too (the planning-sheet import does), so date
+      // matching, cards and filters that read desiredEventDate see this event.
+      desiredEventDate: eventDate,
       scheduledEventDate: eventDate,
       status,
+      statusChangedAt: new Date(),
       externalId,
 
       // Contact info
       firstName: contactNameParts.firstName,
       lastName: contactNameParts.lastName,
-      email: data['Email Address'] || null,
-      phone: data['Contact Cell Number'] || null,
+      email: data['Email Address']?.trim() || null,
+      phone: data['Contact Cell Number']?.trim() || null,
 
       // Event timing
       eventStartTime: data['Event Start time (MUST when volunteer needed)'] || null,
@@ -734,6 +741,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       // Event is confirmed and on calendar since it's coming from the official sheet
       isConfirmed: true,
       addedToOfficialSheet: true,
+      addedToOfficialSheetAt: new Date(),
 
       // Audit
       createdBy: 'google-sheets-import',
@@ -748,6 +756,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     });
     
     const createdEvent = await storage.createEventRequest(eventRequestData as any);
+    geocodeEventInBackground(createdEvent.id, createdEvent.eventAddress);
 
     // Log the import with full details
     logger.info(`✅ Google Sheets import: Created event request ${createdEvent.id} for "${data['Group Name']}" on ${data.date}`, {
@@ -1906,6 +1915,8 @@ router.post(
               .join(', ')}`
           : null,
         duplicateCheckDate: new Date(),
+        // Record when the starting status began, like every other entry point.
+        statusChangedAt: new Date(),
         createdBy: user?.id || 1,
       });
 

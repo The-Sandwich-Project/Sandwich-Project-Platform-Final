@@ -237,6 +237,8 @@ function buildFormDataFromEventRequest(
     followUpOneMonthDate: (eventRequest as any)?.followUpOneMonthDate ? formatDateForInput((eventRequest as any).followUpOneMonthDate) : '',
     followUpNotes: (eventRequest as any)?.followUpNotes || '',
     assignedRecipientIds: parsePostgresArrayFn((eventRequest as any)?.assignedRecipientIds),
+    // Load the saved intake channel so editing shows it (and can change it).
+    manualEntrySource: (eventRequest as any)?.manualEntrySource || '',
     cancelledReason: (eventRequest as any)?.cancelledReason || '',
     cancelledNotes: (eventRequest as any)?.cancelledNotes || '',
     declinedReason: (eventRequest as any)?.declinedReason || '',
@@ -1515,6 +1517,10 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 onToggle={() => setShowContactInfo(!showContactInfo)}
                 isComplete={sectionStatus.contact}
                 isCreateMode={isCreateMode}
+                // Same rule as the always-editable message: new requests and
+                // manually entered ones. Website/planning-sheet events already
+                // have a known source, so the picker doesn't apply to them.
+                showRequestSourcePicker={alwaysEditableMessage}
               />
 
               {/* Backup Contact */}

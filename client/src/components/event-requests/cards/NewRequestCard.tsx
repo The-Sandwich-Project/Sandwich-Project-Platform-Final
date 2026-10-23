@@ -1548,6 +1548,15 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
           const source = getEventRequestSourceIndicator(request as any);
           if (!source) return null;
 
+          if (source.kind === 'planning_sheet') {
+            return (
+              <div className="mt-3 flex items-center gap-1.5 text-[11px] text-gray-500 italic">
+                <Calendar className="w-3 h-3 text-gray-400" aria-hidden="true" />
+                <span>Imported from planning sheet</span>
+              </div>
+            );
+          }
+
           if (source.kind === 'website') {
             return (
               <div className="mt-3 flex items-center gap-1.5 text-[11px] text-gray-500 italic">

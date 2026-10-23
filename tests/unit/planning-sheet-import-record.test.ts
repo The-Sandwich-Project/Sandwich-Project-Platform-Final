@@ -94,4 +94,13 @@ describe('buildImportedEventRecord', () => {
     expect(record.vanNeededFor).toBeNull();
     expect(record.vanDriverNeeded).toBeUndefined();
   });
+
+  it('records the importing user as createdBy, like manual entry', () => {
+    expect(buildImportedEventRecord(makeCandidate(), '42').createdBy).toBe('42');
+    expect(buildImportedEventRecord(makeCandidate()).createdBy).toBeNull();
+  });
+
+  it('records when the starting status began', () => {
+    expect(buildImportedEventRecord(makeCandidate()).statusChangedAt).toBeInstanceOf(Date);
+  });
 });
