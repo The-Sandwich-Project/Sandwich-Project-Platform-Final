@@ -21,6 +21,7 @@ import directionsRouter from './directions';
 import mapTilesRouter from './map-tiles';
 import importCollectionsRouter from './import-collections';
 import notificationsRouter from './notifications';
+import mobileRouter from './mobile';
 import reportsRouter from './reports';
 import searchRouter from './search';
 import { createSmartSearchRouter } from './smart-search';
@@ -452,6 +453,14 @@ export function createMainRoutes(deps: RouterDependencies) {
     notificationsRouter
   );
   router.use('/api/notifications', createErrorHandler('notifications'));
+
+  router.use(
+    '/api/mobile',
+    deps.isAuthenticated,
+    ...createStandardMiddleware(),
+    mobileRouter
+  );
+  router.use('/api/mobile', createErrorHandler('mobile'));
 
   // Permission requests - allow users to request access to features
   const permissionRequestsRouter = createPermissionRequestsRouter(deps);
