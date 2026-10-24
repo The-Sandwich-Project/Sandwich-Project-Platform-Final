@@ -62,7 +62,7 @@ import {
 import { format } from 'date-fns';
 import type { EventRequest } from '@shared/schema';
 import { parseSandwichTypes } from '@/lib/sandwich-utils';
-import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
+import { hasActiveSandwichRange, hasActiveSandwichTypes } from '@shared/sandwich-count-utils';
 import {
   getDriverIds, getDriverCount, getTotalDriverCount,
   getVolunteerIds, getVolunteerCount
@@ -962,7 +962,13 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
   
   // Sandwich types dialog handlers
   const openSandwichDialog = (event: EventRequest) => {
-    const existingTypes = parseSandwichTypes(event.sandwichTypes) || [];
+    // Only seed from a breakdown that agrees with the exact count. Seeding a
+    // stale one would show quantities the event's own count contradicts, and
+    // saving the dialog re-sums them back over that count (exact 500 reappears
+    // as 250 turkey + 248 PBJ = 498).
+    const existingTypes = hasActiveSandwichTypes(event.sandwichTypes, event.estimatedSandwichCount)
+      ? parseSandwichTypes(event.sandwichTypes) || []
+      : [];
     setDialogSandwichTypes(existingTypes.length > 0 ? existingTypes : [{ type: 'deli', quantity: 0 }]);
     setSandwichDialogEventId(event.id);
     setShowSandwichDialog(true);
