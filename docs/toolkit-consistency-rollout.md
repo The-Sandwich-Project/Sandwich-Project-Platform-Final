@@ -18,7 +18,28 @@ Read-only queries against the verified production branch found:
 
 44 of the 133 proposed checkbox corrections have a sent date. Both opposite conflicts have dates, so retain them for history review instead of overwriting their status automatically. Hold the three soft-deleted candidates separately. The 383 already-true records without dates do not need invented dates.
 
-The proposed first cleanup is to set only toolkitSent=true for the 130 non-deleted events explicitly marked sent or received_confirmed. This is a proposal, not an executed backfill. Re-run the preview at deployment because live counts can change.
+The proposed first cleanup was to set only toolkitSent=true for the 130 non-deleted events explicitly marked sent or received_confirmed. It was executed on October 22, 2026, after the audit-history check below.
+
+## Backfill, October 22, 2026
+
+Before writing, `scripts/sql/classify-toolkit-conflicts.sql` sorted each conflict by its most recent audited toolkit change. The concern was spreadsheet "No" edits: before this PR they changed only toolkitSent, so a sent-status/false-flag record could be a deliberate uncheck rather than a stale checkbox.
+
+| Bucket | Records | Outcome |
+| --- | ---: | --- |
+| Latest change set status to sent; flag left behind | 49 | toolkitSent set true |
+| No audited toolkit change | 80 | toolkitSent set true |
+| Deliberate spreadsheet uncheck | 0 | none found |
+| Opposite conflicts (flag true, status not_sent) | 2 | toolkitStatus set sent |
+| Unclear (partial audit snapshot) | 1 | toolkitSent set true |
+| Soft deleted | 3 | left unchanged |
+
+`scripts/sql/diagnose-toolkit-no-history.sql` showed the 80 split into 48 created already marked sent, 18 created before the audit log began (September 5, 2025), and 14 whose status changed through a path that did not write an audit entry. Because their status already said sent and none of the 50 traceable records was a deliberate uncheck, they were treated like the 49.
+
+Both opposite conflicts had a sent date and an audited checkbox-only change from false to true, so the checkbox was the deliberate edit and the status was corrected instead. The unclear record's latest audit entry had no toolkit fields in its after-snapshot, so it was handled like the no-history group.
+
+`scripts/sql/backfill-toolkit-flag-safe.sql` updated 129 records; the three remaining corrections were explicit by ID. Each ran in a transaction, and the returned row count was checked before COMMIT. Only toolkit_sent or toolkit_status changed: dates, senders, contact logs and updated_at were untouched. The returned record IDs were kept privately, not in this public repository. A fresh read afterward found no non-deleted record with a sent status and a false checkbox.
+
+Open question: the 14 unaudited status changes suggest some write path skips the audit log.
 
 ## Rollout
 
@@ -27,4 +48,4 @@ The proposed first cleanup is to set only toolkitSent=true for the 130 non-delet
 3. Run `scripts/sql/preview-toolkit-reconciliation.sql` on the verified production connection. It is read-only and returns record IDs and proposed actions without contact names or email addresses. Keep its output private.
 4. Review the candidate IDs and verify the production restore point before authorizing a separate, audited backfill. Test that exact backfill on a production-derived isolated branch first. Preserve dates, senders, contact logs, and the two unresolved opposite conflicts.
 
-No database migration, historical UPDATE, deployment, or production-copy write is included in this PR. Automated validation covers the shared normalization rules and actual form payload builder; the deployment smoke test and backfill rehearsal remain rollout steps.
+Status: steps 1, 3 and 4 are done (the backfill ran with an in-transaction row-count check rather than a rehearsal on an isolated branch). Step 2's manual smoke test is still pending.
