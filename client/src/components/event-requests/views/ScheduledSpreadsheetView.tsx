@@ -69,6 +69,7 @@ import {
 } from '@/lib/assignment-utils';
 import { SANDWICH_TYPES } from '../constants';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
+import { compareEventsByDateThenTime } from '@/lib/event-sort';
 import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
 
 interface Column {
@@ -574,70 +575,9 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
 
       switch (sortField) {
         case 'eventDate':
-          // Use timezone-safe date parsing for sorting
-          const parseDateSafe = (date: string | Date | null | undefined): number => {
-            if (!date) return 0;
-            const dateStr = typeof date === 'string' ? date : date.toISOString();
-            let dateObj: Date;
-
-            if (dateStr.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
-              const dateOnly = dateStr.split(' ')[0];
-              dateObj = new Date(dateOnly + 'T12:00:00');
-            } else if (dateStr.match(/^\d{4}-\d{2}-\d{2}T00:00:00(\.\d{3})?Z?$/)) {
-              const dateOnly = dateStr.split('T')[0];
-              dateObj = new Date(dateOnly + 'T12:00:00');
-            } else if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              dateObj = new Date(dateStr + 'T12:00:00');
-            } else {
-              const tempDate = new Date(dateStr);
-              if (isNaN(tempDate.getTime())) return 0;
-              const year = tempDate.getUTCFullYear();
-              const month = String(tempDate.getUTCMonth() + 1).padStart(2, '0');
-              const day = String(tempDate.getUTCDate()).padStart(2, '0');
-              dateObj = new Date(`${year}-${month}-${day}T12:00:00`);
-            }
-            return dateObj.getTime();
-          };
-
-          // Helper to parse time string to minutes (for secondary sort)
-          const parseTimeToMinutes = (time: string | null | undefined): number => {
-            if (!time) return 999999; // Events without time go to the end
-            const timeMatch = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-            if (!timeMatch) return 999999;
-
-            let hours = parseInt(timeMatch[1]);
-            const minutes = parseInt(timeMatch[2]);
-            const isPM = timeMatch[3]?.toUpperCase() === 'PM';
-            const isAM = timeMatch[3]?.toUpperCase() === 'AM';
-
-            // Convert to 24-hour format
-            if (isPM && hours !== 12) hours += 12;
-            if (isAM && hours === 12) hours = 0;
-
-            return hours * 60 + minutes;
-          };
-
-          aValue = parseDateSafe(getEffectiveEventDate(a));
-          bValue = parseDateSafe(getEffectiveEventDate(b));
-
-          // If dates are equal, sort by event start time, then pickup time
-          if (aValue === bValue) {
-            const aStartTime = parseTimeToMinutes(a.eventStartTime);
-            const bStartTime = parseTimeToMinutes(b.eventStartTime);
-
-            if (aStartTime !== bStartTime) {
-              return sortDirection === 'asc' ? aStartTime - bStartTime : bStartTime - aStartTime;
-            }
-
-            // If start times are also equal, sort by pickup time
-            const aPickupTime = parseTimeToMinutes(a.pickupTime);
-            const bPickupTime = parseTimeToMinutes(b.pickupTime);
-
-            if (aPickupTime !== bPickupTime) {
-              return sortDirection === 'asc' ? aPickupTime - bPickupTime : bPickupTime - aPickupTime;
-            }
-          }
-          break;
+          // Date in the chosen direction; within a date, earliest start (or
+          // pickup) time first, untimed events last
+          return compareEventsByDateThenTime(a, b, sortDirection);
         case 'groupName':
           aValue = a.organizationName || `${a.firstName} ${a.lastName}`.trim() || '';
           bValue = b.organizationName || `${b.firstName} ${b.lastName}`.trim() || '';
