@@ -35,6 +35,7 @@ import {
   Info,
   Camera,
   Calculator,
+  Repeat,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import SendKudosButton from '@/components/send-kudos-button';
@@ -72,6 +73,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import BulkDataManager from '@/components/bulk-data-manager';
 import CollectionFormSelector from '@/components/collection-form-selector';
+import CollectionAutoEntryDialog from '@/components/collection-auto-entry-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
@@ -294,6 +296,7 @@ export default function SandwichCollectionLog() {
   const [editCalcDisplay, setEditCalcDisplay] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showDataManagement, setShowDataManagement] = useState(false);
+  const [showAutoEntries, setShowAutoEntries] = useState(false);
   const [newCollectionData, setNewCollectionData] = useState({
     collectionDate: '',
     hostName: '',
@@ -2896,6 +2899,17 @@ export default function SandwichCollectionLog() {
                 <span className="sm:hidden">Data</span>
               </Button>
             )}
+            {canEditAllCollections && (
+              <Button
+                onClick={() => setShowAutoEntries(true)}
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-2 w-full sm:w-auto justify-center py-2.5 bg-white border-gray-300 hover:bg-gray-50 text-gray-700"
+              >
+                <Repeat className="w-4 h-4" />
+                <span>Weekly Auto Entries</span>
+              </Button>
+            )}
             {selectedCollections.size > 0 && canEditData && (
               <div className="flex flex-col xs:flex-row gap-2 w-full mt-2">
                 <Button
@@ -3466,6 +3480,12 @@ export default function SandwichCollectionLog() {
                     {collection.createdByName && (
                       <span className="ml-1 font-medium">
                         by {collection.createdByName}
+                      </span>
+                    )}
+                    {collection.submissionMethod === 'automatic' && (
+                      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded border border-slate-300 px-1 text-[10px] font-medium uppercase tracking-wide text-slate-600">
+                        <Repeat className="w-2.5 h-2.5" />
+                        Auto
                       </span>
                     )}
                   </div>
@@ -4815,6 +4835,8 @@ export default function SandwichCollectionLog() {
       </Dialog>
 
       {/* Data Management Dialog */}
+      <CollectionAutoEntryDialog open={showAutoEntries} onOpenChange={setShowAutoEntries} />
+
       <Dialog open={showDataManagement} onOpenChange={setShowDataManagement}>
         <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

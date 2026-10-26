@@ -7,6 +7,7 @@ import createAdminRoutes from './core/admin';
 import createGroupsCatalogRoutes from './collections/groups-catalog';
 import tasksRouter from './tasks';
 import collectionsRouter from './collections';
+import collectionAutoEntriesRouter from './collections/auto-entries';
 import recipientsRouter from './recipients';
 import createMeetingsRouter from './meetings/index';
 import meetingNotesRouter from './meeting-notes';
@@ -315,6 +316,15 @@ export function createMainRoutes(deps: RouterDependencies) {
     collectionsRouter
   );
   router.use('/api/sandwich-collections', createErrorHandler('collections'));
+
+  // Weekly overrides for recurring automatic entries (Collective Learning 250 PBJ)
+  router.use(
+    '/api/collection-auto-entries',
+    deps.isAuthenticated,
+    ...createStandardMiddleware(),
+    collectionAutoEntriesRouter
+  );
+  router.use('/api/collection-auto-entries', createErrorHandler('collection-auto-entries'));
 
   // Photo scanner for sign-in sheets (uses vision AI to extract collection data)
   router.use(

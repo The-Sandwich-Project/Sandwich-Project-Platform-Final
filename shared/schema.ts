@@ -932,6 +932,33 @@ export const sandwichCollections = pgTable('sandwich_collections', {
   eventRequestId: integer('event_request_id'), // Links collection to event request
 });
 
+// Per-week overrides for recurring automatic collection entries (e.g. Collective
+// Learning's standing 250 PBJ). No row = record the default count that week.
+// See server/services/collections/recurring-auto-entry.ts.
+export const collectionAutoEntryOverrides = pgTable(
+  'collection_auto_entry_overrides',
+  {
+    id: serial('id').primaryKey(),
+    scheduleKey: text('schedule_key').notNull(), // Which recurring entry, e.g. 'collective-learning'
+    weekDate: text('week_date').notNull(), // YYYY-MM-DD Wednesday the override applies to
+    action: text('action').notNull(), // 'skip' (didn't collect) or 'count' (collected a different number)
+    count: integer('count'), // Used when action = 'count'
+    updatedBy: text('updated_by'),
+    updatedByName: text('updated_by_name'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('collection_auto_entry_overrides_schedule_week_unique').on(
+      table.scheduleKey,
+      table.weekDate
+    ),
+  ]
+);
+
+export type CollectionAutoEntryOverride =
+  typeof collectionAutoEntryOverrides.$inferSelect;
+
 // Authoritative weekly collections from Scott's Excel tracking system
 // This is the source of truth for analytics and reporting (2020-2025)
 // Imported from "New Sandwich Totals Scott" Excel file with weekly aggregated data

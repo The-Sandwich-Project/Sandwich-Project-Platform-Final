@@ -1628,6 +1628,42 @@ export function initializeCronJobs() {
     timezone: 'America/New_York',
   });
 
+  // Recurring automatic collection entries — daily at 8:00 PM ET.
+  // Records Collective Learning's standing 250 PBJ dated each Wednesday,
+  // honoring per-week overrides (skip / different count) and never
+  // double-counting a manually entered collection. Reconciles this week and
+  // last week, so a missed run catches up and late overrides still apply.
+  // Production only: dev may share the production DB via the DATABASE_URL fallback.
+  const recurringAutoEntryJob = cron.schedule('0 20 * * *', async () => {
+    if (!isProduction) {
+      cronLogger.info('Skipping recurring auto entries - not production environment');
+      return;
+    }
+    cronLogger.info('Running recurring automatic collection entries...');
+    try {
+      const { reconcileRecurringAutoEntries } = await import('./collections/recurring-auto-entry');
+      const results = await reconcileRecurringAutoEntries();
+      cronLogger.info('Recurring automatic collection entries completed', {
+        results: results.map((r) => `${r.schedule} ${r.weekDate}: ${r.plan.kind}`),
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      logError(
+        error as Error,
+        'Error running recurring auto entry cron job',
+        undefined,
+        { jobType: 'recurring-auto-entry' }
+      );
+    }
+  }, {
+    timezone: 'America/New_York',
+  });
+
+  cronLogger.info('Recurring automatic collection entry job scheduled successfully', {
+    schedule: 'Daily at 8:00 PM',
+    timezone: 'America/New_York',
+  });
+
   // Return job references in case we need to manage them later
   return {
     hostScraperJob,
@@ -1649,6 +1685,7 @@ export function initializeCronJobs() {
     standbyFollowupJob,
     integrationHealthJob,
     errorDigestJob,
+    recurringAutoEntryJob,
   };
 }
 
@@ -1676,5 +1713,6 @@ export function stopAllCronJobs(jobs: ReturnType<typeof initializeCronJobs>) {
   jobs.standbyFollowupJob.stop();
   jobs.integrationHealthJob.stop();
   jobs.errorDigestJob.stop();
+  jobs.recurringAutoEntryJob.stop();
   cronLogger.info('All cron jobs stopped successfully');
 }
