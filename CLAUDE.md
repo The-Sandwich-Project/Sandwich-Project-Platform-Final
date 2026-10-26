@@ -117,6 +117,7 @@ Boolean fields on event cards (isConfirmed, addedToOfficialSheet, showOnVoluntee
 All in `server/services/cron-jobs.ts` (node-cron, `America/New_York`). Key jobs:
 - `autoCompletePassedEvents` — nightly at 12:05am, moves scheduled/rescheduled events past their date to completed
 - `processCheckInReminders` — hourly at :15, sends the per-event check-in reminders TSP contacts turn on (this replaced the old automatic volunteer reminders)
+- Collective Learning auto-log — daily at 6:20pm (prod only), records the standing weekly PBJ count (default 250) as a `submission_method = 'auto_recurring'` collection unless a per-week override (`recurring_collection_overrides`) says they didn't collect or gives a different count. Admin card on the Collections page.
 - Weekly/admin digests, admin SMS pulse, standby follow-ups, daily error digest — **production only** (bodies return early unless `NODE_ENV=production`)
 - Monthly AI impact report and prediction alert; daily integration health check; Monday host-availability scrape
 - **Disabled jobs** (volunteer reminders, TSP/corporate follow-ups, event-approaching, etc.) are log-only stubs. Note: they pass `{ scheduled: false }`, but node-cron 4.x ignores that option and starts them anyway — if you restore a real body, it will run on schedule immediately.

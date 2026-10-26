@@ -25,6 +25,7 @@ import { sendDailyErrorDigest } from './application-error-logger';
 import { ALERT_TYPES } from '@shared/alert-catalog';
 import { getEffectivePrefs } from './notifications/preferences';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
+import { runCollectiveLearningAutoLog } from './collections/collective-learning-auto-log';
 
 const cronLogger = createServiceLogger('cron');
 
@@ -1628,6 +1629,39 @@ export function initializeCronJobs() {
     timezone: 'America/New_York',
   });
 
+  // Collective Learning weekly auto-log - runs daily at 6:20 PM
+  // Records the standing weekly PBJ count for the current Wed–Tue collection
+  // week (dated the Wednesday) unless that week has a "didn't collect" /
+  // different-count override, a real log, or is a holiday week. Running daily
+  // instead of once on Wednesday means a missed run (restart, outage) catches
+  // up the next evening; reconcileWeek is idempotent.
+  // PRODUCTION ONLY: dev instances can use the "Run now" button instead
+  const collectiveLearningAutoLogJob = cron.schedule('20 18 * * *', async () => {
+    if (!isProduction) {
+      cronLogger.info('Skipping Collective Learning auto-log - not production environment');
+      return;
+    }
+    try {
+      const result = await runCollectiveLearningAutoLog();
+      cronLogger.info('Collective Learning auto-log completed', result);
+    } catch (error) {
+      logError(
+        error as Error,
+        'Error running Collective Learning auto-log cron job',
+        undefined,
+        { jobType: 'collective-learning-auto-log' }
+      );
+    }
+  }, {
+    scheduled: true,
+    timezone: 'America/New_York',
+  });
+
+  cronLogger.info('Collective Learning auto-log job scheduled successfully', {
+    schedule: 'Daily at 6:20 PM',
+    timezone: 'America/New_York',
+  });
+
   // Return job references in case we need to manage them later
   return {
     hostScraperJob,
@@ -1649,6 +1683,7 @@ export function initializeCronJobs() {
     standbyFollowupJob,
     integrationHealthJob,
     errorDigestJob,
+    collectiveLearningAutoLogJob,
   };
 }
 
@@ -1676,5 +1711,6 @@ export function stopAllCronJobs(jobs: ReturnType<typeof initializeCronJobs>) {
   jobs.standbyFollowupJob.stop();
   jobs.integrationHealthJob.stop();
   jobs.errorDigestJob.stop();
+  jobs.collectiveLearningAutoLogJob.stop();
   cronLogger.info('All cron jobs stopped successfully');
 }
