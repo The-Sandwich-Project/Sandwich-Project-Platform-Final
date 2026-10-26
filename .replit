@@ -10,6 +10,7 @@ packages = ["cairo", "chromium", "ffmpeg-full", "freetype", "ghostscript", "glib
 deploymentTarget = "gce"
 build = ["sh", "-c", "NODE_OPTIONS=--max-old-space-size=4096 npm run build"]
 run = "NODE_ENV=production node dist/index.js"
+ignorePorts = false
 
 [[ports]]
 localPort = 80
