@@ -1,3 +1,5 @@
+import { normalizeEventContacts } from './services/event-contact-directory';
+import { hasEventContactPatch } from '@shared/event-contact-resolution';
 import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import {
   users,
@@ -4246,7 +4248,7 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .insert(eventRequests)
       .values({
-        ...normalizeToolkitPatch(insertEventRequest),
+        ...normalizeToolkitPatch(await normalizeEventContacts(insertEventRequest)),
         updatedAt: new Date(),
       })
       .returning();
@@ -4258,10 +4260,10 @@ export class DatabaseStorage implements IStorage {
     updates: Partial<EventRequest> & { expectedVersion?: Date }
   ): Promise<EventRequest | undefined> {
     const { expectedVersion, ...rawUpdateData } = updates;
-    const previousToolkit = typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus
+    const previousEvent = hasEventContactPatch(rawUpdateData) || (typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus)
       ? await this.getEventRequest(id)
       : undefined;
-    const updateData = normalizeToolkitPatch(rawUpdateData, previousToolkit);
+    const updateData = normalizeToolkitPatch(await normalizeEventContacts(rawUpdateData, previousEvent), previousEvent);
 
     // DEBUG: Log incoming updates for speaker assignment debugging
     logger.info(`[DB updateEventRequest] Event ${id} - Received update keys: ${Object.keys(updateData).join(', ')}`);
