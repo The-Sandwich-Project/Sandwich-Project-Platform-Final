@@ -297,7 +297,73 @@ export async function reconcileWeek(
     }
   }
   const { overrideSeen: _ignored, ...publicResult } = result;
+
+  // Same idea for the on/off switch: if an admin turned the auto-log off
+  // while this run was in flight, undo the entry it just created/restored.
+  if (
+    (publicResult.outcome === 'created' || publicResult.outcome === 'restored') &&
+    publicResult.collectionId != null &&
+    !(await getAutoLogConfig()).enabled
+  ) {
+    await db
+      .update(sandwichCollections)
+      .set({ deletedAt: new Date(), deletedBy: SYSTEM_USER_ID })
+      .where(eq(sandwichCollections.id, publicResult.collectionId));
+    notifyCollectionsChanged(publicResult.collectionId, 'delete');
+    log.info(`Auto-log was disabled mid-run; removed entry ${publicResult.collectionId}`);
+    return { ...publicResult, outcome: 'skipped_disabled', count: null, collectionId: null };
+  }
   return publicResult;
+}
+
+/**
+ * Called by the storage layer after any edit/delete/restore of a collection
+ * outside this module (the Collections log editor, bulk tools, etc.). If the
+ * row is one of our auto entries, turn the change into a per-week override so
+ * the next reconcile keeps it instead of resetting it to the default:
+ *   - count edited  → override with that count
+ *   - deleted       → "didn't collect" override
+ *   - restored      → drop a "didn't collect" override
+ * Reconcile itself writes through `db` directly, so it never triggers this.
+ */
+export async function syncOverrideFromAutoEntryChange(
+  collectionId: number,
+  change: 'update' | 'delete' | 'restore',
+  userId?: string | null
+): Promise<void> {
+  const [row] = await db
+    .select()
+    .from(sandwichCollections)
+    .where(eq(sandwichCollections.id, collectionId))
+    .limit(1);
+  if (
+    !row ||
+    row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD ||
+    row.createdBy !== AUTO_ROW_CREATED_BY
+  ) {
+    return;
+  }
+  const weekOf = wednesdayOf(row.collectionDate);
+  const user = { userId: userId ?? null, userName: null };
+
+  if (change === 'delete') {
+    await upsertOverride({ weekOf, skipped: true, count: null, note: 'Deleted in Collections log', ...user });
+  } else if (change === 'restore') {
+    const existing = await getOverride(weekOf);
+    if (existing?.skipped) await deleteOverride(weekOf);
+  } else if (!row.deletedAt) {
+    const existing = await getOverride(weekOf);
+    if (existing?.count !== row.individualSandwiches || existing?.skipped) {
+      await upsertOverride({
+        weekOf,
+        skipped: false,
+        count: row.individualSandwiches,
+        note: 'Edited in Collections log',
+        ...user,
+      });
+    }
+  }
+  log.info(`Auto entry ${collectionId} ${change}d outside auto-log; saved as override for week of ${weekOf}`);
 }
 
 async function reconcileWeekOnce(

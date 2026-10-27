@@ -213,7 +213,8 @@ export default function CollectiveLearningAutoLogCard() {
             Every week this logs <strong>{config.defaultCount} PB&amp;J</strong> for {config.hostName}, dated the
             Wednesday of the week. Use an override below when they didn't collect or made a different number —
             it works before or after the week is logged. Holiday weeks and weeks where someone logs a real
-            count are left alone automatically.
+            count are left alone automatically. Editing or deleting an auto entry in the log below works too —
+            it's saved as an override for that week.
           </p>
 
           {/* Settings */}
