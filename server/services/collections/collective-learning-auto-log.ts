@@ -316,19 +316,64 @@ export async function reconcileWeek(
   return publicResult;
 }
 
+function isAutoLogRow(row: { createdBy: string | null } | undefined): boolean {
+  return !!row && row.createdBy === AUTO_ROW_CREATED_BY;
+}
+
 /**
- * Called by the storage layer after any edit/delete/restore of a collection
- * outside this module (the Collections log editor, bulk tools, etc.). If the
- * row is one of our auto entries, turn the change into a per-week override so
- * the next reconcile keeps it instead of resetting it to the default:
- *   - count edited  → override with that count
- *   - deleted       → "didn't collect" override
- *   - restored      → drop a "didn't collect" override
- * Reconcile itself writes through `db` directly, so it never triggers this.
+ * Called by the storage layer *before* any hand edit to a collection (the
+ * Collections log editor, bulk tools, version-control restore, ...). Once a
+ * person edits one of our auto entries, it stops being an estimate: it's
+ * converted to a regular log entry, which reconcile already treats as the
+ * real count for its week (so the edited numbers, sandwich-type breakdown
+ * and date are kept as-is). If the edit moves it to a different week, the
+ * week it left is marked "didn't collect" so the estimate doesn't come back.
+ * Reconcile itself writes through `db` directly, so it never hits this.
+ */
+export async function prepareAutoEntryEdit<T extends Record<string, unknown>>(
+  collectionId: number,
+  updates: T,
+  userId?: string | null
+): Promise<T> {
+  const [row] = await db
+    .select()
+    .from(sandwichCollections)
+    .where(eq(sandwichCollections.id, collectionId))
+    .limit(1);
+  if (!isAutoLogRow(row) || row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD) {
+    return updates;
+  }
+  const newDate = typeof updates.collectionDate === 'string' ? updates.collectionDate : null;
+  if (newDate && isValidDateStr(newDate) && wednesdayOf(newDate) !== wednesdayOf(row.collectionDate)) {
+    await upsertOverride({
+      weekOf: wednesdayOf(row.collectionDate),
+      skipped: true,
+      count: null,
+      note: `Moved to week of ${wednesdayOf(newDate)} in Collections log`,
+      userId: userId ?? null,
+      userName: null,
+    });
+  }
+  log.info(`Auto entry ${collectionId} edited in Collections log; converting to a regular log entry`);
+  return {
+    ...updates,
+    submissionMethod: 'standard',
+    createdByName: `${SYSTEM_USER_NAME}, edited`,
+  };
+}
+
+/**
+ * Called by the storage layer after a collection is deleted or restored
+ * outside this module. For rows that started as auto entries (including ones
+ * since converted by an edit):
+ *   - deleted  → "didn't collect" override, so the estimate doesn't return
+ *   - restored → undo that: drop the "didn't collect" override, and for a
+ *                still-auto row keep its count as an override if it isn't
+ *                the default (so a card-set count survives delete + restore)
  */
 export async function syncOverrideFromAutoEntryChange(
   collectionId: number,
-  change: 'update' | 'delete' | 'restore',
+  change: 'delete' | 'restore',
   userId?: string | null
 ): Promise<void> {
   const [row] = await db
@@ -336,34 +381,35 @@ export async function syncOverrideFromAutoEntryChange(
     .from(sandwichCollections)
     .where(eq(sandwichCollections.id, collectionId))
     .limit(1);
-  if (
-    !row ||
-    row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD ||
-    row.createdBy !== AUTO_ROW_CREATED_BY
-  ) {
-    return;
-  }
+  if (!isAutoLogRow(row)) return;
   const weekOf = wednesdayOf(row.collectionDate);
-  const user = { userId: userId ?? null, userName: null };
 
   if (change === 'delete') {
-    await upsertOverride({ weekOf, skipped: true, count: null, note: 'Deleted in Collections log', ...user });
-  } else if (change === 'restore') {
-    const existing = await getOverride(weekOf);
-    if (existing?.skipped) await deleteOverride(weekOf);
-  } else if (!row.deletedAt) {
-    const existing = await getOverride(weekOf);
-    if (existing?.count !== row.individualSandwiches || existing?.skipped) {
+    await upsertOverride({
+      weekOf,
+      skipped: true,
+      count: null,
+      note: 'Deleted in Collections log',
+      userId: userId ?? null,
+      userName: null,
+    });
+  } else {
+    const stillAuto = row.submissionMethod === AUTO_RECURRING_SUBMISSION_METHOD;
+    const { defaultCount } = await getAutoLogConfig();
+    if (stillAuto && row.individualSandwiches !== defaultCount) {
       await upsertOverride({
         weekOf,
         skipped: false,
         count: row.individualSandwiches,
-        note: 'Edited in Collections log',
-        ...user,
+        note: 'Restored in Collections log',
+        userId: userId ?? null,
+        userName: null,
       });
+    } else if ((await getOverride(weekOf))?.skipped) {
+      await deleteOverride(weekOf);
     }
   }
-  log.info(`Auto entry ${collectionId} ${change}d outside auto-log; saved as override for week of ${weekOf}`);
+  log.info(`Auto entry ${collectionId} ${change}d in Collections log; override updated for week of ${weekOf}`);
 }
 
 async function reconcileWeekOnce(

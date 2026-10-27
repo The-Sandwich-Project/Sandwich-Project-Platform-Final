@@ -98,6 +98,21 @@ export default function CollectiveLearningAutoLogCard() {
     queryKey: [ENDPOINT],
   });
 
+  // Edits, deletes and undo in the Collections log can change auto entries and
+  // their overrides, but those handlers only refresh the collections queries.
+  // Refresh this card whenever the collections list reloads.
+  useEffect(() => {
+    return queryClient.getQueryCache().subscribe((event) => {
+      if (
+        event.type === 'updated' &&
+        event.action.type === 'success' &&
+        event.query.queryKey[0] === '/api/sandwich-collections'
+      ) {
+        queryClient.invalidateQueries({ queryKey: [ENDPOINT] });
+      }
+    });
+  }, []);
+
   useEffect(() => {
     if (status && !weekOf) setWeekOf(status.currentWeekOf);
     if (status && defaultCountDraft === '') setDefaultCountDraft(String(status.config.defaultCount));
@@ -213,8 +228,8 @@ export default function CollectiveLearningAutoLogCard() {
             Every week this logs <strong>{config.defaultCount} PB&amp;J</strong> for {config.hostName}, dated the
             Wednesday of the week. Use an override below when they didn't collect or made a different number —
             it works before or after the week is logged. Holiday weeks and weeks where someone logs a real
-            count are left alone automatically. Editing or deleting an auto entry in the log below works too —
-            it's saved as an override for that week.
+            count are left alone automatically. Editing an auto entry in the log below turns it into a regular log
+            entry with your numbers; deleting one marks that week "didn't collect."
           </p>
 
           {/* Settings */}
