@@ -71,6 +71,7 @@ import {
 } from '@/components/ui/tooltip';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import BulkDataManager from '@/components/bulk-data-manager';
+import CollectiveLearningAutoLogCard from '@/components/collective-learning-auto-log-card';
 import CollectionFormSelector from '@/components/collection-form-selector';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -2563,6 +2564,12 @@ export default function SandwichCollectionLog() {
       </div>
 
       <div className="px-3 sm:px-6 py-4">
+        {/* Weekly Collective Learning auto-log controls (admins only) */}
+        {user?.role &&
+          ['admin', 'super_admin', 'admin_coordinator'].includes(user.role) && (
+            <CollectiveLearningAutoLogCard />
+          )}
+
         {/* Role-customized view indicator */}
         {user?.role && user.role !== 'super_admin' && user.role !== 'admin' && (
           <div className="mb-4 p-3 rounded border-l-4" style={{

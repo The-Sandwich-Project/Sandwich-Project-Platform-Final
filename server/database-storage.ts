@@ -192,6 +192,37 @@ const UNASSIGNED_PROJECT_STATUSES: Array<Project['status']> = [
   'available' as Project['status'],
 ];
 
+/**
+ * Keep the Collective Learning auto-log in step with hand edits to its auto
+ * entries (see prepareAutoEntryEdit / syncOverrideFromAutoEntryChange).
+ * Imported lazily to avoid a storage <-> service import cycle; failures never
+ * block the edit itself.
+ */
+async function autoLog() {
+  return import('./services/collections/collective-learning-auto-log');
+}
+
+async function prepareAutoLogEdit<T extends Record<string, unknown>>(id: number, updates: T): Promise<T> {
+  try {
+    return await (await autoLog()).prepareAutoEntryEdit(id, updates);
+  } catch (error) {
+    logger.error('Failed to prepare auto-log entry edit', error);
+    return updates;
+  }
+}
+
+async function syncAutoLogOverride(
+  id: number,
+  change: 'delete' | 'restore',
+  userId?: string
+): Promise<void> {
+  try {
+    await (await autoLog()).syncOverrideFromAutoEntryChange(id, change, userId);
+  } catch (error) {
+    logger.error('Failed to sync auto-log override after collection change', error);
+  }
+}
+
 export class DatabaseStorage implements IStorage {
   // Users (required for authentication)
   async getUser(id: string): Promise<User | undefined> {
@@ -1476,9 +1507,10 @@ export class DatabaseStorage implements IStorage {
     id: number,
     updates: Partial<SandwichCollection>
   ): Promise<SandwichCollection | undefined> {
+    const finalUpdates = await prepareAutoLogEdit(id, updates);
     const [collection] = await db
       .update(sandwichCollections)
-      .set(updates)
+      .set(finalUpdates)
       .where(eq(sandwichCollections.id, id))
       .returning();
     return collection || undefined;
@@ -1493,7 +1525,9 @@ export class DatabaseStorage implements IStorage {
         deletedBy: userId || null,
       })
       .where(eq(sandwichCollections.id, id));
-    return (result.rowCount ?? 0) > 0;
+    const deleted = (result.rowCount ?? 0) > 0;
+    if (deleted) await syncAutoLogOverride(id, 'delete', userId);
+    return deleted;
   }
 
   async restoreSandwichCollection(id: number): Promise<boolean> {
@@ -1505,7 +1539,9 @@ export class DatabaseStorage implements IStorage {
         deletedBy: null,
       })
       .where(eq(sandwichCollections.id, id));
-    return (result.rowCount ?? 0) > 0;
+    const restored = (result.rowCount ?? 0) > 0;
+    if (restored) await syncAutoLogOverride(id, 'restore');
+    return restored;
   }
 
   // Meeting Minutes
