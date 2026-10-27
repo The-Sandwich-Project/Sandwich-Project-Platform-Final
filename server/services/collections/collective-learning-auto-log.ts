@@ -397,6 +397,28 @@ export async function runCollectiveLearningAutoLog(): Promise<ReconcileResult> {
   return reconcileWeek(todayInEastern());
 }
 
+export const MAX_BACKFILL_WEEKS = 60;
+
+/**
+ * Fill in past weeks: reconcile every collection week from `from` through
+ * `through` (default: the current week). Same rules as the weekly run, so
+ * weeks with a real log, a "didn't collect" override, or a holiday are left
+ * alone, and weeks already auto-logged aren't duplicated.
+ */
+export async function backfillWeeks(
+  from: string,
+  through: string = todayInEastern()
+): Promise<ReconcileResult[]> {
+  const today = todayInEastern();
+  const last = wednesdayOf(through < today ? through : today);
+  const results: ReconcileResult[] = [];
+  for (let week = wednesdayOf(from); week <= last; week = addDays(week, 7)) {
+    if (results.length >= MAX_BACKFILL_WEEKS) break;
+    results.push(await reconcileWeek(week, { today }));
+  }
+  return results;
+}
+
 /** Status for the UI: config, current week's outcome preview, recent auto entries, overrides. */
 export async function getAutoLogStatus() {
   const config = await getAutoLogConfig();

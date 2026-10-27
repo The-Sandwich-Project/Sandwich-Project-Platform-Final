@@ -90,6 +90,9 @@ export default function CollectiveLearningAutoLogCard() {
   const [count, setCount] = useState('');
   const [note, setNote] = useState('');
   const [defaultCountDraft, setDefaultCountDraft] = useState('');
+  const [backfillFrom, setBackfillFrom] = useState('');
+  const [backfillThrough, setBackfillThrough] = useState('');
+  const [backfillResults, setBackfillResults] = useState<ReconcileResult[] | null>(null);
 
   const { data: status, isLoading } = useQuery<AutoLogStatus>({
     queryKey: [ENDPOINT],
@@ -140,6 +143,24 @@ export default function CollectiveLearningAutoLogCard() {
   const runMutation = useMutation({
     mutationFn: () => apiRequest('POST', `${ENDPOINT}/run`, {}),
     onSuccess: (res) => onDone(res),
+    onError,
+  });
+
+  const backfillMutation = useMutation({
+    mutationFn: () =>
+      apiRequest('POST', `${ENDPOINT}/backfill`, {
+        from: backfillFrom,
+        ...(backfillThrough ? { through: backfillThrough } : {}),
+      }),
+    onSuccess: (res: { results: ReconcileResult[] }) => {
+      setBackfillResults(res.results);
+      const filled = res.results.filter((r) => ['created', 'restored', 'updated'].includes(r.outcome)).length;
+      onDone();
+      toast({
+        title: 'Past weeks filled in',
+        description: `${filled} of ${res.results.length} weeks logged; the rest were left alone (see list).`,
+      });
+    },
     onError,
   });
 
@@ -295,6 +316,55 @@ export default function CollectiveLearningAutoLogCard() {
             >
               Save override
             </Button>
+          </div>
+
+          {/* Backfill */}
+          <div className="rounded border border-slate-200 bg-white p-3 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Fill in past weeks</p>
+              <p className="text-xs text-slate-600">
+                Logs the default count for every week in the range that's still missing. Weeks with a real
+                log, holiday weeks, and weeks marked "didn't collect" above are skipped, so mark any
+                intentional gaps first.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div>
+                <Label htmlFor="cl-backfill-from" className="text-xs">From</Label>
+                <Input
+                  id="cl-backfill-from"
+                  type="date"
+                  className="h-9"
+                  value={backfillFrom}
+                  onChange={(e) => setBackfillFrom(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="cl-backfill-through" className="text-xs">Through (blank = this week)</Label>
+                <Input
+                  id="cl-backfill-through"
+                  type="date"
+                  className="h-9"
+                  value={backfillThrough}
+                  onChange={(e) => setBackfillThrough(e.target.value)}
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!backfillFrom || backfillMutation.isPending}
+                onClick={() => backfillMutation.mutate()}
+              >
+                {backfillMutation.isPending ? 'Filling in…' : 'Fill in missing weeks'}
+              </Button>
+            </div>
+            {backfillResults && (
+              <ul className="text-xs text-slate-600 space-y-0.5 max-h-48 overflow-y-auto">
+                {backfillResults.map((r) => (
+                  <li key={r.weekOf}>{describe(r)}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Existing overrides */}

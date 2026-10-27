@@ -9,6 +9,8 @@ import {
   upsertOverride,
   deleteOverride,
   reconcileWeek,
+  backfillWeeks,
+  MAX_BACKFILL_WEEKS,
   wednesdayOf,
   isValidDateStr,
   todayInEastern,
@@ -125,6 +127,37 @@ export function createCollectiveLearningAutoLogRouter() {
     } catch (error) {
       logger.error('Error running auto-log:', error);
       res.status(500).json({ error: 'Failed to run auto-log' });
+    }
+  });
+
+  // Fill in past weeks (e.g. weeks missed before the auto-log existed)
+  router.post('/backfill', requireRole(...ADMIN_ROLES), async (req, res) => {
+    const parsed = z
+      .object({ from: dateStr, through: dateStr.optional() })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
+    }
+    const { from, through } = parsed.data;
+    if (through && through < from) {
+      return res.status(400).json({ error: '"through" must be on or after "from"' });
+    }
+    const weeks = Math.floor(
+      (Date.parse(through ?? todayInEastern()) - Date.parse(wednesdayOf(from))) / (7 * 864e5)
+    ) + 1;
+    if (weeks > MAX_BACKFILL_WEEKS) {
+      return res
+        .status(400)
+        .json({ error: `That's ${weeks} weeks; fill in at most ${MAX_BACKFILL_WEEKS} at a time` });
+    }
+    try {
+      const results = await backfillWeeks(from, through);
+      const summary: Record<string, number> = {};
+      for (const r of results) summary[r.outcome] = (summary[r.outcome] ?? 0) + 1;
+      res.json({ results, summary });
+    } catch (error) {
+      logger.error('Error backfilling auto-log:', error);
+      res.status(500).json({ error: 'Failed to fill in past weeks' });
     }
   });
 
