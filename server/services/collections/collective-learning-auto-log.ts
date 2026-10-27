@@ -38,6 +38,13 @@ import { createServiceLogger } from '../../utils/logger';
 const log = createServiceLogger('collective-learning-auto-log');
 
 const SYSTEM_USER_ID = 'system:auto-log';
+// Stable identity for this rule's auto entries. Lookups and the unique index
+// key on this + collection_date (not host_name), so editing the configured
+// host name updates the existing row instead of logging a second one.
+const AUTO_ROW_CREATED_BY = `${SYSTEM_USER_ID}:${COLLECTIVE_LEARNING_AUTO_LOG_KEY}`;
+// How many past weeks the daily run re-checks, so a real log entered late
+// (after its week's last run) still knocks out the auto estimate.
+export const LOOKBACK_WEEKS = 8;
 const SYSTEM_USER_NAME = 'Auto-log (weekly standing count)';
 
 export interface AutoLogConfig {
@@ -251,13 +258,52 @@ function notifyCollectionsChanged(collectionId: number, trigger: string) {
 }
 
 /**
+ * Holiday weeks can straddle a year boundary (Wed Dec 30 – Tue Jan 5), and
+ * isInExcludedWeek only looks at its argument's calendar year, so check both
+ * ends of the week.
+ */
+function holidayFor(weekOf: string): { excluded: boolean; reason?: string } {
+  const start = isInExcludedWeek(weekOf);
+  return start.excluded ? start : isInExcludedWeek(addDays(weekOf, 6));
+}
+
+function overrideFingerprint(o: RecurringCollectionOverride | undefined): string {
+  return o ? `${o.id}:${new Date(o.updatedAt).getTime()}` : 'none';
+}
+
+/**
  * Make the DB match the rules for one collection week.
  * @param weekOf any date in the week; normalized to its Wednesday
  */
 export async function reconcileWeek(
   weekOfInput: string,
-  opts: { today?: string } = {}
+  opts: {
+    today?: string;
+    // false = only correct an existing auto entry, never create/restore one
+    // (used for the daily look-back over past weeks)
+    allowCreate?: boolean;
+    _retried?: boolean;
+  } = {}
 ): Promise<ReconcileResult> {
+  const result = await reconcileWeekOnce(weekOfInput, opts);
+  // Neon's HTTP driver has no transactions, so an override saved while this
+  // run was in flight could be overwritten by a write based on the old one.
+  // If the override changed underneath us, run again on the fresh state; the
+  // override endpoint also reconciles after saving, so both sides converge.
+  if (!opts._retried && result.overrideSeen !== undefined) {
+    const latest = overrideFingerprint(await getOverride(result.weekOf));
+    if (latest !== result.overrideSeen) {
+      return reconcileWeek(weekOfInput, { ...opts, _retried: true });
+    }
+  }
+  const { overrideSeen: _ignored, ...publicResult } = result;
+  return publicResult;
+}
+
+async function reconcileWeekOnce(
+  weekOfInput: string,
+  opts: { today?: string; allowCreate?: boolean }
+): Promise<ReconcileResult & { overrideSeen?: string }> {
   const weekOf = wednesdayOf(weekOfInput);
   const weekEnd = addDays(weekOf, 6);
   const today = opts.today ?? todayInEastern();
@@ -272,7 +318,10 @@ export async function reconcileWeek(
   if (weekOf > today) return { ...base, outcome: 'skipped_future' };
 
   const override = await getOverride(weekOf);
-  const holiday = isInExcludedWeek(weekOf);
+  const overrideSeen = overrideFingerprint(override);
+  const holiday = holidayFor(weekOf);
+  const allowCreate = opts.allowCreate ?? true;
+  const seen = { ...base, overrideSeen };
 
   const [autoRow] = await db
     .select()
@@ -280,7 +329,7 @@ export async function reconcileWeek(
     .where(
       and(
         eq(sandwichCollections.submissionMethod, AUTO_RECURRING_SUBMISSION_METHOD),
-        eq(sandwichCollections.hostName, config.hostName),
+        eq(sandwichCollections.createdBy, AUTO_ROW_CREATED_BY),
         eq(sandwichCollections.collectionDate, weekOf)
       )
     )
@@ -326,14 +375,14 @@ export async function reconcileWeek(
       notifyCollectionsChanged(autoRow.id, 'delete');
       log.info(`Removed auto entry ${autoRow.id} for week of ${weekOf} (${standDown})`);
       return {
-        ...base,
+        ...seen,
         outcome: 'removed',
         collectionId: autoRow.id,
         detail: standDown,
       };
     }
     return {
-      ...base,
+      ...seen,
       outcome: standDown,
       detail: holiday.excluded ? holiday.reason : undefined,
     };
@@ -344,24 +393,30 @@ export async function reconcileWeek(
     individualPbj: desiredCount,
   };
 
+  // Look-back mode only corrects entries that are already live.
+  if (!allowCreate && (!autoRow || autoRow.deletedAt)) {
+    return { ...seen, outcome: 'unchanged', detail: 'no auto entry (look-back does not create)' };
+  }
+
   if (autoRow) {
     const wasDeleted = !!autoRow.deletedAt;
     const countChanged =
       autoRow.individualSandwiches !== desiredCount ||
-      autoRow.individualPbj !== desiredCount;
+      autoRow.individualPbj !== desiredCount ||
+      autoRow.hostName !== config.hostName;
     if (!wasDeleted && !countChanged) {
-      return { ...base, outcome: 'unchanged', count: desiredCount, collectionId: autoRow.id };
+      return { ...seen, outcome: 'unchanged', count: desiredCount, collectionId: autoRow.id };
     }
     await db
       .update(sandwichCollections)
-      .set({ ...countFields, deletedAt: null, deletedBy: null })
+      .set({ ...countFields, hostName: config.hostName, deletedAt: null, deletedBy: null })
       .where(eq(sandwichCollections.id, autoRow.id));
     notifyCollectionsChanged(autoRow.id, wasDeleted ? 'restore' : 'update');
     log.info(
       `${wasDeleted ? 'Restored' : 'Updated'} auto entry ${autoRow.id} for week of ${weekOf} → ${desiredCount}`
     );
     return {
-      ...base,
+      ...seen,
       outcome: wasDeleted ? 'restored' : 'updated',
       count: desiredCount,
       collectionId: autoRow.id,
@@ -377,7 +432,7 @@ export async function reconcileWeek(
       hostName: config.hostName,
       ...countFields,
       groupCollections: [],
-      createdBy: SYSTEM_USER_ID,
+      createdBy: AUTO_ROW_CREATED_BY,
       createdByName: SYSTEM_USER_NAME,
       submissionMethod: AUTO_RECURRING_SUBMISSION_METHOD,
     })
@@ -385,16 +440,32 @@ export async function reconcileWeek(
     .returning();
 
   if (!created) {
-    return { ...base, outcome: 'unchanged', count: desiredCount, detail: 'inserted concurrently' };
+    return { ...seen, outcome: 'unchanged', count: desiredCount, detail: 'inserted concurrently' };
   }
   notifyCollectionsChanged(created.id, 'create');
   log.info(`Created auto entry ${created.id} for week of ${weekOf} → ${desiredCount}`);
-  return { ...base, outcome: 'created', count: desiredCount, collectionId: created.id };
+  return { ...seen, outcome: 'created', count: desiredCount, collectionId: created.id };
 }
 
-/** Cron entry point: reconcile the current collection week. */
-export async function runCollectiveLearningAutoLog(): Promise<ReconcileResult> {
-  return reconcileWeek(todayInEastern());
+/**
+ * Cron entry point: log the current collection week, then re-check the past
+ * LOOKBACK_WEEKS weeks so a real log entered late (or an override saved for an
+ * old week) removes/corrects the auto entry. Look-back never creates entries;
+ * filling old gaps is the explicit backfill's job.
+ */
+export async function runCollectiveLearningAutoLog(): Promise<{
+  current: ReconcileResult;
+  lookback: ReconcileResult[];
+}> {
+  const today = todayInEastern();
+  const current = await reconcileWeek(today, { today });
+  const lookback: ReconcileResult[] = [];
+  for (let i = 1; i <= LOOKBACK_WEEKS; i++) {
+    const week = addDays(wednesdayOf(today), -7 * i);
+    const r = await reconcileWeek(week, { today, allowCreate: false });
+    if (['removed', 'updated', 'restored'].includes(r.outcome)) lookback.push(r);
+  }
+  return { current, lookback };
 }
 
 export const MAX_BACKFILL_WEEKS = 60;
@@ -442,7 +513,7 @@ export async function getAutoLogStatus() {
     config,
     today,
     currentWeekOf,
-    currentWeekHoliday: isInExcludedWeek(currentWeekOf),
+    currentWeekHoliday: holidayFor(currentWeekOf),
     overrides,
     recentAutoEntries,
   };

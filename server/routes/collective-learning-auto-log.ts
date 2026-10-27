@@ -49,7 +49,7 @@ function currentUser(req: Request) {
 export function createCollectiveLearningAutoLogRouter() {
   const router = Router();
 
-  router.get('/', async (_req: Request, res: Response) => {
+  router.get('/', requireRole(...ADMIN_ROLES), async (_req: Request, res: Response) => {
     try {
       res.json(await getAutoLogStatus());
     } catch (error) {

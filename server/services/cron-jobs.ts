@@ -1653,7 +1653,6 @@ export function initializeCronJobs() {
       );
     }
   }, {
-    scheduled: true,
     timezone: 'America/New_York',
   });
 
