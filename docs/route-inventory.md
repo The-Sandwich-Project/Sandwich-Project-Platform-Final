@@ -627,7 +627,7 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/resources/user/favorites | 3 | client/src/mobile/pages/mobile-resources.tsx<br>client/src/pages/resources.tsx |
 | /api/resources/user/recent?limit=5 | 2 | client/src/components/recently-accessed-resources.tsx<br>client/src/pages/resources.tsx |
 | /api/resources?${params} | 1 | client/src/pages/resources.tsx |
-| /api/sandwich-collections | 35 | client/src/components/bulk-data-manager.tsx<br>client/src/components/collective-learning-auto-log-card.tsx<br>client/src/components/compact-collection-form.tsx<br>client/src/components/dashboard-overview.tsx |
+| /api/sandwich-collections | 36 | client/src/components/bulk-data-manager.tsx<br>client/src/components/collective-learning-auto-log-card.tsx<br>client/src/components/compact-collection-form.tsx<br>client/src/components/dashboard-overview.tsx |
 | /api/sandwich-collections/${collectionId} | 1 | client/src/mobile/pages/mobile-collection-detail.tsx |
 | /api/sandwich-collections/${data.id} | 1 | client/src/components/sandwich-collection-log.tsx |
 | /api/sandwich-collections/${data.id}/restore | 1 | client/src/components/sandwich-collection-log.tsx |
