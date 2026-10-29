@@ -126,3 +126,17 @@ mtime_ms = 1790962587068
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:bb1d30f8-d852-4bae-abcd-b7c4521e3d85/e3db4f33-335a-42db-9a86-4848bf4ff720/f52b1d1b-33b7-449c-bc2c-72368d155c23"
 storage_version_token = "1790962612284459"
 content_type = "text/csv"
+
+[[outputs]]
+id = "cXNGlqBmP9u18iiVStytz"
+uri = "file://attached_assets/production-database-columns-2026-10-29.csv"
+type = "table"
+title = "Production database columns"
+description = "Read-only schema export: table names, column names, data types, and whether NULL is allowed. No records or credentials included."
+logical_id = "fd142ef6-bd8a-4fcf-b8ef-cf937b2c7318"
+content_hash = "sha256:0ff00648ee1ec57c6181a1214c8897a287a7d757f06d510f133a2f526bf79a29"
+size = 87427
+mtime_ms = 1793293582293
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:bb1d30f8-d852-4bae-abcd-b7c4521e3d85/fd142ef6-bd8a-4fcf-b8ef-cf937b2c7318/21af8eb0-7826-49db-ac6b-afc1089645ac"
+storage_version_token = "1793293583109583"
+content_type = "text/csv"
