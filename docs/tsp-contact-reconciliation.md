@@ -7,7 +7,7 @@
 - Exact user IDs are preserved, including historical inactive accounts.
 - An exact email or full first/last name resolves only when it identifies one account and that account is not inactive. Inactive duplicates still count toward ambiguity.
 - First names, nicknames, combined names, notes, missing IDs and duplicate accounts are not guessed.
-- New ambiguous imports preserve the text as `customTspContact` and a labeled planning note. Successful non-ID imports also retain the original label in planning notes.
+- New ambiguous imports and newly entered unresolved contact updates preserve the text as `customTspContact` and a labeled planning note, clearing both assignment fields so no old user remains assigned. Successful name/email assignments on both creates and updates retain the original label in planning notes. Updates preserve existing custom contact/planning notes when those fields are omitted from the patch.
 - Existing unchanged full-form snapshots, unresolved historical text, and conflicting assignments are not silently migrated. Historical pairs with different people remain review items.
 - The persistence boundary covers create/update in both storage implementations, including the spreadsheet import routes. The Apps Script import no longer pre-resolves TSP contacts with the permissive staff matcher. Notification contact assignment now uses the same storage boundary.
 - The external intake PATCH allowlist does not include these contact fields. External whole-row GET responses retain both columns. The Google Sheets intake sync does not populate these contact columns.

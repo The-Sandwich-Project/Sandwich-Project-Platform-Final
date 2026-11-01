@@ -1478,7 +1478,9 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
       render: (event) => {
         const contacts = [];
         if (event.tspContact) contacts.push(resolveUserName(event.tspContact));
-        if (event.tspContactAssigned) contacts.push(resolveUserName(event.tspContactAssigned));
+        if (event.tspContactAssigned && event.tspContactAssigned !== event.tspContact) {
+          contacts.push(resolveUserName(event.tspContactAssigned));
+        }
         if (event.customTspContact) contacts.push(event.customTspContact); // Custom is already text
         return contacts.filter(c => c && c !== 'Not assigned').join(', ') || '';
       },

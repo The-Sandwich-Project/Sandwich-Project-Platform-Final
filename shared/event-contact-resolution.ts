@@ -43,7 +43,7 @@ export const hasEventContactPatch = (patch: EventContactFields) =>
 /**
  * Canonical contact + compatibility mirror for new assignments. Historical
  * conflicts and unchanged full-form snapshots are intentionally not backfilled.
- * Unresolved NEW imports retain their exact source text in custom contact/notes.
+ * New unresolved assignments retain their source text in custom contact/notes.
  */
 export function normalizeEventContactPatch<T extends EventContactFields>(
   patch: T, users: readonly ContactDirectoryUser[], previous?: EventContactFields,
@@ -66,7 +66,11 @@ export function normalizeEventContactPatch<T extends EventContactFields>(
       return { ...patch }; // An explicit conflict is review work, never last-value-wins.
     }
   }
-  const usePrimary = hasPrimary && (previous !== undefined || !!clean(patch.tspContact) || !clean(patch.tspContactAssigned));
+  // An unchanged empty primary in a full-form save must not erase a newly
+  // supplied legacy assignment. Clearing a previously populated primary is
+  // still an explicit removal, even when the old mirror is also submitted.
+  const removesPrimary = !!previous && !!clean(previous.tspContact) && !clean(patch.tspContact);
+  const usePrimary = hasPrimary && (removesPrimary || !!clean(patch.tspContact) || !clean(patch.tspContactAssigned));
   const raw = usePrimary ? patch.tspContact : patch.tspContactAssigned;
   const resolution = usePrimary ? primary : assigned;
   if (previous && 'userId' in resolution) {
@@ -74,8 +78,12 @@ export function normalizeEventContactPatch<T extends EventContactFields>(
     const previousChosen = usePrimary ? previous.tspContact : previous.tspContactAssigned;
     if (!clean(previousChosen) && clean(other) && other !== resolution.userId) return { ...patch };
   }
-  // Existing unresolved text is migrated only through the reviewed backfill.
-  if (previous && resolution.kind === 'review') return { ...patch };
+  // Keep unchanged historical labels for the reviewed backfill, but treat a
+  // newly entered unresolved label as a custom contact, not a stale user ID.
+  const previousChosen = usePrimary ? previous?.tspContact : previous?.tspContactAssigned;
+  if (previous && resolution.kind === 'review' && raw === previousChosen) return { ...patch };
+  const customContact = patch.customTspContact !== undefined ? patch.customTspContact : previous?.customTspContact;
+  const planningNotes = patch.planningNotes !== undefined ? patch.planningNotes : previous?.planningNotes;
   const result: T & EventContactFields = { ...patch };
   if ('userId' in resolution) {
     result.tspContact = resolution.userId;
@@ -86,10 +94,10 @@ export function normalizeEventContactPatch<T extends EventContactFields>(
   } else {
     result.tspContact = null;
     result.tspContactAssigned = null;
-    result.customTspContact = [patch.customTspContact, raw].filter(Boolean).join('\n');
+    result.customTspContact = [customContact, raw].filter(Boolean).join('\n');
   }
-  if (!previous && raw && resolution.kind !== 'id' && resolution.kind !== 'empty') {
-    result.planningNotes = [patch.planningNotes, `[Imported TSP contact] ${raw}`].filter(Boolean).join('\n');
+  if (raw && resolution.kind !== 'id' && resolution.kind !== 'empty') {
+    result.planningNotes = [planningNotes, `[Imported TSP contact] ${raw}`].filter(Boolean).join('\n');
   }
   return result;
 }

@@ -88,3 +88,61 @@ it('uses a supplied legacy import contact when the new primary field is empty', 
   expect(normalize({ tspContact: null, tspContactAssigned: 'a' }, users))
     .toEqual({ tspContact: 'a', tspContactAssigned: 'a' });
 });
+
+
+describe('contact update regressions from PR review', () => {
+  const previous = {
+    tspContact: 'a', tspContactAssigned: 'a',
+    customTspContact: 'Existing custom contact', planningNotes: 'Existing planning notes',
+  };
+
+  it.each([null, '', undefined])('accepts a legacy assignment with an unchanged empty primary (%s)', empty => {
+    expect(normalize({ tspContact: empty, tspContactAssigned: 'a' }, users,
+      { tspContact: empty, tspContactAssigned: null }))
+      .toEqual({ tspContact: 'a', tspContactAssigned: 'a' });
+  });
+
+  it('keeps primary removal authoritative when the old mirror is included', () => {
+    expect(normalize({ tspContact: null, tspContactAssigned: 'a' }, users, previous))
+      .toEqual({ tspContact: null, tspContactAssigned: null });
+  });
+
+  it.each(['tspContact', 'tspContactAssigned'] as const)('moves newly unresolved %s text out of assignment fields', field => {
+    expect(normalize({ [field]: 'Alex/Blair' }, users, previous)).toEqual({
+      tspContact: null, tspContactAssigned: null,
+      customTspContact: 'Existing custom contact\nAlex/Blair',
+      planningNotes: 'Existing planning notes\n[Imported TSP contact] Alex/Blair',
+    });
+  });
+
+  it('retains notes supplied in the same unresolved-contact edit', () => {
+    expect(normalize({ tspContact: 'Alex/Blair', customTspContact: 'Updated custom', planningNotes: 'Updated notes' }, users, previous))
+      .toMatchObject({ customTspContact: 'Updated custom\nAlex/Blair', planningNotes: 'Updated notes\n[Imported TSP contact] Alex/Blair' });
+  });
+
+  it('honors explicitly cleared notes instead of restoring previous text', () => {
+    expect(normalize({ tspContact: 'Alex/Blair', customTspContact: null, planningNotes: null }, users, previous))
+      .toMatchObject({ customTspContact: 'Alex/Blair', planningNotes: '[Imported TSP contact] Alex/Blair' });
+  });
+
+  it.each([' Blair Two ', 'BLAIR@EXAMPLE.ORG'])('preserves the exact resolved update label %s and previous notes', label => {
+    expect(normalize({ tspContact: label }, users, previous)).toEqual({
+      tspContact: 'b', tspContactAssigned: 'b',
+      planningNotes: `Existing planning notes\n[Imported TSP contact] ${label}`,
+    });
+  });
+
+  it('preserves a resolved legacy-field update label with replacement notes', () => {
+    expect(normalize({ tspContactAssigned: 'Blair Two', planningNotes: 'Replacement' }, users, previous))
+      .toEqual({ tspContact: 'b', tspContactAssigned: 'b', planningNotes: 'Replacement\n[Imported TSP contact] Blair Two' });
+  });
+
+  it('does not add source notes for an explicit user-ID reassignment', () => {
+    expect(normalize({ tspContact: 'b' }, users, previous)).toEqual({ tspContact: 'b', tspContactAssigned: 'b' });
+  });
+
+  it('leaves an unchanged historical label alone when the empty mirror is submitted', () => {
+    expect(normalize({ tspContact: 'Alex/Blair', tspContactAssigned: null }, users,
+      { tspContact: 'Alex/Blair' })).toEqual({ tspContact: 'Alex/Blair', tspContactAssigned: null });
+  });
+});
