@@ -1,3 +1,4 @@
+import { storage } from '../../storage-wrapper';
 import { Router } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../../db';
@@ -72,15 +73,10 @@ async function handleEventRequestAction(
       if (!actionData?.tspContactId) {
         throw new Error('TSP contact ID required');
       }
-      result = await db
-        .update(eventRequests)
-        .set({
-          tspContact: actionData.tspContactId,
-          tspContactAssignedDate: new Date(),
-          updatedAt: new Date()
-        })
-        .where(eq(eventRequests.id, eventId))
-        .returning();
+      result = [await storage.updateEventRequest(eventId, {
+        tspContact: actionData.tspContactId,
+        tspContactAssignedDate: new Date(),
+      })];
       break;
 
     case 'mark_toolkit_sent':
