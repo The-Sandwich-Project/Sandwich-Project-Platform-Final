@@ -6,7 +6,9 @@ import {
   parseSheetSandwichTypes,
   planToken,
   resolveSheetName,
+  sandwichTypesForNewEvent,
   selectUpdates,
+  staffingForNewEvent,
   type MatchableUser,
   type RowUpdateEvent,
   type SheetRowData,
@@ -85,10 +87,10 @@ describe('parsing helpers', () => {
 
   it('parses staffing the way the push writes it', () => {
     const s = parsePlanningStaffing('D: Katie Long, Kim Lee, S: , V');
-    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false });
+    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false, vanNames: [], plainListed: true });
     expect(s.speaker).toEqual({ listed: true, names: [] });
     expect(s.volunteer).toEqual({ listed: true, names: [] });
-    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true });
+    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true, vanNames: ['Luz'], plainListed: false });
     expect(parsePlanningStaffing('').driver.listed).toBe(false);
   });
 
@@ -209,6 +211,19 @@ describe('buildRowUpdatePlan', () => {
   it('flags a van driver', () => {
     const plan = buildRowUpdatePlan(makeEvent(), makeRow({ Staffing: 'VD: ' }), USERS);
     expect(plan.updates.vanDriverNeeded).toBe(true);
+    expect(plan.updates.customVanDriverName).toBeUndefined();
+  });
+
+  it('keeps the free-text van driver in sync, unless a real van driver is linked', () => {
+    const row = makeRow({ Staffing: 'VD: Luz' });
+    const plan = buildRowUpdatePlan(makeEvent({ vanDriverNeeded: true, customVanDriverName: 'Maria' }), row, USERS);
+    expect(plan.updatesByField.vanDriver).toEqual({ customVanDriverName: 'Luz' });
+    const linked = buildRowUpdatePlan(
+      makeEvent({ vanDriverNeeded: true, assignedVanDriverId: 'u-kim', customVanDriverName: null }),
+      row,
+      USERS
+    );
+    expect(linked.updatesByField.vanDriver).toBeUndefined();
   });
 
   it('produces a token that changes when the plan changes', () => {
@@ -256,5 +271,69 @@ describe('buildRowUpdatePlan', () => {
         { type: 'pbj', quantity: 100 },
       ],
     });
+  });
+});
+
+describe('creating an event from a sheet row ("send row to app")', () => {
+  it('reads "needed, nobody assigned" as a need, not a blank-named person', () => {
+    expect(staffingForNewEvent('D: , S: ')).toMatchObject({
+      driversNeeded: 1,
+      speakersNeeded: 1,
+      volunteersNeeded: 0,
+      assignedDriverNames: [],
+      assignedSpeakerNames: [],
+    });
+  });
+
+  it('keeps every name in a role', () => {
+    expect(staffingForNewEvent('D: Katie, Kim').assignedDriverNames).toEqual(['Katie', 'Kim']);
+    expect(staffingForNewEvent('D: Katie & Kim')).toMatchObject({
+      driversNeeded: 2,
+      assignedDriverNames: ['Katie', 'Kim'],
+    });
+  });
+
+  it('treats VD names as drivers on a van event, and fills the van driver name', () => {
+    expect(staffingForNewEvent('VD: Luz')).toMatchObject({
+      vanDriverNeeded: true,
+      driversNeeded: 1,
+      assignedDriverNames: ['Luz'],
+      customVanDriverName: 'Luz',
+    });
+    expect(staffingForNewEvent('VD')).toMatchObject({
+      vanDriverNeeded: true,
+      assignedDriverNames: [],
+      customVanDriverName: null,
+    });
+  });
+
+  it('still reads the bare-letter format', () => {
+    expect(staffingForNewEvent('D, S, V')).toMatchObject({
+      driversNeeded: 1,
+      speakersNeeded: 1,
+      volunteersNeeded: 1,
+    });
+  });
+
+  it('stores sandwich types with the app\'s keys, as an array', () => {
+    expect(sandwichTypesForNewEvent('Turkey & PBJ', 301)).toEqual([
+      { type: 'deli_turkey', quantity: 150 },
+      { type: 'pbj', quantity: 151 },
+    ]);
+    expect(sandwichTypesForNewEvent('', 100)).toBeNull();
+  });
+
+  it('a row created from the sheet then updated from the same row shows no staffing changes', () => {
+    const staffing = staffingForNewEvent('D: Katie, Kim, VD: Luz, S: ');
+    const event = makeEvent({
+      driversNeeded: staffing.driversNeeded,
+      speakersNeeded: staffing.speakersNeeded,
+      vanDriverNeeded: staffing.vanDriverNeeded,
+      customVanDriverName: staffing.customVanDriverName,
+      // Same name → ID resolution the import does for unambiguous names.
+      assignedDriverIds: staffing.assignedDriverNames.map((n) => resolveSheetName(n, USERS)),
+    });
+    const plan = buildRowUpdatePlan(event, makeRow({ Staffing: 'D: Katie, Kim, VD: Luz, S: ' }), USERS);
+    expect(plan.changes).toEqual([]);
   });
 });

@@ -79,7 +79,10 @@ import {
   normalizeGroupName,
   normalizeSheetDate,
   planToken,
+  resolveSheetName,
+  sandwichTypesForNewEvent,
   selectUpdates,
+  staffingForNewEvent,
   type RowUpdateEvent,
   type SheetRowData,
 } from '../services/planning-sheet-row-update';
@@ -247,108 +250,9 @@ const processPickupTimeFields = (updates: Partial<EventRequest>, existingData?: 
 // Google Sheets Import Helper Functions
 // ============================================================================
 
-// Parse staffing column from Google Sheets
-// Format: "D, S, V" (needs) or "D: Katie, S: Kim, V: Christine, VD: Luz" (assigned)
-interface StaffingResult {
-  driversNeeded: number;
-  speakersNeeded: number;
-  volunteersNeeded: number;
-  vanDriverNeeded: boolean;
-  assignedDriverNames: string[];
-  assignedSpeakerNames: string[];
-  assignedVolunteerNames: string[];
-  customVanDriverName: string | null;
-}
-
-const parseStaffingColumn = (staffing: string | undefined): StaffingResult => {
-  const result: StaffingResult = {
-    driversNeeded: 0,
-    speakersNeeded: 0,
-    volunteersNeeded: 0,
-    vanDriverNeeded: false,
-    assignedDriverNames: [],
-    assignedSpeakerNames: [],
-    assignedVolunteerNames: [],
-    customVanDriverName: null,
-  };
-
-  if (!staffing || staffing.trim() === '') return result;
-
-  // Split by comma and process each part
-  const parts = staffing.split(',').map(p => p.trim());
-
-  for (const part of parts) {
-    if (!part) continue;
-
-    // Check if it has an assignment (contains ':')
-    if (part.includes(':')) {
-      const [role, name] = part.split(':').map(s => s.trim());
-      const roleUpper = role.toUpperCase();
-
-      if (roleUpper === 'VD') {
-        result.vanDriverNeeded = true;
-        result.customVanDriverName = name;
-      } else if (roleUpper === 'D') {
-        result.assignedDriverNames.push(name);
-      } else if (roleUpper === 'S') {
-        result.assignedSpeakerNames.push(name);
-      } else if (roleUpper === 'V') {
-        result.assignedVolunteerNames.push(name);
-      }
-    } else {
-      // Just a role letter means it's needed but not filled
-      const roleUpper = part.toUpperCase();
-      if (roleUpper === 'VD') {
-        result.vanDriverNeeded = true;
-      } else if (roleUpper === 'D') {
-        result.driversNeeded = 1;
-      } else if (roleUpper === 'S') {
-        result.speakersNeeded = 1;
-      } else if (roleUpper === 'V') {
-        result.volunteersNeeded = 1;
-      }
-    }
-  }
-
-  return result;
-};
-
-// Parse sandwich types from Google Sheets
-// Input: "Deli", "PBJ", "Deli & PBJ", "Turkey, Ham", etc.
-const parseSandwichTypes = (
-  typesStr: string | undefined,
-  estimatedCount?: number
-): Array<{ type: string; quantity: number }> | null => {
-  if (!typesStr || typesStr.trim() === '') return null;
-
-  const normalizedStr = typesStr.toLowerCase().trim();
-  const types: string[] = [];
-
-  // Handle common formats
-  if (normalizedStr.includes('&')) {
-    // "Deli & PBJ" format
-    types.push(...normalizedStr.split('&').map(t => t.trim()));
-  } else if (normalizedStr.includes(',')) {
-    // "Turkey, Ham" format
-    types.push(...normalizedStr.split(',').map(t => t.trim()));
-  } else if (normalizedStr.includes('/')) {
-    // "Deli/PBJ" format
-    types.push(...normalizedStr.split('/').map(t => t.trim()));
-  } else {
-    // Single type
-    types.push(normalizedStr);
-  }
-
-  // Calculate quantities - split evenly if we have an estimate
-  const count = estimatedCount || 0;
-  const perType = types.length > 0 ? Math.floor(count / types.length) : 0;
-
-  return types.map((type, index) => ({
-    type: type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
-    // Last type gets any remainder
-    quantity: index === types.length - 1 ? count - (perType * (types.length - 1)) : perType,
-  }));
-};
+// Staffing and sandwich types for rows created from the planning sheet are
+// parsed by server/services/planning-sheet-row-update.ts (staffingForNewEvent,
+// sandwichTypesForNewEvent), the same code the update-from-sheet flow uses.
 
 // Parse contact name into first/last name
 const parseContactName = (name: string | undefined): { firstName: string | null; lastName: string | null } => {
@@ -445,14 +349,11 @@ const batchMatchStaffNames = async (
     ? matchNameToUser(tspContactName, allUsers)
     : null;
 
-  // Match all staff names against cached user list
-  const matchNames = (names: string[]): string[] => {
-    return names.map(name => {
-      const userId = matchNameToUser(name, allUsers);
-      // If no match, store the name as-is (the field accepts text)
-      return userId || name;
-    });
-  };
+  // Match staff names against the cached user list. Only link a user when
+  // exactly one matches (so "Ann" with two Anns stays as typed text instead of
+  // picking one at random); same rule as the update-from-sheet flow.
+  const matchNames = (names: string[]): string[] =>
+    Array.from(new Set(names.map((name) => resolveSheetName(name, allUsers))));
 
   return {
     tspContactUserId,
@@ -625,7 +526,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     });
 
     // Parse staffing column
-    const staffing = parseStaffingColumn(data['Staffing']);
+    const staffing = staffingForNewEvent(data['Staffing']);
 
     // Parse sandwich count
     const sandwichCountRaw = data['Estimate # sandwiches'];
@@ -633,7 +534,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     const estimatedSandwichCount = parsedSandwichCount.count;
 
     // Parse sandwich types
-    const sandwichTypes = parseSandwichTypes(data['Deli or PBJ?'], estimatedSandwichCount || undefined);
+    const sandwichTypes = sandwichTypesForNewEvent(data['Deli or PBJ?'], estimatedSandwichCount);
 
     // Parse contact name
     const contactNameParts = parseContactName(data['Contact Name']);
@@ -710,7 +611,8 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       estimatedSandwichCount,
       estimatedSandwichCountMin: parsedSandwichCount.min,
       estimatedSandwichCountMax: parsedSandwichCount.max,
-      sandwichTypes: sandwichTypes ? JSON.stringify(sandwichTypes) : null,
+      // A real array, not a JSON string: the column is jsonb and readers expect an array.
+      sandwichTypes,
 
       // Staffing needs
       driversNeeded: staffing.driversNeeded,

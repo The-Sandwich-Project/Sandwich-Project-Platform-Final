@@ -30,7 +30,7 @@ row payload as the existing "send row to app" (`/import-from-sheets`).
 | Sandwich estimate | Updated (ranges like `200-300` are kept) |
 | Sandwich types | Updated when the *set* of types differs. If there are several types, the count is split evenly between them. |
 | Final # sandwiches | Updated. This is the reference-only `actualSandwichCount`. Official totals still come from the collections log. |
-| Drivers, speakers, volunteers | Updated from the Staffing cell. Several names per role are fine, separated by commas, `;`, `&` or `and` (`D: Katie & Kim`). People already assigned are kept, matched by name (first name is enough). New names become a user only if exactly one active user matches; otherwise they're saved as typed. A role removed from the cell is cleared. `VD` sets "van driver needed". |
+| Drivers, speakers, volunteers, van driver | Updated from the Staffing cell. Several names per role are fine, separated by commas, `;`, `&` or `and` (`D: Katie & Kim`). People already assigned are kept, matched by name (first name is enough). New names become a user only if exactly one active user matches; otherwise they're saved as typed. A role removed from the cell is cleared. `VD` sets "van driver needed". |
 | Contact name, email, phone, address, recipient | **Fill-only.** Added if the app has nothing. Never overwritten. A difference shows up as a note. |
 
 Never touched: status, TSP contact, notes, group name, toolkit, anything else.
@@ -195,7 +195,12 @@ function applyRowUpdate(payload, eventId, token, fields) {
 
 - If the **group name** is changed on the sheet, the preview won't find the event by name.
   The script can send `eventId` directly; a small "match by ID" prompt can be added if this comes up.
-- The older `/import-from-sheets` create path still uses the legacy staffing parser, which
-  misreads `D: ` (needed, nobody assigned) as an assignee with an empty name and drops the
-  second name in `D: Katie, Kim`. The update flow uses the fixed parser in
-  `server/services/planning-sheet-row-update.ts`.
+- "Send row to app" (`/import-from-sheets`, the create path) reads Staffing and sandwich
+  types with the same code as this update flow (`staffingForNewEvent`,
+  `sandwichTypesForNewEvent`), so creating an event from a row and then updating it from the
+  same row shows no changes.
+- `VD: <names>` is read the way the app's push writes it: those people are the event's
+  **drivers** on a van event. The names also fill the app's free-text van driver field,
+  unless a real van driver is linked in the app. The app's push only writes the van driver
+  slot when that person is also a driver; see `formatStaffingColumn` in
+  `server/planning-sheet-sync-service.ts`.

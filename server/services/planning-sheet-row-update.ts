@@ -48,6 +48,8 @@ export interface RowUpdateEvent {
   speakersNeeded: number | null;
   volunteersNeeded: number | null;
   vanDriverNeeded: boolean | null;
+  assignedVanDriverId?: string | null;
+  customVanDriverName?: string | null;
   assignedDriverIds: string[] | null;
   assignedSpeakerIds: string[] | null;
   assignedVolunteerIds: string[] | null;
@@ -165,7 +167,12 @@ export function normalizeSheetDate(raw: unknown): string | null {
 }
 
 export interface ParsedStaffing {
-  driver: { listed: boolean; names: string[]; van: boolean };
+  /**
+   * `names` includes names written under VD. The push writes the event's
+   * drivers as "VD: ..." on van events, so VD names ARE drivers.
+   * `vanNames` is just the VD ones; `plainListed` is whether a plain "D" appeared.
+   */
+  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean };
   speaker: { listed: boolean; names: string[] };
   volunteer: { listed: boolean; names: string[] };
 }
@@ -184,7 +191,7 @@ export interface ParsedStaffing {
  */
 export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const out: ParsedStaffing = {
-    driver: { listed: false, names: [], van: false },
+    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false },
     speaker: { listed: false, names: [] },
     volunteer: { listed: false, names: [] },
   };
@@ -192,6 +199,13 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   if (!s) return out;
 
   let current: 'driver' | 'speaker' | 'volunteer' | null = null;
+  let inVan = false;
+  const addName = (role: 'driver' | 'speaker' | 'volunteer', name: string) => {
+    const n = name.trim();
+    if (!n) return;
+    out[role].names.push(n);
+    if (role === 'driver' && inVan) out.driver.vanNames.push(n);
+  };
   const roleFor = (code: string) => {
     const c = code.trim().toUpperCase();
     if (c === 'D' || c === 'VD') return 'driver' as const;
@@ -211,15 +225,13 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     if (role) {
       current = role;
       out[role].listed = true;
-      if (role === 'driver' && head.trim().toUpperCase() === 'VD') out.driver.van = true;
-      const name = colon >= 0 ? token.slice(colon + 1).trim() : '';
-      if (name) out[role].names.push(name);
+      inVan = role === 'driver' && head.trim().toUpperCase() === 'VD';
+      if (inVan) out.driver.van = true;
+      else if (role === 'driver') out.driver.plainListed = true;
+      addName(role, colon >= 0 ? token.slice(colon + 1) : '');
     } else if (current) {
-      out[current].names.push(token.replace(/^[:\s]+/, '').trim());
+      addName(current, token.replace(/^[:\s]+/, ''));
     }
-  }
-  for (const r of ['driver', 'speaker', 'volunteer'] as const) {
-    out[r].names = out[r].names.filter(Boolean);
   }
   return out;
 }
@@ -570,6 +582,15 @@ export function buildRowUpdatePlan(
       changes.push({ field: 'vanDriverNeeded', label: 'Van driver needed', from: 'No', to: 'Yes', kind: 'update' });
       set('vanDriverNeeded', 'vanDriverNeeded', true);
     }
+
+    // Names under VD also fill the app's free-text van driver, unless a real
+    // van driver (user) is linked in the app, which the sheet can't express.
+    const vanName = staffing.driver.vanNames.join(', ');
+    const appVanName = clean(event.customVanDriverName);
+    if (vanName && !event.assignedVanDriverId && lower(vanName) !== lower(appVanName)) {
+      changes.push({ field: 'vanDriver', label: 'Van driver', from: appVanName, to: vanName, kind: appVanName ? 'update' : 'fill' });
+      set('vanDriver', 'customVanDriverName', vanName);
+    }
   }
 
   return { changes, updates, updatesByField, notes };
@@ -616,6 +637,45 @@ export function selectUpdates(
 export function planToken(eventId: number, changes: RowChange[]): string {
   const canonical = JSON.stringify([eventId, changes.map((c) => [c.field, c.from, c.to])]);
   return createHash('sha256').update(canonical).digest('hex').slice(0, 32);
+}
+
+/**
+ * Staffing fields for a NEW event created from a planning-sheet row
+ * (the "send row to app" create path). Same reading as the update flow, so
+ * an event created from a row and then updated from the same row shows no
+ * staffing changes.
+ */
+export function staffingForNewEvent(raw: unknown) {
+  const s = parsePlanningStaffing(raw);
+  const need = (listed: boolean, n: number) => (listed ? Math.max(1, n) : 0);
+  return {
+    driversNeeded: need(s.driver.listed, s.driver.names.length),
+    speakersNeeded: need(s.speaker.listed, s.speaker.names.length),
+    volunteersNeeded: need(s.volunteer.listed, s.volunteer.names.length),
+    vanDriverNeeded: s.driver.van,
+    assignedDriverNames: s.driver.names,
+    assignedSpeakerNames: s.speaker.names,
+    assignedVolunteerNames: s.volunteer.names,
+    customVanDriverName: s.driver.vanNames.length ? s.driver.vanNames.join(', ') : null,
+  };
+}
+
+/**
+ * Sandwich types for a NEW event: the app's own type keys ("pbj",
+ * "deli_turkey", ...) as a real array, with the count split evenly.
+ */
+export function sandwichTypesForNewEvent(
+  raw: unknown,
+  total: number | null | undefined
+): { type: string; quantity: number }[] | null {
+  const types = parseSheetSandwichTypes(raw);
+  if (types.length === 0) return null;
+  const count = total ?? 0;
+  const per = Math.floor(count / types.length);
+  return types.map((type, i) => ({
+    type,
+    quantity: i === types.length - 1 ? count - per * (types.length - 1) : per,
+  }));
 }
 
 /** Lowercase, trim, collapse whitespace — for matching group names. */
