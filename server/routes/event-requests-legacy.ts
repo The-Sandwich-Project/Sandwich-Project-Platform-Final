@@ -79,6 +79,7 @@ import {
   normalizeGroupName,
   normalizeSheetDate,
   planToken,
+  selectUpdates,
   type RowUpdateEvent,
   type SheetRowData,
 } from '../services/planning-sheet-row-update';
@@ -816,6 +817,8 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
 const sheetRowUpdateExtrasSchema = z.object({
   eventId: z.coerce.number().int().positive().optional(),
   token: z.string().optional(),
+  // Which changes (RowChange.field) the person ticked. Omitted = all of them.
+  fields: z.array(z.string()).optional(),
 });
 
 const fetchActiveUsersForRowUpdate = async () =>
@@ -935,7 +938,8 @@ router.post('/import-from-sheets/preview-update', validateSheetsApiKey, async (r
 
 /**
  * POST /api/event-requests/import-from-sheets/apply-update
- * Body: the same row payload + eventId + token from the preview.
+ * Body: the same row payload + eventId + token from the preview, and
+ * optionally `fields`: the changes the person ticked (default: all).
  * Re-computes the plan and refuses if it no longer matches what was previewed.
  */
 router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req, res) => {
@@ -967,12 +971,26 @@ router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req
         error: 'The event or the sheet row changed since you previewed it. Run it again to see the current changes.',
       });
     }
-    if (plan.changes.length === 0) {
-      return res.json({ success: true, updated: false, message: 'Already up to date.' });
+    let selected: ReturnType<typeof selectUpdates>;
+    try {
+      selected = selectUpdates(
+        plan,
+        extras.data.fields ?? plan.changes.map((c) => c.field),
+        event as unknown as RowUpdateEvent
+      );
+    } catch (selectError) {
+      return res.status(400).json({ success: false, error: (selectError as Error).message });
+    }
+    if (selected.changes.length === 0) {
+      return res.json({
+        success: true,
+        updated: false,
+        message: plan.changes.length === 0 ? 'Already up to date.' : 'Nothing was selected, so nothing changed.',
+      });
     }
 
     const updated = await storage.updateEventRequest(eventId, {
-      ...plan.updates,
+      ...selected.updates,
       lastSyncedAt: new Date(),
       updatedAt: new Date(),
     } as Partial<EventRequest>);
@@ -981,31 +999,32 @@ router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req
       await AuditLogger.logEventRequestChange(
         String(eventId),
         event,
-        updated ?? { ...event, ...plan.updates },
+        updated ?? { ...event, ...selected.updates },
         { userId: 'planning-sheet' },
         {
           actionType: 'PLANNING_SHEET_UPDATE',
           section: 'planning-sheet',
-          notes: plan.changes.map((c) => `${c.label}: "${c.from}" → "${c.to}"`).join('; '),
+          notes: selected.changes.map((c) => `${c.label}: "${c.from}" → "${c.to}"`).join('; '),
         }
       );
     } catch (auditError) {
       logger.error('Failed to audit planning sheet row update', auditError);
     }
 
-    if (plan.updates.eventAddress) {
-      geocodeEventInBackground(eventId, plan.updates.eventAddress as string);
+    if (selected.updates.eventAddress) {
+      geocodeEventInBackground(eventId, selected.updates.eventAddress as string);
     }
     if (updated) emitEventRequestUpdate('event_request_updated', updated);
 
     logger.info(`✅ Planning sheet row update applied to event ${eventId}`, {
-      fields: plan.changes.map((c) => c.field),
+      fields: selected.changes.map((c) => c.field),
+      skipped: plan.changes.filter((c) => !selected.changes.includes(c)).map((c) => c.field),
     });
     return res.json({
       success: true,
       updated: true,
       eventId,
-      changes: plan.changes,
+      changes: selected.changes,
       link: `/event-requests/${eventId}`,
     });
   } catch (error) {

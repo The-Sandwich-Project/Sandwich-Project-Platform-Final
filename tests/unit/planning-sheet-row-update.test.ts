@@ -6,6 +6,7 @@ import {
   parseSheetSandwichTypes,
   planToken,
   resolveSheetName,
+  selectUpdates,
   type MatchableUser,
   type RowUpdateEvent,
   type SheetRowData,
@@ -89,6 +90,13 @@ describe('parsing helpers', () => {
     expect(s.volunteer).toEqual({ listed: true, names: [] });
     expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true });
     expect(parsePlanningStaffing('').driver.listed).toBe(false);
+  });
+
+  it('accepts several names per role with any common separator', () => {
+    expect(parsePlanningStaffing('D: Katie & Kim').driver.names).toEqual(['Katie', 'Kim']);
+    expect(parsePlanningStaffing('V: Ann and Bo; Cy, S: Dee').volunteer.names).toEqual(['Ann', 'Bo', 'Cy']);
+    // "and" only splits as a whole word
+    expect(parsePlanningStaffing('D: Sandy Anderson').driver.names).toEqual(['Sandy Anderson']);
   });
 
   it('parses sandwich types', () => {
@@ -208,5 +216,45 @@ describe('buildRowUpdatePlan', () => {
     const b = buildRowUpdatePlan(makeEvent(), makeRow({ 'Estimate # sandwiches': '350' }), USERS);
     expect(planToken(42, a.changes)).toBe(planToken(42, a.changes));
     expect(planToken(42, a.changes)).not.toBe(planToken(42, b.changes));
+  });
+
+  it('applies only the changes a person picks', () => {
+    const event = makeEvent();
+    const plan = buildRowUpdatePlan(
+      event,
+      makeRow({
+        'Event Start time (MUST when volunteer needed)': '11:00 AM',
+        'Estimate # sandwiches': '300',
+        Staffing: 'D: Katie',
+      }),
+      USERS
+    );
+    expect(plan.changes.map((c) => c.field)).toEqual(['eventStartTime', 'estimatedSandwichCount', 'drivers']);
+
+    const picked = selectUpdates(plan, ['eventStartTime', 'drivers'], event);
+    expect(picked.changes.map((c) => c.field)).toEqual(['eventStartTime', 'drivers']);
+    expect(picked.updates).toEqual({
+      eventStartTime: '11:00',
+      driversNeeded: 1,
+      assignedDriverIds: ['u-katie'],
+      driverDetails: { 'u-katie': {} },
+    });
+    expect(() => selectUpdates(plan, ['status'], event)).toThrow('Not part of this update: status');
+  });
+
+  it('re-splits types with the app estimate when the new estimate is skipped', () => {
+    const event = makeEvent();
+    const plan = buildRowUpdatePlan(
+      event,
+      makeRow({ 'Estimate # sandwiches': '300', 'Deli or PBJ?': 'Deli & PBJ' }),
+      USERS
+    );
+    const picked = selectUpdates(plan, ['sandwichTypes'], event);
+    expect(picked.updates).toEqual({
+      sandwichTypes: [
+        { type: 'deli', quantity: 100 },
+        { type: 'pbj', quantity: 100 },
+      ],
+    });
   });
 });

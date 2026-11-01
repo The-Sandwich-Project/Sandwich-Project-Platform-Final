@@ -9,9 +9,11 @@ person clicks it** on the sheet. Nothing runs on a timer.
 1. Someone selects a row on the planning sheet and runs **Update row in app**.
 2. The script sends the row to `POST /api/event-requests/import-from-sheets/preview-update`.
    This call is read-only: the app finds the matching event and returns what would change.
-3. The script shows the changes. The person picks the right event if there's
-   more than one, then confirms.
-4. The script sends the row plus the preview's `token` to
+3. The script shows the changes as a checklist, all ticked. The person picks the
+   right event if there's more than one, unticks anything they don't want sent, and
+   clicks **Update selected**. Values can't be edited in the dialog on purpose: to
+   change one, fix the cell on the sheet and run it again, so the sheet and the app agree.
+4. The script sends the row, the preview's `token` and the ticked `fields` to
    `POST /api/event-requests/import-from-sheets/apply-update`. The app works out the
    changes again and **refuses** if they no longer match what was shown (someone edited
    the event or the row in between).
@@ -28,7 +30,7 @@ row payload as the existing "send row to app" (`/import-from-sheets`).
 | Sandwich estimate | Updated (ranges like `200-300` are kept) |
 | Sandwich types | Updated when the *set* of types differs. If there are several types, the count is split evenly between them. |
 | Final # sandwiches | Updated. This is the reference-only `actualSandwichCount`. Official totals still come from the collections log. |
-| Drivers, speakers, volunteers | Updated from the Staffing cell. People already assigned are kept, matched by name (first name is enough). New names become a user only if exactly one active user matches; otherwise they're saved as typed. A role removed from the cell is cleared. `VD` sets "van driver needed". |
+| Drivers, speakers, volunteers | Updated from the Staffing cell. Several names per role are fine, separated by commas, `;`, `&` or `and` (`D: Katie & Kim`). People already assigned are kept, matched by name (first name is enough). New names become a user only if exactly one active user matches; otherwise they're saved as typed. A role removed from the cell is cleared. `VD` sets "van driver needed". |
 | Contact name, email, phone, address, recipient | **Fill-only.** Added if the app has nothing. Never overwritten. A difference shows up as a note. |
 
 Never touched: status, TSP contact, notes, group name, toolkit, anything else.
@@ -130,23 +132,62 @@ function updateRowInApp() {
     return;
   }
 
-  var lines = pick.changes.map(function (c) {
-    return '- ' + c.label + ': ' + (c.from || '(empty)') + ' -> ' + c.to;
-  });
-  var msg = 'Update "' + pick.organizationName + '" (' + (pick.appDate || 'no date') + ') in the app?\n\n' +
-    lines.join('\n');
-  if (!pick.dateMatches) msg = 'Heads up: the app has a different date for this event.\n\n' + msg;
-  if (pick.notes.length) msg += '\n\nNot changed:\n- ' + pick.notes.join('\n- ');
-  if (ui.alert(msg, ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  showUpdateDialog_(payload, pick);
+}
 
-  payload.eventId = pick.eventId;
-  payload.token = pick.token;
+/** Checkbox dialog: every change starts ticked; untick anything to skip it. */
+function showUpdateDialog_(payload, pick) {
+  var esc = function (v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+  var rows = pick.changes.map(function (c) {
+    return '<label class="row"><input type="checkbox" name="f" value="' + esc(c.field) + '" checked>' +
+      '<span><b>' + esc(c.label) + '</b><br><span class="from">' + esc(c.from || '(empty)') +
+      '</span> &rarr; ' + esc(c.to) + '</span></label>';
+  }).join('');
+  var notes = pick.notes.length
+    ? '<p class="notes"><b>Not changed:</b><br>' + pick.notes.map(esc).join('<br>') + '</p>' : '';
+  var warn = pick.dateMatches ? '' : '<p class="warn">The app has a different date for this event (' +
+    esc(pick.appDate || 'none') + '). Make sure this is the right one.</p>';
+
+  var html =
+    '<style>body{font:13px Arial,sans-serif;margin:12px}.row{display:flex;gap:8px;padding:6px 0;' +
+    'border-bottom:1px solid #eee}.from{color:#888;text-decoration:line-through}.warn{color:#b45309}' +
+    '.notes{color:#555;font-size:12px}button{margin-top:12px;padding:6px 14px}#msg{margin-top:10px}</style>' +
+    '<p>Update <b>' + esc(pick.organizationName) + '</b> in the app. Untick anything you don\'t want sent. ' +
+    'To change a value, fix the cell on the sheet and run this again.</p>' + warn +
+    '<form id="f">' + rows + '</form>' + notes +
+    '<button id="go" onclick="send()">Update selected</button> <button onclick="google.script.host.close()">Cancel</button>' +
+    '<div id="msg"></div>' +
+    '<script>var DATA=' + JSON.stringify({ payload: payload, eventId: pick.eventId, token: pick.token })
+      .replace(/</g, '\\u003c') + ';' +
+    'function send(){var fields=[].slice.call(document.querySelectorAll("input[name=f]:checked")).map(function(i){return i.value});' +
+    'if(!fields.length){document.getElementById("msg").textContent="Nothing selected.";return;}' +
+    'document.getElementById("go").disabled=true;document.getElementById("msg").textContent="Updating...";' +
+    'google.script.run.withSuccessHandler(function(m){document.getElementById("msg").textContent=m;})' +
+    '.withFailureHandler(function(e){document.getElementById("msg").textContent="Error: "+e.message;' +
+    'document.getElementById("go").disabled=false;})' +
+    '.applyRowUpdate(DATA.payload,DATA.eventId,DATA.token,fields);}</script>';
+
+  SpreadsheetApp.getUi().showModalDialog(
+    HtmlService.createHtmlOutput(html).setWidth(480).setHeight(Math.min(600, 220 + pick.changes.length * 52)),
+    'Update row in app'
+  );
+}
+
+/** Called from the dialog. (No trailing underscore: google.script.run can't call private functions.) */
+function applyRowUpdate(payload, eventId, token, fields) {
+  payload.eventId = eventId;
+  payload.token = token;
+  payload.fields = fields;
   var applied = callApp_('/import-from-sheets/apply-update', payload);
   if (applied.status === 200) {
-    ui.alert(applied.body.updated ? 'Updated in the app.' : (applied.body.message || 'Nothing to update.'));
-  } else {
-    ui.alert('Not updated: ' + (applied.body.error || applied.status));
+    return applied.body.updated
+      ? 'Updated in the app (' + fields.length + ' change' + (fields.length === 1 ? '' : 's') + '). You can close this.'
+      : (applied.body.message || 'Nothing to update.');
   }
+  throw new Error(applied.body.error || ('HTTP ' + applied.status));
 }
 ```
 

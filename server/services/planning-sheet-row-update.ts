@@ -99,6 +99,8 @@ export interface RowUpdatePlan {
   changes: RowChange[];
   /** Column → value patch to write to event_requests. Empty when no changes. */
   updates: Record<string, unknown>;
+  /** The same patch, split by RowChange.field, so a person can pick which to apply. */
+  updatesByField: Record<string, Record<string, unknown>>;
   /** Things the person should know that we did NOT change. */
   notes: string[];
 }
@@ -198,7 +200,10 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     return null;
   };
 
-  for (const token of s.split(/[,;\n]/).map((t) => t.trim())) {
+  // Names can be separated by commas, semicolons, new lines, "&" or "and"
+  // ("D: Katie & Kim", "V: Ann and Bo"). "and" only counts as a whole word, so
+  // names like "Anderson" or "Sandy" stay intact.
+  for (const token of s.split(/[,;\n&]|\s+and\s+/i).map((t) => t.trim())) {
     if (!token) continue;
     const colon = token.indexOf(':');
     const head = colon >= 0 ? token.slice(0, colon) : token;
@@ -373,15 +378,22 @@ export function buildRowUpdatePlan(
   users: MatchableUser[]
 ): RowUpdatePlan {
   const changes: RowChange[] = [];
-  const updates: Record<string, unknown> = {};
   const notes: string[] = [];
+  const updates: Record<string, unknown> = {};
+  // Every DB write is recorded under the change it belongs to, so a person
+  // can apply some changes and skip others.
+  const updatesByField: Record<string, Record<string, unknown>> = {};
+  const set = (field: string, key: string, value: unknown) => {
+    updates[key] = value;
+    (updatesByField[field] ??= {})[key] = value;
+  };
 
   // --- Date (update) ---------------------------------------------------------
   const sheetDate = normalizeSheetDate(row.date);
   const appDate = toDateOnlyString(getEffectiveEventDate(event) as any);
   if (sheetDate && sheetDate !== appDate) {
     changes.push({ field: 'scheduledEventDate', label: 'Date', from: appDate, to: sheetDate, kind: appDate ? 'update' : 'fill' });
-    updates.scheduledEventDate = parseDateOnly(sheetDate);
+    set('scheduledEventDate', 'scheduledEventDate', parseDateOnly(sheetDate));
   } else if (!sheetDate && clean(row.date)) {
     notes.push(`Couldn't read the date "${clean(row.date)}", so the date was left alone.`);
   }
@@ -403,7 +415,7 @@ export function buildRowUpdatePlan(
     const appRaw = event[field] as string | null;
     if (normalizeTime(appRaw) === sheetT) continue;
     changes.push({ field, label, from: appRaw ? displayTime(appRaw) : '', to: displayTime(sheetT), kind: appRaw ? 'update' : 'fill' });
-    updates[field] = sheetT;
+    set(field, field, sheetT);
   }
 
   // --- Sandwich estimate (update) --------------------------------------------
@@ -419,9 +431,9 @@ export function buildRowUpdatePlan(
           to: parsed.isRange ? `${parsed.count} (${parsed.min}–${parsed.max})` : String(parsed.count),
           kind: event.estimatedSandwichCount ? 'update' : 'fill',
         });
-        updates.estimatedSandwichCount = parsed.count;
-        updates.estimatedSandwichCountMin = parsed.min;
-        updates.estimatedSandwichCountMax = parsed.max;
+        set('estimatedSandwichCount', 'estimatedSandwichCount', parsed.count);
+        set('estimatedSandwichCount', 'estimatedSandwichCountMin', parsed.min);
+        set('estimatedSandwichCount', 'estimatedSandwichCountMax', parsed.max);
       }
     } else {
       notes.push(`Sandwich estimate "${clean(estRaw)}" isn't a number, so it was left alone.`);
@@ -438,10 +450,10 @@ export function buildRowUpdatePlan(
       const total =
         (updates.estimatedSandwichCount as number | undefined) ?? event.estimatedSandwichCount ?? 0;
       const per = Math.floor(total / sheetTypes.length);
-      updates.sandwichTypes = sheetTypes.map((type, i) => ({
+      set('sandwichTypes', 'sandwichTypes', sheetTypes.map((type, i) => ({
         type,
         quantity: i === sheetTypes.length - 1 ? total - per * (sheetTypes.length - 1) : per,
-      }));
+      })));
       changes.push({
         field: 'sandwichTypes',
         label: 'Sandwich types',
@@ -467,7 +479,7 @@ export function buildRowUpdatePlan(
         to: String(parsed.count),
         kind: event.actualSandwichCount ? 'update' : 'fill',
       });
-      updates.actualSandwichCount = parsed.count;
+      set('actualSandwichCount', 'actualSandwichCount', parsed.count);
     }
   }
 
@@ -477,7 +489,7 @@ export function buildRowUpdatePlan(
     if (!sheetVal) return;
     if (!appVal) {
       changes.push({ field, label, from: '', to: sheetVal, kind: 'fill' });
-      updates[field] = sheetVal;
+      set(field, field, sheetVal);
     } else if (lower(appVal) !== lower(sheetVal)) {
       notes.push(`${label} differs (app: "${appVal}", sheet: "${sheetVal}"). The app keeps its value. Change it in the app if the sheet is right.`);
     }
@@ -527,25 +539,26 @@ export function buildRowUpdatePlan(
         newNeeded = Math.max(appNeeded, newIds.length, 1);
       }
 
+      const changeField = role === 'driver' ? 'drivers' : role === 'speaker' ? 'speakers' : 'volunteers';
       const sameIds =
         newIds.length === appIds.length && newIds.every((id) => appIds.includes(id));
       if (sameIds && newNeeded === appNeeded) continue;
 
       changes.push({
-        field: role === 'driver' ? 'drivers' : role === 'speaker' ? 'speakers' : 'volunteers',
+        field: changeField,
         label: cfg.label,
         from: describeStaff(appNeeded, appNames),
         to: describeStaff(newNeeded, newIds.map((id) => assigneeName(id, usersById))),
         kind: appIds.length === 0 && appNeeded === 0 ? 'fill' : 'update',
       });
-      updates[cfg.needed] = newNeeded;
+      set(changeField, cfg.needed, newNeeded);
       if (!sameIds) {
-        updates[cfg.ids] = newIds.length ? newIds : null;
+        set(changeField, cfg.ids, newIds.length ? newIds : null);
         // Keep per-person details for people who stay; new people start empty.
         const oldDetails = asDetailsObject(event[cfg.details]);
-        updates[cfg.details] = newIds.length
+        set(changeField, cfg.details, newIds.length
           ? Object.fromEntries(newIds.map((id) => [id, oldDetails[id] ?? {}]))
-          : null;
+          : null);
         const unmatched = newIds.filter((id) => !usersById.has(id) && !appIds.includes(id));
         if (unmatched.length) {
           notes.push(`${cfg.label}: couldn't match ${unmatched.map((n) => `"${n}"`).join(', ')} to one app user, so they're saved as typed names.`);
@@ -555,11 +568,43 @@ export function buildRowUpdatePlan(
 
     if (staffing.driver.van && !event.vanDriverNeeded) {
       changes.push({ field: 'vanDriverNeeded', label: 'Van driver needed', from: 'No', to: 'Yes', kind: 'update' });
-      updates.vanDriverNeeded = true;
+      set('vanDriverNeeded', 'vanDriverNeeded', true);
     }
   }
 
-  return { changes, updates, notes };
+  return { changes, updates, updatesByField, notes };
+}
+
+/**
+ * Build the DB patch for just the changes a person ticked.
+ * Throws if a field isn't one of this plan's changes.
+ */
+export function selectUpdates(
+  plan: RowUpdatePlan,
+  fields: string[],
+  event: Pick<RowUpdateEvent, 'estimatedSandwichCount'>
+): { changes: RowChange[]; updates: Record<string, unknown> } {
+  const known = new Set(plan.changes.map((c) => c.field));
+  const unknown = fields.filter((f) => !known.has(f));
+  if (unknown.length) {
+    throw new Error(`Not part of this update: ${unknown.join(', ')}`);
+  }
+  const chosen = new Set(fields);
+  const updates: Record<string, unknown> = {};
+  for (const f of chosen) Object.assign(updates, plan.updatesByField[f]);
+
+  // Types were split using the NEW estimate. If the estimate was left out,
+  // re-split them using the count the app keeps.
+  if (chosen.has('sandwichTypes') && !chosen.has('estimatedSandwichCount') && Array.isArray(updates.sandwichTypes)) {
+    const types = updates.sandwichTypes as { type: string; quantity: number }[];
+    const total = event.estimatedSandwichCount ?? 0;
+    const per = Math.floor(total / types.length);
+    updates.sandwichTypes = types.map((t, i) => ({
+      type: t.type,
+      quantity: i === types.length - 1 ? total - per * (types.length - 1) : per,
+    }));
+  }
+  return { changes: plan.changes.filter((c) => chosen.has(c.field)), updates };
 }
 
 /**
