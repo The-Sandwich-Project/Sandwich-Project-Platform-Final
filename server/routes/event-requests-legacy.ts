@@ -4980,7 +4980,7 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     // Import SendGrid service and email footer
     const { sendEmail } = await import('../sendgrid');
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
-    const path = await import('path');
+    const { FROM_EMAIL } = await import('../config/organization');
 
     // Use the HTML content as-is (already styled from EventEmailComposer)
     // Only add footer to the existing content
@@ -4988,18 +4988,21 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     const emailBodyHtml = content + EMAIL_FOOTER_HTML;
 
     // Determine from and reply-to addresses
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'katielong2316@gmail.com';
+    // Must be a verified SendGrid sender; the old gmail fallback was rejected.
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || FROM_EMAIL;
     const replyToEmail = req.user?.preferredEmail || req.user?.email || fromEmail;
 
-    // Convert attachment paths to absolute file system paths
-    const attachmentPaths = attachments.map((filePath: string) => {
-      // If path starts with /, it's already an absolute path from /uploads
-      // Convert to filesystem path
-      if (filePath.startsWith('/uploads/')) {
-        return path.join(process.cwd(), filePath);
-      }
-      return filePath;
-    });
+    // Resolve attachments (incl. /objects/ storage paths) up front; refuse to
+    // send if any selected file can't be loaded instead of dropping it.
+    const { resolveEmailAttachments } = await import('../utils/email-attachments');
+    const { resolved: resolvedAttachments, failed: failedAttachments } =
+      await resolveEmailAttachments(attachments);
+    if (failedAttachments.length > 0) {
+      return res.status(422).json({
+        error: `Email not sent: ${failedAttachments.length} attachment(s) could not be loaded. Remove them or re-upload the document and try again.`,
+        failedAttachments,
+      });
+    }
 
     // Send email via SendGrid with actual file attachments
     const emailSent = await sendEmail({
@@ -5009,7 +5012,7 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
       subject,
       text: emailBodyText,
       html: emailBodyHtml, // Use the styled HTML as-is, no wrapping
-      attachments: attachmentPaths, // Pass actual file paths for attachment
+      attachments: resolvedAttachments,
     });
 
     if (!emailSent) {
