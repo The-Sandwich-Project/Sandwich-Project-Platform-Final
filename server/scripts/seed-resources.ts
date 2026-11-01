@@ -146,7 +146,7 @@ const initialResources = [
     description: 'Step-by-step instructions for making peanut butter and jelly sandwiches',
     type: 'link' as const,
     category: 'training',
-    url: '/attached_assets/PBJ Sandwich Making 2 101 03172026.pdf',
+    url: '/attached_assets/PBJ Sandwich Making 2 101 11012026.pdf',
     isPinnedGlobal: false,
   },
   {

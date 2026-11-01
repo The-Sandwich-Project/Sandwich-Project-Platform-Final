@@ -37,7 +37,7 @@ const documentFiles: DocumentFile[] = [
   },
   {
     name: "PBJ Sandwich Making 101",
-    path: "/attached_assets/PBJ Sandwich Making 2 101 03172026.pdf",
+    path: "/attached_assets/PBJ Sandwich Making 2 101 11012026.pdf",
     type: "pdf", 
     category: "Training",
     description: "Instructions for peanut butter and jelly sandwich preparation"

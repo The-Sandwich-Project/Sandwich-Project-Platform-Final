@@ -703,7 +703,7 @@ export function createEmailRouter(deps: RouterDependencies) {
                   name: 'Food Safety Guide for Volunteers.pdf'
                 },
                 '3e375509b08b20265abdfa6afe632982': {
-                  file: 'attached_assets/PBJ Sandwich Making 2 101 03172026.pdf',
+                  file: 'attached_assets/PBJ Sandwich Making 2 101 11012026.pdf',
                   name: 'PBJ Sandwich Making 101.pdf'
                 },
                 '56687eca96492549ba09d1bda0e5e6e0': {
