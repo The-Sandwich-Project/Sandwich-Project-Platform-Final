@@ -4994,12 +4994,12 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
 
     // Resolve attachments (incl. /objects/ storage paths) up front; refuse to
     // send if any selected file can't be loaded instead of dropping it.
-    const { resolveEmailAttachments } = await import('../utils/email-attachments');
+    const { resolveEmailAttachments, describeFailedAttachments } = await import('../utils/email-attachments');
     const { resolved: resolvedAttachments, failed: failedAttachments } =
-      await resolveEmailAttachments(attachments);
+      await resolveEmailAttachments(attachments, { user: req.user });
     if (failedAttachments.length > 0) {
       return res.status(422).json({
-        error: `Email not sent: ${failedAttachments.length} attachment(s) could not be loaded. Remove them or re-upload the document and try again.`,
+        error: describeFailedAttachments(failedAttachments),
         failedAttachments,
       });
     }

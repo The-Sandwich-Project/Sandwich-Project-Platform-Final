@@ -625,9 +625,9 @@ export function createEmailRouter(deps: RouterDependencies) {
     // Resolve every selected attachment (document IDs, /objects/ storage
     // paths, legacy hashes, local files) into base64 up front. If any can't be
     // loaded, refuse to send rather than silently emailing without it.
-    const { resolveEmailAttachments } = await import('../utils/email-attachments');
+    const { resolveEmailAttachments, describeFailedAttachments } = await import('../utils/email-attachments');
     const { resolved: attachmentsForSendgrid, failed: failedAttachments } =
-      await resolveEmailAttachments(attachments);
+      await resolveEmailAttachments(attachments, { user: fullUserData || user });
 
     if (failedAttachments.length > 0) {
       logger.error(
@@ -635,7 +635,7 @@ export function createEmailRouter(deps: RouterDependencies) {
         failedAttachments
       );
       return res.status(422).json({
-        message: `Email not sent: ${failedAttachments.length} attachment(s) could not be loaded. Remove them or re-upload the document and try again.`,
+        message: describeFailedAttachments(failedAttachments),
         failedAttachments,
       });
     }
