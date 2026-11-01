@@ -631,7 +631,6 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
 
     // Batch match all staff names to user IDs (single DB query instead of N+1)
     const {
-      tspContactUserId,
       assignedDriverIds,
       assignedSpeakerIds,
       assignedVolunteerIds,
@@ -729,7 +728,8 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
         : null,
 
       // TSP Contact
-      tspContact: tspContactUserId || data['TSP Contact'] || null,
+      // Storage resolves only unique full names/emails/IDs; preserve ambiguous source text.
+      tspContact: data['TSP Contact'] || null,
 
       // Toolkit
       toolkitSent,
