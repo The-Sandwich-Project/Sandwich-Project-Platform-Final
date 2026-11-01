@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { inArray, eq } from 'drizzle-orm';
+import { inArray, eq, notLike } from 'drizzle-orm';
 import { db } from '../db';
 import { documents } from '@shared/schema';
 import {
@@ -216,6 +216,38 @@ export async function resolveEmailAttachments(
     return row || null;
   }
 
+  // Every document record that points at a local file, keyed by the file's
+  // canonical (realpath) location, so access rules apply no matter how the
+  // caller spells the path (`./x`, absolute, `..`, symlink, legacy alias).
+  let localRecordsByRealPath: Map<string, DocMeta[]> | null = null;
+  async function localRecordsFor(realPath: string): Promise<DocMeta[]> {
+    if (!localRecordsByRealPath) {
+      localRecordsByRealPath = new Map();
+      const rows: DocMeta[] = await db
+        .select({
+          filePath: documents.filePath,
+          originalName: documents.originalName,
+          mimeType: documents.mimeType,
+          category: documents.category,
+          isActive: documents.isActive,
+        })
+        .from(documents)
+        .where(notLike(documents.filePath, '/objects/%'));
+      for (const row of rows) {
+        let canonical: string;
+        try {
+          canonical = fs.realpathSync(resolveLocalPath(row.filePath));
+        } catch {
+          continue; // File missing on disk; can't be the file being read.
+        }
+        const list = localRecordsByRealPath.get(canonical) || [];
+        list.push(row);
+        localRecordsByRealPath.set(canonical, list);
+      }
+    }
+    return localRecordsByRealPath.get(realPath) || [];
+  }
+
   async function load(
     filePath: string,
     displayName?: string | null,
@@ -237,6 +269,11 @@ export async function resolveEmailAttachments(
       if (isInside(real, CONFIDENTIAL_LOCAL_ROOT) && !canSeeConfidential) {
         throw new AttachmentDeniedError('no permission for confidential documents');
       }
+      // Any record for this file must allow access (strictest wins).
+      const records = await localRecordsFor(real);
+      records.forEach(assertDocAccess);
+      displayName = displayName || records[0]?.originalName;
+      mimeType = mimeType || records[0]?.mimeType;
       buffer = fs.readFileSync(real);
     }
     const filename = displayName || path.basename(filePath);
@@ -246,14 +283,6 @@ export async function resolveEmailAttachments(
       type: contentTypeFor(filename, mimeType),
       disposition: 'attachment',
     };
-  }
-
-  // A local path or `{ filePath }` ref: apply the document record's access
-  // rules if one exists, then load (load() enforces the allowed folders).
-  async function loadPath(p: string, displayName?: string | null) {
-    const meta = await docMetaForPath(p);
-    if (meta) assertDocAccess(meta);
-    return load(p, displayName || meta?.originalName, meta?.mimeType);
   }
 
   for (const ref of refs) {
@@ -280,6 +309,10 @@ export async function resolveEmailAttachments(
           const legacy = LEGACY_HASH_MAP[hash];
           if (legacy) {
             name = legacy.name;
+            // The alias is itself a document path; honor that record's rules
+            // before following it (load() then checks the mapped file too).
+            const aliasRecord = await docMetaForPath(trimmed);
+            if (aliasRecord) assertDocAccess(aliasRecord);
             result.resolved.push(await load(legacy.file, legacy.name));
             continue;
           }
@@ -297,7 +330,7 @@ export async function resolveEmailAttachments(
           continue;
         }
 
-        result.resolved.push(await loadPath(trimmed));
+        result.resolved.push(await load(trimmed));
         continue;
       }
 
@@ -310,7 +343,7 @@ export async function resolveEmailAttachments(
           result.resolved.push({ ...sub.resolved[0], filename: ref.originalName || sub.resolved[0].filename });
           continue;
         }
-        result.resolved.push(await loadPath(ref.filePath, ref.originalName));
+        result.resolved.push(await load(ref.filePath, ref.originalName));
         continue;
       }
 

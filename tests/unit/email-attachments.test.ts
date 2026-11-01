@@ -36,6 +36,25 @@ const docRows = [
     category: 'toolkit',
     isActive: true,
   },
+  {
+    // Confidential document stored as a local file outside the
+    // confidential folder (so only the record protects it).
+    id: 11,
+    filePath: 'uploads/__email_attachment_test__/secret-local.pdf',
+    originalName: 'Local Secret.pdf',
+    mimeType: 'application/pdf',
+    category: 'confidential',
+    isActive: true,
+  },
+  {
+    // Legacy alias whose own record is inactive.
+    id: 12,
+    filePath: 'uploads/documents/015b0f68ddb511633e7696caab59bfa7',
+    originalName: 'Food Safety Guide for Volunteers.pdf',
+    mimeType: 'application/pdf',
+    category: 'toolkit',
+    isActive: false,
+  },
 ];
 
 jest.mock('../../server/db', () => ({
@@ -46,7 +65,9 @@ jest.mock('../../server/db', () => ({
           const rows =
             cond.inArray !== undefined
               ? docRows.filter((r) => cond.inArray.includes(r.id))
-              : docRows.filter((r) => r.filePath === cond.eq);
+              : cond.notLikeObjects
+                ? docRows.filter((r) => !r.filePath.startsWith('/objects/'))
+                : docRows.filter((r) => r.filePath === cond.eq);
           const p: any = Promise.resolve(rows);
           p.limit = () => Promise.resolve(rows.slice(0, 1));
           return p;
@@ -58,6 +79,7 @@ jest.mock('../../server/db', () => ({
 jest.mock('drizzle-orm', () => ({
   inArray: (_col: unknown, values: unknown[]) => ({ inArray: values }),
   eq: (_col: unknown, value: unknown) => ({ eq: value }),
+  notLike: () => ({ notLikeObjects: true }),
 }));
 jest.mock('@shared/schema', () => ({
   documents: { id: 'id', filePath: 'filePath', originalName: 'originalName', mimeType: 'mimeType', category: 'category', isActive: 'isActive' },
@@ -193,6 +215,46 @@ describe('resolveEmailAttachments', () => {
         'path is outside allowed folders',
         'path is outside allowed folders',
       ]);
+    });
+
+    describe('local document records apply however the path is spelled', () => {
+      const rel = 'uploads/__email_attachment_test__/secret-local.pdf';
+      beforeEach(() => fs.writeFileSync(path.join(process.cwd(), rel), 'LOCAL-SECRET'));
+
+      const spellings = [
+        rel,
+        './' + rel,
+        path.join(process.cwd(), rel),
+        'uploads/documents/../__email_attachment_test__/secret-local.pdf',
+      ];
+
+      it.each(spellings)('denies %s without DOCUMENTS_CONFIDENTIAL', async (spelling) => {
+        const { resolved, failed } = await resolveEmailAttachments([spelling], staff);
+        expect(resolved).toEqual([]);
+        expect(failed[0].reason).toBe('no permission for confidential documents');
+      });
+
+      it('denies a symlink to the confidential file', async () => {
+        const link = path.join(uploadsDir, 'alias.pdf');
+        fs.rmSync(link, { force: true });
+        fs.symlinkSync(path.join(process.cwd(), rel), link);
+        const { failed } = await resolveEmailAttachments([link], staff);
+        expect(failed[0].reason).toBe('no permission for confidential documents');
+      });
+
+      it('allows it with DOCUMENTS_CONFIDENTIAL and uses the record name', async () => {
+        const { resolved, failed } = await resolveEmailAttachments(['./' + rel], admin);
+        expect(failed).toEqual([]);
+        expect(resolved[0]).toMatchObject({ filename: 'Local Secret.pdf', content: b64('LOCAL-SECRET') });
+      });
+    });
+
+    it('applies the alias record before following a legacy hash', async () => {
+      const { failed } = await resolveEmailAttachments(
+        ['uploads/documents/015b0f68ddb511633e7696caab59bfa7'],
+        admin
+      );
+      expect(failed[0].reason).toBe('document is not active');
     });
 
     it('blocks symlinks that point outside allowed folders', async () => {
