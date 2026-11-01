@@ -199,6 +199,9 @@ function applyRowUpdate(payload, eventId, token, fields) {
   types with the same code as this update flow (`staffingForNewEvent`,
   `sandwichTypesForNewEvent`), so creating an event from a row and then updating it from the
   same row shows no changes.
+- Events created by "send row to app" before that fix stored sandwich types as a JSON string
+  of labels like `"Pbj"`. `migrations/20261101_heal_sheet_import_sandwich_types.sql` converts
+  them to real arrays with the app's keys on the next boot.
 - `VD: <names>` is read the way the app's push writes it: those people are the event's
   **drivers** on a van event. The names also fill the app's free-text van driver field,
   unless a real van driver is linked in the app. The app's push only writes the van driver
