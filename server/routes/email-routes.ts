@@ -699,23 +699,23 @@ export function createEmailRouter(deps: RouterDependencies) {
               // Map document hashes to attached_assets files
               const hashToFileMap: Record<string, { file: string; name: string }> = {
                 '015b0f68ddb511633e7696caab59bfa7': {
-                  file: 'attached_assets/20260506-TSP-Food+Safety+Volunteers.pdf',
+                  file: 'client/public/documents/food-safety-volunteers.pdf',
                   name: 'Food Safety Guide for Volunteers.pdf'
                 },
                 '3e375509b08b20265abdfa6afe632982': {
-                  file: 'attached_assets/PBJ Sandwich Making 2 101 11012026.pdf',
+                  file: 'client/public/documents/pbj-sandwich-making-101.pdf',
                   name: 'PBJ Sandwich Making 101.pdf'
                 },
                 '56687eca96492549ba09d1bda0e5e6e0': {
-                  file: 'attached_assets/Deli Sandwich Making 101 03172026.pdf',
+                  file: 'client/public/documents/deli-sandwich-making-101.pdf',
                   name: 'Deli Sandwich Making 101.pdf'
                 },
                 '075839360400adce8b79a6a58a96dcfc': {
-                  file: 'attached_assets/Deli Labels_1756865384146.pdf',
+                  file: 'client/public/documents/deli-labels.pdf',
                   name: 'Deli Sandwich Labels.pdf'
                 },
                 'a9458021b23fca8d76e674597c691876': {
-                  file: 'attached_assets/PBJ Labels_1756865384146.pdf',
+                  file: 'client/public/documents/pbj-labels.pdf',
                   name: 'PBJ Sandwich Labels.pdf'
                 }
               };

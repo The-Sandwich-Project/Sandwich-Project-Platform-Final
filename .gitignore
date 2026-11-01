@@ -88,16 +88,8 @@ attached_assets/*
 !attached_assets/LOGOS/TSP_transparent.png
 !attached_assets/CMYK_PRINT_TSP-01_1749585167435.png
 !attached_assets/CMYK_PRINT_TSP-01 (2).png
-# Essential dashboard / Resources PDFs — must be tracked or Preview/Download
-# returns the SPA HTML shell (looks like a broken link).
-!attached_assets/TSP Volunteer Driver Agreement (1).pdf
-!attached_assets/Sandwich Project - Sign In Sheet correct qrs.pdf
-!attached_assets/TSP COMMUNITY SERVICE HOURS (1) (1) (1).pdf
-!attached_assets/Deli Sandwich Making 101 03172026.pdf
-!attached_assets/PBJ Sandwich Making 2 101 11012026.pdf
-!attached_assets/20260506-TSP-Food+Safety+Volunteers.pdf
-!attached_assets/Deli Labels_1756865384146.pdf
-!attached_assets/PBJ Labels_1756865384146.pdf
+# Documents (PDFs etc.) linked from the app live in client/public/documents/,
+# not here — files in attached_assets are ignored unless listed above.
 
 # Windows reserved device names (cannot be deleted normally)
 nul

@@ -160,7 +160,7 @@ interface Tag {
 /** Fallback paths when a seeded resource lost its URL in the DB (e.g. after a bad edit). */
 const STATIC_RESOURCE_URLS: Record<string, string> = {
   'Sandwich Sign-In Form':
-    '/attached_assets/Sandwich Project - Sign In Sheet correct qrs.pdf',
+    '/documents/volunteer-sign-in-sheet.pdf',
 };
 
 function getResourceOpenUrl(item: Resource): string | null {
