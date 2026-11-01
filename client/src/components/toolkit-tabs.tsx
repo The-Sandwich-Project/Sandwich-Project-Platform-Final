@@ -76,7 +76,7 @@ const safetyDocuments: ToolkitDocument[] = [
 const labelDocuments: ToolkitDocument[] = [
   {
     name: 'Deli Labels',
-    path: '/attached_assets/Deli labels_1749341916236.pdf',
+    path: '/documents/deli-labels.pdf',
     type: 'pdf',
     category: 'Labels',
     description:
@@ -84,7 +84,7 @@ const labelDocuments: ToolkitDocument[] = [
   },
   {
     name: 'PBJ Labels',
-    path: '/attached_assets/20250622-TSP-PBJ Sandwich Making 101_1749341916236.pdf',
+    path: '/documents/pbj-labels.pdf',
     type: 'pdf',
     category: 'Labels',
     description: 'Labels and guidelines for peanut butter and jelly sandwiches',
