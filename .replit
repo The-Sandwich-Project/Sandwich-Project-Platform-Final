@@ -66,9 +66,6 @@ author = 43025137
 task = "shell.exec"
 args = "npm run dev"
 
-[objectStorage]
-defaultBucketID = "replit-objstore-5c569e23-2e8a-423a-87c9-b9bf6fd00d94"
-
 [agent]
 integrations = ["javascript_sendgrid:1.0.0", "javascript_database:1.0.0", "twilio:1.0.0", "javascript_openai_ai_integrations:1.0.0", "javascript_object_storage:2.0.0"]
 
