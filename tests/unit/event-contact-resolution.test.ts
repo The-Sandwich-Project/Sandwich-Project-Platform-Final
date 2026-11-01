@@ -146,3 +146,35 @@ describe('contact update regressions from PR review', () => {
       { tspContact: 'Alex/Blair' })).toEqual({ tspContact: 'Alex/Blair', tspContactAssigned: null });
   });
 });
+
+describe('matching dual-field source labels', () => {
+  it.each([undefined, { tspContact: 'a', tspContactAssigned: 'a', planningNotes: 'Keep notes' }])(
+    'moves identical unresolved labels to one custom contact on create/update', previous => {
+      const result = normalize({ tspContact: 'Alex/Blair', tspContactAssigned: 'Alex/Blair' }, users, previous);
+      expect(result).toEqual({
+        tspContact: null, tspContactAssigned: null, customTspContact: 'Alex/Blair',
+        planningNotes: [previous?.planningNotes, '[Imported TSP contact] Alex/Blair'].filter(Boolean).join('\n'),
+      });
+    },
+  );
+  it.each([' Alex One ', 'ALEX@EXAMPLE.ORG'])('preserves the legacy source %s alongside a primary ID', label => {
+    expect(normalize({ tspContact: 'a', tspContactAssigned: label }, users)).toEqual({
+      tspContact: 'a', tspContactAssigned: 'a', planningNotes: `[Imported TSP contact] ${label}`,
+    });
+  });
+  it('preserves both different labels for the same person on updates', () => {
+    expect(normalize({ tspContact: ' Alex One ', tspContactAssigned: 'alex@example.org' }, users,
+      { tspContact: 'b', tspContactAssigned: 'b', planningNotes: 'Keep notes' })).toEqual({
+      tspContact: 'a', tspContactAssigned: 'a',
+      planningNotes: 'Keep notes\n[Imported TSP contact]  Alex One \n[Imported TSP contact] alex@example.org',
+    });
+  });
+  it('preserves an identical resolved source only once', () => {
+    expect(normalize({ tspContact: 'Alex One', tspContactAssigned: 'Alex One' }, users).planningNotes)
+      .toBe('[Imported TSP contact] Alex One');
+  });
+  it('continues to preserve genuinely different unresolved contacts for review', () => {
+    const patch = { tspContact: 'Alex/Blair', tspContactAssigned: 'Jen picking up' };
+    expect(normalize(patch, users)).toEqual(patch);
+  });
+});

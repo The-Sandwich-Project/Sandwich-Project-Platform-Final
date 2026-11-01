@@ -62,7 +62,9 @@ export function normalizeEventContactPatch<T extends EventContactFields>(
   const primary = resolveEventContact(patch.tspContact, users);
   const assigned = resolveEventContact(patch.tspContactAssigned, users);
   if (hasPrimary && hasAssigned && clean(patch.tspContact) && clean(patch.tspContactAssigned)) {
-    if (!('userId' in primary) || !('userId' in assigned) || primary.userId !== assigned.userId) {
+    const identicalSource = patch.tspContact === patch.tspContactAssigned;
+    const sameUser = 'userId' in primary && 'userId' in assigned && primary.userId === assigned.userId;
+    if (!identicalSource && !sameUser) {
       return { ...patch }; // An explicit conflict is review work, never last-value-wins.
     }
   }
@@ -96,8 +98,15 @@ export function normalizeEventContactPatch<T extends EventContactFields>(
     result.tspContactAssigned = null;
     result.customTspContact = [customContact, raw].filter(Boolean).join('\n');
   }
-  if (raw && resolution.kind !== 'id' && resolution.kind !== 'empty') {
-    result.planningNotes = [planningNotes, `[Imported TSP contact] ${raw}`].filter(Boolean).join('\n');
+  // Both supplied fields may contain useful source text for the same person.
+  // Preserve each exact non-ID label once, including the non-selected field.
+  const sourceLabels = [...new Set([
+    ...(hasPrimary && primary.kind !== 'id' && primary.kind !== 'empty' ? [patch.tspContact!] : []),
+    ...(hasAssigned && assigned.kind !== 'id' && assigned.kind !== 'empty' ? [patch.tspContactAssigned!] : []),
+  ])];
+  if (resolution.kind !== 'empty' && sourceLabels.length) {
+    result.planningNotes = [planningNotes, ...sourceLabels.map(label => `[Imported TSP contact] ${label}`)]
+      .filter(Boolean).join('\n');
   }
   return result;
 }
