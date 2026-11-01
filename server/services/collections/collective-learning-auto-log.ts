@@ -267,6 +267,19 @@ function holidayFor(weekOf: string): { excluded: boolean; reason?: string } {
   return start.excluded ? start : isInExcludedWeek(addDays(weekOf, 6));
 }
 
+/**
+ * WHERE clause for reconcile's writes: the row must still be an auto entry.
+ * If someone edited it in the Collections log meanwhile (converting it to a
+ * regular entry), the write matches nothing and reconcile re-reads the week
+ * instead of overwriting their numbers.
+ */
+function stillAutoRow(id: number) {
+  return and(
+    eq(sandwichCollections.id, id),
+    eq(sandwichCollections.submissionMethod, AUTO_RECURRING_SUBMISSION_METHOD)
+  );
+}
+
 function overrideFingerprint(o: RecurringCollectionOverride | undefined): string {
   return o ? `${o.id}:${new Date(o.updatedAt).getTime()}` : 'none';
 }
@@ -290,13 +303,13 @@ export async function reconcileWeek(
   // run was in flight could be overwritten by a write based on the old one.
   // If the override changed underneath us, run again on the fresh state; the
   // override endpoint also reconciles after saving, so both sides converge.
-  if (!opts._retried && result.overrideSeen !== undefined) {
-    const latest = overrideFingerprint(await getOverride(result.weekOf));
-    if (latest !== result.overrideSeen) {
+  if (!opts._retried && (result.raced || result.overrideSeen !== undefined)) {
+    const latest = result.raced ? null : overrideFingerprint(await getOverride(result.weekOf));
+    if (result.raced || latest !== result.overrideSeen) {
       return reconcileWeek(weekOfInput, { ...opts, _retried: true });
     }
   }
-  const { overrideSeen: _ignored, ...publicResult } = result;
+  const { overrideSeen: _ignored, raced: _raced, ...publicResult } = result;
 
   // Same idea for the on/off switch: if an admin turned the auto-log off
   // while this run was in flight, undo the entry it just created/restored.
@@ -308,7 +321,7 @@ export async function reconcileWeek(
     await db
       .update(sandwichCollections)
       .set({ deletedAt: new Date(), deletedBy: SYSTEM_USER_ID })
-      .where(eq(sandwichCollections.id, publicResult.collectionId));
+      .where(stillAutoRow(publicResult.collectionId));
     notifyCollectionsChanged(publicResult.collectionId, 'delete');
     log.info(`Auto-log was disabled mid-run; removed entry ${publicResult.collectionId}`);
     return { ...publicResult, outcome: 'skipped_disabled', count: null, collectionId: null };
@@ -340,9 +353,7 @@ export async function prepareAutoEntryEdit<T extends Record<string, unknown>>(
     .from(sandwichCollections)
     .where(eq(sandwichCollections.id, collectionId))
     .limit(1);
-  if (!isAutoLogRow(row) || row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD) {
-    return updates;
-  }
+  if (!isAutoLogRow(row)) return updates;
   const newDate = typeof updates.collectionDate === 'string' ? updates.collectionDate : null;
   if (newDate && isValidDateStr(newDate) && wednesdayOf(newDate) !== wednesdayOf(row.collectionDate)) {
     await upsertOverride({
@@ -354,6 +365,8 @@ export async function prepareAutoEntryEdit<T extends Record<string, unknown>>(
       userName: null,
     });
   }
+  // Already converted by an earlier edit: just the move handling above.
+  if (row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD) return updates;
   log.info(`Auto entry ${collectionId} edited in Collections log; converting to a regular log entry`);
   return {
     ...updates,
@@ -363,13 +376,38 @@ export async function prepareAutoEntryEdit<T extends Record<string, unknown>>(
 }
 
 /**
+ * For deletes that bypass the storage layer (bulk hard-delete in Data
+ * Management): mark the week of every auto-origin row about to be removed
+ * "didn't collect", so the daily run doesn't recreate the estimate.
+ */
+export async function markAutoEntriesDeleted(
+  rows: Array<{ createdBy: string | null; collectionDate: string; deletedAt?: Date | null }>,
+  userId?: string | null
+): Promise<void> {
+  const weeks = new Set(
+    rows.filter((r) => isAutoLogRow(r) && !r.deletedAt).map((r) => wednesdayOf(r.collectionDate))
+  );
+  for (const weekOf of weeks) {
+    await upsertOverride({
+      weekOf,
+      skipped: true,
+      count: null,
+      note: 'Deleted in bulk (Data Management)',
+      userId: userId ?? null,
+      userName: null,
+    });
+  }
+}
+
+/**
  * Called by the storage layer after a collection is deleted or restored
  * outside this module. For rows that started as auto entries (including ones
  * since converted by an edit):
  *   - deleted  → "didn't collect" override, so the estimate doesn't return
- *   - restored → undo that: drop the "didn't collect" override, and for a
- *                still-auto row keep its count as an override if it isn't
- *                the default (so a card-set count survives delete + restore)
+ *   - restored → undo that: drop the "didn't collect" override, or for a
+ *                still-auto row save its count as an explicit override (so a
+ *                card-set count, holiday weeks included, survives delete +
+ *                restore)
  */
 export async function syncOverrideFromAutoEntryChange(
   collectionId: number,
@@ -394,9 +432,10 @@ export async function syncOverrideFromAutoEntryChange(
       userName: null,
     });
   } else {
-    const stillAuto = row.submissionMethod === AUTO_RECURRING_SUBMISSION_METHOD;
-    const { defaultCount } = await getAutoLogConfig();
-    if (stillAuto && row.individualSandwiches !== defaultCount) {
+    // A still-auto row comes back with the count it had, as an explicit
+    // override, even if that's the default: in a holiday week only an explicit
+    // count keeps the entry (the default alone would be skipped).
+    if (row.submissionMethod === AUTO_RECURRING_SUBMISSION_METHOD) {
       await upsertOverride({
         weekOf,
         skipped: false,
@@ -415,7 +454,7 @@ export async function syncOverrideFromAutoEntryChange(
 async function reconcileWeekOnce(
   weekOfInput: string,
   opts: { today?: string; allowCreate?: boolean }
-): Promise<ReconcileResult & { overrideSeen?: string }> {
+): Promise<ReconcileResult & { overrideSeen?: string; raced?: boolean }> {
   const weekOf = wednesdayOf(weekOfInput);
   const weekEnd = addDays(weekOf, 6);
   const today = opts.today ?? todayInEastern();
@@ -480,10 +519,12 @@ async function reconcileWeekOnce(
 
   if (standDown) {
     if (autoRow && !autoRow.deletedAt) {
-      await db
+      const removed = await db
         .update(sandwichCollections)
         .set({ deletedAt: new Date(), deletedBy: SYSTEM_USER_ID })
-        .where(eq(sandwichCollections.id, autoRow.id));
+        .where(stillAutoRow(autoRow.id))
+        .returning({ id: sandwichCollections.id });
+      if (removed.length === 0) return { ...seen, outcome: 'unchanged', raced: true };
       notifyCollectionsChanged(autoRow.id, 'delete');
       log.info(`Removed auto entry ${autoRow.id} for week of ${weekOf} (${standDown})`);
       return {
@@ -519,10 +560,12 @@ async function reconcileWeekOnce(
     if (!wasDeleted && !countChanged) {
       return { ...seen, outcome: 'unchanged', count: desiredCount, collectionId: autoRow.id };
     }
-    await db
+    const written = await db
       .update(sandwichCollections)
       .set({ ...countFields, hostName: config.hostName, deletedAt: null, deletedBy: null })
-      .where(eq(sandwichCollections.id, autoRow.id));
+      .where(stillAutoRow(autoRow.id))
+      .returning({ id: sandwichCollections.id });
+    if (written.length === 0) return { ...seen, outcome: 'unchanged', raced: true };
     notifyCollectionsChanged(autoRow.id, wasDeleted ? 'restore' : 'update');
     log.info(
       `${wasDeleted ? 'Restored' : 'Updated'} auto entry ${autoRow.id} for week of ${weekOf} → ${desiredCount}`

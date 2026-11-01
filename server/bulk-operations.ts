@@ -152,6 +152,17 @@ export class BulkOperationsManager {
         .from(sandwichCollections)
         .where(inArray(sandwichCollections.id, ids));
 
+      // Keep the Collective Learning auto-log from recreating deleted
+      // auto entries (lazy import avoids a module cycle)
+      try {
+        const { markAutoEntriesDeleted } = await import(
+          './services/collections/collective-learning-auto-log'
+        );
+        await markAutoEntriesDeleted(existingData, context.userId);
+      } catch (error) {
+        logger.error('Failed to sync auto-log overrides before bulk delete', error);
+      }
+
       // Delete records
       const deletedResult = await db
         .delete(sandwichCollections)
