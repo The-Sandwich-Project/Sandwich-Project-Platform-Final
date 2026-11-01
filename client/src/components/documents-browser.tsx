@@ -44,14 +44,14 @@ const documentFiles: DocumentFile[] = [
   },
   {
     name: "Deli Labels",
-    path: "/attached_assets/Deli labels_1749341916236.pdf",
+    path: "/attached_assets/Deli Labels_1756865384146.pdf",
     type: "pdf",
     category: "Resources",
     description: "Printable labels for deli sandwich packaging"
   },
   {
     name: "PBJ Labels", 
-    path: "/attached_assets/Pbj labels_1749341916237.pdf",
+    path: "/attached_assets/PBJ Labels_1756865384146.pdf",
     type: "pdf",
     category: "Resources",
     description: "Printable labels for PBJ sandwich packaging"
