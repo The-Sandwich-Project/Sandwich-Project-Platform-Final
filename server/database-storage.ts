@@ -202,12 +202,15 @@ async function autoLog() {
   return import('./services/collections/collective-learning-auto-log');
 }
 
-async function prepareAutoLogEdit<T extends Record<string, unknown>>(id: number, updates: T): Promise<T> {
+async function prepareAutoLogEdit<T extends Record<string, unknown>>(
+  id: number,
+  updates: T
+): Promise<{ updates: T; afterSave?: () => Promise<void> }> {
   try {
     return await (await autoLog()).prepareAutoEntryEdit(id, updates);
   } catch (error) {
     logger.error('Failed to prepare auto-log entry edit', error);
-    return updates;
+    return { updates };
   }
 }
 
@@ -1507,12 +1510,17 @@ export class DatabaseStorage implements IStorage {
     id: number,
     updates: Partial<SandwichCollection>
   ): Promise<SandwichCollection | undefined> {
-    const finalUpdates = await prepareAutoLogEdit(id, updates);
+    const { updates: finalUpdates, afterSave } = await prepareAutoLogEdit(id, updates);
     const [collection] = await db
       .update(sandwichCollections)
       .set(finalUpdates)
       .where(eq(sandwichCollections.id, id))
       .returning();
+    if (collection && afterSave) {
+      await afterSave().catch((error) =>
+        logger.error('Failed to save auto-log override after collection edit', error)
+      );
+    }
     return collection || undefined;
   }
 

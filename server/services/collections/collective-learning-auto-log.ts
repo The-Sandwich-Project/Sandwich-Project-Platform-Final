@@ -106,8 +106,8 @@ export function wednesdayOf(dateStr: string): string {
   return addDays(dateStr, -((dow + 4) % 7));
 }
 
-export function isValidDateStr(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+export function isValidDateStr(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [y, m, d] = value.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
@@ -295,38 +295,72 @@ export async function reconcileWeek(
     // false = only correct an existing auto entry, never create/restore one
     // (used for the daily look-back over past weeks)
     allowCreate?: boolean;
-    _retried?: boolean;
   } = {}
 ): Promise<ReconcileResult> {
-  const result = await reconcileWeekOnce(weekOfInput, opts);
-  // Neon's HTTP driver has no transactions, so an override saved while this
-  // run was in flight could be overwritten by a write based on the old one.
-  // If the override changed underneath us, run again on the fresh state; the
-  // override endpoint also reconciles after saving, so both sides converge.
-  if (!opts._retried && (result.raced || result.overrideSeen !== undefined)) {
-    const latest = result.raced ? null : overrideFingerprint(await getOverride(result.weekOf));
-    if (result.raced || latest !== result.overrideSeen) {
-      return reconcileWeek(weekOfInput, { ...opts, _retried: true });
-    }
+  const first = await reconcileWeekOnce(weekOfInput, opts);
+  let result = first;
+  // Neon's HTTP driver has no transactions, so an override saved (or a log
+  // edit made) while this run was in flight could be overwritten by a write
+  // based on stale state. If either happened, run once more on fresh state;
+  // the override endpoint also reconciles after saving, so both converge.
+  if (
+    first.raced ||
+    (first.overrideSeen !== undefined &&
+      overrideFingerprint(await getOverride(first.weekOf)) !== first.overrideSeen)
+  ) {
+    result = await reconcileWeekOnce(weekOfInput, opts);
   }
   const { overrideSeen: _ignored, raced: _raced, ...publicResult } = result;
 
   // Same idea for the on/off switch: if an admin turned the auto-log off
-  // while this run was in flight, undo the entry it just created/restored.
-  if (
-    (publicResult.outcome === 'created' || publicResult.outcome === 'restored') &&
-    publicResult.collectionId != null &&
-    !(await getAutoLogConfig()).enabled
-  ) {
-    await db
-      .update(sandwichCollections)
-      .set({ deletedAt: new Date(), deletedBy: SYSTEM_USER_ID })
-      .where(stillAutoRow(publicResult.collectionId));
-    notifyCollectionsChanged(publicResult.collectionId, 'delete');
-    log.info(`Auto-log was disabled mid-run; removed entry ${publicResult.collectionId}`);
+  // while this run was in flight, undo any entry either pass created/restored.
+  const touched = [first, result]
+    .filter((r) => (r.outcome === 'created' || r.outcome === 'restored') && r.collectionId != null)
+    .map((r) => r.collectionId as number);
+  if (touched.length > 0 && !(await getAutoLogConfig()).enabled) {
+    for (const id of new Set(touched)) {
+      const undone = await db
+        .update(sandwichCollections)
+        .set({ deletedAt: new Date(), deletedBy: SYSTEM_USER_ID })
+        .where(stillAutoRow(id))
+        .returning({ id: sandwichCollections.id });
+      if (undone.length > 0) {
+        notifyCollectionsChanged(id, 'delete');
+        log.info(`Auto-log was disabled mid-run; removed entry ${id}`);
+      }
+    }
     return { ...publicResult, outcome: 'skipped_disabled', count: null, collectionId: null };
   }
   return publicResult;
+}
+
+/**
+ * A real log for this host in the given week: any live, non-auto entry whose
+ * host matches the configured name, or that started as one of our auto
+ * entries and was converted by a hand edit (matched by its stable createdBy,
+ * so renaming either the entry's host or the configured host can't hide it).
+ */
+async function findManualEntry(config: AutoLogConfig, weekOf: string) {
+  const [row] = await db
+    .select({ id: sandwichCollections.id, count: sandwichCollections.individualSandwiches })
+    .from(sandwichCollections)
+    .where(
+      and(
+        or(
+          ilike(sandwichCollections.hostName, `%${config.hostName}%`),
+          eq(sandwichCollections.createdBy, AUTO_ROW_CREATED_BY)
+        ),
+        gte(sandwichCollections.collectionDate, weekOf),
+        lte(sandwichCollections.collectionDate, addDays(weekOf, 6)),
+        isNull(sandwichCollections.deletedAt),
+        or(
+          isNull(sandwichCollections.submissionMethod),
+          ne(sandwichCollections.submissionMethod, AUTO_RECURRING_SUBMISSION_METHOD)
+        )
+      )
+    )
+    .limit(1);
+  return row;
 }
 
 function isAutoLogRow(row: { createdBy: string | null } | undefined): boolean {
@@ -347,31 +381,39 @@ export async function prepareAutoEntryEdit<T extends Record<string, unknown>>(
   collectionId: number,
   updates: T,
   userId?: string | null
-): Promise<T> {
+): Promise<{ updates: T; afterSave?: () => Promise<void> }> {
   const [row] = await db
     .select()
     .from(sandwichCollections)
     .where(eq(sandwichCollections.id, collectionId))
     .limit(1);
-  if (!isAutoLogRow(row)) return updates;
-  const newDate = typeof updates.collectionDate === 'string' ? updates.collectionDate : null;
-  if (newDate && isValidDateStr(newDate) && wednesdayOf(newDate) !== wednesdayOf(row.collectionDate)) {
-    await upsertOverride({
-      weekOf: wednesdayOf(row.collectionDate),
-      skipped: true,
-      count: null,
-      note: `Moved to week of ${wednesdayOf(newDate)} in Collections log`,
-      userId: userId ?? null,
-      userName: null,
-    });
-  }
+  if (!isAutoLogRow(row)) return { updates };
+  // The "didn't collect" for the week it left is saved only once the edit
+  // itself has succeeded (afterSave), so a failed edit leaves nothing behind.
+  const newDate = updates.collectionDate;
+  const afterSave =
+    isValidDateStr(newDate) && wednesdayOf(newDate) !== wednesdayOf(row.collectionDate)
+      ? async () => {
+          await upsertOverride({
+            weekOf: wednesdayOf(row.collectionDate),
+            skipped: true,
+            count: null,
+            note: `Moved to week of ${wednesdayOf(newDate)} in Collections log`,
+            userId: userId ?? null,
+            userName: null,
+          });
+        }
+      : undefined;
   // Already converted by an earlier edit: just the move handling above.
-  if (row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD) return updates;
+  if (row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD) return { updates, afterSave };
   log.info(`Auto entry ${collectionId} edited in Collections log; converting to a regular log entry`);
   return {
-    ...updates,
-    submissionMethod: 'standard',
-    createdByName: `${SYSTEM_USER_NAME}, edited`,
+    updates: {
+      ...updates,
+      submissionMethod: 'standard',
+      createdByName: `${SYSTEM_USER_NAME}, edited`,
+    },
+    afterSave,
   };
 }
 
@@ -456,7 +498,6 @@ async function reconcileWeekOnce(
   opts: { today?: string; allowCreate?: boolean }
 ): Promise<ReconcileResult & { overrideSeen?: string; raced?: boolean }> {
   const weekOf = wednesdayOf(weekOfInput);
-  const weekEnd = addDays(weekOf, 6);
   const today = opts.today ?? todayInEastern();
   const config = await getAutoLogConfig();
 
@@ -488,22 +529,7 @@ async function reconcileWeekOnce(
 
   // A real (non-auto) log for this host this week means someone entered the
   // actual number — that beats our standing estimate.
-  const [manualRow] = await db
-    .select({ id: sandwichCollections.id })
-    .from(sandwichCollections)
-    .where(
-      and(
-        ilike(sandwichCollections.hostName, `%${config.hostName}%`),
-        gte(sandwichCollections.collectionDate, weekOf),
-        lte(sandwichCollections.collectionDate, weekEnd),
-        isNull(sandwichCollections.deletedAt),
-        or(
-          isNull(sandwichCollections.submissionMethod),
-          ne(sandwichCollections.submissionMethod, AUTO_RECURRING_SUBMISSION_METHOD)
-        )
-      )
-    )
-    .limit(1);
+  const manualRow = await findManualEntry(config, weekOf);
 
   let standDown: ReconcileOutcome | null = null;
   let desiredCount = config.defaultCount;
@@ -650,7 +676,7 @@ export async function getAutoLogStatus() {
   const config = await getAutoLogConfig();
   const today = todayInEastern();
   const currentWeekOf = wednesdayOf(today);
-  const [overrides, recentAutoEntries] = await Promise.all([
+  const [overrides, recentAutoEntries, currentWeekManual, [currentWeekAuto]] = await Promise.all([
     listOverrides(),
     db
       .select({
@@ -663,12 +689,28 @@ export async function getAutoLogStatus() {
       .where(eq(sandwichCollections.submissionMethod, AUTO_RECURRING_SUBMISSION_METHOD))
       .orderBy(desc(sandwichCollections.collectionDate))
       .limit(8),
+    findManualEntry(config, currentWeekOf),
+    db
+      .select({ id: sandwichCollections.id, count: sandwichCollections.individualSandwiches })
+      .from(sandwichCollections)
+      .where(
+        and(
+          eq(sandwichCollections.submissionMethod, AUTO_RECURRING_SUBMISSION_METHOD),
+          eq(sandwichCollections.createdBy, AUTO_ROW_CREATED_BY),
+          eq(sandwichCollections.collectionDate, currentWeekOf),
+          isNull(sandwichCollections.deletedAt)
+        )
+      )
+      .limit(1),
   ]);
   return {
     config,
     today,
     currentWeekOf,
     currentWeekHoliday: holidayFor(currentWeekOf),
+    // What's actually in the log this week, so the card doesn't have to guess
+    currentWeekManual: currentWeekManual ?? null,
+    currentWeekAuto: currentWeekAuto ?? null,
     overrides,
     recentAutoEntries,
   };

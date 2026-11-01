@@ -38,6 +38,8 @@ interface AutoLogStatus {
   today: string;
   currentWeekOf: string;
   currentWeekHoliday: { excluded: boolean; reason?: string };
+  currentWeekManual: { id: number; count: number } | null;
+  currentWeekAuto: { id: number; count: number } | null;
   overrides: Override[];
   recentAutoEntries: AutoEntry[];
 }
@@ -183,15 +185,20 @@ export default function CollectiveLearningAutoLogCard() {
 
   const { config } = status;
   const currentOverride = status.overrides.find((o) => o.weekOf === status.currentWeekOf);
-  const thisWeekText = !config.enabled
-    ? 'Auto-log is off'
-    : currentOverride?.skipped
-      ? 'Marked as not collected'
-      : currentOverride?.count != null
-        ? `${currentOverride.count} PBJ (override)`
-        : status.currentWeekHoliday.excluded
-          ? `Holiday week (${status.currentWeekHoliday.reason}) — nothing logged`
-          : `${config.defaultCount} PBJ (default)`;
+  // What's in the log this week first; otherwise what the next run will do.
+  const thisWeekText = status.currentWeekManual
+    ? `${status.currentWeekManual.count} logged (real entry)`
+    : status.currentWeekAuto
+      ? `${status.currentWeekAuto.count} PBJ logged`
+      : !config.enabled
+        ? 'Auto-log is off'
+        : currentOverride?.skipped
+          ? 'Marked as not collected'
+          : currentOverride?.count != null
+            ? `Will log ${currentOverride.count} PBJ (override)`
+            : status.currentWeekHoliday.excluded
+              ? `Holiday week (${status.currentWeekHoliday.reason}) — nothing logged`
+              : `Will log ${config.defaultCount} PBJ (default)`;
 
   const countValid = mode === 'skipped' || (count !== '' && Number.isInteger(Number(count)) && Number(count) >= 0);
   const defaultCountValid =
