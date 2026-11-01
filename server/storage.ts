@@ -1,3 +1,4 @@
+import { normalizeEventContactPatch } from '@shared/event-contact-resolution';
 import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import fs from 'fs';
 import path from 'path';
@@ -3224,7 +3225,7 @@ export class MemStorage implements IStorage {
   ): Promise<EventRequest> {
     const id = this.currentIds.eventRequest++;
     const eventRequest: EventRequest = {
-      ...normalizeToolkitPatch(insertEventRequest),
+      ...normalizeToolkitPatch(normalizeEventContactPatch(insertEventRequest, Array.from(this.users.values()))),
       id,
       createdAt: new Date(),
       lastUpdated: new Date(),
@@ -3241,7 +3242,7 @@ export class MemStorage implements IStorage {
     const eventRequest = this.eventRequests.get(id);
     if (!eventRequest) return undefined;
 
-    const updated = { ...eventRequest, ...normalizeToolkitPatch(updates, eventRequest), lastUpdated: new Date() };
+    const updated = { ...eventRequest, ...normalizeToolkitPatch(normalizeEventContactPatch(updates, Array.from(this.users.values()), eventRequest), eventRequest), lastUpdated: new Date() };
     this.eventRequests.set(id, updated);
     return updated;
   }
