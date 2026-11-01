@@ -82,3 +82,6 @@ CLIENT_URL = "https://sandwich-project-platform-final-katielong2316.replit.app"
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 180000
+
+[objectStorage]
+defaultBucketID = "replit-objstore-e4ba14e6-d36d-40a3-b20c-e387843b8e7b"
