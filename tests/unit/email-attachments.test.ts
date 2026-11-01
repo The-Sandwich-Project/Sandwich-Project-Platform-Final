@@ -159,12 +159,17 @@ describe('resolveEmailAttachments', () => {
 
   describe('failures are reported, not dropped', () => {
     it('reports missing storage files, unknown IDs and bad formats', async () => {
-      const { resolved, failed } = await resolveEmailAttachments(['/objects/uploads/missing', 999, null as any], staff);
+      const { resolved, failed } = await resolveEmailAttachments(
+        ['/objects/uploads/missing', 999, null as any, {} as any, { filePath: 42 } as any],
+        staff
+      );
       expect(resolved).toEqual([]);
       expect(failed.map((f) => [f.ref, f.reason])).toEqual([
         ['/objects/uploads/missing', 'file not found in object storage'],
         ['999', 'not a known document'],
         ['null', 'unrecognized attachment format'],
+        ['{}', 'unrecognized attachment format'],
+        ['{"filePath":42}', 'unrecognized attachment format'],
       ]);
       expect(failed[0].name).toBe('Deleted Guide.pdf');
     });
@@ -180,10 +185,14 @@ describe('resolveEmailAttachments', () => {
 
   describe('access control', () => {
     it('blocks confidential documents without DOCUMENTS_CONFIDENTIAL (ID, storage path, local path)', async () => {
-      expect(await reasons([8, '/objects/uploads/secret', `${TEST_DIR_REL}/secret-local.pdf`], staff)).toEqual([
-        'no permission for confidential documents',
-        'no permission for confidential documents',
-        'no permission for confidential documents',
+      const { failed } = await resolveEmailAttachments(
+        [8, '/objects/uploads/secret', `${TEST_DIR_REL}/secret-local.pdf`],
+        staff
+      );
+      expect(failed.map((f) => [f.name, f.reason])).toEqual([
+        ['Board Minutes.pdf', 'no permission for confidential documents'],
+        ['Board Minutes.pdf', 'no permission for confidential documents'],
+        ['Local Secret.pdf', 'no permission for confidential documents'],
       ]);
     });
 

@@ -250,8 +250,14 @@ export async function resolveEmailAttachments(
   for (let i = 0; i < refs.length; i++) {
     const ref = refs[i];
     const key = keys[i];
+    // Always a string, even for malformed input like {} or { filePath: 42 },
+    // so bad refs reach the format error below instead of throwing here.
     const label =
-      typeof ref === 'object' && ref !== null ? ref.filePath : String(ref);
+      typeof ref === 'object' && ref !== null && typeof ref.filePath === 'string'
+        ? ref.filePath
+        : typeof ref === 'object' && ref !== null
+          ? JSON.stringify(ref)
+          : String(ref);
     let name = key && 'id' in key ? `document #${key.id}` : path.basename(label);
     try {
       if (!key) throw new Error('unrecognized attachment format');
@@ -261,6 +267,8 @@ export async function resolveEmailAttachments(
         doc = byId.get(key.id);
       } else {
         const matches = byPath.get(key.filePath) || [];
+        // Name the document before any denial, so errors show its title.
+        if (matches[0]?.originalName) name = matches[0].originalName;
         // If several records share a path, every one must allow access.
         matches.forEach(assertDocAccess);
         doc = matches[0];
