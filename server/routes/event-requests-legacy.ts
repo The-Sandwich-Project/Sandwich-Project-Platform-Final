@@ -74,6 +74,14 @@ import { geocodeEventInBackground } from '../utils/geocode-event';
 import { rateLimiter } from '../utils/rate-limiter';
 import { getEffectiveEventDate, getAssignmentUrgentGaps, daysSinceSubmitted, daysUntilEventDate } from '../../shared/event-validation-utils';
 import { filterEventsByWeekScope, parseWeekScopeOffset } from '../lib/event-week-filter';
+import {
+  buildRowUpdatePlan,
+  normalizeGroupName,
+  normalizeSheetDate,
+  planToken,
+  type RowUpdateEvent,
+  type SheetRowData,
+} from '../services/planning-sheet-row-update';
 
 const router = Router();
 
@@ -792,6 +800,217 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       error: 'Failed to import event',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+});
+
+// ============================================================================
+// Planning sheet → app UPDATE for rows that were already sent/pushed.
+//
+// "Send row to app" on a row that already exists used to just 409. These two
+// routes let the Apps Script show the person what would change and then apply
+// exactly that. Manual on purpose: no timer, a human confirms every update.
+// Field rules (what can change, fill-only vs update) live in
+// server/services/planning-sheet-row-update.ts.
+// ============================================================================
+
+const sheetRowUpdateExtrasSchema = z.object({
+  eventId: z.coerce.number().int().positive().optional(),
+  token: z.string().optional(),
+});
+
+const fetchActiveUsersForRowUpdate = async () =>
+  db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      displayName: users.displayName,
+    })
+    .from(users)
+    .where(eq(users.isActive, true));
+
+/**
+ * Find app events this sheet row could be. The date can change on the sheet,
+ * so match by group name and rank by how close the date is, rather than
+ * requiring the exact date the old duplicate check used.
+ */
+const findSheetRowCandidates = async (groupName: string, sheetDateIso: string | null) => {
+  const rows = await db
+    .select()
+    .from(eventRequests)
+    .where(
+      and(
+        sql`LOWER(REGEXP_REPLACE(TRIM(${eventRequests.organizationName}), '\\s+', ' ', 'g')) = ${normalizeGroupName(groupName)}`,
+        isNull(eventRequests.deletedAt),
+        sql`${eventRequests.status} NOT IN ('declined', 'non_event')`
+      )
+    );
+  const target = sheetDateIso ? parseDateOnly(sheetDateIso)?.getTime() ?? null : null;
+  const distance = (e: EventRequest) => {
+    const d = getEffectiveEventDate(e);
+    if (!d || target === null) return Number.MAX_SAFE_INTEGER;
+    return Math.abs(new Date(d as any).getTime() - target);
+  };
+  return rows
+    // Drop events more than ~6 months from the sheet date: that's a repeat
+    // event from the same group, not this row.
+    .filter((e) => distance(e) <= 183 * 24 * 60 * 60 * 1000 || distance(e) === Number.MAX_SAFE_INTEGER)
+    .sort((a, b) => distance(a) - distance(b))
+    .slice(0, 5);
+};
+
+/**
+ * POST /api/event-requests/import-from-sheets/preview-update
+ * Body: the same row payload as /import-from-sheets, optionally with eventId.
+ * READ-ONLY. Returns candidate events and, for each, what would change.
+ */
+router.post('/import-from-sheets/preview-update', validateSheetsApiKey, async (req, res) => {
+  try {
+    const parsed = importFromSheetsSchema.safeParse(req.body);
+    const extras = sheetRowUpdateExtrasSchema.safeParse(req.body);
+    if (!parsed.success || !extras.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: parsed.success ? extras.error?.errors : parsed.error.errors,
+      });
+    }
+    const row = parsed.data as unknown as SheetRowData;
+    const sheetDateIso = normalizeSheetDate(row.date);
+
+    let candidates: EventRequest[];
+    if (extras.data.eventId) {
+      const [event] = await db
+        .select()
+        .from(eventRequests)
+        .where(and(eq(eventRequests.id, extras.data.eventId), isNull(eventRequests.deletedAt)));
+      candidates = event ? [event] : [];
+    } else {
+      candidates = await findSheetRowCandidates(row['Group Name'], sheetDateIso);
+    }
+
+    if (candidates.length === 0) {
+      return res.json({
+        success: true,
+        match: 'none',
+        message: `No event for "${row['Group Name']}" found in the app. Use "send row to app" to create it.`,
+        candidates: [],
+      });
+    }
+
+    const allUsers = await fetchActiveUsersForRowUpdate();
+    const results = candidates.map((event) => {
+      const plan = buildRowUpdatePlan(event as unknown as RowUpdateEvent, row, allUsers);
+      const appDate = toDateOnlyString(getEffectiveEventDate(event) as any);
+      const notes = [...plan.notes];
+      if (normalizeGroupName(event.organizationName) !== normalizeGroupName(row['Group Name'])) {
+        notes.unshift(`Group name differs (app: "${event.organizationName}"). The name was not changed.`);
+      }
+      return {
+        eventId: event.id,
+        organizationName: event.organizationName,
+        status: event.status,
+        appDate,
+        dateMatches: !!sheetDateIso && appDate === sheetDateIso,
+        changes: plan.changes,
+        notes,
+        token: planToken(event.id, plan.changes),
+        link: `/event-requests/${event.id}`,
+      };
+    });
+
+    const exact = results.filter((r) => r.dateMatches);
+    const match =
+      extras.data.eventId ? 'selected'
+      : exact.length === 1 ? 'exact'
+      : results.length === 1 ? 'date_differs'
+      : 'ambiguous';
+
+    return res.json({ success: true, match, candidates: results });
+  } catch (error) {
+    logger.error('Planning sheet row update preview failed:', error);
+    return res.status(500).json({ success: false, error: 'Failed to preview update' });
+  }
+});
+
+/**
+ * POST /api/event-requests/import-from-sheets/apply-update
+ * Body: the same row payload + eventId + token from the preview.
+ * Re-computes the plan and refuses if it no longer matches what was previewed.
+ */
+router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req, res) => {
+  try {
+    const parsed = importFromSheetsSchema.safeParse(req.body);
+    const extras = sheetRowUpdateExtrasSchema.safeParse(req.body);
+    if (!parsed.success || !extras.success || !extras.data.eventId || !extras.data.token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Send the row data plus eventId and token from the preview.',
+      });
+    }
+    const row = parsed.data as unknown as SheetRowData;
+    const eventId = extras.data.eventId;
+
+    const [event] = await db
+      .select()
+      .from(eventRequests)
+      .where(and(eq(eventRequests.id, eventId), isNull(eventRequests.deletedAt)));
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'That event no longer exists in the app.' });
+    }
+
+    const allUsers = await fetchActiveUsersForRowUpdate();
+    const plan = buildRowUpdatePlan(event as unknown as RowUpdateEvent, row, allUsers);
+    if (planToken(eventId, plan.changes) !== extras.data.token) {
+      return res.status(409).json({
+        success: false,
+        error: 'The event or the sheet row changed since you previewed it. Run it again to see the current changes.',
+      });
+    }
+    if (plan.changes.length === 0) {
+      return res.json({ success: true, updated: false, message: 'Already up to date.' });
+    }
+
+    const updated = await storage.updateEventRequest(eventId, {
+      ...plan.updates,
+      lastSyncedAt: new Date(),
+      updatedAt: new Date(),
+    } as Partial<EventRequest>);
+
+    try {
+      await AuditLogger.logEventRequestChange(
+        String(eventId),
+        event,
+        updated ?? { ...event, ...plan.updates },
+        { userId: 'planning-sheet' },
+        {
+          actionType: 'PLANNING_SHEET_UPDATE',
+          section: 'planning-sheet',
+          notes: plan.changes.map((c) => `${c.label}: "${c.from}" → "${c.to}"`).join('; '),
+        }
+      );
+    } catch (auditError) {
+      logger.error('Failed to audit planning sheet row update', auditError);
+    }
+
+    if (plan.updates.eventAddress) {
+      geocodeEventInBackground(eventId, plan.updates.eventAddress as string);
+    }
+    if (updated) emitEventRequestUpdate('event_request_updated', updated);
+
+    logger.info(`✅ Planning sheet row update applied to event ${eventId}`, {
+      fields: plan.changes.map((c) => c.field),
+    });
+    return res.json({
+      success: true,
+      updated: true,
+      eventId,
+      changes: plan.changes,
+      link: `/event-requests/${eventId}`,
+    });
+  } catch (error) {
+    logger.error('Planning sheet row update apply failed:', error);
+    return res.status(500).json({ success: false, error: 'Failed to apply update' });
   }
 });
 
