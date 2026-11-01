@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { inArray, eq, notLike } from 'drizzle-orm';
+import { inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { documents } from '@shared/schema';
 import {
@@ -12,15 +12,21 @@ import { hasPermission } from '@shared/unified-auth-utils';
 import { PERMISSIONS } from '@shared/auth-utils';
 
 /**
- * Resolves email attachment references (document IDs, `/objects/...` storage
- * paths, legacy `uploads/documents/<hash>` refs, local file paths) into
- * base64 attachments SendGrid can send directly.
+ * Resolves email attachment references into base64 attachments SendGrid can
+ * send directly.
  *
  * Why this exists: the SendGrid helper only reads local disk and silently
  * skips anything missing. Document records that live in object storage
  * (`/objects/uploads/...`) were being dropped, so toolkit emails could go out
  * without the PDFs the sender selected. Callers should refuse to send when
  * `failed` is non-empty.
+ *
+ * Security model: a reference is only ever a pointer to a `documents` record
+ * (its numeric ID, or its exact stored `filePath`, which is what the email
+ * composers send). The record's access rules are checked, and the file is
+ * read from the record's own stored path. A path supplied by the caller is
+ * never read directly, so path spellings, `..`, symlinks and aliases can't
+ * be used to reach files the record system doesn't vouch for.
  */
 
 export interface ResolvedAttachment {
@@ -117,7 +123,11 @@ function resolveLocalPath(p: string): string {
 
 // Only files under these folders (relative to the app root) may be attached.
 // Without this, any path string — e.g. `.env` — could be read and emailed.
+// Defense in depth: even a record's stored path may only point here.
 const ALLOWED_LOCAL_ROOTS = ['uploads', 'server/uploads', 'public', 'attached_assets'];
+// Confidential uploads have their own per-document email allowlists
+// (confidential_documents table), which this resolver doesn't model, so
+// files there are never attachable.
 const CONFIDENTIAL_LOCAL_ROOT = 'server/uploads/confidential';
 
 function isInside(child: string, parentRel: string): boolean {
@@ -144,6 +154,7 @@ async function readObjectStorageFile(objectPath: string): Promise<Buffer> {
 }
 
 interface DocMeta {
+  id: number;
   filePath: string;
   originalName?: string | null;
   mimeType?: string | null;
@@ -155,6 +166,9 @@ export async function resolveEmailAttachments(
   refs: AttachmentRef[] | undefined | null,
   options: ResolveAttachmentOptions
 ): Promise<AttachmentResolution> {
+  const result: AttachmentResolution = { resolved: [], failed: [] };
+  if (!refs || refs.length === 0) return result;
+
   const canSeeConfidential = hasPermission(
     options.user,
     PERMISSIONS.DOCUMENTS_CONFIDENTIAL
@@ -170,184 +184,108 @@ export async function resolveEmailAttachments(
     }
   }
 
-  const result: AttachmentResolution = { resolved: [], failed: [] };
-  if (!refs || refs.length === 0) return result;
-
-  // Batch-load document records referenced by numeric ID.
-  const numericIds = refs
-    .map((r) =>
-      typeof r === 'number'
-        ? r
-        : typeof r === 'string' && /^\d+$/.test(r.trim())
-          ? parseInt(r.trim(), 10)
-          : NaN
-    )
-    .filter((id) => !isNaN(id));
-
-  const docsById = new Map<number, DocMeta>();
-  if (numericIds.length > 0) {
-    const rows = await db
-      .select({
-        id: documents.id,
-        filePath: documents.filePath,
-        originalName: documents.originalName,
-        mimeType: documents.mimeType,
-        category: documents.category,
-        isActive: documents.isActive,
-      })
-      .from(documents)
-      .where(inArray(documents.id, numericIds));
-    rows.forEach((r) => docsById.set(r.id, r));
-  }
-
-  // Look up nicer filenames/mime types for raw `/objects/...` paths.
-  async function docMetaForPath(filePath: string): Promise<DocMeta | null> {
-    const [row] = await db
-      .select({
-        filePath: documents.filePath,
-        originalName: documents.originalName,
-        mimeType: documents.mimeType,
-        category: documents.category,
-        isActive: documents.isActive,
-      })
-      .from(documents)
-      .where(eq(documents.filePath, filePath))
-      .limit(1);
-    return row || null;
-  }
-
-  // Every document record that points at a local file, keyed by the file's
-  // canonical (realpath) location, so access rules apply no matter how the
-  // caller spells the path (`./x`, absolute, `..`, symlink, legacy alias).
-  let localRecordsByRealPath: Map<string, DocMeta[]> | null = null;
-  async function localRecordsFor(realPath: string): Promise<DocMeta[]> {
-    if (!localRecordsByRealPath) {
-      localRecordsByRealPath = new Map();
-      const rows: DocMeta[] = await db
-        .select({
-          filePath: documents.filePath,
-          originalName: documents.originalName,
-          mimeType: documents.mimeType,
-          category: documents.category,
-          isActive: documents.isActive,
-        })
-        .from(documents)
-        .where(notLike(documents.filePath, '/objects/%'));
-      for (const row of rows) {
-        let canonical: string;
-        try {
-          canonical = fs.realpathSync(resolveLocalPath(row.filePath));
-        } catch {
-          continue; // File missing on disk; can't be the file being read.
-        }
-        const list = localRecordsByRealPath.get(canonical) || [];
-        list.push(row);
-        localRecordsByRealPath.set(canonical, list);
-      }
+  // Normalize each ref to either a document ID or an exact stored filePath.
+  type Key = { id: number } | { filePath: string };
+  const keys: (Key | null)[] = refs.map((ref) => {
+    if (typeof ref === 'number') return { id: ref };
+    if (typeof ref === 'string') {
+      const t = ref.trim();
+      return /^\d+$/.test(t) ? { id: parseInt(t, 10) } : { filePath: t };
     }
-    return localRecordsByRealPath.get(realPath) || [];
-  }
-
-  async function load(
-    filePath: string,
-    displayName?: string | null,
-    mimeType?: string | null
-  ): Promise<ResolvedAttachment> {
-    let buffer: Buffer;
-    if (filePath.startsWith('/objects/')) {
-      buffer = await readObjectStorageFile(filePath);
-    } else {
-      const local = resolveLocalPath(filePath);
-      if (!fs.existsSync(local)) {
-        throw new Error('file not found on server');
-      }
-      // realpath defeats `..` segments and symlinks pointing elsewhere.
-      const real = fs.realpathSync(local);
-      if (!ALLOWED_LOCAL_ROOTS.some((root) => isInside(real, root))) {
-        throw new AttachmentDeniedError('path is outside allowed folders');
-      }
-      if (isInside(real, CONFIDENTIAL_LOCAL_ROOT) && !canSeeConfidential) {
-        throw new AttachmentDeniedError('no permission for confidential documents');
-      }
-      // Any record for this file must allow access (strictest wins).
-      const records = await localRecordsFor(real);
-      records.forEach(assertDocAccess);
-      displayName = displayName || records[0]?.originalName;
-      mimeType = mimeType || records[0]?.mimeType;
-      buffer = fs.readFileSync(real);
+    if (ref && typeof ref === 'object' && typeof ref.filePath === 'string') {
+      return { filePath: ref.filePath.trim() };
     }
-    const filename = displayName || path.basename(filePath);
-    return {
-      content: buffer.toString('base64'),
-      filename,
-      type: contentTypeFor(filename, mimeType),
-      disposition: 'attachment',
-    };
+    return null;
+  });
+
+  // Load every referenced record in at most two queries.
+  const ids = keys.flatMap((k) => (k && 'id' in k ? [k.id] : []));
+  const paths = keys.flatMap((k) => (k && 'filePath' in k ? [k.filePath] : []));
+  const columns = {
+    id: documents.id,
+    filePath: documents.filePath,
+    originalName: documents.originalName,
+    mimeType: documents.mimeType,
+    category: documents.category,
+    isActive: documents.isActive,
+  };
+  const byId = new Map<number, DocMeta>();
+  const byPath = new Map<string, DocMeta[]>();
+  if (ids.length > 0) {
+    const rows: DocMeta[] = await db.select(columns).from(documents).where(inArray(documents.id, ids));
+    rows.forEach((r) => byId.set(r.id, r));
+  }
+  if (paths.length > 0) {
+    const rows: DocMeta[] = await db.select(columns).from(documents).where(inArray(documents.filePath, paths));
+    rows.forEach((r) => byPath.set(r.filePath, [...(byPath.get(r.filePath) || []), r]));
   }
 
-  for (const ref of refs) {
+  // Reads the file a record points at. Only ever called with a record's
+  // stored path, never with caller input.
+  async function readRecordFile(doc: DocMeta): Promise<Buffer> {
+    if (doc.filePath.startsWith('/objects/')) {
+      return readObjectStorageFile(doc.filePath);
+    }
+
+    let localPath = doc.filePath;
+    const legacyMatch = /^uploads\/documents\/([0-9a-f]{32})$/.exec(doc.filePath);
+    if (legacyMatch && LEGACY_HASH_MAP[legacyMatch[1]]) {
+      localPath = LEGACY_HASH_MAP[legacyMatch[1]].file;
+    }
+
+    const resolved = resolveLocalPath(localPath);
+    if (!fs.existsSync(resolved)) {
+      throw new Error('file not found on server');
+    }
+    const real = fs.realpathSync(resolved);
+    if (!ALLOWED_LOCAL_ROOTS.some((root) => isInside(real, root))) {
+      throw new AttachmentDeniedError('path is outside allowed folders');
+    }
+    if (isInside(real, CONFIDENTIAL_LOCAL_ROOT)) {
+      throw new AttachmentDeniedError('confidential uploads cannot be emailed');
+    }
+    return fs.readFileSync(real);
+  }
+
+  for (let i = 0; i < refs.length; i++) {
+    const ref = refs[i];
+    const key = keys[i];
     const label =
       typeof ref === 'object' && ref !== null ? ref.filePath : String(ref);
-    let name = path.basename(label);
+    let name = key && 'id' in key ? `document #${key.id}` : path.basename(label);
     try {
-      if (typeof ref === 'number' || (typeof ref === 'string' && /^\d+$/.test(ref.trim()))) {
-        const id = typeof ref === 'number' ? ref : parseInt(ref.trim(), 10);
-        name = `document #${id}`;
-        const doc = docsById.get(id);
-        if (!doc) throw new Error('document not found');
-        if (doc.originalName) name = doc.originalName;
-        assertDocAccess(doc);
-        result.resolved.push(await load(doc.filePath, doc.originalName, doc.mimeType));
-        continue;
+      if (!key) throw new Error('unrecognized attachment format');
+
+      let doc: DocMeta | undefined;
+      if ('id' in key) {
+        doc = byId.get(key.id);
+      } else {
+        const matches = byPath.get(key.filePath) || [];
+        // If several records share a path, every one must allow access.
+        matches.forEach(assertDocAccess);
+        doc = matches[0];
       }
+      if (!doc) throw new AttachmentDeniedError('not a known document');
+      if (doc.originalName) name = doc.originalName;
+      assertDocAccess(doc);
 
-      if (typeof ref === 'string') {
-        const trimmed = ref.trim();
+      const legacyName = (() => {
+        const m = /^uploads\/documents\/([0-9a-f]{32})$/.exec(doc.filePath);
+        return m ? LEGACY_HASH_MAP[m[1]]?.name : undefined;
+      })();
+      const displayName =
+        (typeof ref === 'object' && ref?.originalName) ||
+        doc.originalName ||
+        legacyName ||
+        path.basename(doc.filePath);
 
-        if (trimmed.startsWith('uploads/documents/')) {
-          const hash = trimmed.split('/').pop() || '';
-          const legacy = LEGACY_HASH_MAP[hash];
-          if (legacy) {
-            name = legacy.name;
-            // The alias is itself a document path; honor that record's rules
-            // before following it (load() then checks the mapped file too).
-            const aliasRecord = await docMetaForPath(trimmed);
-            if (aliasRecord) assertDocAccess(aliasRecord);
-            result.resolved.push(await load(legacy.file, legacy.name));
-            continue;
-          }
-          // Not a bundled alias: fall through and try it as a local file.
-        }
-
-        if (trimmed.startsWith('/objects/')) {
-          // Only storage objects that belong to a document record, so access
-          // rules can be applied.
-          const meta = await docMetaForPath(trimmed);
-          if (!meta) throw new AttachmentDeniedError('not a known document');
-          if (meta.originalName) name = meta.originalName;
-          assertDocAccess(meta);
-          result.resolved.push(await load(trimmed, meta.originalName, meta.mimeType));
-          continue;
-        }
-
-        result.resolved.push(await load(trimmed));
-        continue;
-      }
-
-      if (ref && typeof ref === 'object' && typeof ref.filePath === 'string') {
-        if (ref.originalName) name = ref.originalName;
-        if (ref.filePath.startsWith('/objects/')) {
-          // Route through the string branch's document check.
-          const sub = await resolveEmailAttachments([ref.filePath], options);
-          if (sub.failed.length) throw new AttachmentDeniedError(sub.failed[0].reason);
-          result.resolved.push({ ...sub.resolved[0], filename: ref.originalName || sub.resolved[0].filename });
-          continue;
-        }
-        result.resolved.push(await load(ref.filePath, ref.originalName));
-        continue;
-      }
-
-      throw new Error('unrecognized attachment format');
+      const buffer = await readRecordFile(doc);
+      result.resolved.push({
+        content: buffer.toString('base64'),
+        filename: displayName,
+        type: contentTypeFor(displayName, doc.mimeType),
+        disposition: 'attachment',
+      });
     } catch (err) {
       const reason =
         err instanceof ObjectNotFoundError
