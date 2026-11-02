@@ -118,7 +118,7 @@ function amountOf(min: number | null, max: number | null): Amount | null {
 const midpoint = (a: Amount) => Math.round((a.min + a.max) / 2);
 const isRange = (a: Amount | null): a is Amount => !!a && a.min !== a.max;
 
-/** Parse stored/sent type lines (array or legacy JSON string). Drops "not decided" lines. */
+/** Parse stored/sent type lines (array, legacy JSON string or legacy object). Drops "not decided" lines without an amount. */
 export function parseEstimateLines(raw: unknown): EstimateLine[] {
   let arr: unknown = raw;
   if (typeof raw === 'string') {
@@ -132,25 +132,43 @@ export function parseEstimateLines(raw: unknown): EstimateLine[] {
     // A JSON string holding a JSON array (double-encoded) - unwrap once more.
     if (typeof arr === 'string') return parseEstimateLines(arr);
   }
+  // Older object shapes the app still reads (client/src/lib/sandwich-utils.ts):
+  // line objects under numeric keys, or { pbj: 200, deli: 0 }.
+  if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
+    const values = Object.values(arr as Record<string, unknown>);
+    if (values.length && values.every((v) => v && typeof v === 'object' && 'type' in (v as any))) {
+      arr = values;
+    } else if (values.length && values.every((v) => typeof v === 'number')) {
+      arr = Object.entries(arr as Record<string, number>)
+        .filter(([, n]) => n > 0) // 0 here meant "none of this type"
+        .map(([type, quantity]) => ({ type, quantity }));
+    }
+  }
   if (!Array.isArray(arr)) return [];
   const lines: EstimateLine[] = [];
   for (const item of arr) {
     if (!item || typeof item !== 'object') continue;
-    const type = normalizeSandwichTypeKey((item as any).type);
-    if (!type) continue;
     const lo = count((item as any).min);
     const hi = count((item as any).max);
-    const q = count((item as any).quantity);
+    const rawQ = (item as any).quantity;
+    const q = count(rawQ);
+    // An amount cleared to 0 is "TBD", even if the line kept its old min/max.
+    const clearedToZero = rawQ === 0 || rawQ === '0';
     // A line's range only counts while its quantity is still the range's
     // midpoint; a quantity edited to something else (an editor that kept the
     // old min/max) is an exact amount, the same rule as totalFromFields.
     const lineRange = lo !== null && hi !== null ? amountOf(lo, hi) : null;
-    const amount =
-      lineRange && (q === null || q === midpoint(lineRange))
+    const amount = clearedToZero
+      ? null
+      : lineRange && (q === null || q === midpoint(lineRange))
         ? lineRange
         : q !== null
           ? { min: q, max: q }
           : lineRange;
+    // "Unknown"/TBD type: no line when it has no amount, but an amount still
+    // counts toward the total (150 Deli + 50 Unknown = 200), kept as "unknown".
+    const type = normalizeSandwichTypeKey((item as any).type) ?? (amount ? 'unknown' : null);
+    if (!type) continue;
     lines.push({ type, amount });
   }
   return lines;
@@ -213,16 +231,18 @@ function sumAmounts(lines: EstimateLine[]): Amount {
 
 /** Turn a state into consistent stored fields. */
 export function normalizeEstimate(state: EstimateState): EstimateFields {
-  // Merge duplicate types (first one wins its position; amounts add up).
-  const byType = new Map<string, EstimateLine>();
+  // Merge duplicate types (first one wins its position): amounts add up, and
+  // repeated TBD lines become one. A known amount and a TBD line of the same
+  // type stay separate, so "150 Deli + more Deli TBD" doesn't read as a
+  // complete 150.
+  let lines: EstimateLine[] = [];
   for (const l of state.lines) {
-    const prev = byType.get(l.type);
-    if (!prev) byType.set(l.type, { ...l });
+    const prev = lines.find((p) => p.type === l.type && !!p.amount === !!l.amount);
+    if (!prev) lines.push({ ...l });
     else if (prev.amount && l.amount) {
       prev.amount = { min: prev.amount.min + l.amount.min, max: prev.amount.max + l.amount.max };
-    } else if (!prev.amount) prev.amount = l.amount;
+    }
   }
-  let lines = Array.from(byType.values());
   let total = state.total;
 
   // One line with no amount takes the whole total.
@@ -242,6 +262,10 @@ export function normalizeEstimate(state: EstimateState): EstimateFields {
       total = { min: Math.max(total.min, known.min), max: Math.max(total.max, known.max) };
     }
   }
+
+  // Only "unknown" lines: the type isn't decided at all. The total (worked
+  // out above, from them if need be) carries the amount; no lines.
+  if (lines.length > 0 && lines.every((l) => l.type === 'unknown')) lines = [];
 
   const stored: StoredEstimateLine[] = lines.map((l) => {
     if (!l.amount) return { type: l.type, quantity: 0 };

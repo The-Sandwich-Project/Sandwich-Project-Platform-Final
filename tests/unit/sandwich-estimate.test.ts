@@ -301,3 +301,53 @@ describe('Copilot review round 2', () => {
     expect(out.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
   });
 });
+
+describe('Copilot review round 3 (previously missed)', () => {
+  it('keeps legacy object-shaped breakdowns on a count-only edit', () => {
+    const map = resolveEstimatePatch({ estimatedSandwichCount: 200, sandwichTypes: { pbj: 200, deli: 0 } as any }, { estimatedSandwichCount: 300 });
+    expect(map.sandwichTypes).toEqual([{ type: 'pbj', quantity: 300 }]);
+    const keyed = resolveEstimatePatch(
+      { estimatedSandwichCount: 200, sandwichTypes: { 0: { type: 'deli', quantity: 200 } } as any },
+      { estimatedSandwichCount: 300 }
+    );
+    expect(keyed.sandwichTypes).toEqual([{ type: 'deli', quantity: 300 }]);
+  });
+
+  it('an Unknown-type amount still counts toward the total', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 200 },
+      { sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'Unknown', quantity: 50 }] }
+    );
+    expect(out.estimatedSandwichCount).toBe(200);
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 50 }]);
+    // An Unknown row with no amount is still no line.
+    expect(parseEstimateLines([{ type: 'unknown', quantity: 0 }])).toEqual([]);
+  });
+
+  it('clearing a ranged amount to 0 makes it TBD instead of restoring the range', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 350, estimatedSandwichCountMin: 300, estimatedSandwichCountMax: 400 },
+      { sandwichTypes: [
+        { type: 'deli', quantity: 0, min: 100, max: 150 },
+        { type: 'pbj', quantity: 225, min: 200, max: 250 },
+      ] }
+    );
+    expect(out.sandwichTypes).toEqual([
+      { type: 'deli', quantity: 0 },
+      { type: 'pbj', quantity: 225, min: 200, max: 250 },
+    ]);
+    expect(out).toMatchObject({ estimatedSandwichCountMin: 300, estimatedSandwichCountMax: 400 });
+  });
+
+  it('a known amount and a TBD duplicate of the same type stay incomplete', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 300 },
+      { sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'deli', quantity: 0 }] }
+    );
+    expect(out.estimatedSandwichCount).toBe(300);
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 150 }, { type: 'deli', quantity: 0 }]);
+    // Two known amounts of one type still add up.
+    const sum = resolveEstimatePatch({}, { sandwichTypes: [{ type: 'deli', quantity: 100 }, { type: 'deli', quantity: 50 }] });
+    expect(sum.sandwichTypes).toEqual([{ type: 'deli', quantity: 150 }]);
+  });
+});
