@@ -254,7 +254,7 @@ function showUpdateDialog_(payload, pick, sheetName, rowNum) {
     '<form id="f">' + rows + '</form>' + notes +
     '<button id="go" onclick="send()">Update selected</button> <button onclick="google.script.host.close()">Cancel</button>' +
     '<div id="msg"></div>' +
-    '<script>var DATA=' + JSON.stringify({ payload: payload, eventId: pick.eventId, token: pick.token, sheetName: sheetName, rowNum: rowNum })
+    '<script>var DATA=' + JSON.stringify({ rowPrint: rowFingerprint_(payload), eventId: pick.eventId, token: pick.token, sheetName: sheetName, rowNum: rowNum })
       .replace(/</g, '\\u003c') + ';' +
     'function send(){var fields=[].slice.call(document.querySelectorAll("input[name=f]:checked")).map(function(i){return i.value});' +
     'if(!fields.length){document.getElementById("msg").textContent="Nothing selected.";return;}' +
@@ -262,7 +262,7 @@ function showUpdateDialog_(payload, pick, sheetName, rowNum) {
     'google.script.run.withSuccessHandler(function(m){document.getElementById("msg").textContent=m;})' +
     '.withFailureHandler(function(e){document.getElementById("msg").textContent="Error: "+e.message;' +
     'document.getElementById("go").disabled=false;})' +
-    '.applyRowUpdate(DATA.payload,DATA.eventId,DATA.token,fields,DATA.sheetName,DATA.rowNum);}</script>';
+    '.applyRowUpdate(DATA.rowPrint,DATA.eventId,DATA.token,fields,DATA.sheetName,DATA.rowNum);}</script>';
 
   SpreadsheetApp.getUi().showModalDialog(
     HtmlService.createHtmlOutput(html).setWidth(480).setHeight(Math.min(600, 220 + pick.changes.length * 52)),
@@ -270,18 +270,30 @@ function showUpdateDialog_(payload, pick, sheetName, rowNum) {
   );
 }
 
+/** A short fingerprint of the row payload, made the same way every time. */
+function rowFingerprint_(payload) {
+  const keys = Object.keys(payload).sort();
+  const text = keys.map(function (k) {
+    const v = payload[k];
+    const s = v instanceof Date ? v.toISOString() : (v == null ? '' : String(v).trim());
+    return k + '=' + s;
+  }).join('\n');
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8));
+}
+
 /** Called from the dialog. (No trailing underscore: google.script.run can't call private functions.) */
-function applyRowUpdate(payload, eventId, token, fields, sheetName, rowNum) {
+function applyRowUpdate(rowPrint, eventId, token, fields, sheetName, rowNum) {
   const apiKey = getApiKey_();
   if (!apiKey) throw new Error('Missing APP_API_KEY script property.');
   // Re-read the row: if someone edited it while the checklist was open, stop
   // instead of sending what the person saw (which is no longer the sheet).
+  // Both fingerprints are made here in the script, from the row as read, so
+  // dates and blanks can't look "changed" after a trip through the dialog.
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  const fresh = buildAppPayload_(sheet, rowNum);
-  if (JSON.stringify(fresh) !== JSON.stringify(payload)) {
+  const payload = buildAppPayload_(sheet, rowNum);
+  if (rowFingerprint_(payload) !== rowPrint) {
     throw new Error('Row ' + rowNum + ' changed while this was open. Close this and run Update Row in App again.');
   }
-  payload = fresh;
   payload.eventId = eventId;
   payload.token = token;
   payload.fields = fields;
