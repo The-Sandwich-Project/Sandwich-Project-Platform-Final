@@ -1346,7 +1346,7 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
         {saveError && (
           <div
             role="alert"
-            className="mx-6 mb-2 rounded-md border-2 border-[#A31C41] bg-red-50 px-4 py-3 text-sm text-[#A31C41] flex items-start gap-3"
+            className="mx-6 mb-2 rounded-md border-2 border-tsp-red bg-red-50 px-4 py-3 text-sm text-tsp-red flex items-start gap-3"
             data-testid="banner-save-error"
           >
             <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden="true" />
@@ -1364,7 +1364,7 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
             <button
               type="button"
               onClick={() => setSaveError(null)}
-              className="text-[#A31C41]/70 hover:text-[#A31C41] flex-shrink-0"
+              className="text-tsp-red/70 hover:text-tsp-red flex-shrink-0"
               aria-label="Dismiss"
             >
               <X className="w-4 h-4" />

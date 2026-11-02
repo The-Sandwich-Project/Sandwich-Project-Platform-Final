@@ -186,7 +186,7 @@ export function VanNeededBadgeAndButton({
             <TooltipTrigger asChild>
               <Badge
                 onClick={() => canEdit && clearVan()}
-                className={`inline-flex items-center gap-1 whitespace-nowrap bg-[#007E8C] text-white border-transparent ${hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
+                className={`inline-flex items-center gap-1 whitespace-nowrap bg-tsp-teal text-white border-transparent ${hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
                 data-testid="badge-van-needed"
               >
                 <Truck className="w-3 h-3" />
@@ -216,7 +216,7 @@ export function VanNeededBadgeAndButton({
         variant="outline"
         onClick={() => updateMutation.mutate({ vanDriverNeeded: true, vanNeededLikely: false })}
         disabled={updateMutation.isPending}
-        className="h-6 px-2 text-xs border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
+        className="h-6 px-2 text-xs border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10"
         data-testid="button-mark-van-needed"
       >
         <Truck className="w-3 h-3 mr-1" />
@@ -234,7 +234,7 @@ export function VanNeededBadgeAndButton({
           <TooltipTrigger asChild>
             <Badge
               onClick={() => canEdit && setDialogOpen(true)}
-              className={`inline-flex items-center gap-1 whitespace-nowrap bg-[#007E8C] text-white border-transparent ${hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
+              className={`inline-flex items-center gap-1 whitespace-nowrap bg-tsp-teal text-white border-transparent ${hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
               data-testid="badge-van-needed"
             >
               <Truck className="w-3 h-3" />
@@ -373,7 +373,7 @@ function VanChoiceDialog({
             variant={current === 'confirmed' ? 'secondary' : 'default'}
             disabled={isSaving || current === 'confirmed'}
             onClick={() => onChoose('confirmed')}
-            className="w-full justify-start bg-[#007E8C] hover:bg-[#006873] text-white disabled:opacity-50"
+            className="w-full justify-start bg-tsp-teal hover:bg-brand-primary-dark text-white disabled:opacity-50"
             data-testid="button-van-confirmed"
           >
             <Truck className="w-4 h-4 mr-2" />

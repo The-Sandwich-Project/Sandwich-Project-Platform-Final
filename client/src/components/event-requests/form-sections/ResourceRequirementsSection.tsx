@@ -44,8 +44,8 @@ export const ResourceRequirementsSection: React.FC<ResourceRequirementsSectionPr
   return (
     <div className="space-y-4 border rounded-lg p-4 bg-white">
       <div className="flex items-center gap-3 pb-2 border-b">
-        <Car className="w-5 h-5 text-[#236383]" />
-        <span className="text-lg font-semibold text-[#236383]">Resource Requirements</span>
+        <Car className="w-5 h-5 text-tsp-teal" />
+        <span className="text-lg font-semibold text-tsp-teal">Resource Requirements</span>
         {isComplete && <CheckCircle2 className="w-4 h-4 text-tsp-teal" />}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

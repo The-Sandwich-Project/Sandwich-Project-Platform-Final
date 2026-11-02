@@ -105,12 +105,12 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 </span>
               )}
             </h3>
-            <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold bg-tsp-navy text-white border border-tsp-navy text-sm whitespace-nowrap">
+            <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold bg-slate-600 text-white border border-slate-600 text-sm whitespace-nowrap">
               <StatusIcon className="w-3 h-3 mr-1" />
               {getStatusLabel(request.status)}
             </Badge>
           </div>
-          <div className="text-sm text-[#236383] mt-1 space-y-1">
+          <div className="text-sm text-tsp-teal mt-1 space-y-1">
             <div className="text-sm text-gray-700 mb-2">
               <strong>{request.firstName} {request.lastName}</strong>
               {request.email && (
@@ -172,7 +172,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
   return (
     <Card
       className={`transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-tsp-mist shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl`}
-      style={{ borderLeftColor: '#114154' }}
+      style={{ borderLeftColor: '#475569' }}
       data-testid={`card-standby-${request.id}`}
     >
       <CardContent className="p-3">
@@ -403,7 +403,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onLogContact}
-                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10 h-8"
                   data-testid="button-log-contact"
                 >
                   <FileText className="w-4 h-4 mr-1" />
@@ -423,7 +423,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                   size="sm"
                   onClick={messageAboutEvent}
                   variant="ghost"
-                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="text-tsp-teal hover:text-tsp-teal hover:bg-tsp-teal/10 h-8"
                   data-testid="button-message"
                 >
                   <MessageSquare className="w-4 h-4" />

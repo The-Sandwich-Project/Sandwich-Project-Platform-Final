@@ -268,15 +268,15 @@ export function EventConflictWarnings({
 
       {/* Suggestions (weekly capacity) */}
       {suggestions.length > 0 && (
-        <Alert className="border-[#47B3CB] bg-[#47B3CB]/5">
-          <Lightbulb className="h-4 w-4 text-[#007E8C]" />
-          <AlertTitle className="flex items-center gap-2 text-[#236383]">
+        <Alert className="border-tsp-sky bg-tsp-sky/5">
+          <Lightbulb className="h-4 w-4 text-tsp-teal" />
+          <AlertTitle className="flex items-center gap-2 text-tsp-teal">
             <span>Suggestion</span>
-            <Badge variant="outline" className="text-xs border-[#47B3CB] text-[#007E8C]">
+            <Badge variant="outline" className="text-xs border-tsp-sky text-tsp-teal">
               High Volume Week
             </Badge>
           </AlertTitle>
-          <AlertDescription className="text-[#236383]">
+          <AlertDescription className="text-tsp-teal">
             <ul className="mt-2 space-y-2">
               {suggestions.map((warning, index) => (
                 <li key={index} className="flex items-start gap-2 text-sm">

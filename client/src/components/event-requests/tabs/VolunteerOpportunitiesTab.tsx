@@ -37,7 +37,7 @@ import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
 const BRAND = {
   primary: '#236383',       // deep navy-teal
   primaryDark: '#1A2332',   // near-black ink
-  teal: '#007E8C',          // mid teal
+  teal: '#236383',          // mid teal
   tealLight: '#47B3CB',     // bright accent
   burgundy: '#A31C41',      // speaker accent
   amber: '#F59E0B',         // van driver accent

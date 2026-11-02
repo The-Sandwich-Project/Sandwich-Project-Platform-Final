@@ -271,7 +271,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               <Input
                 value={editingValue}
                 onChange={(e) => setEditingValue?.(e.target.value)}
-                className="h-8 text-lg font-bold text-[#236383]"
+                className="h-8 text-lg font-bold text-tsp-teal"
                 autoFocus
                 data-testid="input-organization-name"
               />
@@ -284,7 +284,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
-              <h3 className="text-lg sm:text-xl font-bold text-[#236383] flex items-center gap-2 break-words min-w-0">
+              <h3 className="text-lg sm:text-xl font-bold text-tsp-teal flex items-center gap-2 break-words min-w-0">
                 {request.organizationName}
               </h3>
               {canEditOrgDetails && startEditing && (
@@ -323,7 +323,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                   <Input
                     value={editingValue}
                     onChange={(e) => setEditingValue?.(e.target.value)}
-                    className="h-8 text-base sm:text-lg font-medium text-[#236383]"
+                    className="h-8 text-base sm:text-lg font-medium text-tsp-teal"
                     placeholder="Department"
                     autoFocus
                     data-testid="input-department"
@@ -338,7 +338,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               ) : (
                 <div className="flex items-center gap-2 group">
                   {request.department ? (
-                    <span className="text-base sm:text-lg font-medium text-[#236383] break-words">{request.department}</span>
+                    <span className="text-base sm:text-lg font-medium text-tsp-teal break-words">{request.department}</span>
                   ) : canEditOrgDetails ? (
                     <span className="text-base sm:text-lg font-normal text-gray-400 italic">No department</span>
                   ) : null}
@@ -517,7 +517,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               <TooltipTrigger asChild>
                 <Badge
                   variant="outline"
-                  className="bg-[#FBAD3F]/15 text-[#236383] border-[#FBAD3F] whitespace-nowrap cursor-help"
+                  className="bg-tsp-gold/15 text-tsp-teal border-tsp-gold whitespace-nowrap cursor-help"
                 >
                   <AlertTriangle className="w-3 h-3 mr-1" />
                   Needs follow-up
@@ -533,7 +533,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Badge
-                  className="bg-[#A31C41] text-white px-2.5 py-0.5 text-sm font-medium shadow-sm inline-flex items-center whitespace-nowrap cursor-help"
+                  className="bg-tsp-red text-white px-2.5 py-0.5 text-sm font-medium shadow-sm inline-flex items-center whitespace-nowrap cursor-help"
                 >
                   <Clock className="w-3 h-3 mr-1" />
                   Date Passed
@@ -575,7 +575,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             return missingInfo.map((item) => (
               <Badge
                 key={item}
-                className="bg-[#A31C41] text-white px-2.5 py-0.5 text-sm font-medium shadow-sm inline-flex items-center"
+                className="bg-tsp-red text-white px-2.5 py-0.5 text-sm font-medium shadow-sm inline-flex items-center"
                 data-testid={`badge-missing-${item.toLowerCase().replace(' ', '-')}`}
               >
                 <AlertTriangle className="w-3 h-3 mr-1" />
@@ -597,7 +597,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                     startEditing?.('isConfirmed', 'false');
                     setTimeout(() => saveEdit?.(), 0);
                   }}
-                  className="px-2.5 py-1 text-sm font-medium inline-flex items-center cursor-pointer hover:opacity-80 transition-opacity whitespace-nowrap bg-gradient-to-br from-[#007E8C] to-[#47B3CB] text-white border-transparent shadow-sm"
+                  className="px-2.5 py-1 text-sm font-medium inline-flex items-center cursor-pointer hover:opacity-80 transition-opacity whitespace-nowrap bg-gradient-to-br from-tsp-teal to-tsp-sky text-white border-transparent shadow-sm"
                 >
                   ✓ Date Confirmed
                 </Badge>
@@ -643,7 +643,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
       </div>
     ),
     eventDate: (
-      <div className="bg-[#236383] text-white rounded-lg p-3 shadow-md">
+      <div className="bg-tsp-teal text-white rounded-lg p-3 shadow-md">
         <div className="flex items-center gap-1.5 mb-1">
           <Calendar className="w-4 h-4 opacity-80" />
           <span className="text-xs font-semibold opacity-80">Event Date</span>
@@ -661,7 +661,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             <Button
               size="sm"
               onClick={saveEdit}
-              className="bg-[#FBAD3F] hover:bg-[#e89a2d]"
+              className="bg-tsp-gold hover:bg-[#e89a2d]"
               data-testid="button-save-date"
             >
               <Save className="w-3 h-3" />
@@ -856,7 +856,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
               size="sm"
               variant="default"
               onClick={onIntakeCall}
-              className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-[#007E8C] hover:bg-[#236383] text-white"
+              className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-tsp-teal hover:bg-tsp-teal text-white"
             >
               <Phone className="w-4 h-4 mr-1" />
               Intake Call
@@ -908,7 +908,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
                 <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <a
                   href={`mailto:${(request as any).backupContactEmail}`}
-                  className="text-brand-primary-muted hover:text-brand-primary-dark text-base break-all min-w-0"
+                  className="text-tsp-teal hover:text-brand-primary-dark text-base break-all min-w-0"
                 >
                   {(request as any).backupContactEmail}
                 </a>
@@ -919,7 +919,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
                 <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <a
                   href={`tel:${(request as any).backupContactPhone}`}
-                  className="text-brand-primary-muted hover:text-brand-primary-dark text-base break-words"
+                  className="text-tsp-teal hover:text-brand-primary-dark text-base break-words"
                 >
                   {(request as any).backupContactPhone}
                 </a>
@@ -1030,7 +1030,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
       id={`event-card-${request.id}`}
       data-event-card
       className={`min-w-0 overflow-hidden transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-[#FFF4E5] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl ${
-        isStale ? 'border-l-[#A31C41]' : ''
+        isStale ? 'border-l-tsp-red' : ''
       }`}
       style={!isStale ? { borderLeftColor: statusBorderColors.in_process } : {}}
     >
@@ -1044,11 +1044,11 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
 
           return (
             <div className="mb-4">
-              <div className="inline-flex items-center gap-2 rounded-md border border-[#007E8C]/25 bg-[#00CED1]/10 text-[#007E8C] px-3 py-2 text-sm font-medium">
+              <div className="inline-flex items-center gap-2 rounded-md border border-tsp-teal/25 bg-[#00CED1]/10 text-tsp-teal px-3 py-2 text-sm font-medium">
                 <Package className="w-4 h-4" />
                 <span>Toolkit sent {formattedDate}</span>
                 {request.toolkitSentBy && (
-                  <span className="text-xs text-[#007E8C]">
+                  <span className="text-xs text-tsp-teal">
                     by {resolveUserName ? resolveUserName(request.toolkitSentBy) : request.toolkitSentBy}
                   </span>
                 )}
@@ -1450,7 +1450,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
             {request.scheduledCallDate && (
               <div className="bg-brand-primary-lighter rounded-lg p-3">
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-brand-primary-muted" />
+                  <Phone className="w-4 h-4 text-tsp-teal" />
                   <span className="text-sm font-medium">Call scheduled:</span>
                   <span className="text-sm">
                     {(() => {
@@ -1491,27 +1491,27 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                 >
                   {hasEventTimes && (
                     <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-2">
+                      <p className="text-sm uppercase font-bold tracking-wide text-tsp-teal mb-2">
                         Event Times
                       </p>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                         {request.eventStartTime && (
                           <div className="flex items-center gap-1.5 text-sm">
-                            <Clock className="w-4 h-4 text-[#007E8C] shrink-0" />
+                            <Clock className="w-4 h-4 text-tsp-teal shrink-0" />
                             <span className="font-medium text-gray-700">Start:</span>
                             <span className="text-gray-900">{formatTime12Hour(request.eventStartTime)}</span>
                           </div>
                         )}
                         {request.eventEndTime && (
                           <div className="flex items-center gap-1.5 text-sm">
-                            <Clock className="w-4 h-4 text-[#007E8C] shrink-0" />
+                            <Clock className="w-4 h-4 text-tsp-teal shrink-0" />
                             <span className="font-medium text-gray-700">End:</span>
                             <span className="text-gray-900">{formatTime12Hour(request.eventEndTime)}</span>
                           </div>
                         )}
                         {(request.pickupTime || request.pickupDateTime) && (
                           <div className="flex items-center gap-1.5 text-sm">
-                            <Package className="w-4 h-4 text-[#007E8C] shrink-0" />
+                            <Package className="w-4 h-4 text-tsp-teal shrink-0" />
                             <span className="font-medium text-gray-700">Pickup:</span>
                             <span className="text-gray-900">
                               {request.pickupDateTime
@@ -1597,10 +1597,10 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                     <Building className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-1">
+                    <div className="text-sm uppercase font-bold tracking-wide text-tsp-teal mb-1">
                       TSP Contact
                     </div>
-                    <div className="text-base font-semibold text-[#007E8C] break-words">
+                    <div className="text-base font-semibold text-tsp-teal break-words">
                       {request.tspContact ? (resolveUserName ? resolveUserName(request.tspContact) : request.tspContact) : request.customTspContact}
                     </div>
                     {request.tspContactAssignedDate && (
@@ -1708,7 +1708,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={() => setShowComments(true)}
-                className="sm:ml-2 w-full sm:w-auto border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
+                className="sm:ml-2 w-full sm:w-auto border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10"
               >
                 <MessageSquare className="w-4 h-4 mr-1" />
                 Add Comment
@@ -1742,7 +1742,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                   size="sm"
                   variant="default"
                   onClick={onSchedule}
-                  className="bg-[#FBAD3F] hover:bg-[#e89a2d] text-white"
+                  className="bg-tsp-gold hover:bg-[#e89a2d] text-white"
                 >
                   <Calendar className="w-4 h-4 mr-1" />
                   <span className="sm:hidden">Schedule</span>
@@ -1809,7 +1809,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
               size="sm"
               variant="outline"
               onClick={onLogContact}
-              className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
+              className="border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10"
               title="Log a contact attempt or conversation"
             >
               <MessageSquare className="w-4 h-4 mr-1" />
@@ -1885,7 +1885,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onAiSuggest}
-                    className="border-[#236383] text-[#236383] hover:bg-[#236383]/10"
+                    className="border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10"
                     data-testid="button-ai-suggest-date"
                   >
                     <Sparkles className="w-4 h-4 mr-1" />
@@ -1907,7 +1907,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onAiIntakeAssist}
-                    className="border-[#47B3CB] text-[#47B3CB] hover:bg-[#47B3CB]/10"
                     data-testid="button-ai-intake-assist"
                   >
                     <Sparkles className="w-4 h-4 mr-1" />
@@ -1950,7 +1949,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                       size="sm"
                       variant={contextualAction?.action === 'schedule' ? 'default' : 'outline'}
                       onClick={handleClick}
-                      className={contextualAction?.action === 'schedule' ? 'bg-[#007E8C] hover:bg-[#005f6b]' : ''}
+                      className={contextualAction?.action === 'schedule' ? 'bg-tsp-teal hover:bg-[#005f6b]' : ''}
                       data-testid="button-edit-request"
                     >
                       {contextualAction?.action === 'schedule' ? (

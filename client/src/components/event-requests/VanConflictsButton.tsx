@@ -77,7 +77,7 @@ function StatusBadge({ status }: { status: string }) {
 function VanFlagBadge({ event }: { event: VanConflictEvent }) {
   if (event.vanDriverNeeded) {
     return (
-      <Badge className="bg-[#007E8C] text-white border-transparent text-xs">
+      <Badge className="bg-tsp-teal text-white border-transparent text-xs">
         <Truck className="w-3 h-3 mr-1" />
         Confirmed
       </Badge>
@@ -103,7 +103,7 @@ function ConflictDateCard({
 }) {
   const accent =
     variant === 'confirmed'
-      ? 'border-l-[#A31C41] bg-[#FCE4E6]'
+      ? 'border-l-tsp-red bg-[#FCE4E6]'
       : 'border-l-amber-400 bg-amber-50';
   return (
     <div className={`border-l-4 ${accent} rounded-md p-3 space-y-2`}>
@@ -115,7 +115,7 @@ function ConflictDateCard({
           {conflict.events.length} events ·{' '}
           {conflict.confirmedCount > 0 && (
             <>
-              <span className="font-semibold text-[#007E8C]">
+              <span className="font-semibold text-tsp-teal">
                 {conflict.confirmedCount} confirmed
               </span>
               {conflict.possiblyCount > 0 && ' · '}
@@ -194,7 +194,7 @@ export function VanConflictsButton({ isMobile = false }: VanConflictsButtonProps
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Truck className="w-5 h-5 text-[#007E8C]" />
+              <Truck className="w-5 h-5 text-tsp-teal" />
               Van Scheduling Conflicts
             </DialogTitle>
             <DialogDescription>
@@ -227,7 +227,7 @@ export function VanConflictsButton({ isMobile = false }: VanConflictsButtonProps
                 <button
                   onClick={() => refetch()}
                   disabled={isFetching}
-                  className="text-[#007E8C] hover:underline disabled:opacity-50"
+                  className="text-tsp-teal hover:underline disabled:opacity-50"
                 >
                   {isFetching ? 'Rescanning…' : 'Rescan'}
                 </button>
@@ -248,11 +248,11 @@ export function VanConflictsButton({ isMobile = false }: VanConflictsButtonProps
               {hasConfirmed && (
                 <section>
                   <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="w-5 h-5 text-[#A31C41]" />
-                    <h3 className="font-semibold text-[#A31C41]">
+                    <AlertTriangle className="w-5 h-5 text-tsp-red" />
+                    <h3 className="font-semibold text-tsp-red">
                       Must Resolve — Confirmed Double-Bookings
                     </h3>
-                    <Badge className="bg-[#A31C41] text-white border-transparent">
+                    <Badge className="bg-tsp-red text-white border-transparent">
                       {data.confirmed.length}
                     </Badge>
                   </div>

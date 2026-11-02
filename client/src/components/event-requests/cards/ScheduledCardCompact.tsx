@@ -107,7 +107,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
 
   return (
     <Card 
-      className="w-full bg-white border-l-4 shadow-sm hover:shadow-md transition-all bg-[#236383]/5"
+      className="w-full bg-white border-l-4 shadow-sm hover:shadow-md transition-all bg-tsp-teal/5"
       style={{ borderLeftColor: '#236383' }}
     >
       <CardContent className="p-4">
@@ -116,7 +116,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
           <div className="flex-1 min-w-0">
             {/* Title Row with Status */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
-              <h3 className="text-base sm:text-lg font-bold text-[#236383] break-words">
+              <h3 className="text-base sm:text-lg font-bold text-tsp-teal break-words">
                 {request.organizationName}
                 {request.department && (
                   <span className="text-sm text-gray-600 ml-2">
@@ -138,7 +138,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
                 </div>
               )}
               {request.isConfirmed ? (
-                <Badge className="bg-[#007E8C]/10 text-[#007E8C] border-[#007E8C]/30 shrink-0">
+                <Badge className="bg-tsp-teal/10 text-tsp-teal border-tsp-teal/30 shrink-0">
                   <Check className="w-3 h-3 mr-1" />
                   Confirmed
                 </Badge>
@@ -146,7 +146,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
                 <Badge variant="outline" className="shrink-0 border-gray-400">Requested</Badge>
               )}
               {!request.selfTransport && staffingComplete && (
-                <Badge className="bg-[#47B3CB]/10 text-[#236383] border-[#47B3CB]/30 shrink-0">
+                <Badge className="bg-tsp-sky/10 text-tsp-teal border-tsp-sky/30 shrink-0">
                   <Check className="w-3 h-3 mr-1" />
                   Staffed
                 </Badge>
@@ -160,7 +160,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
               {missingInfo.length > 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge className="bg-[#A31C41]/10 text-[#A31C41] border-[#A31C41]/30 shrink-0 cursor-help">
+                    <Badge className="bg-tsp-red/10 text-tsp-red border-tsp-red/30 shrink-0 cursor-help">
                       <AlertTriangle className="w-3 h-3 mr-1" />
                       Missing: {missingInfo.join(', ')}
                     </Badge>
@@ -181,7 +181,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
             <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-2 text-sm">
               {/* Date */}
               <div className="flex items-center gap-2 text-gray-700">
-                <Calendar className="w-4 h-4 text-[#007E8C] shrink-0" />
+                <Calendar className="w-4 h-4 text-tsp-teal shrink-0" />
                 <span className="font-medium truncate">
                   {dateInfo ? dateInfo.text : 'No date'}
                 </span>
@@ -190,7 +190,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
               {/* Time */}
               {request.eventStartTime && (
                 <div className="flex items-center gap-2 text-gray-700">
-                  <Clock className="w-4 h-4 text-[#236383] shrink-0" />
+                  <Clock className="w-4 h-4 text-tsp-teal shrink-0" />
                   <span className="truncate">
                     {formatTime12Hour(request.eventStartTime)}
                     {request.eventEndTime && ` - ${formatTime12Hour(request.eventEndTime)}`}
@@ -200,14 +200,14 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
 
               {/* Sandwiches */}
               <div className="flex items-center gap-2 text-gray-700">
-                <Package className="w-4 h-4 text-[#FBAD3F] shrink-0" />
+                <Package className="w-4 h-4 text-tsp-gold shrink-0" />
                 <span className="font-semibold truncate">{sandwichInfo}</span>
               </div>
 
               {/* Attendance */}
               {request.estimatedAttendance && (
                 <div className="flex items-center gap-2 text-gray-700">
-                  <Users className="w-4 h-4 text-[#47B3CB] shrink-0" />
+                  <Users className="w-4 h-4 text-tsp-sky shrink-0" />
                   <span className="truncate">{request.estimatedAttendance} people</span>
                 </div>
               )}
@@ -215,12 +215,12 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
               {/* Location */}
               {request.eventAddress && (
                 <div className="flex items-center gap-2 text-gray-700 col-span-2">
-                  <MapPin className="w-4 h-4 text-[#A31C41] shrink-0" />
+                  <MapPin className="w-4 h-4 text-tsp-red shrink-0" />
                   <a
                     href={`https://maps.google.com/maps?q=${encodeURIComponent(request.eventAddress)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#236383] hover:underline truncate"
+                    className="text-tsp-teal hover:underline truncate"
                   >
                     {request.eventAddress}
                   </a>
@@ -230,7 +230,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
               {/* Contact */}
               {request.contactName && (
                 <div className="flex items-center gap-2 text-gray-700">
-                  <Mail className="w-4 h-4 text-[#007E8C] shrink-0" />
+                  <Mail className="w-4 h-4 text-tsp-teal shrink-0" />
                   <span className="truncate">{request.contactName}</span>
                 </div>
               )}
@@ -238,7 +238,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
               {/* Recipients */}
               {request.assignedRecipientIds && request.assignedRecipientIds.length > 0 && (
                 <div className="flex items-center gap-2 text-gray-700">
-                  <Building className="w-4 h-4 text-[#47B3CB] shrink-0" />
+                  <Building className="w-4 h-4 text-tsp-sky shrink-0" />
                   <span className="truncate">
                     {request.assignedRecipientIds.length} recipient{request.assignedRecipientIds.length > 1 ? 's' : ''}
                   </span>
@@ -314,7 +314,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
                     size="sm"
                     variant="outline"
                     onClick={onContact}
-                    className="h-8 bg-[#236383] text-white border-[#236383] hover:bg-[#007E8C]"
+                    className="h-8 bg-tsp-teal text-white border-tsp-teal hover:bg-tsp-teal"
                   >
                     <Mail className="w-4 h-4" />
                   </Button>
@@ -377,8 +377,8 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
           <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
             {/* Contact Details */}
             {(request.contactEmail || request.contactPhone) && (
-              <div className="bg-[#47B3CB]/5 rounded-lg p-3 border border-[#47B3CB]/20">
-                <h4 className="text-xs font-semibold text-[#236383] mb-2 uppercase tracking-wide">Contact Info</h4>
+              <div className="bg-tsp-sky/5 rounded-lg p-3 border border-tsp-sky/20">
+                <h4 className="text-xs font-semibold text-tsp-teal mb-2 uppercase tracking-wide">Contact Info</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                   {request.contactEmail && (
                     <div className="flex items-center gap-2">
@@ -410,8 +410,8 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
 
             {/* Assignments */}
             {!request.selfTransport && totalNeeded > 0 && (
-              <div className="bg-[#007E8C]/5 rounded-lg p-3 border border-[#007E8C]/20">
-                <h4 className="text-xs font-semibold text-[#236383] mb-2 uppercase tracking-wide">Team Assignments</h4>
+              <div className="bg-tsp-teal/5 rounded-lg p-3 border border-tsp-teal/20">
+                <h4 className="text-xs font-semibold text-tsp-teal mb-2 uppercase tracking-wide">Team Assignments</h4>
                 <div className="space-y-2 text-sm">
                   {driverNeeded > 0 && (
                     <div>
@@ -473,8 +473,8 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
 
             {/* Notes */}
             {(request.message || request.planningNotes || request.schedulingNotes) && (
-              <div className="bg-[#FBAD3F]/5 rounded-lg p-3 border border-[#FBAD3F]/20">
-                <h4 className="text-xs font-semibold text-[#236383] mb-2 uppercase tracking-wide">Notes</h4>
+              <div className="bg-tsp-gold/5 rounded-lg p-3 border border-tsp-gold/20">
+                <h4 className="text-xs font-semibold text-tsp-teal mb-2 uppercase tracking-wide">Notes</h4>
                 <div className="space-y-2 text-sm">
                   {request.message && (
                     <div>

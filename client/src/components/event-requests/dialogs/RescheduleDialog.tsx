@@ -111,7 +111,7 @@ export const RescheduleDialog: React.FC<RescheduleDialogProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <RefreshCw className="w-5 h-5 text-[#236383]" />
+            <RefreshCw className="w-5 h-5 text-tsp-teal" />
             Reschedule Event
           </DialogTitle>
           <DialogDescription>
@@ -206,7 +206,7 @@ export const RescheduleDialog: React.FC<RescheduleDialogProps> = ({
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting}
-                className="bg-[#236383] hover:bg-[#1e5a75] text-white"
+                className="bg-tsp-teal hover:bg-[#1e5a75] text-white"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 {form.formState.isSubmitting ? 'Processing...' : 'Reschedule Event'}

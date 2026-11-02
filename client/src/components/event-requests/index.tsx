@@ -681,7 +681,7 @@ const EventRequestsManagementContent: React.FC = () => {
               <button
                 onClick={() => setShowVolunteerOpportunities(true)}
                 className="premium-btn-primary whitespace-nowrap shrink-0"
-                style={{ backgroundColor: '#007E8C' }}
+                style={{ backgroundColor: '#236383' }}
               >
                 <Users className="w-4 h-4" />
                 {!isMobile && 'Volunteer Opps'}
@@ -694,10 +694,10 @@ const EventRequestsManagementContent: React.FC = () => {
         {user?.role && user.role !== 'super_admin' && user.role !== 'admin' && (
           <div className="premium-card-flat p-3 border-l-4" style={{
             backgroundColor: 'rgba(0, 126, 140, 0.08)',
-            borderLeftColor: '#007E8C'
+            borderLeftColor: '#236383'
           }}>
             <div className="flex items-start gap-2">
-              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#007E8C' }} />
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#236383' }} />
               <p className="text-sm" style={{ color: '#236383' }}>
                 {getRoleViewDescription(user.role, 'events')}
               </p>
@@ -712,10 +712,10 @@ const EventRequestsManagementContent: React.FC = () => {
               control reads as decoration and users miss the calendar/map
               options entirely. */}
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[#236383] hidden sm:inline">
+            <span className="text-xs font-semibold uppercase tracking-wide text-tsp-teal hidden sm:inline">
               View as:
             </span>
-          <div className="flex items-center gap-1 bg-[#007E8C]/10 border border-[#007E8C]/20 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-tsp-teal/10 border border-tsp-teal/20 rounded-lg p-0.5">
             {/* Consistent view switcher on every tab: Cards, Spreadsheet,
                 Calendar, Map always appear in the same order and place so the
                 controls don't reshuffle when you change tabs. The Spreadsheet
@@ -730,7 +730,7 @@ const EventRequestsManagementContent: React.FC = () => {
                   localStorage.setItem('scheduledTabViewMode', 'card');
                 }
               }}
-              className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'list' && (activeTab !== 'scheduled' || scheduledViewMode === 'card') ? 'bg-white shadow-sm text-[#007E8C]' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'list' && (activeTab !== 'scheduled' || scheduledViewMode === 'card') ? 'bg-white shadow-sm text-tsp-teal' : 'text-gray-600 hover:text-gray-900'}`}
             >
               <LayoutGrid className="w-4 h-4" />
               Cards
@@ -738,7 +738,7 @@ const EventRequestsManagementContent: React.FC = () => {
             {!isMobile && activeTab === 'scheduled' ? (
               <button
                 onClick={() => { setViewMode('list'); setScheduledViewMode('spreadsheet'); localStorage.setItem('scheduledTabViewMode', 'spreadsheet'); }}
-                className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'list' && scheduledViewMode === 'spreadsheet' ? 'bg-white shadow-sm text-[#007E8C]' : 'text-gray-600 hover:text-gray-900'}`}
+                className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'list' && scheduledViewMode === 'spreadsheet' ? 'bg-white shadow-sm text-tsp-teal' : 'text-gray-600 hover:text-gray-900'}`}
               >
                 <Table2 className="w-4 h-4" />
                 Spreadsheet
@@ -765,14 +765,14 @@ const EventRequestsManagementContent: React.FC = () => {
             <button
               data-tour="calendar-tab"
               onClick={() => setViewMode('calendar')}
-              className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'calendar' ? 'bg-white shadow-sm text-[#007E8C]' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'calendar' ? 'bg-white shadow-sm text-tsp-teal' : 'text-gray-600 hover:text-gray-900'}`}
             >
               <Calendar className="w-4 h-4" />
               {isMobile ? 'Cal' : 'Calendar'}
             </button>
             <button
               onClick={() => setViewMode('map')}
-              className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'map' ? 'bg-white shadow-sm text-[#007E8C]' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`min-h-11 px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'map' ? 'bg-white shadow-sm text-tsp-teal' : 'text-gray-600 hover:text-gray-900'}`}
             >
               <MapPin className="w-4 h-4" />
               Map
@@ -823,7 +823,7 @@ const EventRequestsManagementContent: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className={quickFilter || weekScope ? 'border-[#007E8C] text-[#007E8C] bg-[#007E8C]/5' : ''}
+                className={quickFilter || weekScope ? 'border-tsp-teal text-tsp-teal bg-tsp-teal/5' : ''}
               >
                 <Filter className="w-4 h-4 mr-1.5" />
                 {weekScope
@@ -843,31 +843,31 @@ const EventRequestsManagementContent: React.FC = () => {
               <div className="space-y-1">
                 <button
                   onClick={() => { setActiveTab('scheduled'); setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'needsDriver' ? null : 'needsDriver'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'needsDriver' ? 'bg-[#236383] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'needsDriver' ? 'bg-tsp-teal text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Car className="w-4 h-4" /> Needs Driver
                 </button>
                 <button
                   onClick={() => { setActiveTab('scheduled'); setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'needsVan' ? null : 'needsVan'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'needsVan' ? 'bg-[#007E8C] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'needsVan' ? 'bg-tsp-teal text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Truck className="w-4 h-4" /> Needs Van
                 </button>
                 <button
                   onClick={() => { setActiveTab('scheduled'); setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'week' ? null : 'week'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'week' ? 'bg-[#007E8C] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'week' ? 'bg-tsp-teal text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Calendar className="w-4 h-4" /> This Week
                 </button>
                 <button
                   onClick={() => { setActiveTab('scheduled'); setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'today' ? null : 'today'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'today' ? 'bg-[#007E8C] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'today' ? 'bg-tsp-teal text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Calendar className="w-4 h-4" /> Today
                 </button>
                 <button
                   onClick={() => { setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'corporatePriority' ? null : 'corporatePriority'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'corporatePriority' ? 'bg-[#007E8C] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'corporatePriority' ? 'bg-tsp-teal text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Shield className="w-4 h-4" /> Corporate Priority
                 </button>
@@ -1578,12 +1578,12 @@ const EventRequestsManagementContent: React.FC = () => {
             <div className="space-y-6 mt-6">
               <SandwichForecastWidget />
 
-              <div className="bg-[#e6f2f5] border border-[#007E8C]/30 rounded-lg p-4">
+              <div className="bg-[#e6f2f5] border border-tsp-teal/30 rounded-lg p-4">
                 <h4 className="font-semibold text-[#1A2332] mb-2 flex items-center gap-2">
                   <HelpCircle className="w-4 h-4" />
                   Sandwich Planning Tips
                 </h4>
-                <ul className="text-sm text-[#236383] space-y-1">
+                <ul className="text-sm text-tsp-teal space-y-1">
                   <li>
                     • Plan sandwich types based on dietary restrictions and
                     preferences
@@ -1622,7 +1622,7 @@ const EventRequestsManagementContent: React.FC = () => {
           <DialogContent className="!w-[calc(100vw-2rem)] !max-w-[calc(100vw-2rem)] !h-[88vh] flex flex-col overflow-hidden p-0">
             <div className="px-4 sm:px-8 pt-6 pb-4 flex-shrink-0">
               <DialogHeader>
-                <DialogTitle className="text-xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-4 mb-2" style={{ color: '#007E8C' }}>
+                <DialogTitle className="text-xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-4 mb-2" style={{ color: '#236383' }}>
                   <Users className="w-6 h-6 sm:w-8 sm:h-8" />
                   Volunteer Opportunities
                 </DialogTitle>
@@ -1658,12 +1658,12 @@ const EventRequestsManagementContent: React.FC = () => {
             <div className="space-y-6 mt-6">
               <StaffingForecastWidget />
 
-              <div className="bg-[#e6f2f5] border border-[#007E8C]/30 rounded-lg p-4">
+              <div className="bg-[#e6f2f5] border border-tsp-teal/30 rounded-lg p-4">
                 <h4 className="font-semibold text-[#1A2332] mb-2 flex items-center gap-2">
                   <HelpCircle className="w-4 h-4" />
                   Staffing Planning Tips
                 </h4>
-                <ul className="text-sm text-[#236383] space-y-1">
+                <ul className="text-sm text-tsp-teal space-y-1">
                   <li>
                     • Check driver assignments early - transportation is
                     critical

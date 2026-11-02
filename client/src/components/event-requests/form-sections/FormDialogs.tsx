@@ -37,7 +37,7 @@ export const DateChangeDialog: React.FC<{
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
-        <AlertDialogAction onClick={onConfirm} className="bg-[#236383] hover:bg-[#1a4e68]">
+        <AlertDialogAction onClick={onConfirm} className="bg-tsp-teal hover:bg-[#1a4e68]">
           Yes, Change Date
         </AlertDialogAction>
       </AlertDialogFooter>
@@ -213,7 +213,7 @@ export const DeleteConfirmDialog: React.FC<{
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel onClick={() => onOpenChange(false)}>Cancel</AlertDialogCancel>
-        <AlertDialogAction onClick={onDelete} className="bg-[#A31C41] hover:bg-[#8a1837]">
+        <AlertDialogAction onClick={onDelete} className="bg-tsp-red hover:bg-[#8a1837]">
           Delete Event
         </AlertDialogAction>
       </AlertDialogFooter>

@@ -109,9 +109,9 @@ const ToolkitSentDialog = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] flex flex-col">
-          <DialogHeader className="border-b border-[#007E8C]/10 pb-4 flex-shrink-0">
-            <DialogTitle className="flex items-center space-x-2 text-[#236383] text-xl">
-              <Shield className="w-5 h-5 text-[#007E8C]" aria-hidden="true" />
+          <DialogHeader className="border-b border-tsp-teal/10 pb-4 flex-shrink-0">
+            <DialogTitle className="flex items-center space-x-2 text-tsp-teal text-xl">
+              <Shield className="w-5 h-5 text-tsp-teal" aria-hidden="true" />
               <span>Mark Toolkit as Sent</span>
             </DialogTitle>
             <DialogDescription className="text-gray-600 mt-2">
@@ -129,24 +129,24 @@ const ToolkitSentDialog = ({
             {/* Date and Time Selection */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="toolkit-sent-date" className="text-[#236383] font-medium">Toolkit Sent Date</Label>
+                <Label htmlFor="toolkit-sent-date" className="text-tsp-teal font-medium">Toolkit Sent Date</Label>
                 <Input
                   id="toolkit-sent-date"
                   type="date"
                   value={toolkitSentDate}
                   onChange={(e) => setToolkitSentDate(e.target.value)}
-                  className="border-[#007E8C]/30 focus:border-[#007E8C] focus:ring-[#007E8C]/20"
+                  className="border-tsp-teal/30 focus:border-tsp-teal focus:ring-tsp-teal/20"
                   data-testid="input-toolkit-sent-date"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="toolkit-sent-time" className="text-[#236383] font-medium">Toolkit Sent Time</Label>
+                <Label htmlFor="toolkit-sent-time" className="text-tsp-teal font-medium">Toolkit Sent Time</Label>
                 <Input
                   id="toolkit-sent-time"
                   type="time"
                   value={toolkitSentTime}
                   onChange={(e) => setToolkitSentTime(e.target.value)}
-                  className="border-[#007E8C]/30 focus:border-[#007E8C] focus:ring-[#007E8C]/20"
+                  className="border-tsp-teal/30 focus:border-tsp-teal focus:ring-tsp-teal/20"
                   data-testid="input-toolkit-sent-time"
                 />
               </div>
@@ -214,11 +214,11 @@ const ToolkitSentDialog = ({
             )}
 
             {/* Information */}
-            <div className="bg-[#47B3CB]/5 border border-[#47B3CB]/30 rounded-lg p-4">
-              <h4 className="font-semibold text-[#236383] uppercase tracking-wide text-sm mb-3">
+            <div className="bg-tsp-sky/5 border border-tsp-sky/30 rounded-lg p-4">
+              <h4 className="font-semibold text-tsp-teal uppercase tracking-wide text-sm mb-3">
                 What happens when you mark toolkit as sent:
               </h4>
-              <ul className="text-sm text-[#236383] space-y-2">
+              <ul className="text-sm text-tsp-teal space-y-2">
                 <li>• Event status will change from &quot;New&quot; to &quot;In Process&quot;</li>
                 <li>• Event will appear in the &quot;In Process&quot; tab</li>
                 <li>
@@ -233,7 +233,7 @@ const ToolkitSentDialog = ({
                 they live behind the separate "Send Toolkit" button on
                 the card now. This dialog is purely for LOGGING a
                 previously-sent toolkit. */}
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-3 pt-4 border-t border-[#007E8C]/10">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-3 pt-4 border-t border-tsp-teal/10">
               <div className="flex flex-wrap gap-2">
                 {eventRequest?.phone && (
                   <Button
@@ -260,7 +260,7 @@ const ToolkitSentDialog = ({
                         }
                       }
                     }}
-                    className="flex items-center space-x-2 border-[#47B3CB]/30 text-[#47B3CB] hover:bg-[#47B3CB]/5"
+                    className="flex items-center space-x-2"
                     data-testid="button-call-contact"
                     title={eventRequest?.phone || ''}
                   >
@@ -285,7 +285,7 @@ const ToolkitSentDialog = ({
                   type="button"
                   onClick={handleSubmit}
                   disabled={!toolkitSentDate || !toolkitSentTime || isLoading}
-                  className="bg-[#007E8C] hover:bg-[#236383] text-white shadow-sm flex-1 sm:flex-initial whitespace-nowrap"
+                  className="bg-tsp-teal hover:bg-tsp-teal text-white shadow-sm flex-1 sm:flex-initial whitespace-nowrap"
                   data-testid="button-confirm-toolkit-sent"
                 >
                   <Shield className="w-4 h-4 mr-2" aria-hidden="true" />

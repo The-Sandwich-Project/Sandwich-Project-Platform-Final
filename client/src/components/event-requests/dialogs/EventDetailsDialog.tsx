@@ -90,7 +90,7 @@ export function EventDetailsDialog({
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <DialogTitle className="text-xl sm:text-2xl font-bold text-[#236383] flex-1 min-w-0 break-words">
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-tsp-teal flex-1 min-w-0 break-words">
               {event.organizationName}
             </DialogTitle>
             <Button
@@ -108,12 +108,12 @@ export function EventDetailsDialog({
               {getStatusLabel(event.status)}
             </Badge>
             {event.isConfirmed && (
-              <Badge className="bg-gradient-to-br from-[#007E8C] to-[#47B3CB] text-white">
+              <Badge className="bg-gradient-to-br from-tsp-teal to-tsp-sky text-white">
                 Date Confirmed
               </Badge>
             )}
             {event.addedToOfficialSheet && (
-              <Badge className="bg-gradient-to-br from-[#236383] to-[#007E8C] text-white">
+              <Badge className="bg-gradient-to-br from-tsp-teal to-tsp-teal text-white">
                 On Calendar
               </Badge>
             )}

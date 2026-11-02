@@ -50,11 +50,11 @@ export const ContactInfoSection: React.FC<ContactInfoSectionProps> = ({
         onClick={onToggle}
       >
         <div className="flex items-center gap-3">
-          <User className="w-5 h-5 text-[#236383]" />
-          <span className="font-semibold text-[#236383]">Primary Contact Information</span>
+          <User className="w-5 h-5 text-tsp-teal" />
+          <span className="font-semibold text-tsp-teal">Primary Contact Information</span>
           {isComplete && <CheckCircle2 className="w-4 h-4 text-tsp-teal" />}
         </div>
-        <ChevronDown className={`w-4 h-4 text-[#236383] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-tsp-teal transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </Button>
 
       {isExpanded && (

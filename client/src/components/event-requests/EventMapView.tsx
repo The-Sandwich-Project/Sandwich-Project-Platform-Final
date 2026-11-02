@@ -36,7 +36,7 @@ L.Icon.Default.mergeOptions({
 // --- Brand Colors ---
 const ENTITY_COLORS: Record<EntityType, string> = {
   event: '#236383',
-  host: '#007E8C',
+  host: '#236383',
   recipient: '#47B3CB',
   driver: '#FBAD3F',
   volunteer: '#A31C31',
@@ -721,7 +721,7 @@ function EntityPopup({
         {onEventClick && (
           <button
             onClick={onEventClick}
-            className="text-xs px-2 py-1 rounded bg-[#007E8C]/10 text-[#007E8C] hover:bg-[#007E8C]/20"
+            className="text-xs px-2 py-1 rounded bg-tsp-teal/10 text-tsp-teal hover:bg-tsp-teal/20"
           >
             View Event
           </button>

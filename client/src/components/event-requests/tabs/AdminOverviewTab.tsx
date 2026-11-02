@@ -336,27 +336,27 @@ export function AdminOverviewTab({ eventRequests }: AdminOverviewTabProps) {
                     {/* Status Breakdown */}
                     <div className="flex flex-wrap gap-2 ml-13">
                       {stat.byStatus.new > 0 && (
-                        <Badge variant="outline" className="text-xs border-[#47B3CB] bg-[#47B3CB]/10" style={{ color: '#236383' }}>
+                        <Badge variant="outline" className="text-xs border-tsp-sky bg-tsp-sky/10" style={{ color: '#236383' }}>
                           New: {stat.byStatus.new}
                         </Badge>
                       )}
                       {stat.byStatus.in_process > 0 && (
-                        <Badge variant="outline" className="text-xs border-[#FBAD3F] bg-[#FBAD3F]/10" style={{ color: '#236383' }}>
+                        <Badge variant="outline" className="text-xs border-tsp-gold bg-tsp-gold/10" style={{ color: '#236383' }}>
                           In Process: {stat.byStatus.in_process}
                         </Badge>
                       )}
                       {stat.byStatus.scheduled > 0 && (
-                        <Badge variant="outline" className="text-xs border-[#007E8C] bg-[#007E8C]/10" style={{ color: '#236383' }}>
+                        <Badge variant="outline" className="text-xs border-tsp-teal bg-tsp-teal/10" style={{ color: '#236383' }}>
                           Scheduled: {stat.byStatus.scheduled}
                         </Badge>
                       )}
                       {stat.byStatus.completed > 0 && (
-                        <Badge variant="outline" className="text-xs border-[#007E8C] bg-[#007E8C]/20" style={{ color: '#236383' }}>
+                        <Badge variant="outline" className="text-xs border-tsp-teal bg-tsp-teal/20" style={{ color: '#236383' }}>
                           Completed: {stat.byStatus.completed}
                         </Badge>
                       )}
                       {stat.byStatus.declined > 0 && (
-                        <Badge variant="outline" className="text-xs border-[#A31C41] bg-[#A31C41]/10" style={{ color: '#A31C41' }}>
+                        <Badge variant="outline" className="text-xs border-tsp-red bg-tsp-red/10" style={{ color: '#A31C41' }}>
                           Declined: {stat.byStatus.declined}
                         </Badge>
                       )}
@@ -439,15 +439,15 @@ export function AdminOverviewTab({ eventRequests }: AdminOverviewTabProps) {
                               key={event.id}
                               className={`rounded-lg p-3 border-l-4 border transition-colors ${
                                 event.status === 'new'
-                                  ? 'bg-[#E2F5F6] border-l-[#47B3CB] border-slate-200 hover:shadow-md'
+                                  ? 'bg-tsp-mist border-l-tsp-sky border-slate-200 hover:shadow-md'
                                   : event.status === 'in_process'
-                                  ? 'bg-[#FFF4E5] border-l-[#FBAD3F] border-slate-200 hover:shadow-md'
+                                  ? 'bg-[#FFF4E5] border-l-tsp-gold border-slate-200 hover:shadow-md'
                                   : event.status === 'scheduled'
-                                  ? 'bg-[#E4EFF6] border-l-[#007E8C] border-slate-200 hover:shadow-md'
+                                  ? 'bg-[#E4EFF6] border-l-tsp-teal border-slate-200 hover:shadow-md'
                                   : event.status === 'completed' || event.status === 'contact_completed'
-                                  ? 'bg-[#E8F7FB] border-l-[#007E8C] border-slate-200 hover:shadow-md'
+                                  ? 'bg-[#E8F7FB] border-l-tsp-teal border-slate-200 hover:shadow-md'
                                   : event.status === 'declined' || event.status === 'cancelled'
-                                  ? 'bg-[#FAE7ED] border-l-[#A31C41] border-slate-200 hover:shadow-md'
+                                  ? 'bg-tsp-red-tint border-l-tsp-red border-slate-200 hover:shadow-md'
                                   : 'bg-white border-l-slate-300 border-slate-200 hover:shadow-md'
                               }`}
                             >
@@ -469,7 +469,7 @@ export function AdminOverviewTab({ eventRequests }: AdminOverviewTabProps) {
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-1 hover:underline"
-                                        style={{ color: '#007E8C' }}
+                                        style={{ color: '#236383' }}
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         <MapPin className="w-4 h-4" />
@@ -488,17 +488,17 @@ export function AdminOverviewTab({ eventRequests }: AdminOverviewTabProps) {
                                     variant="outline"
                                     className={`text-sm ${
                                       event.status === 'new'
-                                        ? 'border-[#47B3CB] text-[#236383]'
+                                        ? 'border-tsp-sky text-tsp-teal'
                                         : event.status === 'in_process'
-                                        ? 'border-[#FBAD3F] text-[#236383]'
+                                        ? 'border-tsp-gold text-tsp-teal'
                                         : event.status === 'scheduled'
-                                        ? 'border-[#007E8C] text-[#236383]'
+                                        ? 'border-tsp-teal text-tsp-teal'
                                         : event.status === 'completed'
-                                        ? 'border-[#007E8C] text-[#236383] bg-[#007E8C]/10'
+                                        ? 'border-tsp-teal text-tsp-teal bg-tsp-teal/10'
                                         : event.status === 'declined' || event.status === 'cancelled'
-                                        ? 'border-[#A31C41] text-[#A31C41]'
+                                        ? 'border-tsp-red text-tsp-red'
                                         : event.status === 'contact_completed'
-                                        ? 'border-[#007E8C] text-[#236383] bg-[#007E8C]/5'
+                                        ? 'border-tsp-teal text-tsp-teal bg-tsp-teal/5'
                                         : 'border-slate-300 text-slate-600'
                                     }`}
                                   >
@@ -512,7 +512,7 @@ export function AdminOverviewTab({ eventRequests }: AdminOverviewTabProps) {
                                     variant="ghost"
                                     size="sm"
                                     className="text-sm h-auto p-0 font-medium hover:bg-transparent"
-                                    style={{ color: '#007E8C' }}
+                                    style={{ color: '#236383' }}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleViewEvent(event);

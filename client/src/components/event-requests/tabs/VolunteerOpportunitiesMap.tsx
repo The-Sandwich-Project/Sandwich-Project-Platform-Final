@@ -65,7 +65,7 @@ function MapBounds({ events }: { events: EventRequest[] }) {
 const createClusterCustomIcon = (cluster: any) => {
   const count = cluster.getChildCount();
   return L.divIcon({
-    html: `<div style="background-color: #007E8C; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${count}</div>`,
+    html: `<div style="background-color: #236383; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${count}</div>`,
     className: 'custom-cluster-icon',
     iconSize: L.point(40, 40, true),
   });
@@ -168,7 +168,7 @@ const VolunteerOpportunityPopup = ({ event, onEventClick }: { event: EventReques
       {onEventClick && (
         <button
           onClick={() => onEventClick(event)}
-          className="w-full mt-2 px-3 py-2 bg-[#007E8C] text-white rounded hover:bg-[#006B75] transition-colors text-sm font-medium"
+          className="w-full mt-2 px-3 py-2 bg-tsp-teal text-white rounded hover:bg-brand-primary-dark transition-colors text-sm font-medium"
         >
           View Details
         </button>
@@ -309,8 +309,8 @@ export function VolunteerOpportunitiesMap({ events, onEventClick }: VolunteerOpp
       {/* Date range info bar */}
       {dateRange && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 backdrop-blur-sm rounded-lg shadow-md px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200">
-          <Calendar className="w-4 h-4 inline mr-1.5 -mt-0.5" style={{ color: '#007E8C' }} />
-          Showing <span className="font-bold" style={{ color: '#007E8C' }}>{dateRange.count}</span> scheduled events with unfilled roles &middot; {dateRange.from} – {dateRange.to}
+          <Calendar className="w-4 h-4 inline mr-1.5 -mt-0.5" style={{ color: '#236383' }} />
+          Showing <span className="font-bold" style={{ color: '#236383' }}>{dateRange.count}</span> scheduled events with unfilled roles &middot; {dateRange.from} – {dateRange.to}
         </div>
       )}
 

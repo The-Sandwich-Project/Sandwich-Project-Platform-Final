@@ -176,10 +176,10 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 className="mr-1"
               />
             )}
-            <h3 className="font-bold text-lg sm:text-xl text-[#236383] break-words min-w-0">
+            <h3 className="font-bold text-lg sm:text-xl text-tsp-teal break-words min-w-0">
               {request.organizationName}
               {request.department && (
-                <span className="text-[#236383]/70 font-medium ml-1">
+                <span className="text-tsp-teal/70 font-medium ml-1">
                   &bull; {request.department}
                 </span>
               )}
@@ -197,7 +197,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 ))}
               </div>
             )}
-            <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-primary/80 bg-gradient-to-br from-[#e6f2f5] to-[#d1e9ed] text-[#236383] border border-[#236383]/30 text-sm whitespace-nowrap">
+            <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-primary/80 bg-gradient-to-br from-[#e6f2f5] to-[#d1e9ed] text-tsp-teal border border-tsp-teal/30 text-sm whitespace-nowrap">
               <StatusIcon className="w-3 h-3 mr-1" />
               {getStatusLabel(request.status)}
             </Badge>
@@ -208,7 +208,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               </Badge>
             )}
           </div>
-          <div className="text-sm text-[#236383] mt-1 space-y-1">
+          <div className="text-sm text-tsp-teal mt-1 space-y-1">
             {/* Contact Information */}
             <div className="text-sm text-gray-700 mb-2">
               <strong>{request.firstName} {request.lastName}</strong>
@@ -261,7 +261,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       {displayDate && dateInfo ? dateInfo.text : 'No date set'}
                     </strong>
                     {displayDate && getRelativeTime(displayDate.toString()) && (
-                      <span className="text-[#236383] ml-1">({getRelativeTime(displayDate.toString())})</span>
+                      <span className="text-tsp-teal ml-1">({getRelativeTime(displayDate.toString())})</span>
                     )}
                   </span>
                   {canEdit && startEditing && (
@@ -307,7 +307,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
 
   return (
     <Card 
-      className={`transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-[#FAE7ED] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl`}
+      className={`transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-tsp-red-tint shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl`}
       style={{ borderLeftColor: statusBorderColors[request.status as keyof typeof statusBorderColors] || statusBorderColors.declined }}
     >
       <CardContent className="p-3">
@@ -434,7 +434,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
                   size="sm"
                   variant="default"
                   onClick={onReactivate}
-                  className="bg-[#FBAD3F] hover:bg-[#e89a2d] text-white h-8"
+                  className="bg-tsp-gold hover:bg-[#e89a2d] text-white h-8"
                 >
                   <RefreshCw className="w-4 h-4 mr-1" />
                   Reactivate Request
@@ -515,7 +515,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onLogContact}
-                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10 h-8"
                 >
                   <FileText className="w-4 h-4 mr-1" />
                   Log Contact
@@ -534,7 +534,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
                   size="sm"
                   onClick={messageAboutEvent}
                   variant="ghost"
-                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="text-tsp-teal hover:text-tsp-teal hover:bg-tsp-teal/10 h-8"
                   aria-label="Message about this event"
                 >
                   <MessageSquare className="w-4 h-4" aria-hidden="true" />

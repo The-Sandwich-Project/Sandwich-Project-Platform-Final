@@ -43,20 +43,20 @@ interface LastContactAgeBadgeProps {
 // gold for contrast. `fresh` is kept neutral (not a warning color) purely for
 // type completeness in case that threshold ever changes.
 const TIER_STYLES: Record<ContactAgeTier, { className: string; variant: 'outline' | 'default' }> = {
-  fresh: { variant: 'outline', className: 'bg-transparent text-[#236383] border-[#236383]/30' },
-  wk1: { variant: 'outline', className: 'bg-[#FBAD3F]/15 text-[#236383] border-[#FBAD3F]' },
-  wk2: { variant: 'outline', className: 'bg-[#FBAD3F]/25 text-[#236383] border-[#FBAD3F]' },
-  wk3: { variant: 'outline', className: 'bg-[#FBAD3F]/40 text-[#236383] border-[#FBAD3F]' },
-  mo1: { variant: 'outline', className: 'bg-[#A31C41]/10 text-[#A31C41] border-[#A31C41]/50' },
-  wk6: { variant: 'outline', className: 'bg-[#A31C41]/15 text-[#A31C41] border-[#A31C41]' },
-  mo2plus: { variant: 'default', className: 'bg-[#A31C41] text-white border-[#A31C41]' },
+  fresh: { variant: 'outline', className: 'bg-transparent text-tsp-teal border-tsp-teal/30' },
+  wk1: { variant: 'outline', className: 'bg-tsp-gold/15 text-tsp-teal border-tsp-gold' },
+  wk2: { variant: 'outline', className: 'bg-tsp-gold/25 text-tsp-teal border-tsp-gold' },
+  wk3: { variant: 'outline', className: 'bg-tsp-gold/40 text-tsp-teal border-tsp-gold' },
+  mo1: { variant: 'outline', className: 'bg-tsp-red/10 text-tsp-red border-tsp-red/50' },
+  wk6: { variant: 'outline', className: 'bg-tsp-red/15 text-tsp-red border-tsp-red' },
+  mo2plus: { variant: 'default', className: 'bg-tsp-red text-white border-tsp-red' },
 };
 
 // Positive-state palette for "Call scheduled" and "Recently contacted".
 // Both use the sky-blue accent (#47B3CB) so they read as friendly, on-top-of-it
 // signals — the visual opposite of the escalating stale tiers above.
 const POSITIVE_BADGE_CLASS =
-  'bg-[#47B3CB]/15 text-[#236383] border-[#47B3CB]';
+  'bg-tsp-sky/15 text-tsp-teal border-tsp-sky';
 
 function parseDate(input: Date | string | null | undefined): Date | null {
   if (!input) return null;

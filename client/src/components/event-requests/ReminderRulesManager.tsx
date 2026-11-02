@@ -347,7 +347,7 @@ export function ReminderRulesManager({
               activeSnooze
                 ? 'border-amber-400 text-amber-600 hover:bg-amber-50'
                 : isEffectivelyActive
-                  ? 'border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10'
+                  ? 'border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10'
                   : 'text-gray-400 hover:bg-gray-100'
             }`}
             title={
@@ -371,7 +371,7 @@ export function ReminderRulesManager({
               <>
                 <span className="text-xs">Reminders</span>
                 {hasPerEventRules && activeRuleCount > 0 && (
-                  <Badge variant="secondary" className="ml-1 h-4 min-w-4 px-1 text-[10px] bg-[#007E8C] text-white hover:bg-[#007E8C]">
+                  <Badge variant="secondary" className="ml-1 h-4 min-w-4 px-1 text-[10px] bg-tsp-teal text-white hover:bg-tsp-teal">
                     {activeRuleCount}
                   </Badge>
                 )}
@@ -395,7 +395,7 @@ export function ReminderRulesManager({
                 </div>
               </div>
             ) : isEffectivelyActive ? (
-              <div className="flex items-center gap-2 text-[#007E8C]">
+              <div className="flex items-center gap-2 text-tsp-teal">
                 <Bell className="w-4 h-4" />
                 <span className="text-sm font-medium">
                   {hasPerEventRules
@@ -417,7 +417,7 @@ export function ReminderRulesManager({
             {!hasGlobalDefaults && !hasPerEventRules && (
               <p className="text-xs text-gray-500">
                 Set up your default reminders in{' '}
-                <a href="/profile?tab=notifications" className="text-[#007E8C] underline">
+                <a href="/profile?tab=notifications" className="text-tsp-teal underline">
                   Profile → Alerts
                 </a>{' '}
                 to apply them to all events.
@@ -433,7 +433,7 @@ export function ReminderRulesManager({
               <button
                 onClick={() => unsnoozeMutation.mutate()}
                 disabled={unsnoozeMutation.isPending}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-md hover:bg-gray-100 transition-colors text-[#007E8C]"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-md hover:bg-gray-100 transition-colors text-tsp-teal"
               >
                 <PlayCircle className="w-4 h-4" />
                 Resume reminders
@@ -467,7 +467,7 @@ export function ReminderRulesManager({
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
-              <Settings2 className="w-5 h-5 text-[#007E8C]" />
+              <Settings2 className="w-5 h-5 text-tsp-teal" />
               Custom Rules for This Event
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-500">
@@ -768,7 +768,7 @@ function RulesEditor({
               <div
                 key={rule.ruleType}
                 className={`border rounded-lg p-3 space-y-3 transition-colors ${
-                  rule.enabled ? 'border-[#007E8C]/30 bg-[#007E8C]/5' : 'border-gray-200 bg-gray-50'
+                  rule.enabled ? 'border-tsp-teal/30 bg-tsp-teal/5' : 'border-gray-200 bg-gray-50'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -844,7 +844,7 @@ function RulesEditor({
               <button
                 key={rt.type}
                 onClick={() => addRule(rt.type)}
-                className="flex items-center gap-2 text-left px-3 py-2 rounded-lg border border-dashed border-gray-300 hover:border-[#007E8C] hover:bg-[#007E8C]/5 transition-colors text-sm text-gray-600 hover:text-[#007E8C]"
+                className="flex items-center gap-2 text-left px-3 py-2 rounded-lg border border-dashed border-gray-300 hover:border-tsp-teal hover:bg-tsp-teal/5 transition-colors text-sm text-gray-600 hover:text-tsp-teal"
               >
                 <Plus className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="font-medium">{rt.label}</span>
@@ -856,7 +856,7 @@ function RulesEditor({
 
       {rules.length > 0 && (
         <Button
-          className={`w-full text-white ${isDirty ? 'bg-[#007E8C] hover:bg-[#006570]' : 'bg-gray-400 cursor-default'}`}
+          className={`w-full text-white ${isDirty ? 'bg-tsp-teal hover:bg-[#006570]' : 'bg-gray-400 cursor-default'}`}
           onClick={() => bulkSaveMutation.mutate(rules)}
           disabled={isSaving || !isDirty}
         >

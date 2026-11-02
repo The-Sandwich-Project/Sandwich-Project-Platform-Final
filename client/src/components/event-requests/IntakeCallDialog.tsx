@@ -1362,7 +1362,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
         <DialogHeader className="px-4 sm:px-6 pt-6 pb-4 border-b flex-shrink-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl text-[#236383]">
+              <DialogTitle className="flex items-center gap-2 text-xl sm:text-2xl text-tsp-teal">
                 <Phone className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
                 Intake Call Guide
               </DialogTitle>
@@ -1375,7 +1375,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
               <Badge
                 variant="outline"
                 className="text-sm px-3 py-1"
-                style={{ borderColor: '#007E8C', color: '#007E8C' }}
+                style={{ borderColor: '#236383', color: '#236383' }}
               >
                 {checkedRequiredCount}/{requiredCount} Required
               </Badge>
@@ -1433,7 +1433,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
 
             {/* Quick Info Summary */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="font-semibold text-[#236383] mb-3 flex items-center gap-2">
+              <h3 className="font-semibold text-tsp-teal mb-3 flex items-center gap-2">
                 <AlertCircle className="w-5 h-5" />
                 Quick Reference
               </h3>
@@ -1478,7 +1478,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
             {/* Checklist by Category */}
             {Object.entries(itemsByCategory).map(([category, items]) => (
               <div key={category} className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold text-[#236383] mb-3 text-lg flex items-center gap-2">
+                <h3 className="font-semibold text-tsp-teal mb-3 text-lg flex items-center gap-2">
                   {category === 'Contact Confirmation' && <Users className="w-5 h-5" />}
                   {category === 'Event Basics' && <MapPin className="w-5 h-5" />}
                   {category === 'Sandwich Logistics' && <Refrigerator className="w-5 h-5" />}
@@ -1683,9 +1683,9 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                                 onClick={(e) => e.stopPropagation()}
                               />
                               {isUnder200 && (
-                                <div className="border-l-4 border-[#A31C41] bg-[#A31C41]/5 rounded-md p-3">
+                                <div className="border-l-4 border-tsp-red bg-tsp-red/5 rounded-md p-3">
                                   <div className="flex items-start gap-2">
-                                    <AlertTriangle className="w-4 h-4 text-[#A31C41] flex-shrink-0 mt-0.5" />
+                                    <AlertTriangle className="w-4 h-4 text-tsp-red flex-shrink-0 mt-0.5" />
                                     <div className="text-xs text-[#7a1632] space-y-2">
                                       <p>
                                         Under 200 sandwiches is not a group event. Let the group know they can make this quantity and drop them at a host home on a Wednesday — share our host finder:
@@ -1694,7 +1694,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                                         href="https://tsp-host-finder-tool.web.app/"
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 font-medium text-[#A31C41] underline hover:no-underline"
+                                        className="inline-flex items-center gap-1 font-medium text-tsp-red underline hover:no-underline"
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         <ExternalLink className="w-3.5 h-3.5" />
@@ -1840,7 +1840,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                                 </SelectContent>
                               </Select>
                               {itemAnswers[item.id] === 'yes' && (
-                                <p className="text-xs text-[#A31C41] italic">
+                                <p className="text-xs text-tsp-red italic">
                                   Corporate follow-ups will appear below: participant count and volunteer needs.
                                 </p>
                               )}
@@ -1874,15 +1874,15 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                           ) : item.id === 'assembly_reviewed' ? (
                             <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-gray-800 space-y-2">
                               <div>
-                                <span className="font-semibold text-[#236383]">Deli:</span>{' '}
+                                <span className="font-semibold text-tsp-teal">Deli:</span>{' '}
                                 bread → cheese → meat → cheese → bread. Check the serving size on the meat package and use that many slices per sandwich (= 2 oz, our required amount). Two pieces of cheese per sandwich, with the meat in between. Each sandwich goes in its own sandwich-sized ziploc, stacked 10–12 per stack, returned to the bag the loaf of bread came out of.
                               </div>
                               <div>
-                                <span className="font-semibold text-[#236383]">PBJ:</span>{' '}
+                                <span className="font-semibold text-tsp-teal">PBJ:</span>{' '}
                                 peanut butter spread on BOTH sides of the bread. Jelly on one side neatly, kept away from the edges to prevent leakage.
                               </div>
                               <div>
-                                <span className="font-semibold text-[#236383]">All events:</span>{' '}
+                                <span className="font-semibold text-tsp-teal">All events:</span>{' '}
                                 food-safe gloves, hairnets (beardnets where relevant), access to sinks for handwashing — hand sanitizer is NOT sufficient. Disposable tablecloths are incredibly helpful for keeping the prep area clean.
                               </div>
                               <p className="italic text-gray-600 pt-1">
@@ -1910,10 +1910,10 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                               return (
                                 <div className="space-y-2">
                                   {showCard ? (
-                                    <div className="bg-white border border-[#47B3CB]/40 rounded-md p-3">
+                                    <div className="bg-white border border-tsp-sky/40 rounded-md p-3">
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="flex items-start gap-2 min-w-0">
-                                          <MapPin className="w-4 h-4 text-[#236383] flex-shrink-0 mt-0.5" />
+                                          <MapPin className="w-4 h-4 text-tsp-teal flex-shrink-0 mt-0.5" />
                                           <div className="text-sm text-gray-900 break-words min-w-0">
                                             {currentAddress}
                                           </div>
@@ -1949,7 +1949,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                                       <Button
                                         type="button"
                                         size="sm"
-                                        className="h-8 bg-[#007E8C] hover:bg-[#236383] text-white"
+                                        className="h-8 bg-tsp-teal hover:bg-tsp-teal text-white"
                                         disabled={!canSave}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1980,7 +1980,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                                       href={mapsHref}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 text-xs font-medium text-[#007E8C] hover:underline"
+                                      className="inline-flex items-center gap-1 text-xs font-medium text-tsp-teal hover:underline"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <MapPin className="w-3.5 h-3.5" />
@@ -2061,11 +2061,11 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                     {item.id === 'event_date' && conflictDate && (
                       <div className="space-y-3">
                         {shouldConsultTeam && (
-                          <div className="border-l-4 border-[#A31C41] bg-[#A31C41]/5 rounded-md p-4">
+                          <div className="border-l-4 border-tsp-red bg-tsp-red/5 rounded-md p-4">
                             <div className="flex items-start gap-3">
-                              <AlertCircle className="w-5 h-5 text-[#A31C41] flex-shrink-0 mt-0.5" />
+                              <AlertCircle className="w-5 h-5 text-tsp-red flex-shrink-0 mt-0.5" />
                               <div className="text-sm">
-                                <div className="font-semibold text-[#A31C41]">
+                                <div className="font-semibold text-tsp-red">
                                   Consult with Christine &amp; Marcy before scheduling
                                 </div>
                                 <ul className="mt-2 list-disc list-inside text-[#7a1632] space-y-1">
@@ -2109,7 +2109,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                         areas" below. */}
                     {item.id === 'event_address' && (
                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                        <h4 className="font-semibold text-[#236383] mb-2 flex items-center gap-2 text-sm">
+                        <h4 className="font-semibold text-tsp-teal mb-2 flex items-center gap-2 text-sm">
                           <MapPin className="w-4 h-4" />
                           Typical Operating Areas
                         </h4>
@@ -2141,7 +2141,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
             {/* Other Notes — final admin wrap-up bucket for anything that
                 didn't fit a structured question above. */}
             <div className="bg-white border border-gray-300 rounded-lg p-4">
-              <Label htmlFor="call-notes" className="text-base font-semibold text-[#236383] mb-2 flex items-center gap-2">
+              <Label htmlFor="call-notes" className="text-base font-semibold text-tsp-teal mb-2 flex items-center gap-2">
                 <FileText className="w-5 h-5" />
                 Other Notes
               </Label>
@@ -2189,7 +2189,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
               variant="outline"
               onClick={handleSaveAndClose}
               disabled={isSaving}
-              className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 w-full sm:w-auto"
+              className="border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10 w-full sm:w-auto"
             >
               {isSaving ? 'Saving...' : 'Close & Save'}
             </Button>
@@ -2201,7 +2201,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                 trigger={
                   <Button
                     variant="outline"
-                    className="border-[#A31C41] text-[#A31C41] hover:bg-[#A31C41]/10 w-full sm:w-auto"
+                    className="border-tsp-red text-tsp-red hover:bg-tsp-red/10 w-full sm:w-auto"
                     disabled={isSaving}
                   >
                     Move to Non-Event
@@ -2217,7 +2217,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
             )}
             <Button
               onClick={handleComplete}
-              className="bg-[#007E8C] hover:bg-[#236383] text-white w-full sm:w-auto"
+              className="bg-tsp-teal hover:bg-tsp-teal text-white w-full sm:w-auto"
               disabled={isSaving}
             >
               {isSaving ? 'Saving...' : 'Mark Call Complete'}

@@ -659,7 +659,7 @@ export const MyAssignmentsTab: React.FC = () => {
           {myAssignments.map((request) => (
             <div
               key={request.id}
-              className="border-2 border-[#47B3CB] rounded-lg p-1 bg-[#47B3CB]/5 shadow-sm hover:shadow-md transition-all"
+              className="border-2 border-tsp-sky rounded-lg p-1 bg-tsp-sky/5 shadow-sm hover:shadow-md transition-all"
             >
               {renderEventCard(request)}
             </div>

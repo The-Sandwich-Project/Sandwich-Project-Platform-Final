@@ -317,7 +317,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               </div>
             ) : (
               <div className="flex items-center gap-2 group">
-                <h3 className="font-bold text-lg sm:text-xl text-[#236383] break-words">
+                <h3 className="font-bold text-lg sm:text-xl text-tsp-teal break-words">
                   {request.organizationName}
                 </h3>
                 {canEditOrgDetails && startEditing && (
@@ -399,7 +399,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-primary/80 bg-gradient-to-br from-[#e6f2f5] to-[#d1e9ed] text-[#236383] border border-[#236383]/30 text-[16px] cursor-help">
+                <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover:bg-primary/80 bg-gradient-to-br from-[#e6f2f5] to-[#d1e9ed] text-tsp-teal border border-tsp-teal/30 text-[16px] cursor-help">
                   <StatusIcon className="w-3 h-3 mr-1" />
                   {getStatusLabel(request.status)}
                 </Badge>
@@ -509,7 +509,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               </Tooltip>
             )}
           </div>
-          <div className="text-sm text-[#236383] mt-1 space-y-1">
+          <div className="text-sm text-tsp-teal mt-1 space-y-1">
             {/* Contact Information */}
             <div className="text-sm text-gray-700 mb-2">
               <strong>{request.firstName} {request.lastName}</strong>
@@ -618,7 +618,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                           size="sm"
                           variant="ghost"
                           onClick={startEditingTspContact}
-                          className="ml-2 h-6 w-6 p-0 text-[#236383] hover:bg-[#236383]/10 transition-opacity opacity-0 group-hover:opacity-100"
+                          className="ml-2 h-6 w-6 p-0 text-tsp-teal hover:bg-tsp-teal/10 transition-opacity opacity-0 group-hover:opacity-100"
                           title="Edit TSP contact"
                         >
                           <Edit2 className="w-3 h-3" />
@@ -692,7 +692,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       </span>
                     )}
                     {displayDate && getRelativeTime(displayDate.toString()) && (
-                      <span className="text-[#236383] ml-1">({getRelativeTime(displayDate.toString())})</span>
+                      <span className="text-tsp-teal ml-1">({getRelativeTime(displayDate.toString())})</span>
                     )}
                   </span>
                   {canEdit && startEditing && (
@@ -713,7 +713,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             {/* Event Address — always a Google Maps link */}
             {(request.eventAddress || (isEditingThisCard && editingField === 'eventAddress') || canEditOrgDetails) && (
               <div className="flex items-start gap-1 group mt-1">
-                <MapPin className="w-3.5 h-3.5 mt-1 shrink-0 text-[#236383]" />
+                <MapPin className="w-3.5 h-3.5 mt-1 shrink-0 text-tsp-teal" />
                 {isEditingThisCard && editingField === 'eventAddress' ? (
                   <div className="flex flex-col gap-2 flex-1">
                     <Textarea
@@ -742,7 +742,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                         href={`https://maps.google.com/maps?q=${encodeURIComponent(request.eventAddress)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm sm:text-base text-[#236383] hover:text-[#007e8c] hover:underline break-words flex-1"
+                        className="text-sm sm:text-base text-tsp-teal hover:text-tsp-teal hover:underline break-words flex-1"
                         data-testid="link-event-address"
                       >
                         {request.eventAddress}
@@ -935,7 +935,7 @@ const CardAssignments: React.FC<CardAssignmentsProps> = ({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* Drivers or Self-Transport */}
           <div className="flex items-center gap-2">
-            <Car className="w-4 h-4 text-[#236383]" />
+            <Car className="w-4 h-4 text-tsp-teal" />
             {request.selfTransport ? (
               // Organization transported sandwiches themselves - clickable to switch to driver
               <div className="flex items-center gap-1">
@@ -959,14 +959,14 @@ const CardAssignments: React.FC<CardAssignmentsProps> = ({
               </div>
             ) : (
               <>
-                <span className="font-medium text-[#236383]">Drivers:</span>
+                <span className="font-medium text-tsp-teal">Drivers:</span>
                 {drivers.length > 0 ? (
                   <div className="flex flex-wrap gap-1">
                     {drivers.map((driver, index) => (
                       <React.Fragment key={driver.id}>
                         <Badge
                           variant="secondary"
-                          className="bg-[#236383]/10 text-[#236383] text-xs px-2 py-0.5 group relative"
+                          className="bg-tsp-teal/10 text-tsp-teal text-xs px-2 py-0.5 group relative"
                           data-testid={`badge-driver-${driver.id}`}
                         >
                           <span className="flex items-center gap-1">
@@ -1019,14 +1019,14 @@ const CardAssignments: React.FC<CardAssignmentsProps> = ({
             <>
               <span className="text-gray-300">|</span>
               <div className="flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-[#236383]" />
-                <span className="font-medium text-[#236383]">Speakers:</span>
+                <Megaphone className="w-4 h-4 text-tsp-teal" />
+                <span className="font-medium text-tsp-teal">Speakers:</span>
                 <div className="flex flex-wrap gap-1">
                   {speakers.map((speaker, index) => (
                     <React.Fragment key={speaker.id}>
                       <Badge
                         variant="secondary"
-                        className="bg-[#236383]/10 text-[#236383] text-xs px-2 py-0.5 group relative"
+                        className="bg-tsp-teal/10 text-tsp-teal text-xs px-2 py-0.5 group relative"
                         data-testid={`badge-speaker-${speaker.id}`}
                       >
                         <span className="flex items-center gap-1">
@@ -1056,15 +1056,15 @@ const CardAssignments: React.FC<CardAssignmentsProps> = ({
 
           {/* Volunteers */}
           <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-[#236383]" />
-            <span className="font-medium text-[#236383]">Volunteers:</span>
+            <Users className="w-4 h-4 text-tsp-teal" />
+            <span className="font-medium text-tsp-teal">Volunteers:</span>
             {volunteers.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {volunteers.map((volunteer, index) => (
                   <React.Fragment key={volunteer.id}>
                     <Badge
                       variant="secondary"
-                      className="bg-[#236383]/10 text-[#236383] text-xs px-2 py-0.5 group relative"
+                      className="bg-tsp-teal/10 text-tsp-teal text-xs px-2 py-0.5 group relative"
                       data-testid={`badge-volunteer-${volunteer.id}`}
                     >
                       <span className="flex items-center gap-1">
@@ -1302,13 +1302,13 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
   return (
     <>
       {/* Compact Social Media Tracking Section - positioned in the corner */}
-      <div className="inline-block bg-[#47b3cb]/5 rounded-lg p-3 border border-[#47b3cb]/30 max-w-xs" data-testid="social-media-tracking">
+      <div className="inline-block bg-tsp-sky/5 rounded-lg p-3 border border-tsp-sky/30 max-w-xs" data-testid="social-media-tracking">
         {/* Compact Header */}
         <div className="flex items-center gap-2 mb-2">
-          <Share2 className="w-4 h-4 text-[#236383]" />
-          <span className="font-semibold text-sm text-[#236383]">Social Media</span>
+          <Share2 className="w-4 h-4 text-tsp-teal" />
+          <span className="font-semibold text-sm text-tsp-teal">Social Media</span>
           {updateSocialMediaMutation.isPending && (
-            <span className="text-xs text-[#007e8c] ml-auto">Saving...</span>
+            <span className="text-xs text-tsp-teal ml-auto">Saving...</span>
           )}
         </div>
 
@@ -1317,7 +1317,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
           {!request.socialMediaPostRequested && !request.socialMediaPostCompleted && (
             <Button
               onClick={handleMarkRequested}
-              className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs px-3 py-1 h-8 w-full"
+              className="bg-tsp-teal hover:bg-tsp-teal text-white text-xs px-3 py-1 h-8 w-full"
               disabled={updateSocialMediaMutation.isPending}
             >
               📱 Mark Social Media Requested
@@ -1329,7 +1329,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
             <>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-1 text-xs">
-                  <span className="text-[#236383] font-medium">✓ Requested</span>
+                  <span className="text-tsp-teal font-medium">✓ Requested</span>
                   {showRequestedDate ? (
                     <Input
                       type="date"
@@ -1338,7 +1338,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                         handleUpdateRequestedDate(e.target.value);
                         setShowRequestedDate(false);
                       }}
-                      className="h-6 text-xs border-[#47b3cb]"
+                      className="h-6 text-xs border-tsp-sky"
                       disabled={updateSocialMediaMutation.isPending}
                       onBlur={() => setShowRequestedDate(false)}
                       autoFocus
@@ -1346,7 +1346,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                   ) : (
                     <button
                       onClick={() => setShowRequestedDate(true)}
-                      className="text-[#007e8c] underline hover:text-[#236383] text-xs"
+                      className="text-tsp-teal underline hover:text-tsp-teal text-xs"
                     >
                       {formatDateForDisplay(request.socialMediaPostRequestedDate?.toString())}
                     </button>
@@ -1355,7 +1355,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                 
                 <Button
                   onClick={() => setShowInstagramDialog(true)}
-                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs px-3 py-1 h-7 w-full"
+                  className="bg-tsp-gold hover:bg-tsp-red text-white text-xs px-3 py-1 h-7 w-full"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   Mark as Posted
@@ -1368,7 +1368,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
           {request.socialMediaPostCompleted && (
             <div className="space-y-2">
               <div className="flex items-center gap-1 text-xs">
-                <span className="text-[#236383] font-medium">✓ Posted</span>
+                <span className="text-tsp-teal font-medium">✓ Posted</span>
                 {showPostedDate ? (
                   <Input
                     type="date"
@@ -1377,7 +1377,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                       handleUpdatePostedDate(e.target.value);
                       setShowPostedDate(false);
                     }}
-                    className="h-6 text-xs border-[#47b3cb]"
+                    className="h-6 text-xs border-tsp-sky"
                     disabled={updateSocialMediaMutation.isPending}
                     onBlur={() => setShowPostedDate(false)}
                     autoFocus
@@ -1385,7 +1385,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                 ) : (
                   <button
                     onClick={() => setShowPostedDate(true)}
-                    className="text-[#007e8c] underline hover:text-[#236383] text-xs"
+                    className="text-tsp-teal underline hover:text-tsp-teal text-xs"
                   >
                     {formatDateForDisplay(request.socialMediaPostCompletedDate?.toString())}
                   </button>
@@ -1502,7 +1502,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                         value={postLink}
                         onChange={(e) => setPostLink(e.target.value)}
                         placeholder="Post link..."
-                        className="h-6 text-xs border-[#47b3cb]"
+                        className="h-6 text-xs border-tsp-sky"
                         disabled={updateSocialMediaMutation.isPending}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleUpdatePostLink();
@@ -1516,7 +1516,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                         <Button
                           size="sm"
                           onClick={handleUpdatePostLink}
-                          className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs px-2 py-1 h-6"
+                          className="bg-tsp-teal hover:bg-tsp-teal text-white text-xs px-2 py-1 h-6"
                           disabled={updateSocialMediaMutation.isPending}
                         >
                           Save
@@ -1541,11 +1541,11 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                         setPostLink(request.socialMediaPostLink || '');
                         setEditingPostLink(true);
                       }}
-                      className="p-1 rounded border border-[#47b3cb]/30 bg-white/50 cursor-pointer hover:bg-white/70 transition-colors truncate"
+                      className="p-1 rounded border border-tsp-sky/30 bg-white/50 cursor-pointer hover:bg-white/70 transition-colors truncate"
                     >
                       {request.socialMediaPostLink ? (
                         toSafeHttpUrl(request.socialMediaPostLink) ? (
-                          <a href={toSafeHttpUrl(request.socialMediaPostLink)!} target="_blank" rel="noopener noreferrer" className="text-[#007e8c] underline text-xs">
+                          <a href={toSafeHttpUrl(request.socialMediaPostLink)!} target="_blank" rel="noopener noreferrer" className="text-tsp-teal underline text-xs">
                             View post
                           </a>
                         ) : (
@@ -1564,7 +1564,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
               {!request.socialMediaPostLink && !editingPostLink && (
                 <Button
                   onClick={() => setEditingPostLink(true)}
-                  className="bg-[#47b3cb]/20 hover:bg-[#47b3cb]/30 text-[#236383] text-xs px-2 py-1 h-6 w-full"
+                  className="bg-tsp-sky/20 hover:bg-tsp-sky/30 text-tsp-teal text-xs px-2 py-1 h-6 w-full"
                 >
                   + Add link
                 </Button>
@@ -1602,7 +1602,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                   placeholder="https://instagram.com/..."
                   value={instagramLink}
                   onChange={(e) => setInstagramLink(e.target.value)}
-                  className="w-full border-[#47b3cb] focus:border-[#007e8c]"
+                  className="w-full border-tsp-sky focus:border-tsp-teal"
                 />
               </div>
               <p className="text-xs text-gray-500">
@@ -1628,7 +1628,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                 handleMarkPostedWithLink();
                 setShowInstagramDialog(false);
               }}
-              className="flex-1 bg-[#47b3cb] hover:bg-[#236383] text-white"
+              className="flex-1 bg-tsp-sky hover:bg-tsp-teal text-white"
               disabled={updateSocialMediaMutation.isPending}
             >
               Mark as Posted
@@ -2486,7 +2486,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
         <div className="bg-white rounded-lg p-3 border border-gray-200 space-y-2">
           {/* Sandwiches row */}
           <div className="flex items-center gap-2 text-sm flex-wrap">
-            <Package className="w-4 h-4 text-[#FBAD3F] shrink-0" />
+            <Package className="w-4 h-4 text-tsp-gold shrink-0" />
             <span className="text-gray-600 font-medium">Sandwiches:</span>
             {isEditingSandwichCount ? (
               <div className="flex items-center gap-2 flex-wrap">
@@ -2540,7 +2540,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 </span>
                 <span className="text-gray-400">·</span>
                 <span className="text-gray-700">
-                  Delivered <strong className="font-semibold text-[#FBAD3F]">
+                  Delivered <strong className="font-semibold text-tsp-navy">
                     {(() => {
                       const count = request.actualSandwichCount;
                       const typesRaw = request.actualSandwichTypes;
@@ -2570,7 +2570,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
 
           {/* Social media row */}
           <div className="flex items-center gap-2 text-sm flex-wrap">
-            <Share2 className="w-4 h-4 text-[#47b3cb] shrink-0" />
+            <Share2 className="w-4 h-4 text-tsp-sky shrink-0" />
             <span className="text-gray-600 font-medium">Social:</span>
             <span className="text-gray-700">
               {request.socialMediaPostCompleted
@@ -2586,7 +2586,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                   href={instagramLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-[#236383] hover:underline"
+                  className="inline-flex items-center gap-1 text-xs text-tsp-teal hover:underline"
                 >
                   <Instagram className="w-3 h-3" />
                   View
@@ -2608,7 +2608,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                       socialMediaPostRequestedDate: todayDate,
                     });
                   }}
-                  className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs h-7 px-2"
+                  className="bg-tsp-teal hover:bg-tsp-teal text-white text-xs h-7 px-2"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   Mark Requested
@@ -2618,7 +2618,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 <Button
                   size="sm"
                   onClick={() => setShowInstagramDialog(true)}
-                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs h-7 px-2"
+                  className="bg-tsp-gold hover:bg-tsp-red text-white text-xs h-7 px-2"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   Mark Posted
@@ -2628,7 +2628,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 <Button
                   size="sm"
                   onClick={() => setShowInstagramDialog(true)}
-                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs h-7 px-2"
+                  className="bg-tsp-gold hover:bg-tsp-red text-white text-xs h-7 px-2"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   <Instagram className="w-3 h-3 mr-1" />
@@ -2736,8 +2736,8 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                 {/* Recipients with Allocations */}
                 <div className="flex items-center gap-2 group">
-                  <Building className="w-4 h-4 text-[#236383]" />
-                  <span className="font-medium text-[#236383]">Recipients:</span>
+                  <Building className="w-4 h-4 text-tsp-teal" />
+                  <span className="font-medium text-tsp-teal">Recipients:</span>
                   {/* Show allocations if available with actual sandwich counts, otherwise show recipient badges */}
                   {(request as any).recipientAllocations && ((request as any).recipientAllocations as RecipientAllocation[]).some(a => a.sandwichCount > 0) ? (
                     <RecipientAllocationDisplay
@@ -2750,7 +2750,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                         <Badge
                           key={index}
                           variant="secondary"
-                          className="bg-white text-[#236383] border border-[#236383]/30 text-xs flex items-center gap-1"
+                          className="bg-white text-tsp-teal border border-tsp-teal/30 text-xs flex items-center gap-1"
                           data-testid={`badge-${item.type}-${index}`}
                         >
                           {item.icon}
@@ -2778,7 +2778,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
 
                 {/* Drivers or Self-Transport */}
                 <div className="flex items-center gap-1">
-                  <Car className="w-4 h-4 text-[#236383]" />
+                  <Car className="w-4 h-4 text-tsp-teal" />
                   {request.selfTransport ? (
                     <Badge
                       variant="outline"
@@ -2790,16 +2790,16 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     </Badge>
                   ) : (
                     <>
-                      <span className="font-medium text-[#236383]">Drivers:</span>
+                      <span className="font-medium text-tsp-teal">Drivers:</span>
                       {canEditAssignments && openAssignmentDialog && (
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => openAssignmentDialog('driver')}
-                          className="h-5 w-5 p-0 hover:bg-[#236383]/10"
+                          className="h-5 w-5 p-0 hover:bg-tsp-teal/10"
                           title="Add driver"
                         >
-                          <UserPlus className="w-3 h-3 text-[#236383]" />
+                          <UserPlus className="w-3 h-3 text-tsp-teal" />
                         </Button>
                       )}
                       {drivers.length > 0 ? (
@@ -2808,7 +2808,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                             <Badge
                               key={driver.id}
                               variant="secondary"
-                              className="bg-[#236383]/10 text-[#236383] text-xs px-2 py-0.5"
+                              className="bg-tsp-teal/10 text-tsp-teal text-xs px-2 py-0.5"
                             >
                               {driver.name}
                               {canEditAssignments && handleRemoveAssignment && (
@@ -2835,14 +2835,14 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 {speakers.length > 0 && (
                   <>
                     <div className="flex items-center gap-1">
-                      <Megaphone className="w-4 h-4 text-[#236383]" />
-                      <span className="font-medium text-[#236383]">Speakers:</span>
+                      <Megaphone className="w-4 h-4 text-tsp-teal" />
+                      <span className="font-medium text-tsp-teal">Speakers:</span>
                       <div className="flex flex-wrap gap-1">
                         {speakers.map((speaker) => (
                           <Badge
                             key={speaker.id}
                             variant="secondary"
-                            className="bg-[#236383]/10 text-[#236383] text-xs px-2 py-0.5"
+                            className="bg-tsp-teal/10 text-tsp-teal text-xs px-2 py-0.5"
                           >
                             {speaker.name}
                           </Badge>
@@ -2856,17 +2856,17 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
 
                 {/* Volunteers */}
                 <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4 text-[#236383]" />
-                  <span className="font-medium text-[#236383]">Volunteers:</span>
+                  <Users className="w-4 h-4 text-tsp-teal" />
+                  <span className="font-medium text-tsp-teal">Volunteers:</span>
                   {canEditAssignments && openAssignmentDialog && (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => openAssignmentDialog('volunteer')}
-                      className="h-5 w-5 p-0 hover:bg-[#236383]/10"
+                      className="h-5 w-5 p-0 hover:bg-tsp-teal/10"
                       title="Add volunteer"
                     >
-                      <UserPlus className="w-3 h-3 text-[#236383]" />
+                      <UserPlus className="w-3 h-3 text-tsp-teal" />
                     </Button>
                   )}
                   {volunteers.length > 0 ? (
@@ -2875,7 +2875,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                         <Badge
                           key={volunteer.id}
                           variant="secondary"
-                          className="bg-[#236383]/10 text-[#236383] text-xs px-2 py-0.5"
+                          className="bg-tsp-teal/10 text-tsp-teal text-xs px-2 py-0.5"
                         >
                           {volunteer.name}
                           {canEditAssignments && handleRemoveAssignment && (
@@ -3063,7 +3063,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onLogContact}
-                  className="text-base border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
+                  className="text-base border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10"
                 >
                   <FileText className="w-4 h-4 mr-1" />
                   Log Contact
@@ -3102,7 +3102,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                   size="sm"
                   onClick={messageAboutEvent}
                   variant="ghost"
-                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10"
+                  className="text-tsp-teal hover:text-tsp-teal hover:bg-tsp-teal/10"
                   aria-label="Message about this event"
                 >
                   <MessageSquare className="w-4 h-4" aria-hidden="true" />
@@ -3257,7 +3257,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 handleMarkPostedWithLink();
                 setShowInstagramDialog(false);
               }}
-              className="flex-1 bg-[#47b3cb] hover:bg-[#236383] text-white"
+              className="flex-1 bg-tsp-sky hover:bg-tsp-teal text-white"
               disabled={updateSocialMediaMutation.isPending}
             >
               Mark as Posted

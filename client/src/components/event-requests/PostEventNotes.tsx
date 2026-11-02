@@ -107,7 +107,7 @@ export function PostEventNotes({ eventId }: PostEventNotesProps) {
   return (
     <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
       <div className="flex items-center gap-2 mb-3">
-        <ClipboardList className="w-4 h-4 text-[#236383]" />
+        <ClipboardList className="w-4 h-4 text-tsp-teal" />
         <h3 className="text-sm font-semibold text-gray-800">Post-event Notes</h3>
         {notes.length > 0 && (
           <span className="text-xs text-gray-500">({notes.length})</span>
@@ -129,7 +129,7 @@ export function PostEventNotes({ eventId }: PostEventNotesProps) {
             size="sm"
             onClick={handleSubmit}
             disabled={!draft.trim() || addMutation.isPending}
-            className="bg-[#236383] hover:bg-[#1d5470]"
+            className="bg-tsp-teal hover:bg-[#1d5470]"
             data-testid="button-add-post-event-note"
           >
             {addMutation.isPending ? (
@@ -212,7 +212,7 @@ export function PostEventNotes({ eventId }: PostEventNotesProps) {
                         size="sm"
                         onClick={() => handleEditSave(note.id)}
                         disabled={!editDraft.trim() || editMutation.isPending}
-                        className="text-xs h-7 bg-[#236383] hover:bg-[#1d5470]"
+                        className="text-xs h-7 bg-tsp-teal hover:bg-[#1d5470]"
                       >
                         {editMutation.isPending ? (
                           <Loader2 className="w-3 h-3 mr-1 animate-spin" />

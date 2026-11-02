@@ -37,7 +37,7 @@ export function TrafficConflictBadge({
         <TooltipTrigger asChild>
           <Badge
             variant="outline"
-            className={`gap-1 border-[#A31C41] bg-[#A31C41]/10 text-[#A31C41] hover:bg-[#A31C41]/15 ${className}`}
+            className={`gap-1 border-tsp-red bg-tsp-red/10 text-tsp-red hover:bg-tsp-red/15 ${className}`}
           >
             <span className="text-sm leading-none">⚽</span>
             {compact ? (

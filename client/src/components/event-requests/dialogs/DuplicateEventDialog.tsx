@@ -140,7 +140,7 @@ export const DuplicateEventDialog: React.FC<DuplicateEventDialogProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Copy className="w-5 h-5 text-[#236383]" />
+            <Copy className="w-5 h-5 text-tsp-teal" />
             Create Another Event
           </DialogTitle>
           <DialogDescription>
@@ -265,7 +265,7 @@ export const DuplicateEventDialog: React.FC<DuplicateEventDialogProps> = ({
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting}
-                className="bg-[#236383] hover:bg-[#1e5a75] text-white"
+                className="bg-tsp-teal hover:bg-[#1e5a75] text-white"
               >
                 <Copy className="w-4 h-4 mr-2" />
                 {form.formState.isSubmitting ? 'Creating...' : 'Create Event'}

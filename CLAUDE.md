@@ -131,7 +131,8 @@ Separately, `server/background-sync-service.ts` reads the Event Requests Google 
 - `tsp-sky` #47B3CB — OK / complete (fill or border only — fails as text)
 - `tsp-gold` #FBAD3F + `tsp-cream` #FEF3E2 — needs attention (fill/border only, navy text, ⚠ icon)
 - `tsp-red` #A31C41 — destructive or blocking (e.g. staffing gap ≤3 days out), with an icon
-- Everything else: neutral outline (`variant="outline"`, no color classes). No purple, orange, or green.
+- Everything else: neutral outline (`variant="outline"`, no color classes). No purple, orange, or green, and no **#007E8C** — that teal was dropped from the brand palette; use `tsp-teal`.
+- Status colors (`constants.ts`): new = navy, in process = gold, scheduled = teal, completed = sky, declined/cancelled = red, standby = slate, stalled = gray.
 Applied so far to `client/src/components/event-requests/`; badge tones are centralized in `cards/card-ui.tsx` (`badgeTone`).
 
 ### Onboarding System

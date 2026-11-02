@@ -81,7 +81,7 @@ export const RescheduledTab: React.FC = () => {
                           </Badge>
                         )}
                       </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-[#236383] break-words min-w-0">
+                      <h3 className="text-lg sm:text-xl font-bold text-tsp-teal break-words min-w-0">
                         {request.organizationName}
                         {request.department && (
                           <span className="text-base sm:text-lg font-normal text-gray-600 ml-2">

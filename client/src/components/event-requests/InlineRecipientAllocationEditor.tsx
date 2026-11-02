@@ -186,7 +186,7 @@ export function InlineRecipientAllocationEditor({
           size="sm"
           onClick={handleSave}
           disabled={saveMutation.isPending}
-          className="h-7 bg-[#236383] hover:bg-[#1a4a63]"
+          className="h-7 bg-tsp-teal hover:bg-[#1a4a63]"
         >
           {saveMutation.isPending ? (
             <Loader2 className="w-3 h-3 mr-1 animate-spin" />

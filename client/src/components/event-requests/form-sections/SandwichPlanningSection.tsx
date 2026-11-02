@@ -68,8 +68,8 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
   return (
     <div className="space-y-4 border rounded-lg p-4 bg-white">
       <div className="flex items-center gap-3 pb-2 border-b">
-        <Sandwich className="w-5 h-5 text-[#236383]" />
-        <span className="text-lg font-semibold text-[#236383]">Sandwich Planning</span>
+        <Sandwich className="w-5 h-5 text-tsp-teal" />
+        <span className="text-lg font-semibold text-tsp-teal">Sandwich Planning</span>
         {isComplete && <CheckCircle2 className="w-4 h-4 text-tsp-teal" />}
       </div>
 
@@ -140,7 +140,7 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
             min="0"
             className="w-40"
           />
-          <p className="text-sm text-[#236383]">
+          <p className="text-sm text-tsp-teal">
             Use this when you know the exact count.
           </p>
         </div>
@@ -192,7 +192,7 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
               </SelectContent>
             </Select>
           </div>
-          <p className="text-sm text-[#236383]">
+          <p className="text-sm text-tsp-teal">
             Use this when the final count isn't confirmed yet (e.g., 500-700 turkey sandwiches).
           </p>
         </div>
@@ -210,7 +210,7 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
           </div>
 
           {(!formData.sandwichTypes || formData.sandwichTypes.length === 0) ? (
-            <div className="text-center py-4 text-[#007E8C] border-2 border-dashed border-[#236383]/30 rounded">
+            <div className="text-center py-4 text-tsp-teal border-2 border-dashed border-tsp-teal/30 rounded">
               <p>No sandwich types added yet. Click "Add Type" to get started.</p>
             </div>
           ) : (
@@ -250,7 +250,7 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
                   </Button>
                 </div>
               ))}
-              <div className="text-sm text-[#236383] bg-[#e6f2f5] p-2 rounded">
+              <div className="text-sm text-tsp-teal bg-[#e6f2f5] p-2 rounded">
                 <strong>Total:</strong> {formData.sandwichTypes.reduce((sum, item) => sum + item.quantity, 0)} sandwiches
               </div>
             </div>

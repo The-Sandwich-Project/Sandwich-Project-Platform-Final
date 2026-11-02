@@ -32,7 +32,7 @@ export const SANDWICH_TYPES = [
 
 // Status color scheme - VIBRANT BRAND COLORS: Using TSP brand palette with high saturation
 export const statusColors: Record<string, string> = {
-  new: 'bg-gradient-to-br from-[#007E8C] to-[#47B3CB] text-white border-2 border-[#007E8C] shadow-md',
+  new: 'bg-tsp-navy text-white border-2 border-tsp-navy shadow-md',
   // Gold and light teal fail as text backgrounds for white text — navy text instead.
   in_process: 'bg-tsp-gold text-tsp-navy border-2 border-tsp-gold shadow-md',
   scheduled:
@@ -46,14 +46,14 @@ export const statusColors: Record<string, string> = {
     'bg-gradient-to-br from-[#A31C41] to-[#c5245a] text-white border-2 border-[#A31C41] font-bold shadow-lg',
   non_event:
     'bg-gradient-to-br from-[#78716C] to-[#A8A29E] text-white border-2 border-[#78716C] shadow-md',
-  standby: 'bg-tsp-navy text-white border-2 border-tsp-navy shadow-md',
+  standby: 'bg-slate-600 text-white border-2 border-slate-600 shadow-md',
   stalled:
     'bg-gradient-to-br from-[#6B7280] to-[#9CA3AF] text-white border-2 border-[#6B7280] shadow-md',
 };
 
 // Card border colors for left border accent - VIBRANT BRAND COLORS
 export const statusBorderColors: Record<string, string> = {
-  new: '#007E8C', // Vibrant teal
+  new: '#114154', // TSP navy
   in_process: '#FBAD3F', // TSP gold
   scheduled: '#236383', // Vibrant dark blue
   rescheduled: '#236383', // Same as scheduled
@@ -61,13 +61,13 @@ export const statusBorderColors: Record<string, string> = {
   declined: '#A31C41', // Vibrant red
   cancelled: '#A31C41', // Vibrant red
   non_event: '#78716C', // Warm gray (stone)
-  standby: '#114154', // TSP navy (purple isn't in the palette)
+  standby: '#475569', // Slate — parked, waiting on the group
   stalled: '#6B7280', // Gray
 };
 
 // Card background colors - SOLID LIGHTER TINTS (no opacity mixing)
 export const statusBgColors: Record<string, string> = {
-  new: 'bg-[#E2F5F6]', // Solid light teal
+  new: 'bg-tsp-mist', // TSP mist
   in_process: 'bg-tsp-cream', // TSP cream
   scheduled: 'bg-[#E4EFF6]', // Solid light navy
   rescheduled: 'bg-[#E4EFF6]', // Same as scheduled

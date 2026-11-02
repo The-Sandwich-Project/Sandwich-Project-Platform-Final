@@ -189,7 +189,7 @@ const SandwichTypesSelector = ({
       )}
 
       {/* Summary */}
-      <div className="text-xs text-[#236383] bg-white p-2 rounded border-l-4 border-[#007E8C]/30">
+      <div className="text-xs text-tsp-teal bg-white p-2 rounded border-l-4 border-tsp-teal/30">
         <strong>Current Selection:</strong>{' '}
         {mode === 'single'
           ? `${estimatedCount || '?'} ${

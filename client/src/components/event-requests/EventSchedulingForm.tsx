@@ -1367,7 +1367,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       <DialogContent className="z-[9999] w-[95vw] max-w-4xl max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-bold text-[#236383]">
+            <DialogTitle className="text-xl font-bold text-tsp-teal">
               {isCreateMode ? 'Create New Event' : `${mode === 'edit' ? 'Edit Event Details:' : 'Schedule Event:'} ${eventRequest?.organizationName}`}
             </DialogTitle>
             {isCollaborationEnabled && currentUser && (
@@ -1397,11 +1397,11 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
           {/* Progress Indicator */}
           <div className="bg-slate-50 rounded-lg p-3 border mb-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-[#236383]">Form Progress</span>
+              <span className="text-sm font-medium text-tsp-teal">Form Progress</span>
               <span className="text-sm text-gray-600">{completedSections} of {totalSections} sections</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-[#47B3CB] h-2 rounded-full transition-all duration-300"
+              <div className="bg-tsp-sky h-2 rounded-full transition-all duration-300"
                 style={{ width: `${(completedSections / totalSections) * 100}%` }} />
             </div>
           </div>
@@ -1443,7 +1443,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                           vanNeededLikely: false,
                         }))
                       }
-                      className="px-3 py-1.5 text-sm rounded-md bg-[#007E8C] text-white hover:bg-[#006873] font-medium"
+                      className="px-3 py-1.5 text-sm rounded-md bg-tsp-teal text-white hover:bg-brand-primary-dark font-medium"
                       data-testid="button-van-confirm-needed"
                     >
                       Yes, van is needed
@@ -1479,7 +1479,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
 
             {/* Lifecycle & Core Scheduling */}
             <div className="bg-white border rounded-lg p-4 space-y-4">
-              <h3 className="text-base font-semibold text-[#236383]">1) Lifecycle & Core Scheduling</h3>
+              <h3 className="text-base font-semibold text-tsp-teal">1) Lifecycle & Core Scheduling</h3>
 
               {/* Status & Toolkit */}
               <StatusToolkitSection
@@ -1507,7 +1507,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
 
             {/* Contacts */}
             <div className="bg-white border rounded-lg p-4 space-y-4">
-              <h3 className="text-base font-semibold text-[#236383]">2) Contacts</h3>
+              <h3 className="text-base font-semibold text-tsp-teal">2) Contacts</h3>
 
               {/* Contact Info */}
               <ContactInfoSection
@@ -1534,7 +1534,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
 
             {/* Planning & Logistics */}
             <div className="bg-white border rounded-lg p-4 space-y-4">
-              <h3 className="text-base font-semibold text-[#236383]">3) Planning & Logistics</h3>
+              <h3 className="text-base font-semibold text-tsp-teal">3) Planning & Logistics</h3>
 
               {/* Sandwich Planning */}
               <SandwichPlanningSection
@@ -1594,7 +1594,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
 
             {/* Internal Coordination */}
             <div className="bg-white border rounded-lg p-4 space-y-4">
-              <h3 className="text-base font-semibold text-[#236383]">4) Internal Coordination & Notes</h3>
+              <h3 className="text-base font-semibold text-tsp-teal">4) Internal Coordination & Notes</h3>
 
               {/* TSP Contact */}
               <TspContactSection
@@ -1699,7 +1699,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
           <div>
             {eventRequest && mode === 'edit' && (
               <Button type="button" variant="outline"
-                className="border-[#A31C41] text-[#A31C41] hover:bg-[#A31C41] hover:text-white"
+                className="border-tsp-red text-tsp-red hover:bg-tsp-red hover:text-white"
                 onClick={() => setShowDeleteConfirmation(true)}
                 disabled={deleteEventRequestMutation.isPending}
                 data-testid="button-delete-event">

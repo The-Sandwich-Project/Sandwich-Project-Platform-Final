@@ -54,8 +54,8 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
   return (
     <div className="space-y-4 border rounded-lg p-4 bg-white">
       <div className="flex items-center gap-3 pb-2 border-b">
-        <FileText className="w-5 h-5 text-[#236383]" />
-        <span className="text-lg font-semibold text-[#236383]">Notes & Requirements</span>
+        <FileText className="w-5 h-5 text-tsp-teal" />
+        <span className="text-lg font-semibold text-tsp-teal">Notes & Requirements</span>
         {isComplete && <CheckCircle2 className="w-4 h-4 text-tsp-teal" />}
       </div>
       <div>
@@ -107,7 +107,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
                     type="button"
                     size="sm"
                     onClick={() => setIsMessageEditable(false)}
-                    className="bg-[#47B3CB] hover:bg-[#47B3CB]/80 text-white"
+                    className="bg-tsp-sky hover:bg-tsp-sky/80 text-white"
                   >
                     Save
                   </Button>

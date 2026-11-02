@@ -150,7 +150,7 @@ export const QuickScheduleButton: React.FC<QuickScheduleButtonProps> = ({
             <AlertDialogAction
               onClick={handleQuickSchedule}
               disabled={isLoading}
-              className="bg-[#236383] hover:bg-[#1a4a63]"
+              className="bg-tsp-teal hover:bg-[#1a4a63]"
             >
               {isLoading ? 'Scheduling...' : 'Yes, Schedule It'}
             </AlertDialogAction>

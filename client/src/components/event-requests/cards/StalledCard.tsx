@@ -95,10 +95,10 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 className="mr-1"
               />
             )}
-            <h3 className="font-bold text-lg sm:text-xl text-[#236383] break-words min-w-0">
+            <h3 className="font-bold text-lg sm:text-xl text-tsp-teal break-words min-w-0">
               {request.organizationName}
               {request.department && (
-                <span className="text-[#236383]/70 font-medium ml-1">
+                <span className="text-tsp-teal/70 font-medium ml-1">
                   &bull; {request.department}
                 </span>
               )}
@@ -108,7 +108,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               {getStatusLabel(request.status)}
             </Badge>
           </div>
-          <div className="text-sm text-[#236383] mt-1 space-y-1">
+          <div className="text-sm text-tsp-teal mt-1 space-y-1">
             <div className="text-sm text-gray-700 mb-2">
               <strong>{request.firstName} {request.lastName}</strong>
               {request.email && (
@@ -417,7 +417,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onLogContact}
-                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="border-tsp-teal text-tsp-teal hover:bg-tsp-teal/10 h-8"
                   data-testid="button-log-contact"
                 >
                   <FileText className="w-4 h-4 mr-1" />
@@ -443,7 +443,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
                   size="sm"
                   onClick={messageAboutEvent}
                   variant="ghost"
-                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="text-tsp-teal hover:text-tsp-teal hover:bg-tsp-teal/10 h-8"
                   data-testid="button-message"
                 >
                   <MessageSquare className="w-4 h-4" />

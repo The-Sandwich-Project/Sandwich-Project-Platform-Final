@@ -39,8 +39,8 @@ export const EventScheduleSection: React.FC<EventScheduleSectionProps> = ({
   return (
     <div className="space-y-4 border rounded-lg p-4 bg-white">
       <div className="flex items-center gap-3 pb-2 border-b">
-        <Calendar className="w-5 h-5 text-[#236383]" />
-        <span className="text-lg font-semibold text-[#236383]">Event Schedule</span>
+        <Calendar className="w-5 h-5 text-tsp-teal" />
+        <span className="text-lg font-semibold text-tsp-teal">Event Schedule</span>
         {isComplete && <CheckCircle2 className="w-4 h-4 text-tsp-teal" />}
       </div>
 

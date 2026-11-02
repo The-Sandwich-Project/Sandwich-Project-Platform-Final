@@ -158,7 +158,7 @@ const LinkifyAddresses: React.FC<{ text: string | null | undefined }> = ({ text 
         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[#236383] hover:text-[#1a4a63] underline"
+        className="text-tsp-teal hover:text-[#1a4a63] underline"
       >
         {address}
       </a>
@@ -319,7 +319,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 className="mr-1"
               />
             )}
-            <h3 className="text-lg sm:text-xl font-bold text-[#236383] break-words min-w-0">
+            <h3 className="text-lg sm:text-xl font-bold text-tsp-teal break-words min-w-0">
               {request.organizationName}
               {request.department && (
                 <span className="text-base sm:text-lg font-normal text-gray-600 ml-2">
@@ -537,7 +537,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               dates={[getEffectiveEventDate(request)]}
             />
           </div>
-          <div className="text-sm text-[#007E8C] mt-1 space-y-1">
+          <div className="text-sm text-tsp-teal mt-1 space-y-1">
             <div className="flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               {isEditingDate ? (
@@ -562,11 +562,11 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 <div className="flex items-center gap-2 group flex-wrap">
                   <span data-testid="text-date-label" className="text-sm uppercase text-gray-600">
                     {dateLabel}: {' '}
-                    <strong className="text-base font-bold text-[#236383]" data-testid="text-date-value">
+                    <strong className="text-base font-bold text-tsp-teal" data-testid="text-date-value">
                       {displayDate && dateInfo ? dateInfo.text : 'No date set'}
                     </strong>
                     {displayDate && getRelativeTime(displayDate.toString()) && (
-                      <span className="text-[#007E8C] ml-1">({getRelativeTime(displayDate.toString())})</span>
+                      <span className="text-tsp-teal ml-1">({getRelativeTime(displayDate.toString())})</span>
                     )}
                   </span>
                   {/* Date Population Badges */}
@@ -715,7 +715,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
               <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <a
                 href={`mailto:${request.email}`}
-                className="text-brand-primary-muted hover:text-brand-primary-dark text-base break-all min-w-0"
+                className="text-tsp-teal hover:text-brand-primary-dark text-base break-all min-w-0"
               >
                 {request.email}
               </a>
@@ -726,7 +726,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
               <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <a
                 href={`tel:${request.phone}`}
-                className="text-brand-primary-muted hover:text-brand-primary-dark text-base break-words"
+                className="text-tsp-teal hover:text-brand-primary-dark text-base break-words"
               >
                 {request.phone}
               </a>
@@ -739,7 +739,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(request.eventAddress)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#236383] hover:text-[#1a4a63] underline text-base break-words min-w-0"
+                className="text-tsp-teal hover:text-[#1a4a63] underline text-base break-words min-w-0"
               >
                 {request.eventAddress}
               </a>
@@ -754,7 +754,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
                   size="sm"
                   variant="default"
                   onClick={onIntakeCall}
-                  className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-[#007E8C] hover:bg-[#236383] text-white"
+                  className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-tsp-teal hover:bg-tsp-teal text-white"
                 >
                   <Phone className="w-4 h-4 mr-1" />
                   <span className="sm:hidden">Intake Call</span>
@@ -802,7 +802,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
               size="sm"
               variant="default"
               onClick={onSendToolkit}
-              className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-[#FBAD3F] hover:bg-[#e89a2d] text-white"
+              className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-tsp-gold hover:bg-[#e89a2d] text-white"
               data-testid="button-send-toolkit"
             >
               <Mail className="w-4 h-4 mr-1" />
@@ -814,7 +814,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
               size="sm"
               variant="outline"
               onClick={onToolkit}
-              className="text-sm h-10 sm:h-8 w-full sm:w-auto border-[#FBAD3F]/40 text-[#92400E] hover:bg-[#FBAD3F]/10"
+              className="text-sm h-10 sm:h-8 w-full sm:w-auto border-tsp-gold/40 text-[#92400E] hover:bg-tsp-gold/10"
               data-testid="button-mark-toolkit-sent"
             >
               <Package className="w-4 h-4 mr-1" />
@@ -845,7 +845,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
                 <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <a
                   href={`mailto:${(request as any).backupContactEmail}`}
-                  className="text-brand-primary-muted hover:text-brand-primary-dark text-base break-all min-w-0"
+                  className="text-tsp-teal hover:text-brand-primary-dark text-base break-all min-w-0"
                 >
                   {(request as any).backupContactEmail}
                 </a>
@@ -856,7 +856,7 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
                 <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 <a
                   href={`tel:${(request as any).backupContactPhone}`}
-                  className="text-brand-primary-muted hover:text-brand-primary-dark text-base break-words"
+                  className="text-tsp-teal hover:text-brand-primary-dark text-base break-words"
                 >
                   {(request as any).backupContactPhone}
                 </a>
@@ -983,7 +983,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
   return (
     <Card
       data-event-card
-      className={`min-w-0 overflow-hidden transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-[#E2F5F6] shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl`}
+      className={`min-w-0 overflow-hidden transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-tsp-mist shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl`}
       style={{ borderLeftColor: statusBorderColors.new }}
     >
       <CardContent className="p-3">
@@ -1061,7 +1061,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
         {request.scheduledCallDate && (
           <div className="mb-4 bg-brand-primary-lighter rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-brand-primary-muted" />
+              <Phone className="w-4 h-4 text-tsp-teal" />
               <span className="text-sm font-medium">Call scheduled:</span>
               <span className="text-sm">
                 {(() => {
@@ -1085,7 +1085,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
           <div className="space-y-3">
             {/* Submitted Info */}
             <div className="bg-brand-primary-lighter rounded-lg p-3">
-              <p className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-1">
+              <p className="text-sm uppercase font-bold tracking-wide text-tsp-teal mb-1">
                 Submitted
               </p>
               <div className="space-y-1">
@@ -1097,7 +1097,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       new Date(request.createdAt).toLocaleTimeString()
                     : 'Unknown date'}
                   {request.createdAt && (
-                    <Badge className="ml-1 bg-[#236383] text-white border-0 shadow-lg hover:bg-[#007E8C] transition-all duration-200 text-sm">
+                    <Badge className="ml-1 bg-tsp-teal text-white border-0 shadow-lg hover:bg-tsp-teal transition-all duration-200 text-sm">
                       {formatDistanceToNow(new Date(request.createdAt), {
                         addSuffix: true,
                       })}
@@ -1164,14 +1164,14 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
             {request.previouslyHosted !== undefined && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-sm uppercase font-bold tracking-wide text-[#236383]">
+                  <span className="text-sm uppercase font-bold tracking-wide text-tsp-teal">
                     Previously hosted:
                   </span>
                   <Badge
                     className={
                       request.previouslyHosted === 'yes'
-                        ? 'inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-[#007E8C] text-white border-0 shadow-lg hover:bg-[#47B3CB] transition-all duration-200 text-sm'
-                        : 'inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-[#236383] text-white border-0 shadow-lg hover:bg-[#007E8C] transition-all duration-200 text-sm'
+                        ? 'inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-tsp-teal text-white border-0 shadow-lg hover:bg-tsp-sky transition-all duration-200 text-sm'
+                        : 'inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-tsp-teal text-white border-0 shadow-lg hover:bg-tsp-teal transition-all duration-200 text-sm'
                     }
                   >
                     {request.previouslyHosted === 'yes' ? 'Yes' : 'No - First Time'}
@@ -1335,7 +1335,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={onAiSuggest}
-                      className="h-8 text-[#236383] hover:bg-[#236383]/10"
+                      className="h-8 text-tsp-teal hover:bg-tsp-teal/10"
                       data-testid="button-ai-suggest-date"
                     >
                       <Sparkles className="w-4 h-4 mr-1.5" />
@@ -1356,7 +1356,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={onAiIntakeAssist}
-                      className="h-8 text-[#47B3CB] hover:bg-[#47B3CB]/10"
+                      className="h-8"
                       data-testid="button-ai-intake-assist"
                     >
                       <Sparkles className="w-4 h-4 mr-1.5" />
@@ -1394,7 +1394,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                     size="sm"
                     variant="ghost"
                     onClick={onLogContact}
-                    className="h-8 text-[#007E8C] hover:bg-[#007E8C]/10"
+                    className="h-8 text-tsp-teal hover:bg-tsp-teal/10"
                   >
                     <MessageSquare className="w-4 h-4 mr-1.5" />
                     Log Contact

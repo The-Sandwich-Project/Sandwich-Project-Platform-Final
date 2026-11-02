@@ -62,7 +62,7 @@ export const ScheduleCallDialog: React.FC<ScheduleCallDialogProps> = ({
       <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
-            <Phone className="w-5 h-5 text-[#007E8C]" />
+            <Phone className="w-5 h-5 text-tsp-teal" />
             <span>Schedule Follow-up Call</span>
           </DialogTitle>
           <DialogDescription>
@@ -76,16 +76,16 @@ export const ScheduleCallDialog: React.FC<ScheduleCallDialogProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Contact Information */}
-          <div className="bg-[#e6f2f5] border border-[#007E8C]/30 rounded-lg p-3">
+          <div className="bg-[#e6f2f5] border border-tsp-teal/30 rounded-lg p-3">
             <h4 className="font-medium text-[#1A2332] mb-2">Contact Details</h4>
             <div className="space-y-1 text-sm">
               <div className="flex items-center space-x-2">
-                <Mail className="w-4 h-4 text-[#007E8C]" />
+                <Mail className="w-4 h-4 text-tsp-teal" />
                 <span>{eventRequest.email}</span>
               </div>
               {eventRequest.phone && (
                 <div className="flex items-center space-x-2">
-                  <Phone className="w-4 h-4 text-[#007E8C]" />
+                  <Phone className="w-4 h-4 text-tsp-teal" />
                   <span>{eventRequest.phone}</span>
                   <Button
                     type="button"

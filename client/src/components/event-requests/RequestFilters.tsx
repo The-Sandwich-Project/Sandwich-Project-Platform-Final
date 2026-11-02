@@ -62,14 +62,14 @@ const STATUS_TAB_TIPS: Record<string, string> = {
  */
 const STATUS_TAB_COLOR: Record<string, string> = {
   all: '#236383',
-  new: '#007E8C',
+  new: '#114154',
   in_process: '#FBAD3F',
   scheduled: '#236383',
   rescheduled: '#236383',
   completed: '#47B3CB',
   declined: '#A31C41',
   non_event: '#78716C',
-  standby: '#114154',
+  standby: '#475569',
   stalled: '#6B7280',
   my_assignments: '#236383',
 };
@@ -288,7 +288,7 @@ export default function RequestFilters({
       {/* Search + filter dropdowns — single row */}
       <div className="flex flex-col md:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#007E8C] w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-tsp-teal w-4 h-4" />
           <Input
             id="event-requests-search"
             placeholder="Search events…"
@@ -301,7 +301,7 @@ export default function RequestFilters({
             <button
               type="button"
               onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#007E8C] hover:text-[#004f57] font-semibold"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-tsp-teal hover:text-brand-primary-dark font-semibold"
               aria-label="Clear search"
             >
               Clear
@@ -346,7 +346,7 @@ export default function RequestFilters({
             <div className="flex items-center space-x-1.5 truncate">
               {currentTab && (
                 <>
-                  <currentTab.icon className="w-3.5 h-3.5 text-[#007E8C] flex-shrink-0" />
+                  <currentTab.icon className="w-3.5 h-3.5 text-tsp-teal flex-shrink-0" />
                   <span className="truncate">{currentTab.shortLabel}</span>
                   {currentTab.count !== undefined && <span className="text-gray-500 text-xs">({formatCount(currentTab.count)})</span>}
                 </>
@@ -357,7 +357,7 @@ export default function RequestFilters({
             {tabConfig.map((tab) => (
               <SelectItem key={tab.value} value={tab.value} className="mobile-select-item">
                 <div className="flex items-center space-x-2">
-                  <tab.icon className="w-4 h-4 text-[#007E8C]" />
+                  <tab.icon className="w-4 h-4 text-tsp-teal" />
                   <span>{tab.label}</span>
                   {tab.count !== undefined && <span className="text-gray-500">({formatCount(tab.count)})</span>}
                   {tab.hasNotification && !statusCountsLoading && (
@@ -369,8 +369,8 @@ export default function RequestFilters({
           </SelectContent>
         </Select>
         {STATUS_TAB_TIPS[activeTab] && (
-          <div className="flex items-start gap-2 px-3 py-2 mt-2 rounded-md bg-[#007E8C]/8 border border-[#007E8C]/20 text-[13px] text-[#236383] leading-snug">
-            <Info className="w-4 h-4 mt-0.5 shrink-0 text-[#007E8C]" aria-hidden="true" />
+          <div className="flex items-start gap-2 px-3 py-2 mt-2 rounded-md bg-tsp-teal/8 border border-tsp-teal/20 text-[13px] text-tsp-teal leading-snug">
+            <Info className="w-4 h-4 mt-0.5 shrink-0 text-tsp-teal" aria-hidden="true" />
             <p>{STATUS_TAB_TIPS[activeTab]}</p>
           </div>
         )}
@@ -388,8 +388,8 @@ export default function RequestFilters({
                 onClick={() => onActiveTabChange(tab.value)}
                 className={`text-xs lg:text-sm whitespace-nowrap px-3 py-1.5 rounded-md font-medium transition-colors border ${
                   activeTab === tab.value
-                    ? 'bg-[#236383] text-white border-[#236383] shadow-sm'
-                    : 'text-[#236383] border-[#236383]/20 bg-[#236383]/5 hover:bg-[#236383]/10 hover:border-[#236383]/40'
+                    ? 'bg-tsp-teal text-white border-tsp-teal shadow-sm'
+                    : 'text-tsp-teal border-tsp-teal/20 bg-tsp-teal/5 hover:bg-tsp-teal/10 hover:border-tsp-teal/40'
                 }`}
                 data-testid={tab.value === 'my_assignments' ? 'tab-my-assignments' : undefined}
                 data-tour={tab.value === 'my_assignments' ? 'my-assignments-tab' : undefined}
@@ -472,8 +472,8 @@ export default function RequestFilters({
             stage. Hidden when the user is on a non-status filter (e.g.,
             navTabs like Planning) since those don't map to a workflow stage. */}
         {STATUS_TAB_TIPS[activeTab] && (
-          <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-[#007E8C]/8 border border-[#007E8C]/20 text-[13px] text-[#236383] leading-snug">
-            <Info className="w-4 h-4 mt-0.5 shrink-0 text-[#007E8C]" aria-hidden="true" />
+          <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-tsp-teal/8 border border-tsp-teal/20 text-[13px] text-tsp-teal leading-snug">
+            <Info className="w-4 h-4 mt-0.5 shrink-0 text-tsp-teal" aria-hidden="true" />
             <p>
               <span className="font-semibold">
                 {tabConfig.find((t) => t.value === activeTab)?.label}:

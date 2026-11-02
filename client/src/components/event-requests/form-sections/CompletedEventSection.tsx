@@ -83,7 +83,7 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
         onClick={onToggle}
         data-testid="toggle-completed-details"
       >
-        <span className="font-semibold text-[#236383]">
+        <span className="font-semibold text-tsp-teal">
           Completed Event Details
         </span>
         <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -94,7 +94,7 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
 
           {/* Social Media Tracking Section */}
           <div className="space-y-4">
-            <h4 className="text-md font-semibold text-[#236383]">Social Media Tracking</h4>
+            <h4 className="text-md font-semibold text-tsp-teal">Social Media Tracking</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
@@ -164,7 +164,7 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
 
           {/* Actual Sandwiches Delivered Section */}
           <div className="space-y-4">
-            <h4 className="text-md font-semibold text-[#236383]">Actual Sandwiches Delivered</h4>
+            <h4 className="text-md font-semibold text-tsp-teal">Actual Sandwiches Delivered</h4>
 
             {/* Mode Selector for Actual Sandwiches */}
             <div className="flex gap-2">
@@ -224,7 +224,7 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
                 </div>
 
                 {formData.actualSandwichTypes.length === 0 ? (
-                  <div className="text-center py-4 text-[#007E8C] border-2 border-dashed border-[#236383]/30 rounded">
+                  <div className="text-center py-4 text-tsp-teal border-2 border-dashed border-tsp-teal/30 rounded">
                     <p>No actual sandwich types added yet. Click "Add Type" to get started.</p>
                   </div>
                 ) : (
@@ -264,7 +264,7 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
                         </Button>
                       </div>
                     ))}
-                    <div className="text-sm text-[#236383] bg-white p-2 rounded border border-[#236383]/30">
+                    <div className="text-sm text-tsp-teal bg-white p-2 rounded border border-tsp-teal/30">
                       <strong>Total:</strong> {formData.actualSandwichTypes.reduce((sum, item) => sum + item.quantity, 0)} sandwiches
                     </div>
                   </div>
@@ -297,7 +297,7 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
 
           {/* Follow-up Completion Section */}
           <div className="space-y-4">
-            <h4 className="text-md font-semibold text-[#236383]">Follow-up Completion</h4>
+            <h4 className="text-md font-semibold text-tsp-teal">Follow-up Completion</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">

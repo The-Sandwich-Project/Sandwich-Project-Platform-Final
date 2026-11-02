@@ -137,7 +137,7 @@ export const AttendeeSection: React.FC<AttendeeSectionProps> = ({
         </div>
       )}
 
-      <p className="text-sm text-[#236383]">
+      <p className="text-sm text-tsp-teal">
         Optional: Estimate how many people will attend this event.
       </p>
     </div>

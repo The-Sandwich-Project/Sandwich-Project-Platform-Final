@@ -118,7 +118,7 @@ export function AiDateSuggestionDialog({
     const colors = {
       high: 'bg-tsp-sky/15 text-tsp-teal dark:bg-tsp-navy dark:text-tsp-sky',
       medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      low: 'bg-[#FBAD3F]/20 text-[#FBAD3F] dark:bg-[#FBAD3F]/30 dark:text-[#FBAD3F]',
+      low: 'bg-tsp-cream text-tsp-navy dark:bg-tsp-gold/30 dark:text-tsp-gold',
     };
 
     const icons = {
@@ -146,7 +146,7 @@ export function AiDateSuggestionDialog({
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader className="space-y-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#236383]" />
+            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-tsp-teal" />
             <DialogTitle className="text-lg sm:text-xl">AI Scheduling Assistant</DialogTitle>
           </div>
           <DialogDescription className="text-sm sm:text-base">
@@ -172,11 +172,11 @@ export function AiDateSuggestionDialog({
           {!suggestion && !generateSuggestionMutation.isPending && (
             <div className="space-y-6">
               {/* Flexibility Options */}
-              <div className="bg-gradient-to-br from-[#236383]/5 to-[#47B3CB]/5 dark:from-[#236383]/10 dark:to-[#47B3CB]/10 p-6 rounded-xl border border-[#236383]/20">
+              <div className="bg-gradient-to-br from-tsp-teal/5 to-tsp-sky/5 dark:from-tsp-teal/10 dark:to-tsp-sky/10 p-6 rounded-xl border border-tsp-teal/20">
                 <div className="flex items-start gap-3 mb-4">
-                  <AlertCircle className="h-5 w-5 text-[#236383] mt-0.5 flex-shrink-0" />
+                  <AlertCircle className="h-5 w-5 text-tsp-teal mt-0.5 flex-shrink-0" />
                   <div>
-                    <h3 className="font-semibold text-[#236383] mb-2">Scheduling Flexibility</h3>
+                    <h3 className="font-semibold text-tsp-teal mb-2">Scheduling Flexibility</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                       Help the AI find the best date by letting us know what flexibility the organization has:
                     </p>
@@ -190,10 +190,10 @@ export function AiDateSuggestionDialog({
                       type="checkbox"
                       checked={flexibility.canChangeDayOfWeek}
                       onChange={(e) => setFlexibility({ ...flexibility, canChangeDayOfWeek: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#236383] focus:ring-[#236383] cursor-pointer"
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-tsp-teal focus:ring-tsp-teal cursor-pointer"
                     />
                     <div className="flex-1">
-                      <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#236383]">
+                      <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-tsp-teal">
                         Can change day of the week
                       </span>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -208,10 +208,10 @@ export function AiDateSuggestionDialog({
                       type="checkbox"
                       checked={flexibility.canChangeWeek}
                       onChange={(e) => setFlexibility({ ...flexibility, canChangeWeek: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#236383] focus:ring-[#236383] cursor-pointer"
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-tsp-teal focus:ring-tsp-teal cursor-pointer"
                     />
                     <div className="flex-1">
-                      <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#236383]">
+                      <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-tsp-teal">
                         Can change to a different week
                       </span>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -226,10 +226,10 @@ export function AiDateSuggestionDialog({
                       type="checkbox"
                       checked={flexibility.canChangeMonth}
                       onChange={(e) => setFlexibility({ ...flexibility, canChangeMonth: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#236383] focus:ring-[#236383] cursor-pointer"
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-tsp-teal focus:ring-tsp-teal cursor-pointer"
                     />
                     <div className="flex-1">
-                      <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-[#236383]">
+                      <span className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-tsp-teal">
                         Can move to a different month
                       </span>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -242,7 +242,7 @@ export function AiDateSuggestionDialog({
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <Button
                     onClick={() => generateSuggestionMutation.mutate()}
-                    className="w-full bg-[#236383] hover:bg-[#1a4d66] text-white font-semibold py-3 shadow-md hover:shadow-lg transition-all"
+                    className="w-full bg-tsp-teal hover:bg-[#1a4d66] text-white font-semibold py-3 shadow-md hover:shadow-lg transition-all"
                     data-testid="button-generate-ai-suggestion"
                   >
                     <Sparkles className="h-5 w-5 mr-2" />
@@ -255,8 +255,8 @@ export function AiDateSuggestionDialog({
 
           {generateSuggestionMutation.isPending && (
             <div className="text-center py-8 sm:py-12 px-4">
-              <div className="bg-gradient-to-br from-[#236383]/5 to-[#47B3CB]/5 dark:from-[#236383]/10 dark:to-[#47B3CB]/10 p-6 sm:p-8 rounded-xl border border-[#236383]/20">
-                <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-[#236383] mx-auto mb-4"></div>
+              <div className="bg-gradient-to-br from-tsp-teal/5 to-tsp-sky/5 dark:from-tsp-teal/10 dark:to-tsp-sky/10 p-6 sm:p-8 rounded-xl border border-tsp-teal/20">
+                <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-tsp-teal mx-auto mb-4"></div>
                 <p className="text-gray-600 dark:text-gray-400 font-medium text-sm sm:text-base">
                   Analyzing dates and current schedule...
                 </p>
@@ -283,15 +283,15 @@ export function AiDateSuggestionDialog({
               )}
 
               {/* AI Recommendation - Prominent Section */}
-              <div className="bg-gradient-to-br from-[#236383] to-[#47B3CB] p-1 rounded-xl shadow-lg">
+              <div className="bg-gradient-to-br from-tsp-teal to-tsp-sky p-1 rounded-xl shadow-lg">
                 <div className="bg-white dark:bg-gray-950 p-4 sm:p-6 rounded-lg">
                   {/* Header with Icon and Confidence Badge */}
                   <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
                     <div className="flex items-center gap-2">
-                      <div className="bg-[#236383]/10 p-2 rounded-lg">
-                        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#236383]" />
+                      <div className="bg-tsp-teal/10 p-2 rounded-lg">
+                        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-tsp-teal" />
                       </div>
-                      <h3 className="font-bold text-lg sm:text-xl text-[#236383]">
+                      <h3 className="font-bold text-lg sm:text-xl text-tsp-teal">
                         AI Recommended Date
                       </h3>
                     </div>
@@ -299,14 +299,14 @@ export function AiDateSuggestionDialog({
                   </div>
 
                   {/* The Recommended Date - Extra Prominent with Day of Week */}
-                  <div className="text-center py-4 sm:py-6 mb-4 sm:mb-6 bg-gradient-to-br from-[#236383]/5 to-[#47B3CB]/5 dark:from-[#236383]/10 dark:to-[#47B3CB]/10 rounded-lg border-2 border-[#236383]/20">
+                  <div className="text-center py-4 sm:py-6 mb-4 sm:mb-6 bg-gradient-to-br from-tsp-teal/5 to-tsp-sky/5 dark:from-tsp-teal/10 dark:to-tsp-sky/10 rounded-lg border-2 border-tsp-teal/20">
                     <div className="flex items-center justify-center gap-2 sm:gap-3 mb-2">
-                      <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-[#236383]" />
-                      <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#236383] leading-tight">
+                      <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-tsp-teal" />
+                      <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-tsp-teal leading-tight">
                         {new Date(suggestion.recommendedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' })}
                       </p>
                     </div>
-                    <p className="text-xl sm:text-2xl font-semibold text-[#47B3CB] px-2">
+                    <p className="text-xl sm:text-2xl font-semibold text-tsp-navy px-2">
                       {formatDate(suggestion.recommendedDate)}
                     </p>
                   </div>
@@ -377,7 +377,7 @@ export function AiDateSuggestionDialog({
                   {/* Reasoning - Clearly Secondary */}
                   <div className="mb-4 sm:mb-6">
                     <div className="flex items-center gap-2 mb-3">
-                      <CheckCircle2 className="h-4 w-4 text-[#236383] flex-shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-tsp-teal flex-shrink-0" />
                       <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">
                         Why This Date?
                       </h4>
@@ -391,7 +391,7 @@ export function AiDateSuggestionDialog({
                   {onSelectDate && (
                     <Button
                       onClick={() => handleSelectDate(suggestion.recommendedDate)}
-                      className="w-full bg-[#236383] hover:bg-[#1a4d66] text-white font-semibold py-3 sm:py-4 text-base sm:text-lg shadow-md hover:shadow-lg transition-all"
+                      className="w-full bg-tsp-teal hover:bg-[#1a4d66] text-white font-semibold py-3 sm:py-4 text-base sm:text-lg shadow-md hover:shadow-lg transition-all"
                       data-testid="button-select-recommended-date"
                     >
                       <Calendar className="h-5 w-5 mr-2" />
@@ -422,7 +422,7 @@ export function AiDateSuggestionDialog({
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
                               <p className="font-medium text-sm sm:text-base">
-                                <span className="text-[#236383] font-bold">{analysis.dayOfWeek}</span>
+                                <span className="text-tsp-teal font-bold">{analysis.dayOfWeek}</span>
                                 {' • '}
                                 {formatDate(analysis.date)}
                               </p>
@@ -452,7 +452,7 @@ export function AiDateSuggestionDialog({
                             </div>
                           </div>
                           {analysis.date === suggestion.recommendedDate && (
-                            <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-[#236383] flex-shrink-0 self-start" />
+                            <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-tsp-teal flex-shrink-0 self-start" />
                           )}
                         </div>
 

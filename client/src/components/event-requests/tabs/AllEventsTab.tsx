@@ -201,7 +201,7 @@ export const AllEventsTab: React.FC = () => {
             return (
               <Card
                 key={request.id}
-                className="p-4 hover:border-[#007E8C] hover:shadow-sm transition cursor-pointer"
+                className="p-4 hover:border-tsp-teal hover:shadow-sm transition cursor-pointer"
                 onClick={() => openEvent(request)}
                 data-event-id={request.id}
               >

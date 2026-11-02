@@ -578,7 +578,7 @@ export function AiIntakeAssistantDialog({
               {issue.action && (
                 <div className="mt-2">
                   <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                    <span className="text-[#236383]">→</span> {issue.action}
+                    <span className="text-tsp-teal">→</span> {issue.action}
                   </p>
                 </div>
               )}
@@ -622,7 +622,7 @@ export function AiIntakeAssistantDialog({
       <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader className="space-y-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-[#236383]" />
+            <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-tsp-teal" />
             <DialogTitle className="text-lg sm:text-xl">
               AI Intake Assistant
             </DialogTitle>
@@ -664,15 +664,15 @@ export function AiIntakeAssistantDialog({
           {/* Generate or Show Analysis */}
           {!analysis && !analyzeEventMutation.isPending && (
             <div className="text-center py-6 sm:py-8 px-4">
-              <div className="bg-gradient-to-br from-[#236383]/5 to-[#47B3CB]/5 dark:from-[#236383]/10 dark:to-[#47B3CB]/10 p-6 sm:p-8 rounded-xl border border-[#236383]/20">
-                <Sparkles className="h-10 w-10 sm:h-12 sm:w-12 text-[#236383] mx-auto mb-3 sm:mb-4" />
+              <div className="bg-gradient-to-br from-tsp-teal/5 to-tsp-sky/5 dark:from-tsp-teal/10 dark:to-tsp-sky/10 p-6 sm:p-8 rounded-xl border border-tsp-teal/20">
+                <Sparkles className="h-10 w-10 sm:h-12 sm:w-12 text-tsp-teal mx-auto mb-3 sm:mb-4" />
                 <p className="text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 text-sm sm:text-base px-2">
                   Analyze this event request for missing information and get
                   AI-powered suggestions
                 </p>
                 <Button
                   onClick={() => analyzeEventMutation.mutate()}
-                  className="bg-[#236383] hover:bg-[#1a4d66] text-white font-semibold px-6 py-2 sm:px-8 sm:py-3 text-sm sm:text-base shadow-md hover:shadow-lg transition-all"
+                  className="bg-tsp-teal hover:bg-[#1a4d66] text-white font-semibold px-6 py-2 sm:px-8 sm:py-3 text-sm sm:text-base shadow-md hover:shadow-lg transition-all"
                 >
                   <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Analyze Event Request
@@ -683,8 +683,8 @@ export function AiIntakeAssistantDialog({
 
           {analyzeEventMutation.isPending && (
             <div className="text-center py-8 sm:py-12 px-4">
-              <div className="bg-gradient-to-br from-[#236383]/5 to-[#47B3CB]/5 dark:from-[#236383]/10 dark:to-[#47B3CB]/10 p-6 sm:p-8 rounded-xl border border-[#236383]/20">
-                <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-[#236383] mx-auto mb-4"></div>
+              <div className="bg-gradient-to-br from-tsp-teal/5 to-tsp-sky/5 dark:from-tsp-teal/10 dark:to-tsp-sky/10 p-6 sm:p-8 rounded-xl border border-tsp-teal/20">
+                <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-tsp-teal mx-auto mb-4"></div>
                 <p className="text-gray-600 dark:text-gray-400 font-medium text-sm sm:text-base">
                   Analyzing event request...
                 </p>
@@ -698,7 +698,7 @@ export function AiIntakeAssistantDialog({
           {analysis && (
             <div className="space-y-4 sm:space-y-6">
               {/* Overall Status */}
-              <div className="bg-gradient-to-br from-[#236383] to-[#47B3CB] p-1 rounded-xl shadow-lg">
+              <div className="bg-gradient-to-br from-tsp-teal to-tsp-sky p-1 rounded-xl shadow-lg">
                 <div className="bg-white dark:bg-gray-950 p-4 sm:p-6 rounded-lg">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                     <div>
@@ -706,7 +706,7 @@ export function AiIntakeAssistantDialog({
                       {getOverallStatusBadge(analysis.overallStatus)}
                     </div>
                     <div className="text-right">
-                      <p className="text-3xl sm:text-4xl font-bold text-[#236383] mb-1">
+                      <p className="text-3xl sm:text-4xl font-bold text-tsp-teal mb-1">
                         {analysis.completionPercentage}%
                       </p>
                       <p className="text-xs text-gray-500">Complete</p>
@@ -786,11 +786,11 @@ export function AiIntakeAssistantDialog({
 
                         // Determine icon and color based on title keywords
                         let icon = ListChecks;
-                        let iconColor = 'text-[#236383]';
+                        let iconColor = 'text-tsp-teal';
                         let bgColor = 'bg-white dark:bg-gray-900';
                         let borderColor =
-                          'border-[#236383]/30 dark:border-[#236383]/50';
-                        let borderLeftColor = 'border-l-[#236383]';
+                          'border-tsp-teal/30 dark:border-tsp-teal/50';
+                        let borderLeftColor = 'border-l-tsp-teal';
 
                         if (
                           title.toLowerCase().includes('contact') ||
@@ -884,7 +884,7 @@ export function AiIntakeAssistantDialog({
               {analysis.nextSteps.length > 0 && (
                 <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
                   <div className="flex items-center gap-2 mb-4">
-                    <ListChecks className="h-5 w-5 text-[#236383]" />
+                    <ListChecks className="h-5 w-5 text-tsp-teal" />
                     <h3 className="font-semibold text-base text-gray-900 dark:text-gray-100">
                       Next Steps
                     </h3>
@@ -903,7 +903,7 @@ export function AiIntakeAssistantDialog({
                           key={idx}
                           className="flex gap-3 items-start pb-3 border-b border-gray-200 dark:border-gray-700 last:border-0 last:pb-0"
                         >
-                          <span className="font-semibold text-[#236383] flex-shrink-0 mt-0.5 text-sm w-6">
+                          <span className="font-semibold text-tsp-teal flex-shrink-0 mt-0.5 text-sm w-6">
                             {idx + 1}.
                           </span>
                           <div className="flex-1 min-w-0">

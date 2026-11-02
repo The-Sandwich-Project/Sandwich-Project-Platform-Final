@@ -56,7 +56,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-[#236383] bg-opacity-50 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-tsp-teal bg-opacity-50 z-50 flex items-center justify-center p-4"
       style={{
         left: window.innerWidth > 768 ? 240 : 0, // 240px nav bar width on desktop
         width: window.innerWidth > 768 ? `calc(100vw - 240px)` : '100vw',
@@ -71,7 +71,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
               <h2 className="text-2xl font-bold">
                 Collection Log for {eventRequest?.organizationName}
               </h2>
-              <p className="text-[#236383]">
+              <p className="text-tsp-teal">
                 {eventRequest?.firstName} {eventRequest?.lastName}
               </p>
             </div>
@@ -94,7 +94,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                 <div className="flex items-center space-x-2">
                   <span className="text-2xl">🥪</span>
                   <div>
-                    <p className="text-sm text-[#236383]">Total Sandwiches</p>
+                    <p className="text-sm text-tsp-teal">Total Sandwiches</p>
                     <p className="text-2xl font-bold text-brand-primary">
                       {totalSandwiches.toLocaleString()}
                     </p>
@@ -108,8 +108,8 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                 <div className="flex items-center space-x-2">
                   <span className="text-2xl">📅</span>
                   <div>
-                    <p className="text-sm text-[#236383]">Collection Days</p>
-                    <p className="text-2xl font-bold text-brand-teal">
+                    <p className="text-sm text-tsp-teal">Collection Days</p>
+                    <p className="text-2xl font-bold text-tsp-teal">
                       {collections.length}
                     </p>
                   </div>
@@ -122,7 +122,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="w-8 h-8 text-tsp-teal" />
                   <div>
-                    <p className="text-sm text-[#236383]">Status</p>
+                    <p className="text-sm text-tsp-teal">Status</p>
                     <p className="text-sm font-medium text-tsp-teal">
                       {collections.length > 0 ? 'Active' : 'No Collections'}
                     </p>
@@ -172,7 +172,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                         {/* Host */}
                         {collection.hostName && (
                           <div className="ml-0 sm:ml-8 pl-7 sm:pl-0">
-                            <p className="text-sm text-[#236383]">
+                            <p className="text-sm text-tsp-teal">
                               <strong>Host:</strong> {collection.hostName}
                             </p>
                           </div>
@@ -181,7 +181,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
                         {/* Sandwich Types Breakdown (from real type fields) */}
                         {breakdown.total > 0 && (
                           <div className="ml-0 sm:ml-8 pl-7 sm:pl-0">
-                            <p className="text-sm text-[#236383]">
+                            <p className="text-sm text-tsp-teal">
                               Types:{' '}
                               {TYPE_LABELS.filter(({ key }) => breakdown[key] > 0)
                                 .map(
@@ -200,7 +200,7 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-[#236383] mb-4">
+              <p className="text-tsp-teal mb-4">
                 No collections recorded for this event yet.
               </p>
             </div>

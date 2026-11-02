@@ -121,7 +121,7 @@ export const getSandwichTypesSummary = (request: any) => {
 export const formatEventDate = (dateString: string) => {
   try {
     if (!dateString)
-      return { text: 'No date provided', className: 'text-[#007E8C]' };
+      return { text: 'No date provided', className: 'text-tsp-teal' };
 
     // Parse the date string safely - handle database timestamps, YYYY-MM-DD, and ISO dates
     let date: Date;
