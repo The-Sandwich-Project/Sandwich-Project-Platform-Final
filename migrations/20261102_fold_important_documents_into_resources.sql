@@ -4,12 +4,12 @@
 --    resources row (type 'link') unless one already exists with the same URL
 --    or title. seed-resources.ts covered most of them, but not all, and it may
 --    never have run against a given database.
--- 2. Files uploaded through the Important Documents page live only in the
---    documents table. Give each active, non-confidential one a resources row
---    (type 'file'). Confidential uploads stay on the Resources page's
---    Confidential tab, which reads the documents table directly.
--- 3. The Resources page has no 'training' section, so rows seeded with that
+-- 2. The Resources page has no 'training' section, so rows seeded with that
 --    category were invisible. Move them to sections that exist.
+--
+-- Files uploaded through Document Management are NOT copied into resources:
+-- the Resources page lists them live from /api/documents, so there is no
+-- second copy to keep in sync.
 --
 -- Runs after 20261101_move_documents_to_public_documents.sql, so URLs are
 -- already on their /documents/ paths. Idempotent: every step skips rows it
@@ -46,24 +46,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM resources r
   WHERE r.url = v.url OR lower(r.title) = lower(v.title)
 );
-
-INSERT INTO resources (title, description, type, category, document_id, created_by, created_by_name)
-SELECT d.title, d.description, 'file',
-  CASE lower(d.category)
-    WHEN 'legal & tax' THEN 'legal_governance'
-    WHEN 'governance' THEN 'legal_governance'
-    WHEN 'forms' THEN 'forms_templates'
-    WHEN 'safety guidelines' THEN 'operations_safety'
-    WHEN 'labels & printing' THEN 'operations_safety'
-    WHEN 'operations' THEN 'operations_safety'
-    WHEN 'reference lists' THEN 'master_documents'
-    ELSE 'toolkit'
-  END,
-  d.id, d.uploaded_by, d.uploaded_by_name
-FROM documents d
-WHERE d.is_active = true
-  AND lower(d.category) <> 'confidential'
-  AND NOT EXISTS (SELECT 1 FROM resources r WHERE r.document_id = d.id AND r.type = 'file');
 
 UPDATE resources
 SET category = 'master_documents', updated_at = NOW()

@@ -742,10 +742,11 @@ function SandwichGuideEditDialog({
   );
 }
 
-// Files uploaded with category 'confidential' through the old Important
-// Documents page live in the documents table, not in confidential_documents,
-// so ConfidentialDocuments doesn't show them. /api/documents only returns them
-// to users with DOCUMENTS_CONFIDENTIAL, and the download route re-checks that.
+// Files uploaded through Document Management live in the documents table.
+// They're listed here live from /api/documents rather than copied into
+// resources, so there's no second copy to drift out of sync. The server only
+// returns active documents, and confidential ones only to users with
+// DOCUMENTS_CONFIDENTIAL; download/preview routes re-check both.
 interface UploadedDocument {
   id: number;
   title: string;
@@ -754,19 +755,43 @@ interface UploadedDocument {
   originalName: string;
 }
 
-function useConfidentialUploads() {
-  const { data } = useQuery<UploadedDocument[]>({ queryKey: ['/api/documents'] });
-  return (data || []).filter((d) => d.category === 'confidential');
+interface FileResourceRow {
+  resource: { documentId: number | null };
 }
 
-function ConfidentialUploadsList({ docs }: { docs: UploadedDocument[] }) {
+function useUploadedDocuments() {
+  const { data: docs } = useQuery<UploadedDocument[]>({ queryKey: ['/api/documents'] });
+  // Files added through "Add Resource" already have a resource card; don't
+  // list them twice.
+  const { data: fileResources } = useQuery<FileResourceRow[]>({
+    queryKey: ['/api/resources?type=file&limit=1000'],
+  });
+  const linked = new Set(
+    (fileResources || []).map((r) => r.resource.documentId).filter((id): id is number => id != null)
+  );
+  const all = docs || [];
+  return {
+    confidential: all.filter((d) => d.category === 'confidential'),
+    library: all.filter((d) => d.category !== 'confidential' && !linked.has(d.id)),
+  };
+}
+
+function UploadedDocumentsList({
+  docs,
+  title,
+  subtitle,
+  testId,
+}: {
+  docs: UploadedDocument[];
+  title: string;
+  subtitle: string;
+  testId: string;
+}) {
   if (docs.length === 0) return null;
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 mb-6" data-testid="confidential-uploads">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">Confidential uploads</h2>
-      <p className="text-sm text-gray-500 mb-3">
-        Files uploaded as confidential through the old Important Documents page.
-      </p>
+    <div className="bg-white rounded-lg shadow-sm p-4 mb-6" data-testid={testId}>
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">{title}</h2>
+      <p className="text-sm text-gray-500 mb-3">{subtitle}</p>
       <ul className="divide-y divide-gray-100">
         {docs.map((doc) => (
           <li key={doc.id} className="py-2 flex items-center justify-between gap-4">
@@ -776,13 +801,24 @@ function ConfidentialUploadsList({ docs }: { docs: UploadedDocument[] }) {
                 <p className="text-sm text-gray-500 truncate">{doc.description}</p>
               )}
             </div>
-            <a
-              href={`/api/documents/${doc.id}/download`}
-              className="text-sm text-[#236383] hover:underline flex items-center gap-1 shrink-0"
-            >
-              <Download className="w-4 h-4" />
-              Download
-            </a>
+            <div className="flex items-center gap-4 shrink-0">
+              <a
+                href={`/api/documents/${doc.id}/preview`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[#236383] hover:underline flex items-center gap-1"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open
+              </a>
+              <a
+                href={`/api/documents/${doc.id}/download`}
+                className="text-sm text-[#236383] hover:underline flex items-center gap-1"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </a>
+            </div>
           </li>
         ))}
       </ul>
@@ -804,7 +840,8 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
   const hasConfidentialAccess =
     user?.email === 'admin@sandwich.project' ||
     user?.email === 'katielong2316@gmail.com';
-  const confidentialUploads = useConfidentialUploads();
+  const uploads = useUploadedDocuments();
+  const confidentialUploads = uploads.confidential;
   const showConfidentialTab = hasConfidentialAccess || confidentialUploads.length > 0;
   // The tab comes from Dashboard (which resolves split-view panel
   // destinations too), so follow it when it changes.
@@ -1665,6 +1702,25 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
                 })}
               </div>
             )}
+
+            {/* Uploaded files (Document Management), listed live */}
+            {!selectedCategory && selectedTags.length === 0 && (
+              <div className="mt-6">
+                <UploadedDocumentsList
+                  docs={uploads.library.filter((d) => {
+                    if (!searchTerm) return true;
+                    const q = searchTerm.toLowerCase();
+                    return (
+                      d.title.toLowerCase().includes(q) ||
+                      (d.description || '').toLowerCase().includes(q)
+                    );
+                  })}
+                  title="Uploaded files"
+                  subtitle="Files uploaded through Document Management."
+                  testId="uploaded-documents"
+                />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="logos" data-tour="resources-logos-panel">
@@ -1673,7 +1729,12 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
 
           {showConfidentialTab && (
             <TabsContent value="confidential">
-              <ConfidentialUploadsList docs={confidentialUploads} />
+              <UploadedDocumentsList
+                docs={confidentialUploads}
+                title="Confidential uploads"
+                subtitle="Files uploaded as confidential through Document Management."
+                testId="confidential-uploads"
+              />
               {hasConfidentialAccess && <ConfidentialDocuments />}
             </TabsContent>
           )}

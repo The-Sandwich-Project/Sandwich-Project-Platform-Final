@@ -187,8 +187,6 @@ function DocumentUploadDialog({ onSuccess }: { onSuccess: () => void }) {
           fileSize: file.size,
           mimeType: file.type,
           objectPath,
-          // Also list it in Reference Materials (skipped for confidential).
-          addToResources: true,
         }),
       });
 
