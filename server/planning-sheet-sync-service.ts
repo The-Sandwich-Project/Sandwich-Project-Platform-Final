@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { parsePlanningStaffing } from './services/planning-sheet-row-update';
 import { JWT } from 'google-auth-library';
 import { db } from './db';
 import { eq, desc, inArray, and, gte, sql } from 'drizzle-orm';
@@ -137,74 +138,34 @@ export interface StaffingInfo {
   volunteer: { needed: boolean; assigned: string | null };
 }
 
+/** user_<ms>_<rand> (current), UUIDs, or bare numbers (legacy) are IDs; anything else is a typed name. */
+export function assignmentLabelForUnknownId(idOrName: string): string {
+  const v = (idOrName || '').trim();
+  const looksLikeId =
+    /^user_\d+_[a-z0-9]+$/i.test(v) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ||
+    /^\d+$/.test(v);
+  return !v || looksLikeId ? 'Unknown' : v;
+}
+
 /**
  * Parse a staffing column string into structured staffing information.
  *
- * Uses regex to split on role prefixes (VD:, D:, S:, V:) to correctly handle
- * multiple comma-separated names within a single role.
+ * Delegates to parsePlanningStaffing (server/services/planning-sheet-row-update.ts)
+ * so every place that reads the Staffing cell agrees. Handles "D: " (needed,
+ * unassigned), multi-name lists ("D: Katie, Kim", "Katie & Kim"), VD, and the
+ * letters-only format ("D, S, V") the old regex parser missed.
  *
  * See StaffingInfo documentation for format details.
  */
 export function parseStaffingColumn(staffingStr: string): StaffingInfo {
-  const result: StaffingInfo = {
-    driver: { needed: false, assigned: null, isVanDriver: false },
-    speaker: { needed: false, assigned: null },
-    volunteer: { needed: false, assigned: null },
+  const p = parsePlanningStaffing(staffingStr);
+  const joined = (names: string[]) => (names.length ? names.join(', ') : null);
+  return {
+    driver: { needed: p.driver.listed, assigned: joined(p.driver.names), isVanDriver: p.driver.van },
+    speaker: { needed: p.speaker.listed, assigned: joined(p.speaker.names) },
+    volunteer: { needed: p.volunteer.listed, assigned: joined(p.volunteer.names) },
   };
-
-  if (!staffingStr || !staffingStr.trim()) {
-    return result;
-  }
-
-  // Use regex to find role sections - split on role prefixes
-  // Match: VD: or D: or S: or V: (case insensitive, VD must come before D)
-  // The lookahead ensures we capture content until the next role prefix
-  const rolePattern = /\b(VD|D|S|V)\s*:/gi;
-  const matches: { role: string; startIndex: number }[] = [];
-  let match;
-
-  while ((match = rolePattern.exec(staffingStr)) !== null) {
-    matches.push({ role: match[1].toUpperCase(), startIndex: match.index });
-  }
-
-  // Process each role section
-  for (let i = 0; i < matches.length; i++) {
-    const currentMatch = matches[i];
-    const nextMatch = matches[i + 1];
-
-    // Extract content from after the colon to the next role prefix (or end of string)
-    const colonIndex = staffingStr.indexOf(':', currentMatch.startIndex);
-    const endIndex = nextMatch ? nextMatch.startIndex : staffingStr.length;
-    const content = staffingStr.slice(colonIndex + 1, endIndex).trim();
-
-    // Remove trailing comma if present (from being before the next role)
-    const cleanedContent = content.replace(/,\s*$/, '').trim();
-
-    switch (currentMatch.role) {
-      case 'VD':
-        result.driver.needed = true;
-        result.driver.isVanDriver = true;
-        result.driver.assigned = cleanedContent || null;
-        break;
-      case 'D':
-        // Only set if not already set by VD
-        if (!result.driver.isVanDriver) {
-          result.driver.needed = true;
-          result.driver.assigned = cleanedContent || null;
-        }
-        break;
-      case 'S':
-        result.speaker.needed = true;
-        result.speaker.assigned = cleanedContent || null;
-        break;
-      case 'V':
-        result.volunteer.needed = true;
-        result.volunteer.assigned = cleanedContent || null;
-        break;
-    }
-  }
-
-  return result;
 }
 
 /**
@@ -1143,8 +1104,11 @@ export class PlanningSheetSyncService {
       ])
     );
 
-    // Return names in the same order as userIds
-    return userIds.map(id => userMap.get(id) || 'Unknown');
+    // Return names in the same order as userIds. Assignment columns also hold
+    // free-text names (people typed on the sheet who don't match one app user);
+    // write those back as typed so they survive the round trip. Only something
+    // that looks like a user ID with no matching user becomes "Unknown".
+    return userIds.map(id => userMap.get(id) || assignmentLabelForUnknownId(id));
   }
 
   /**

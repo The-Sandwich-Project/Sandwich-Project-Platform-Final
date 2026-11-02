@@ -324,6 +324,7 @@ Because Neon's HTTP driver has no transactions, a migration that fails partway c
 | `POST /api/sms/webhook` (`routes/sms-users.ts`) | Twilio inbound SMS/MMS | Twilio signature (`X-Twilio-Signature`) validated | Handles STOP / START / HELP / IDEA keywords; parses texted collection counts (OpenAI); reads MMS sign-in sheet photos (Claude) |
 | `POST /api/sms-webhook/status` (`routes/sms-users.ts`) | Twilio delivery status callbacks | **No signature check** | Logs failed deliveries and updates the user's SMS status for certain error codes |
 | `POST /api/webhook/new-event-request` (`routes/index.ts`) | Google Apps Script on the event-requests sheet | `SHEETS_WEBHOOK_SECRET` in the `x-webhook-secret` header or the body | Triggers a full Sheet → DB event-request sync |
+| `POST /api/event-requests/import-from-sheets` and `.../preview-update`, `.../apply-update` (`routes/event-requests-legacy.ts`) | Google Apps Script on the planning sheet ("send row to app" / "update row in app") | `GOOGLE_SHEETS_API_KEY` in `x-api-key` | Creates an event from a planning-sheet row, or previews and applies a person-confirmed update to an existing one. See `docs/planning-sheet-update-from-sheet.md` |
 
 There is no SendGrid event or inbound-parse webhook. SendGrid is send-only.
 
