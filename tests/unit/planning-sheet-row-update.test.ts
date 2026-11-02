@@ -176,7 +176,7 @@ describe('buildRowUpdatePlan', () => {
     );
     expect(plan.updates.estimatedSandwichCount).toBe(300);
     // The sheet has no per-type amounts, so none are invented: split TBD.
-    expect(plan.updates.sandwichTypes).toEqual([{ type: 'deli' }, { type: 'pbj' }]);
+    expect(plan.updates.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
     expect(plan.updates.actualSandwichCount).toBe(310);
     expect(saved(event, plan, ['estimatedSandwichCount', 'sandwichTypes'])).toMatchObject({
       estimatedSandwichCount: 300,
@@ -290,7 +290,7 @@ describe('buildRowUpdatePlan', () => {
       USERS
     );
     expect(selectUpdates(plan, ['sandwichTypes'], event).updates).toEqual({
-      sandwichTypes: [{ type: 'deli' }, { type: 'pbj' }],
+      sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }],
     });
     expect(saved(event, plan, ['sandwichTypes'])).toMatchObject({
       estimatedSandwichCount: 200,
@@ -349,7 +349,7 @@ describe('creating an event from a sheet row ("send row to app")', () => {
   });
 
   it('stores sandwich types with the app\'s keys, as an array, without inventing amounts', () => {
-    expect(sandwichTypesForNewEvent('Turkey & PBJ')).toEqual([{ type: 'deli_turkey' }, { type: 'pbj' }]);
+    expect(sandwichTypesForNewEvent('Turkey & PBJ')).toEqual([{ type: 'deli_turkey', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
     expect(sandwichTypesForNewEvent('')).toBeNull();
   });
 
@@ -883,5 +883,15 @@ describe('Copilot review: sheet types compared without Unknown or duplicates', (
     expect(buildRowUpdatePlan(event, makeRow({ 'Deli or PBJ?': 'Deli' }), USERS).updatesByField.sandwichTypes).toBeUndefined();
     const dup = makeEvent({ estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'deli', quantity: 0 }] });
     expect(buildRowUpdatePlan(dup, makeRow({ 'Estimate # sandwiches': '300', 'Deli or PBJ?': 'Deli' }), USERS).updatesByField.sandwichTypes).toBeUndefined();
+  });
+});
+
+describe('Copilot review: type lines satisfy the save schema', () => {
+  it('every type line the sheet flows send has a numeric quantity', () => {
+    const { insertEventRequestSchema } = require('../../shared/schema');
+    const lines = sandwichTypesForNewEvent('Turkey & PBJ');
+    expect(() => insertEventRequestSchema.partial().parse({ sandwichTypes: lines })).not.toThrow();
+    const plan = buildRowUpdatePlan(makeEvent(), makeRow({ 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
+    expect(() => insertEventRequestSchema.partial().parse({ sandwichTypes: plan.updates.sandwichTypes })).not.toThrow();
   });
 });

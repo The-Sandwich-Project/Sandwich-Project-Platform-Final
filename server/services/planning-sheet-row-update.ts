@@ -673,7 +673,7 @@ export function buildRowUpdatePlan(
     const same =
       sheetTypes.length === appTypes.length && sheetTypes.every((t) => appTypes.includes(t));
     if (!same) {
-      set('sandwichTypes', 'sandwichTypes', sheetTypes.map((type) => ({ type })));
+      set('sandwichTypes', 'sandwichTypes', sheetTypes.map((type) => ({ type, quantity: 0 })));
       changes.push({
         field: 'sandwichTypes',
         label: 'Sandwich types',
@@ -1043,12 +1043,12 @@ export function staffingForNewEvent(raw: unknown) {
  * Sandwich types for a NEW event: the app's own type keys ("pbj",
  * "deli_turkey", ...) as a real array, with the count split evenly.
  */
-export function sandwichTypesForNewEvent(raw: unknown): { type: string }[] | null {
+export function sandwichTypesForNewEvent(raw: unknown): { type: string; quantity: number }[] | null {
   // Type names only: the sheet has no per-type amounts. The storage layer's
   // estimate rule gives a single type the whole total, and marks several
   // types "split TBD" instead of inventing an even split.
   const types = parseSheetSandwichTypes(raw);
-  return types.length ? types.map((type) => ({ type })) : null;
+  return types.length ? types.map((type) => ({ type, quantity: 0 })) : null;
 }
 
 /** Lowercase, trim, collapse whitespace — for matching group names. */

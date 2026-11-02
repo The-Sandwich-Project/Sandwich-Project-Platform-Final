@@ -267,9 +267,10 @@ export function buildEventDataForServer(
     eventData.estimatedSandwichCountMax = formData.estimatedSandwichCountMax || null;
     eventData.estimatedSandwichCount = null;
     // A picked range type IS the type; "No specific type" (null) clears it.
+    // quantity 0 = amount TBD (the save schemas require a number).
     eventData.estimatedSandwichRangeType = formData.rangeSandwichType || null;
     if (formData.rangeSandwichType) {
-      eventData.sandwichTypes = [{ type: formData.rangeSandwichType }];
+      eventData.sandwichTypes = [{ type: formData.rangeSandwichType, quantity: 0 }];
     }
   } else {
     eventData.sandwichTypes = JSON.stringify(formData.sandwichTypes);

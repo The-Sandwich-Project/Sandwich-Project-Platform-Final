@@ -11,6 +11,7 @@ import {
   sumSandwichTypeQuantities,
 } from '../form-utils';
 import { resolveEstimatePatch } from '@shared/sandwich-estimate';
+import { insertEventRequestSchema } from '@shared/schema';
 
 const baseFormData: any = {
   eventDate: '2026-06-15',
@@ -339,6 +340,9 @@ describe('determineSandwichMode (sandwich count drift)', () => {
     );
     expect(saved.estimatedSandwichRangeType).toBe('deli_turkey');
     expect(saved.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
+    // The create/PATCH schema requires a numeric quantity on every line.
+    expect(payload.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 0 }]);
+    expect(() => insertEventRequestSchema.partial().parse({ sandwichTypes: payload.sandwichTypes })).not.toThrow();
   });
 
   it('includes cancelledReason when status is cancelled (edit-form MISSING_REASON bug)', () => {
