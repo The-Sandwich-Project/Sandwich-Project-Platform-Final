@@ -10,6 +10,8 @@ import {
   determineActualSandwichMode,
   sumSandwichTypeQuantities,
 } from '../form-utils';
+import { resolveEstimatePatch } from '@shared/sandwich-estimate';
+import { insertEventRequestSchema } from '@shared/schema';
 
 const baseFormData: any = {
   eventDate: '2026-06-15',
@@ -254,7 +256,15 @@ describe('determineSandwichMode (sandwich count drift)', () => {
       },
     );
     expect(payload.estimatedSandwichCount).toBe(200);
-    expect(payload.sandwichTypes).toBeNull();
+    // Types are no longer deleted by a total-mode save: the server rule keeps
+    // them and drops amounts that don't add up to the new total.
+    expect(payload.sandwichTypes).toBeUndefined();
+    const saved = resolveEstimatePatch(
+      { estimatedSandwichCount: 198, sandwichTypes: [{ type: 'deli', quantity: 100 }, { type: 'pbj', quantity: 98 }] },
+      payload,
+    );
+    expect(saved.estimatedSandwichCount).toBe(200);
+    expect(saved.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
   });
 
   it('derives estimatedSandwichCount from types in types-mode save', () => {
@@ -296,7 +306,43 @@ describe('determineSandwichMode (sandwich count drift)', () => {
     expect(payload.estimatedSandwichCount).toBe(500);
     expect(payload.estimatedSandwichCountMin).toBeNull();
     expect(payload.estimatedSandwichCountMax).toBeNull();
-    expect(payload.estimatedSandwichRangeType).toBeNull();
+    // The range type isn't sent; the server clears it for an exact count.
+    const saved = resolveEstimatePatch(
+      { estimatedSandwichCount: 498, estimatedSandwichCountMin: 490, estimatedSandwichCountMax: 506, estimatedSandwichRangeType: 'deli' },
+      payload,
+    );
+    expect(saved).toMatchObject({
+      estimatedSandwichCount: 500,
+      estimatedSandwichCountMin: null,
+      estimatedSandwichCountMax: null,
+      estimatedSandwichRangeType: null,
+    });
+  });
+
+  it('types mode with some amounts blank keeps the existing total', () => {
+    const payload = buildEventDataForServer(
+      { ...baseFormData, totalSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 0 }] },
+      { mode: 'edit', hasEventRequest: true, eventRequestStatus: 'scheduled', sandwichMode: 'types', actualSandwichMode: 'total' },
+    );
+    expect(payload.estimatedSandwichCount).toBeUndefined();
+    const saved = resolveEstimatePatch({ estimatedSandwichCount: 300 }, payload);
+    expect(saved.estimatedSandwichCount).toBe(300);
+  });
+
+  it('range mode with a picked type replaces existing types', () => {
+    const payload = buildEventDataForServer(
+      { ...baseFormData, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, rangeSandwichType: 'deli_turkey' },
+      { mode: 'edit', hasEventRequest: true, eventRequestStatus: 'scheduled', sandwichMode: 'range', actualSandwichMode: 'total' },
+    );
+    const saved = resolveEstimatePatch(
+      { estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }] },
+      payload,
+    );
+    expect(saved.estimatedSandwichRangeType).toBe('deli_turkey');
+    expect(saved.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
+    // The create/PATCH schema requires a numeric quantity on every line.
+    expect(payload.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 0 }]);
+    expect(() => insertEventRequestSchema.partial().parse({ sandwichTypes: payload.sandwichTypes })).not.toThrow();
   });
 
   it('includes cancelledReason when status is cancelled (edit-form MISSING_REASON bug)', () => {

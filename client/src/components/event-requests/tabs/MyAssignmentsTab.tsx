@@ -3,6 +3,11 @@ import { useEventRequestContext } from '../context/EventRequestContext';
 import { useEventDialogState } from '../context/EventDialogContext';
 import { useEventFilters } from '../hooks/useEventFilters';
 import { useEventMutations } from '../hooks/useEventMutations';
+import {
+  buildInlineSandwichPatch,
+  DEFAULT_NEW_SANDWICH_TYPE,
+  inlineSandwichStateFromEvent,
+} from '../lib/inline-sandwich-edit';
 import { useEventAssignments } from '../hooks/useEventAssignments';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -104,7 +109,7 @@ export const MyAssignmentsTab: React.FC = () => {
   };
 
   const addInlineSandwichType = () => {
-    setInlineSandwichTypes((prev: Array<{ type: string; quantity: number }>) => [...prev, { type: 'turkey', quantity: 0 }]);
+    setInlineSandwichTypes((prev: Array<{ type: string; quantity: number }>) => [...prev, { type: DEFAULT_NEW_SANDWICH_TYPE, quantity: 0 }]);
   };
 
   const updateInlineSandwichType = (index: number, field: 'type' | 'quantity', value: string | number) => {
@@ -357,9 +362,38 @@ export const MyAssignmentsTab: React.FC = () => {
               setEditingScheduledId(request.id);
               setEditingField(field);
               setEditingValue(value || '');
+              // The sandwich editor keeps its values in the inline state, not
+              // editingValue. Without this it opened with stale values and
+              // saved '' (which erased the estimate).
+              if (field === 'sandwichTypes') {
+                const st = inlineSandwichStateFromEvent(request);
+                setInlineSandwichMode(st.mode);
+                setInlineTotalCount(st.totalCount);
+                setInlineSandwichTypes(st.types);
+                setInlineRangeMin(st.rangeMin);
+                setInlineRangeMax(st.rangeMax);
+                setInlineRangeType(st.rangeType);
+              }
             }}
             saveEdit={() => {
               if (editingScheduledId && editingField) {
+                if (editingField === 'sandwichTypes') {
+                  updateEventRequestMutation.mutate({
+                    id: editingScheduledId,
+                    data: buildInlineSandwichPatch({
+                      mode: inlineSandwichMode,
+                      totalCount: inlineTotalCount,
+                      types: inlineSandwichTypes,
+                      rangeMin: inlineRangeMin,
+                      rangeMax: inlineRangeMax,
+                      rangeType: inlineRangeType,
+                    }),
+                  });
+                  setEditingScheduledId(null);
+                  setEditingField(null);
+                  setEditingValue('');
+                  return;
+                }
                 updateScheduledFieldMutation.mutate({
                   id: editingScheduledId,
                   field: editingField,

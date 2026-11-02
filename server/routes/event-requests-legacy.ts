@@ -68,6 +68,7 @@ function applyVanPurposeNormalization(updates: Record<string, any>): { error?: s
   return {};
 }
 import { safeJsonParse } from '../utils/safe-json';
+import { loadAssigneeDirectory } from '../services/assignee-directory';
 import { getUndefinedColumn, dropColumnKey, classifyDbError, parsePgError } from '../utils/pg-error-utils';
 import { geocodeAddress } from '../utils/geocoding';
 import { geocodeEventInBackground } from '../utils/geocode-event';
@@ -355,14 +356,17 @@ const batchMatchStaffNames = async (
   // Match staff names against the cached user list. Only link a user when
   // exactly one matches (so "Ann" with two Anns stays as typed text instead of
   // picking one at random); same rule as the update-from-sheet flow.
-  const matchNames = (names: string[]): string[] =>
-    Array.from(new Set(names.map((name) => resolveSheetName(name, allUsers))));
+  // Staff are matched against every directory the assignment picker lists
+  // (team members, drivers, volunteers, host contacts), not just users.
+  const people = await loadAssigneeDirectory();
+  const matchNames = (names: string[], role: 'driver' | 'volunteer'): string[] =>
+    Array.from(new Set(names.map((name) => resolveSheetName(name, people, role))));
 
   return {
     tspContactUserId,
-    assignedDriverIds: matchNames(driverNames),
-    assignedSpeakerIds: matchNames(speakerNames),
-    assignedVolunteerIds: matchNames(volunteerNames),
+    assignedDriverIds: matchNames(driverNames, 'driver'),
+    assignedSpeakerIds: matchNames(speakerNames, 'volunteer'),
+    assignedVolunteerIds: matchNames(volunteerNames, 'volunteer'),
   };
 };
 
@@ -529,7 +533,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     const estimatedSandwichCount = parsedSandwichCount.count;
 
     // Parse sandwich types
-    const sandwichTypes = sandwichTypesForNewEvent(data['Deli or PBJ?'], estimatedSandwichCount);
+    const sandwichTypes = sandwichTypesForNewEvent(data['Deli or PBJ?']);
 
     // Parse contact name
     const contactNameParts = parseContactName(data['Contact Name']);
@@ -723,23 +727,12 @@ const sheetRowUpdateExtrasSchema = z.object({
  * already assigned to these events, so an existing assignee whose name the push
  * wrote to the sheet keeps their ID and per-person details.
  */
-const fetchUsersForRowUpdate = async (events: EventRequest[]) => {
-  const assigned = Array.from(
-    new Set(
-      events.flatMap((e) => [...(e.assignedDriverIds ?? []), ...(e.assignedVolunteerIds ?? [])]).filter(Boolean)
-    )
+const fetchUsersForRowUpdate = async (events: EventRequest[]) =>
+  // Team members AND the Drivers/Volunteers/Host Contacts directories, so a
+  // sheet name links to the same person the app's assignment picker would.
+  loadAssigneeDirectory(
+    events.flatMap((e) => [...(e.assignedDriverIds ?? []), ...(e.assignedVolunteerIds ?? [])])
   );
-  return db
-    .select({
-      id: users.id,
-      firstName: users.firstName,
-      lastName: users.lastName,
-      displayName: users.displayName,
-      isActive: users.isActive,
-    })
-    .from(users)
-    .where(assigned.length ? or(eq(users.isActive, true), inArray(users.id, assigned)) : eq(users.isActive, true));
-};
 
 
 /**

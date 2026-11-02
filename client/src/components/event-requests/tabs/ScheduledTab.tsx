@@ -10,8 +10,11 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { ScheduledCardEnhanced } from '../cards/ScheduledCardEnhanced';
 import { RescheduleDialog } from '../dialogs/RescheduleDialog';
 import { DuplicateEventDialog } from '../dialogs/DuplicateEventDialog';
-import { parseSandwichTypes, stringifySandwichTypes } from '@/lib/sandwich-utils';
-import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
+import {
+  buildInlineSandwichPatch,
+  DEFAULT_NEW_SANDWICH_TYPE,
+  inlineSandwichStateFromEvent,
+} from '../lib/inline-sandwich-edit';
 import { useConfirmation } from '@/components/ui/confirmation-dialog';
 import type { EventRequest } from '@shared/schema';
 import { ScheduledSpreadsheetView } from '../views/ScheduledSpreadsheetView';
@@ -157,25 +160,15 @@ export const ScheduledTab: React.FC = () => {
     if (field === 'sandwichTypes') {
       const eventRequest = eventRequests.find(req => req.id === id);
       if (eventRequest) {
-        const existingSandwichTypes = parseSandwichTypes(eventRequest.sandwichTypes) || [];
-        const hasTypesData = existingSandwichTypes.length > 0;
-        const hasRangeData = hasActiveSandwichRange(
-          (eventRequest as any).estimatedSandwichCountMin,
-          (eventRequest as any).estimatedSandwichCountMax,
-          eventRequest.estimatedSandwichCount,
-        );
-        const totalCount = eventRequest.estimatedSandwichCount || 0;
-
-        setInlineSandwichMode(hasTypesData ? 'types' : hasRangeData ? 'range' : 'total');
-        setInlineTotalCount(totalCount);
-        setInlineSandwichTypes(hasTypesData ? existingSandwichTypes : []);
-
-        // Set range values if range data exists
-        if (hasRangeData) {
-          setInlineRangeMin((eventRequest as any).estimatedSandwichCountMin || 0);
-          setInlineRangeMax((eventRequest as any).estimatedSandwichCountMax || 0);
-          setInlineRangeType((eventRequest as any).estimatedSandwichRangeType || '');
-        }
+        // Same mode choice as the full form, and every field reset (range
+        // values used to carry over from the previous event edited).
+        const st = inlineSandwichStateFromEvent(eventRequest);
+        setInlineSandwichMode(st.mode);
+        setInlineTotalCount(st.totalCount);
+        setInlineSandwichTypes(st.types);
+        setInlineRangeMin(st.rangeMin);
+        setInlineRangeMax(st.rangeMax);
+        setInlineRangeType(st.rangeType);
       }
     }
   };
@@ -187,27 +180,14 @@ export const ScheduledTab: React.FC = () => {
 
       // Special handling for sandwich types
       if (editingField === 'sandwichTypes') {
-        const updateData: any = {};
-
-        if (inlineSandwichMode === 'total') {
-          updateData.estimatedSandwichCount = inlineTotalCount;
-          updateData.sandwichTypes = null;
-          updateData.estimatedSandwichCountMin = null;
-          updateData.estimatedSandwichCountMax = null;
-          updateData.estimatedSandwichRangeType = null;
-        } else if (inlineSandwichMode === 'range') {
-          updateData.estimatedSandwichCountMin = inlineRangeMin;
-          updateData.estimatedSandwichCountMax = inlineRangeMax;
-          updateData.estimatedSandwichRangeType = inlineRangeType || null;
-          updateData.estimatedSandwichCount = null;
-          updateData.sandwichTypes = null;
-        } else {
-          updateData.sandwichTypes = stringifySandwichTypes(inlineSandwichTypes);
-          updateData.estimatedSandwichCount = inlineSandwichTypes.reduce((sum, item) => sum + item.quantity, 0);
-          updateData.estimatedSandwichCountMin = null;
-          updateData.estimatedSandwichCountMax = null;
-          updateData.estimatedSandwichRangeType = null;
-        }
+        const updateData = buildInlineSandwichPatch({
+          mode: inlineSandwichMode,
+          totalCount: inlineTotalCount,
+          types: inlineSandwichTypes,
+          rangeMin: inlineRangeMin,
+          rangeMax: inlineRangeMax,
+          rangeType: inlineRangeType,
+        });
 
         updateEventRequestMutation.mutate({
           id: editingScheduledId,
@@ -390,6 +370,9 @@ export const ScheduledTab: React.FC = () => {
     setInlineSandwichMode('total');
     setInlineTotalCount(0);
     setInlineSandwichTypes([]);
+    setInlineRangeMin(0);
+    setInlineRangeMax(0);
+    setInlineRangeType('');
   };
 
   // Batch save function for saving multiple time fields at once (used by TimeDialogContent)
@@ -402,7 +385,7 @@ export const ScheduledTab: React.FC = () => {
   };
 
   const addInlineSandwichType = () => {
-    setInlineSandwichTypes(prev => [...prev, { type: 'turkey', quantity: 0 }]);
+    setInlineSandwichTypes(prev => [...prev, { type: DEFAULT_NEW_SANDWICH_TYPE, quantity: 0 }]);
   };
 
   const updateInlineSandwichType = (index: number, field: 'type' | 'quantity', value: string | number) => {

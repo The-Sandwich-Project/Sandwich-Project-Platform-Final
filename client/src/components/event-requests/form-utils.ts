@@ -252,29 +252,37 @@ export function buildEventDataForServer(
     })(),
   };
 
-  // Sandwich data based on mode.
-  // Each mode owns exactly one representation of the count; the OTHER two
-  // representations must be explicitly nulled so a stale range/breakdown can't
-  // survive in the DB alongside an exact count (the "500 shows as 498" bug).
-  // See the diff-based save note in EventSchedulingForm.
+  // Sandwich estimate, by mode. Each mode sends only what it edits; the
+  // server's shared estimate rule (shared/sandwich-estimate.ts) keeps the rest
+  // consistent: an exact count clears the range (so a stale range can't
+  // survive next to it - the "500 shows as 498" bug), and existing types are
+  // kept (amounts that no longer fit are dropped) instead of being deleted.
+  // The diff-based save in EventSchedulingForm drops anything unchanged.
   if (sandwichMode === 'total') {
     eventData.estimatedSandwichCount = formData.totalSandwichCount;
-    eventData.sandwichTypes = null;
     eventData.estimatedSandwichCountMin = null;
     eventData.estimatedSandwichCountMax = null;
-    eventData.estimatedSandwichRangeType = null;
   } else if (sandwichMode === 'range') {
     eventData.estimatedSandwichCountMin = formData.estimatedSandwichCountMin || null;
     eventData.estimatedSandwichCountMax = formData.estimatedSandwichCountMax || null;
-    eventData.estimatedSandwichRangeType = formData.rangeSandwichType || null;
     eventData.estimatedSandwichCount = null;
-    eventData.sandwichTypes = null;
+    // A picked range type IS the type; "No specific type" (null) clears it.
+    // quantity 0 = amount TBD (the save schemas require a number).
+    eventData.estimatedSandwichRangeType = formData.rangeSandwichType || null;
+    if (formData.rangeSandwichType) {
+      eventData.sandwichTypes = [{ type: formData.rangeSandwichType, quantity: 0 }];
+    }
   } else {
     eventData.sandwichTypes = JSON.stringify(formData.sandwichTypes);
-    eventData.estimatedSandwichCount = sumSandwichTypeQuantities(formData.sandwichTypes);
-    eventData.estimatedSandwichCountMin = null;
-    eventData.estimatedSandwichCountMax = null;
-    eventData.estimatedSandwichRangeType = null;
+    // Only a complete breakdown sets the total. With some amounts left blank
+    // (TBD) the existing total is kept.
+    const lines = (formData.sandwichTypes || []).filter((t: any) => t && t.type);
+    const complete = lines.length > 0 && lines.every((t: any) => Number(t.quantity) > 0);
+    if (complete) {
+      eventData.estimatedSandwichCount = sumSandwichTypeQuantities(formData.sandwichTypes);
+      eventData.estimatedSandwichCountMin = null;
+      eventData.estimatedSandwichCountMax = null;
+    }
   }
 
   // Attendee counts.
