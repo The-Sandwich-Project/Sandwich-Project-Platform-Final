@@ -39,7 +39,7 @@ function makeRow(
     deliOrPbj: '',
     finalSandwiches: '',
     totalInApp: '',
-    socialPost: '',
+    followUpEmailSent: '',
     sentToolkit: '',
     contactName: '',
     email: '',
@@ -50,8 +50,8 @@ function makeRow(
     afterEventNotes: '',
     cancelled: '',
     notes: '',
-    addlNotes: '',
-    waitingOn: '',
+    syncId: '',
+    unlabeledAB: '',
     ...overrides,
   };
 }
@@ -598,7 +598,8 @@ describe('planning sheet column map (van needed for insertion)', () => {
     expect(PLANNING_SHEET_COLUMNS.VAN_BOOKED).toBe(8);
     expect(PLANNING_SHEET_COLUMNS.VAN_NEEDED_FOR).toBe(9);
     expect(PLANNING_SHEET_COLUMNS.STAFFING).toBe(10);
-    expect(PLANNING_SHEET_COLUMNS.WAITING_ON).toBe(27);
+    expect(PLANNING_SHEET_COLUMNS.UNLABELED_AB).toBe(27);
+    expect(PLANNING_SHEET_COLUMNS.SYNC_ID).toBe(26);
     expect(PLANNING_SHEET_COLUMN_COUNT).toBe(28);
     expect(PLANNING_SHEET_LAST_COLUMN).toBe('AB');
     expect(planningSheetColumnLetter(9)).toBe('J');

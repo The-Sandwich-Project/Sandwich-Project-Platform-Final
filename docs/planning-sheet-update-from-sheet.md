@@ -69,12 +69,21 @@ Add `updateRowInApp` to the sheet's custom menu next to `sendRowToApp`, for exam
 ```javascript
 // ============================= SEND ROW TO APP ============================
 //
-// Column layout confirmed: N = "Total in App" (index 13). Reads the full
-// 27-column width (through AA) via COL and deliberately omits N (Total in App)
-// and O (Social Post) from the payload: neither is an event-request field the
-// app expects. This matches the original working map.
+// Live sheet layout (checked Nov 2026): A=Date ... N="Final # of Sandwiches",
+// O="#'s added to app", P="Follow-up email sent", Z="Planning/Contact Notes",
+// AA="sync_id" (a row ID), AB=no header. COL still names P as SOCIAL_POST and
+// AA/AB as ADDL_NOTES/WAITING_ON from the older layout.
+//
+// The payload deliberately leaves out:
+//   O  (#'s added to app)    - maintained on the sheet, not an event field
+//   P  (Follow-up email sent) - not an event field the app reads
+//   AA (sync_id)             - a row ID, not notes; sending it as "Add'l Notes"
+//                              put "Additional Notes: <id>" into planning notes
+//
+// buildAppPayload_ is shared by Send Row to App and Update Row in App, so both
+// always send exactly the same data.
 
-/** The row payload, shared by send and update so both send the same data. */
+/** The row payload (see the notes above for what's left out and why). */
 function buildAppPayload_(sheet, rowNum) {
   const data = sheet.getRange(rowNum, 1, 1, ROW_WIDTH).getValues()[0];
   return {
@@ -99,7 +108,6 @@ function buildAppPayload_(sheet, rowNum) {
     'Planned Recipient/Host Home': data[COL.PLANNED_RECIPIENT],
     'Cancelled': data[COL.CANCELLED],
     'Notes': data[COL.NOTES],
-    "Add'l Notes": data[COL.ADDL_NOTES],
     'Waiting On': data[COL.WAITING_ON]
   };
 }
@@ -298,6 +306,14 @@ function setApiKeyHelp() {
 ```
 
 ## Known gaps
+
+- **Live column layout (checked Nov 2026).** The script's `COL` map and the app's
+  `PLANNING_SHEET_COLUMNS` were written for an older layout. On the live sheet,
+  P is "Follow-up email sent" (was Social Post), AA is `sync_id` (a per-row ID, was
+  "Add'l Notes") and AB has no header (was "Waiting On"). The payload no longer sends
+  AA as "Add'l Notes", the server ignores any note that's only an ID, and the app never
+  writes O, P, AA or AB (`SHEET_OWNED_COLUMNS`). Where `sync_id` comes from is still
+  being investigated; once it's known to be stable it can replace name + date matching.
 
 - **Use Update Row in App for rows already in the app.** Send Row to App only recognizes an
   existing event when the group name *and* the date both match. If the date was changed on

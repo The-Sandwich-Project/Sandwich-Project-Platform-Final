@@ -752,6 +752,11 @@ const STATUS_LABELS: Record<string, string> = {
 
 const squash = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
 
+/** True when a cell is only a row ID (UUID), like the planning sheet's sync_id column. */
+export function isRowIdOnly(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
+}
+
 /**
  * The sheet's note columns as planning-notes paragraphs. Same format the
  * "send row to app" create path has always used, so both paths agree.
@@ -763,10 +768,16 @@ export function sheetNoteParts(row: {
   'Waiting On'?: string;
 }): string[] {
   const parts: string[] = [];
-  const details = clean(row['ALL DETAILS']);
-  const notesCell = clean(row.Notes);
-  const addl = clean(row["Add'l Notes"]);
-  const waiting = clean(row['Waiting On']);
+  // A cell holding nothing but a row ID is the sheet's sync_id (column AA,
+  // which older scripts sent as "Add'l Notes"), not a note. Skip it.
+  const note = (v: unknown) => {
+    const t = clean(v);
+    return isRowIdOnly(t) ? '' : t;
+  };
+  const details = note(row['ALL DETAILS']);
+  const notesCell = note(row.Notes);
+  const addl = note(row["Add'l Notes"]);
+  const waiting = note(row['Waiting On']);
   if (details) parts.push(details);
   if (notesCell) parts.push(`Notes: ${notesCell}`);
   if (addl) parts.push(`Additional Notes: ${addl}`);

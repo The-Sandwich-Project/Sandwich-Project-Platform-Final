@@ -60,8 +60,8 @@ const COLUMN_LABELS: Record<number, string> = {
   11: 'Estimate # Sandwiches',
   12: 'Deli or PBJ?',
   13: 'Final # Sandwiches',
-  14: 'Total in App?',
-  15: 'Social Post',
+  14: "#'s added to app",
+  15: 'Follow-up email sent',
   16: 'Sent Toolkit?',
   17: 'Contact Name',
   18: 'Email',
@@ -72,9 +72,14 @@ const COLUMN_LABELS: Record<number, string> = {
   23: 'After Event Notes',
   24: 'Cancelled',
   25: 'Notes',
-  26: "Add'l Notes",
-  27: 'Waiting On',
+  26: 'sync_id',
+  27: '(unlabeled)',
 };
+
+// Columns the sheet owns (O, P, AA sync_id, AB). The server never writes them
+// and always keeps the sheet's value on update, so they aren't offered as
+// differences here. Mirrors SHEET_OWNED_COLUMNS in server/planning-sheet-sync-service.ts.
+const SHEET_OWNED_COLUMNS = new Set([14, 15, 26, 27]);
 
 // Keep ProposeToSheetButton as an alias for backward compatibility
 export { PushToSheetButton as ProposeToSheetButton };
@@ -118,6 +123,7 @@ export function PushToSheetButton({
     // Sheet columns through AB/"Waiting On" (index 27).
     const columnCount = Object.keys(COLUMN_LABELS).length;
     for (let i = 0; i < columnCount; i++) {
+      if (SHEET_OWNED_COLUMNS.has(i)) continue;
       const appValue = (previewData.rawData[i] || '').trim();
       const sheetValue = (previewData.existingRawData[i] || '').trim();
       if (appValue !== sheetValue) {
@@ -220,7 +226,9 @@ export function PushToSheetButton({
     setMergeDecisions(prev => ({ ...prev, [columnIndex]: decision }));
   };
 
-  const unchangedCount = hasExistingRawData ? Object.keys(COLUMN_LABELS).length - conflicts.length : 0;
+  const unchangedCount = hasExistingRawData
+    ? Object.keys(COLUMN_LABELS).length - SHEET_OWNED_COLUMNS.size - conflicts.length
+    : 0;
   const allMatch = hasExistingRow && hasExistingRawData && conflicts.length === 0;
 
   return (
@@ -453,6 +461,7 @@ export function PushToSheetButton({
                                 </div>
                                 {Array.from({ length: Object.keys(COLUMN_LABELS).length }, (_, i) => i)
                                   .filter(i => {
+                                    if (SHEET_OWNED_COLUMNS.has(i)) return false;
                                     const appVal = (previewData.rawData[i] || '').trim();
                                     const sheetVal = (previewData.existingRawData[i] || '').trim();
                                     return appVal === sheetVal && (appVal || sheetVal);
