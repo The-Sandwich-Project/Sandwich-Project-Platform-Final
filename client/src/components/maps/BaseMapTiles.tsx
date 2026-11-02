@@ -11,8 +11,15 @@ type MapTileConfig =
   | { provider: 'google'; attribution: string }
   | { provider: 'carto'; reason: string };
 
-const CARTO_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+// Fallback basemap when Google tiles are unavailable. This used to be CARTO's
+// keyless Voyager tiles, but CARTO now stamps "API KEY REQUIRED" across them,
+// so we fall back to the standard OpenStreetMap tiles instead. (The server
+// config still calls this provider 'carto'; only the tile source changed.)
+const OSM_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+/** OSM's standard layer stops at z19; Leaflet upscales beyond that. */
+const OSM_MAX_NATIVE_ZOOM = 19;
 
 let warnedFallback = false;
 
@@ -146,9 +153,9 @@ function CartoTiles({ reason }: { reason?: string }) {
   return (
     <>
       <TileLayer
-        attribution={CARTO_ATTRIBUTION}
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
+        attribution={OSM_ATTRIBUTION}
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxNativeZoom={OSM_MAX_NATIVE_ZOOM}
         maxZoom={BASEMAP_MAX_ZOOM}
       />
       {reason ? <FallbackNotice reason={reason} /> : null}
@@ -185,7 +192,7 @@ function FallbackNotice({ reason }: { reason: string }) {
 
 /**
  * Basemap for Leaflet screens. Uses Google roadmap tiles when the server
- * can reach the Map Tiles API, and the previous CARTO tiles when it cannot.
+ * can reach the Map Tiles API, and OpenStreetMap tiles when it cannot.
  */
 export function BaseMapTiles() {
   // Runs during render so the ceiling is in place before sibling map

@@ -478,47 +478,27 @@ const teamMemberIcon = createTeamMemberIcon(colors.teamMember);
 // Format time to 12-hour format
 const formatTime12Hour = (time: string | null): string => {
   if (!time) return '';
-  try {
-    // Handle both 24-hour format (e.g., "11:00") and 12-hour format (e.g., "11:00 AM")
-    // Remove any existing AM/PM and whitespace
-    const cleanTime = time.trim().toUpperCase().replace(/\s*(AM|PM)\s*/i, '');
-    const [hoursStr, minutesStr] = cleanTime.split(':');
-    
-    if (!hoursStr || !minutesStr) {
-      console.error('Failed to parse time (invalid format):', time);
-      return time; // Return original if we can't parse
-    }
-    
-    // Parse minutes (may have trailing characters)
-    const minutes = parseInt(minutesStr.trim().split(/\s+/)[0], 10);
-    let hours = parseInt(hoursStr.trim(), 10);
-    
-    // If original time had AM/PM, preserve it
-    const hasAM = /AM/i.test(time);
-    const hasPM = /PM/i.test(time);
-    
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-      console.error('Failed to parse time (NaN):', time);
-      return time; // Return original if we can't parse
-    }
-    
-    // If input was already 12-hour format, use it as-is
-    if (hasAM || hasPM) {
-      // Adjust hours if PM and not 12
-      if (hasPM && hours !== 12) {
-        hours += 12;
-      } else if (hasAM && hours === 12) {
-        hours = 0;
-      }
-    }
-    
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
-  } catch (error) {
-    console.error('Failed to parse time:', time, error);
-    return time || 'Invalid time';
-  }
+  // Pull the first H:MM (optionally with AM/PM) out of the string, so values
+  // like "Approx. 7:30 AM", "around 11:00", or "14:30:00" all parse.
+  // Anything without a recognizable time is shown as-is.
+  const match = time.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|A\.M\.|P\.M\.)?/i);
+  if (!match) return time;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  if (hours > 23 || minutes > 59) return time;
+
+  const meridiem = match[3]?.replace(/\./g, '').toUpperCase();
+  if (meridiem === 'PM' && hours !== 12) hours += 12;
+  else if (meridiem === 'AM' && hours === 12) hours = 0;
+
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  const formatted = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+
+  // Keep any qualifier the coordinator typed ("Approx.", "around", etc.).
+  const prefix = time.slice(0, match.index).trim();
+  return prefix ? `${prefix} ${formatted}` : formatted;
 };
 
 // Sandwich summary used across the driver-planning surfaces (event
