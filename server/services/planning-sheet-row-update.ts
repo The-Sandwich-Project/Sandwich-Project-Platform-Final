@@ -210,10 +210,12 @@ export interface ParsedStaffing {
    * drivers as "VD: ..." on van events, so VD names ARE drivers.
    * `vanNames` is just the VD ones; `plainListed` is whether a plain "D" appeared.
    */
-  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean };
+  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number };
   /** Always empty: "S" is read as a volunteer. Kept so callers' shapes don't change. */
-  speaker: { listed: boolean; names: string[] };
-  volunteer: { listed: boolean; names: string[] };
+  speaker: { listed: boolean; names: string[]; slots: number };
+  volunteer: { listed: boolean; names: string[]; slots: number };
+  /** Parts of the cell that weren't under any role code (shown to the person, never applied). */
+  unread: string[];
 }
 
 /**
@@ -234,51 +236,133 @@ export interface ParsedStaffing {
  */
 export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const out: ParsedStaffing = {
-    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false },
-    speaker: { listed: false, names: [] },
-    volunteer: { listed: false, names: [] },
+    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0 },
+    speaker: { listed: false, names: [], slots: 0 },
+    volunteer: { listed: false, names: [], slots: 0 },
+    unread: [],
   };
   const s = clean(raw);
   if (!s) return out;
 
-  let current: 'driver' | 'speaker' | 'volunteer' | null = null;
-  let inVan = false;
-  const addName = (role: 'driver' | 'speaker' | 'volunteer', name: string) => {
-    const n = name.trim();
-    if (!n) return;
-    out[role].names.push(n);
-    if (role === 'driver' && inVan) out.driver.vanNames.push(n);
-  };
-  const roleFor = (code: string) => {
-    const c = code.trim().toUpperCase();
-    if (c === 'D' || c === 'VD') return 'driver' as const;
-    if (c === 'S') return 'volunteer' as const; // speakers were folded into volunteers
-    if (c === 'V') return 'volunteer' as const;
+  // Role codes, optionally numbered per slot ("D1:", "V2:"), or spelled out
+  // ("Driver:", "Volunteers:", "Van driver:"). Speakers were folded into
+  // volunteers, so S counts as a volunteer.
+  const roleFor = (code: string): { role: 'driver' | 'volunteer' | 'both'; van: boolean } | null => {
+    const c = code.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\d+$/, '').trim();
+    if (c === 'VANDD') return { role: 'both', van: false }; // "V/D" placeholder, see below
+    if (c === 'VD' || c === 'VAN DRIVER' || c === 'VAN DRIVERS') return { role: 'driver', van: true };
+    if (c === 'D' || c === 'DRIVER' || c === 'DRIVERS') return { role: 'driver', van: false };
+    if (c === 'V' || c === 'VOLUNTEER' || c === 'VOLUNTEERS') return { role: 'volunteer', van: false };
+    if (c === 'S' || c === 'SPEAKER' || c === 'SPEAKERS') return { role: 'volunteer', van: false };
     return null;
   };
+  const PAREN = '\u0001';
+  const ROLE_CODE = String.raw`(?:van\s+drivers?|drivers?|volunteers?|speakers?|VANDD|VD|D|S|V)\d*\s*:`;
 
-  // Names can be separated by commas, semicolons, new lines, "&" or "and"
-  // ("D: Katie & Kim", "V: Ann and Bo"). "and" only counts as a whole word, so
-  // names like "Anderson" or "Sandy" stay intact.
-  // A role code can also start mid-cell with no comma ("D: Katie V: Kim"),
-  // which the old parser accepted, so break before each one too.
-  const cell = s.replace(/\s+(?=(?:VD|D|S|V)\s*:)/gi, ',');
-  for (const token of cell.split(/[,;\n&]|\s+and\s+/i).map((t) => t.trim())) {
+  // Formats seen on the live sheet, all handled here:
+  //   "D: Katie, Kim"  "D: Katie & Kim"  "V: Ann and Bo"   (name separators)
+  //   "D1: Karen V1: Karen  V2: Bev Lowe + Alicia"         (numbered slots, "+")
+  //   "V1: Sibet/Bruce"                                    (slash between names)
+  //   "D: (VD: Luz for event)"                             (a code in parentheses)
+  //   "V/D: Dawn M."                                       (V/D = volunteer AND driver; VD = van driver)
+  //   "D: Brigith (9:15 pickup or go for event)"           (a note in parentheses)
+  //   "D: Katie V: Kim"                                    (no comma before a code)
+  let cell = s
+    // "V/D:" means the person both volunteers and drives (not two names, and
+    // not "VD", which is van driver). Swap in a placeholder code first.
+    .replace(/\bV\s*\/\s*D(?=\d*\s*:)/gi, 'VANDD')
+    // A code inside parentheses is just a code: "(VD: Luz)" -> " VD: Luz ".
+    // PAREN marks it so the code just before it can be merged as its label.
+    .replace(new RegExp(String.raw`\(\s*(${ROLE_CODE}[^)]*)\)`, 'gi'), ` ${PAREN}$1 `)
+    // Any other parenthetical is a note about the person, not a name. One
+    // with its own label ("(Helper: Kim)") might name someone in a role we
+    // don't know, so it's kept as unread: that keeps the partial-read safety
+    // on (nobody already assigned is removed). Times like "(9:15 pickup)"
+    // aren't labels.
+    .replace(/\([^)]*\)/g, (m) => {
+      if (/[A-Za-z][A-Za-z ]*:/.test(m)) out.unread.push(m.slice(1, -1).trim());
+      return ' ';
+    })
+    // A slash between two names separates them; inside numbers (11/5) it doesn't.
+    .replace(/(?<=[A-Za-z])\s*\/\s*(?=[A-Za-z])/g, ' + ')
+    // Break before every role code, even without a comma, but never inside
+    // a spelled-out code ("Van driver:" must stay one code).
+    .replace(new RegExp(String.raw`(?<!\bvan)\s+(?=${PAREN}?${ROLE_CODE})`, 'gi'), ',');
+
+  // A note after a name ("Luz for event", "Kim maybe", "Ann - backup") is cut
+  // at a recognizable note word or a dash; ordinary lowercase name parts
+  // ("Ann de la Cruz") are kept. A name that is only a role code ("V2: VD")
+  // refers to another role, not a person.
+  const NOTE_START = /\s+(?:[-–—]\s|for\b|to\b|at\b|from\b|until\b|after\b|before\b|if\b|maybe\b|tbd\b|tentative\b|backup\b|pick\s?up\b|drop\s?off\b|driving\b|available\b|confirmed\b|\?)/i;
+  const cleanName = (raw: string): string => {
+    const t = raw.replace(/^[:\s]+/, '').trim();
+    const cut = t.search(NOTE_START);
+    return (cut > 0 ? t.slice(0, cut) : t).trim();
+  };
+
+  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean };
+  const segments: Segment[] = [];
+  let current: Segment | null = null;
+  const addTo = (seg: Segment, raw: string) => {
+    const name = cleanName(raw);
+    if (!name) return;
+    if (roleFor(name)) {
+      out.unread.push(`${seg.head.replace(/^VANDD/i, 'V/D')}: ${name}`);
+      return;
+    }
+    seg.names.push(name);
+  };
+  for (const rawToken of cell.split(/[,;\n&+]|\s+and\s+/i).map((t) => t.trim())) {
+    if (!rawToken) continue;
+    const fromParen = rawToken.startsWith(PAREN);
+    const token = rawToken.replace(new RegExp(PAREN, 'g'), '').trim();
     if (!token) continue;
     const colon = token.indexOf(':');
     const head = colon >= 0 ? token.slice(0, colon) : token;
-    const role = roleFor(head);
-    if (role) {
-      current = role;
-      out[role].listed = true;
-      inVan = role === 'driver' && head.trim().toUpperCase() === 'VD';
-      if (inVan) out.driver.van = true;
-      else if (role === 'driver') out.driver.plainListed = true;
-      addName(role, colon >= 0 ? token.slice(colon + 1) : '');
+    const hit = roleFor(head);
+    if (hit) {
+      current = { role: hit.role, van: hit.van, names: [], head: head.trim(), fromParen };
+      segments.push(current);
+      addTo(current, colon >= 0 ? token.slice(colon + 1) : '');
+    } else if (colon > 0) {
+      // An unknown label ("Helper: Kim"): not a name for the previous role.
+      // It and anything after it until the next known code are unread.
+      out.unread.push(token);
+      current = null;
     } else if (current) {
-      addName(current, token.replace(/^[:\s]+/, ''));
+      addTo(current, token);
+    } else {
+      out.unread.push(token);
     }
   }
+
+  // "D: (VD: Luz)" = one driver slot, filled by the van driver: a nameless
+  // driver code straight before a van-driver code is its label, not a slot.
+  const merged = segments.filter((seg, i) => {
+    const next = segments[i + 1];
+    const isWrapper = seg.role === 'driver' && !seg.van && seg.names.length === 0 && !!next && next.fromParen && next.role === 'driver';
+    return !isWrapper;
+  });
+  const rolesOf = (seg: Segment): Array<'driver' | 'volunteer'> =>
+    seg.role === 'both' ? ['volunteer', 'driver'] : [seg.role];
+  for (const seg of merged) {
+    for (const role of rolesOf(seg)) {
+      const r = out[role];
+      r.listed = true;
+      r.slots += 1;
+      r.names.push(...seg.names);
+      if (role === 'driver') {
+        if (seg.van) {
+          out.driver.van = true;
+          out.driver.vanNames.push(...seg.names);
+        } else {
+          out.driver.plainListed = true;
+        }
+      }
+    }
+  }
+  // A code with nothing at all (a label merged away) still means the role is listed.
+  for (const seg of segments) for (const role of rolesOf(seg)) out[role].listed = true;
   return out;
 }
 
@@ -609,9 +693,22 @@ export function buildRowUpdatePlan(
   // --- Staffing (update) -----------------------------------------------------
   // A blank Staffing cell means "not filled in", so leave staffing alone.
   const staffingCell = staffingCellOf(row);
-  if (clean(staffingCell)) {
-    const staffing = parsePlanningStaffing(staffingCell);
+  const staffingRead = clean(staffingCell) ? parsePlanningStaffing(staffingCell) : null;
+  if (staffingRead && !staffingRead.driver.listed && !staffingRead.volunteer.listed) {
+    // Something is in the cell but no role code could be read from it. Never
+    // treat that as "roles removed": leave staffing alone and say so.
+    notes.push(
+      `Couldn't read the staffing cell ("${clean(staffingCell)}"), so drivers and volunteers were left alone. Use codes like D: / V: (numbered D1: / V2: is fine).`
+    );
+  } else if (staffingRead) {
+    const staffing = staffingRead;
     const usersById = new Map(users.map((u) => [u.id, u]));
+    // Part of the cell couldn't be read: show it, and don't remove a role that
+    // might be hiding in it.
+    const partlyUnread = staffing.unread.length > 0;
+    if (partlyUnread) {
+      notes.push(`Part of the staffing cell wasn't understood and was ignored: "${staffing.unread.join('", "')}".`);
+    }
 
     // Speakers were retired (folded into volunteers), so the speaker columns
     // are never touched here.
@@ -625,7 +722,8 @@ export function buildRowUpdatePlan(
       let newIds: string[];
       let newNeeded: number;
       if (!sheet.listed) {
-        // Role was taken off the sheet.
+        // Role was taken off the sheet (only trusted when the whole cell was read).
+        if (partlyUnread) continue;
         newIds = [];
         newNeeded = 0;
       } else {
@@ -640,7 +738,11 @@ export function buildRowUpdatePlan(
           return resolveSheetName(name, users);
         });
         newIds = Array.from(new Set(newIds));
-        newNeeded = Math.max(appNeeded, newIds.length, 1);
+        // Part of the cell couldn't be read: only add people, never drop
+        // someone already assigned (they may be in the unread part).
+        if (partlyUnread) newIds = Array.from(new Set([...appIds, ...newIds]));
+        // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned).
+        newNeeded = Math.max(appNeeded, sheet.slots, newIds.length, 1);
       }
 
       const changeField = role === 'driver' ? 'drivers' : 'volunteers';
@@ -679,7 +781,9 @@ export function buildRowUpdatePlan(
     // van driver (user) is linked in the app, which the sheet can't express.
     const vanName = staffing.driver.vanNames.join(', ');
     const appVanName = clean(event.customVanDriverName);
-    if (vanName && !event.assignedVanDriverId && lower(vanName) !== lower(appVanName)) {
+    // On a partial read, a van driver name already in the app is kept (the
+    // unread part may hold the rest of it).
+    if (vanName && !event.assignedVanDriverId && lower(vanName) !== lower(appVanName) && (!partlyUnread || !appVanName)) {
       changes.push({ field: 'vanDriver', label: 'Van driver', from: appVanName, to: vanName, kind: appVanName ? 'update' : 'fill' });
       set('vanDriver', 'customVanDriverName', vanName);
     }
@@ -925,11 +1029,12 @@ export function staffingCellOf(row: {
  */
 export function staffingForNewEvent(raw: unknown) {
   const s = parsePlanningStaffing(raw);
-  const need = (listed: boolean, n: number) => (listed ? Math.max(1, n) : 0);
+  const need = (r: { listed: boolean; slots: number; names: string[] }) =>
+    r.listed ? Math.max(1, r.slots, r.names.length) : 0;
   return {
-    driversNeeded: need(s.driver.listed, s.driver.names.length),
+    driversNeeded: need(s.driver),
     speakersNeeded: 0, // retired role; "S" is counted under volunteers
-    volunteersNeeded: need(s.volunteer.listed, s.volunteer.names.length),
+    volunteersNeeded: need(s.volunteer),
     vanDriverNeeded: s.driver.van,
     assignedDriverNames: s.driver.names,
     assignedSpeakerNames: [] as string[],

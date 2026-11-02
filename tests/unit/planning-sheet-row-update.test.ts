@@ -90,9 +90,9 @@ describe('parsing helpers', () => {
 
   it('parses staffing the way the push writes it', () => {
     const s = parsePlanningStaffing('D: Katie Long, Kim Lee, V: ');
-    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false, vanNames: [], plainListed: true });
-    expect(s.volunteer).toEqual({ listed: true, names: [] });
-    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true, vanNames: ['Luz'], plainListed: false });
+    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false, vanNames: [], plainListed: true, slots: 1 });
+    expect(s.volunteer).toEqual({ listed: true, names: [], slots: 1 });
+    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true, vanNames: ['Luz'], plainListed: false, slots: 1 });
     expect(parsePlanningStaffing('').driver.listed).toBe(false);
   });
 
@@ -211,8 +211,8 @@ describe('buildRowUpdatePlan', () => {
   });
 
   it('reads an old "S" (speaker) as a volunteer and never touches speaker columns', () => {
-    expect(parsePlanningStaffing('S: Ann').volunteer).toEqual({ listed: true, names: ['Ann'] });
-    expect(parsePlanningStaffing('S: Ann').speaker).toEqual({ listed: false, names: [] });
+    expect(parsePlanningStaffing('S: Ann').volunteer).toEqual({ listed: true, names: ['Ann'], slots: 1 });
+    expect(parsePlanningStaffing('S: Ann').speaker).toEqual({ listed: false, names: [], slots: 0 });
     const plan = buildRowUpdatePlan(
       makeEvent({ speakersNeeded: 1, assignedSpeakerIds: ['u-kim'] }),
       makeRow({ Staffing: 'D: , S: Ann Jones' }),
@@ -331,10 +331,11 @@ describe('creating an event from a sheet row ("send row to app")', () => {
   });
 
   it('still reads the bare-letter format', () => {
+    // An old speaker slot (S) is a volunteer slot now, so S + V = 2 volunteers.
     expect(staffingForNewEvent('D, S, V')).toMatchObject({
       driversNeeded: 1,
       speakersNeeded: 0,
-      volunteersNeeded: 1,
+      volunteersNeeded: 2,
     });
   });
 
@@ -637,5 +638,140 @@ describe('sync_id is never treated as a note', () => {
   it('the update flow adds no ID to planning notes', () => {
     const plan = buildRowUpdatePlan(makeEvent({ planningNotes: null }), makeRow({ "Add'l Notes": ID } as any), USERS);
     expect(plan.updatesByField.planningNotes).toBeUndefined();
+  });
+});
+
+describe('numbered role codes and unreadable cells (live sheet format)', () => {
+  const CELL = 'D1: Karen V1: Karen  V2: Bev Lowe + Alicia Jn Baptiste';
+
+  it('reads numbered codes and "+" between names', () => {
+    const p = parsePlanningStaffing(CELL);
+    expect(p.driver).toMatchObject({ listed: true, names: ['Karen'], slots: 1 });
+    expect(p.volunteer).toMatchObject({ listed: true, names: ['Karen', 'Bev Lowe', 'Alicia Jn Baptiste'], slots: 2 });
+    expect(p.unread).toEqual([]);
+  });
+
+  it('the update adds them instead of removing them', () => {
+    const plan = buildRowUpdatePlan(makeEvent({ driversNeeded: 0 }), makeRow({ Staffing: CELL }), USERS);
+    expect(plan.updates.driversNeeded).toBe(1);
+    expect(plan.updates.assignedDriverIds).toEqual(['Karen']);
+    expect(plan.updates.volunteersNeeded).toBe(3);
+    expect(plan.updates.assignedVolunteerIds).toEqual(['Karen', 'Bev Lowe', 'Alicia Jn Baptiste']);
+  });
+
+  it('reads the other live formats', () => {
+    const a = parsePlanningStaffing('VD: Luz  V1: Sibet/Bruce V2:  James');
+    expect(a.driver).toMatchObject({ names: ['Luz'], van: true });
+    expect(a.volunteer).toMatchObject({ names: ['Sibet', 'Bruce', 'James'], slots: 2 });
+    const b = parsePlanningStaffing('D: Luz, V1: Jeff Gross V2: Laurel Gross');
+    expect(b.driver.names).toEqual(['Luz']);
+    expect(b.volunteer).toMatchObject({ names: ['Jeff Gross', 'Laurel Gross'], slots: 2 });
+    // A slash in a date doesn't split the name; the parenthetical note is dropped.
+    expect(parsePlanningStaffing('D: Brigith (pick up 11/5)').driver.names).toEqual(['Brigith']);
+    expect(parsePlanningStaffing('D: Ann 11/5').driver.names).toEqual(['Ann 11/5']);
+  });
+
+  it('reads codes in parentheses, notes after names, and role references', () => {
+    const a = parsePlanningStaffing('D: (VD: Luz for event), V1: Christine V2:  Laura B');
+    expect(a.driver).toMatchObject({ names: ['Luz'], van: true, vanNames: ['Luz'], slots: 1 });
+    expect(a.volunteer).toMatchObject({ names: ['Christine', 'Laura B'], slots: 2 });
+    expect(a.unread).toEqual([]);
+
+    const b = parsePlanningStaffing('V1: Dawn M. V2: VD');
+    expect(b.volunteer).toMatchObject({ names: ['Dawn M.'], slots: 2 });
+    expect(b.unread).toEqual(['V2: VD']);
+
+    // V/D = volunteer AND driver (VD is van driver).
+    const c = parsePlanningStaffing('V/D: Dawn M. D: Jeff Gross');
+    expect(c.driver).toMatchObject({ names: ['Dawn M.', 'Jeff Gross'], van: false, vanNames: [], slots: 2 });
+    expect(c.volunteer).toMatchObject({ listed: true, names: ['Dawn M.'], slots: 1 });
+    expect(parsePlanningStaffing('VD: Luz').driver).toMatchObject({ van: true, names: ['Luz'] });
+
+    const d = parsePlanningStaffing('D: Luz S: Brigith (9:15 pickup or go for event)');
+    expect(d.volunteer.names).toEqual(['Brigith']);
+  });
+
+  it('empty numbered slots count as needed', () => {
+    const p = parsePlanningStaffing('D1: Karen, D2:');
+    expect(p.driver).toMatchObject({ names: ['Karen'], slots: 2 });
+    expect(staffingForNewEvent('D1: Karen, D2:').driversNeeded).toBe(2);
+  });
+
+  it('spelled-out roles work too', () => {
+    const p = parsePlanningStaffing('Driver: Katie, Volunteers: Ann');
+    expect(p.driver.names).toEqual(['Katie']);
+    expect(p.volunteer.names).toEqual(['Ann']);
+  });
+
+  it('never removes staffing when the cell can\'t be read', () => {
+    const event = makeEvent({ driversNeeded: 1, assignedDriverIds: ['u-katie'], volunteersNeeded: 2, assignedVolunteerIds: ['u-kim'] });
+    const plan = buildRowUpdatePlan(event, makeRow({ Staffing: 'Katie driving, Kim helping' }), USERS);
+    expect(plan.updatesByField.drivers).toBeUndefined();
+    expect(plan.updatesByField.volunteers).toBeUndefined();
+    expect(plan.notes.some((n) => n.includes("Couldn't read the staffing cell"))).toBe(true);
+  });
+
+  it('doesn\'t remove a role when part of the cell couldn\'t be read', () => {
+    const event = makeEvent({ driversNeeded: 1, assignedDriverIds: ['u-katie'], volunteersNeeded: 1, assignedVolunteerIds: ['u-kim'] });
+    const plan = buildRowUpdatePlan(event, makeRow({ Staffing: 'mystery text, D: Katie' }), USERS);
+    expect(plan.updatesByField.volunteers).toBeUndefined();
+    expect(plan.notes.some((n) => n.includes('wasn\'t understood'))).toBe(true);
+  });
+});
+
+describe('Copilot review on the staffing parser', () => {
+  it('keeps "Van driver:" as one code', () => {
+    const p = parsePlanningStaffing('Van driver: Luz');
+    expect(p.driver).toMatchObject({ van: true, names: ['Luz'] });
+    expect(staffingForNewEvent('Van driver: Luz').vanDriverNeeded).toBe(true);
+  });
+
+  it('keeps lowercase name parts, cuts only note phrases', () => {
+    expect(parsePlanningStaffing('V: Ann de la Cruz').volunteer.names).toEqual(['Ann de la Cruz']);
+    expect(parsePlanningStaffing('VD: Luz for event').driver.names).toEqual(['Luz']);
+    expect(parsePlanningStaffing('V: Kim maybe, Bo - backup').volunteer.names).toEqual(['Kim', 'Bo']);
+  });
+
+  it('treats an unknown label as unread, not as a name', () => {
+    const p = parsePlanningStaffing('D: Katie, Helper: Kim');
+    expect(p.driver.names).toEqual(['Katie']);
+    expect(p.unread).toEqual(['Helper: Kim']);
+  });
+
+  it('keeps a separate empty numbered driver slot', () => {
+    expect(parsePlanningStaffing('D1: , VD1: Luz').driver).toMatchObject({ names: ['Luz'], slots: 2 });
+    expect(parsePlanningStaffing('D: (VD: Luz)').driver).toMatchObject({ names: ['Luz'], slots: 1 });
+  });
+
+  it('only adds people when part of the cell is unclear', () => {
+    const event = makeEvent({ volunteersNeeded: 2, assignedVolunteerIds: ['u-kim', 'u-ann1'] });
+    const a = buildRowUpdatePlan(event, makeRow({ Staffing: 'V1: VD' }), USERS);
+    expect(a.updatesByField.volunteers?.assignedVolunteerIds).toBeUndefined();
+    const b = buildRowUpdatePlan(event, makeRow({ Staffing: 'V1: Katie V2: VD' }), USERS);
+    expect(b.updatesByField.volunteers?.assignedVolunteerIds).toEqual(['u-kim', 'u-ann1', 'u-katie']);
+  });
+});
+
+describe('Copilot review fixes, round 6', () => {
+  it('keeps a labelled parenthetical as unread so assigned volunteers are not cleared', () => {
+    expect(parsePlanningStaffing('D: Katie, (Helper: Kim)').unread).toEqual(['Helper: Kim']);
+    // A time in a note is not a label.
+    expect(parsePlanningStaffing('D: Brigith (9:15 pickup)').unread).toEqual([]);
+    const plan = buildRowUpdatePlan(
+      makeEvent({ driversNeeded: 1, volunteersNeeded: 1, assignedVolunteerIds: ['u-kim'] }),
+      makeRow({ Staffing: 'D: Katie, (Helper: Kim)' }),
+      USERS
+    );
+    expect(plan.updates.assignedVolunteerIds).toBeUndefined();
+    expect(plan.updates.volunteersNeeded).toBeUndefined();
+  });
+
+  it('a partial read never overwrites a van driver name already in the app', () => {
+    const event = makeEvent({ vanDriverNeeded: true, customVanDriverName: 'Luz, Maria' });
+    const partial = buildRowUpdatePlan(event, makeRow({ Staffing: 'VD1: Luz VD2: V' }), USERS);
+    expect(partial.updatesByField.vanDriver).toBeUndefined();
+    // A full read still updates it.
+    const full = buildRowUpdatePlan(event, makeRow({ Staffing: 'VD: Luz' }), USERS);
+    expect(full.updatesByField.vanDriver).toEqual({ customVanDriverName: 'Luz' });
   });
 });
