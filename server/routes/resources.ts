@@ -10,6 +10,8 @@ import {
   users,
 } from '../../shared/schema';
 import { isAuthenticated } from '../auth';
+import { hasPermission } from '@shared/unified-auth-utils';
+import { PERMISSIONS } from '@shared/auth-utils';
 import { logger } from '../middleware/logger';
 import { createStandardMiddleware, createErrorHandler } from '../middleware';
 import type { AuthenticatedRequest } from '../types/express';
@@ -22,6 +24,23 @@ resourcesRouter.use(createStandardMiddleware());
 
 // Error handling for this module
 const errorHandler = createErrorHandler('resources');
+
+/**
+ * A file resource is only listed while its linked document is active and, if
+ * that document is confidential, only to users who may see confidential
+ * documents — evaluated live, so a document marked confidential or deactivated
+ * after its resource was created stops leaking its title/description here.
+ * Same rules as GET /api/documents.
+ */
+function linkedDocumentVisible(user: Parameters<typeof hasPermission>[0]) {
+  const canViewConfidential = hasPermission(user, PERMISSIONS.DOCUMENTS_CONFIDENTIAL);
+  return sql`(${resources.documentId} IS NULL OR EXISTS (
+    SELECT 1 FROM ${documents} AS linked_doc
+    WHERE linked_doc.id = ${resources.documentId}
+      AND linked_doc.is_active = true
+      ${canViewConfidential ? sql`` : sql`AND linked_doc.category <> 'confidential'`}
+  ))`;
+}
 
 // Helper function to get user from request
 const getUser = (req: AuthenticatedRequest) => {
@@ -62,7 +81,7 @@ resourcesRouter.get(
       } = req.query;
 
       // Build query conditions
-      const conditions: any[] = [eq(resources.isActive, true)];
+      const conditions: any[] = [eq(resources.isActive, true), linkedDocumentVisible(user)];
 
       if (category) {
         conditions.push(eq(resources.category, category as string));
@@ -225,7 +244,8 @@ resourcesRouter.get(
         .where(
           and(
             eq(userResourceFavorites.userId, user.id),
-            eq(resources.isActive, true)
+            eq(resources.isActive, true),
+            linkedDocumentVisible(user)
           )
         )
         .groupBy(resources.id, userResourceFavorites.createdAt, documents.id, documents.mimeType, documents.originalName, documents.fileSize)
@@ -289,7 +309,8 @@ resourcesRouter.get(
         .where(
           and(
             eq(resources.isActive, true),
-            sql`${resources.lastAccessedAt} IS NOT NULL`
+            sql`${resources.lastAccessedAt} IS NOT NULL`,
+            linkedDocumentVisible(user)
           )
         )
         .groupBy(resources.id, documents.id, documents.mimeType, documents.originalName, documents.fileSize)
@@ -418,7 +439,7 @@ resourcesRouter.get(
           eq(resources.id, resourceTagAssignments.resourceId)
         )
         .leftJoin(resourceTags, eq(resourceTagAssignments.tagId, resourceTags.id))
-        .where(eq(resources.id, resourceId))
+        .where(and(eq(resources.id, resourceId), linkedDocumentVisible(user)))
         .groupBy(resources.id)
         .limit(1);
 

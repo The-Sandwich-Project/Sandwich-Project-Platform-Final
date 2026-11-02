@@ -10,6 +10,8 @@ import type { AuthenticatedRequest } from '../types/express';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { ObjectStorageService, ObjectNotFoundError } from '../replit_integrations/object_storage';
+import { db } from '../db';
+import { resources } from '@shared/schema';
 
 const objectStorageService = new ObjectStorageService();
 
@@ -129,7 +131,7 @@ documentsRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
       return res.status(403).json({ error: 'Only super admins can create documents' });
     }
 
-    const { title, description, category, fileName, originalName, fileSize, mimeType, objectPath } = req.body;
+    const { title, description, category, fileName, originalName, fileSize, mimeType, objectPath, addToResources } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
@@ -161,6 +163,32 @@ documentsRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const document = await storage.createDocument(documentData);
 
     logger.info(`Document created successfully: ID ${document.id} - "${document.title}"`);
+
+    // Document Management uploads should show up in Reference Materials
+    // (Resources), which replaced the Important Documents page that listed
+    // every upload. Opt-in, because the Add Resource form uploads through this
+    // route and then creates its own resource. Confidential documents never get
+    // one; they're listed on the Resources page's Confidential tab instead.
+    if (addToResources === true && document.category !== 'confidential') {
+      try {
+        const resourceCategory: Record<string, string> = {
+          governance: 'legal_governance',
+          operations: 'operations_safety',
+        };
+        await db.insert(resources).values({
+          title: document.title,
+          description: document.description,
+          type: 'file',
+          category: resourceCategory[document.category] || 'toolkit',
+          documentId: document.id,
+          createdBy: user.id,
+          createdByName: documentData.uploadedByName,
+        });
+      } catch (resourceError) {
+        // The upload itself succeeded; don't fail it over the library entry.
+        logger.error(`Failed to add document ${document.id} to resources:`, resourceError);
+      }
+    }
 
     res.status(201).json({ document });
   } catch (error: any) {
