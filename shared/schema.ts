@@ -3472,6 +3472,9 @@ export const importFromSheetsSchema = z.object({
   'ALL DETAILS': z.string().optional(),
   'Social Post': z.string().optional(),
   'Staffing': z.string().optional(),
+  // The planning sheet's "Send row to app" Apps Script sends the staffing
+  // column under this key (the sheet's header), not 'Staffing'.
+  'Volunteer/Driver Needed': z.string().optional(),
 
   // Sandwich info
   'Estimate # sandwiches': z.union([z.string(), z.number()]).optional(),

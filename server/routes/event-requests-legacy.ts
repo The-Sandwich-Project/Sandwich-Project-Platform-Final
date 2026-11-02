@@ -82,6 +82,7 @@ import {
   resolveSheetName,
   sandwichTypesForNewEvent,
   selectUpdates,
+  staffingCellOf,
   staffingForNewEvent,
   type RowUpdateEvent,
   type SheetRowData,
@@ -526,7 +527,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     });
 
     // Parse staffing column
-    const staffing = staffingForNewEvent(data['Staffing']);
+    const staffing = staffingForNewEvent(staffingCellOf(data));
 
     // Parse sandwich count
     const sandwichCountRaw = data['Estimate # sandwiches'];

@@ -337,3 +337,19 @@ describe('creating an event from a sheet row ("send row to app")', () => {
     expect(plan.changes).toEqual([]);
   });
 });
+
+describe('the staffing column key the Apps Script sends', () => {
+  it('reads staffing from "Volunteer/Driver Needed"', () => {
+    const row = makeRow({ Staffing: undefined, 'Volunteer/Driver Needed': 'D: Katie, S: ' });
+    const plan = buildRowUpdatePlan(makeEvent({ driversNeeded: 0 }), row, USERS);
+    expect(plan.updates.assignedDriverIds).toEqual(['u-katie']);
+    expect(plan.updates.speakersNeeded).toBe(1);
+  });
+
+  it('is what the create path reads too', () => {
+    const { staffingCellOf } = require('../../server/services/planning-sheet-row-update');
+    expect(staffingCellOf({ 'Volunteer/Driver Needed': 'V: Ann' })).toBe('V: Ann');
+    expect(staffingCellOf({ Staffing: 'D' })).toBe('D');
+    expect(staffingCellOf({})).toBe('');
+  });
+});

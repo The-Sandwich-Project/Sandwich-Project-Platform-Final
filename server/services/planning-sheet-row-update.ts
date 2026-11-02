@@ -66,6 +66,8 @@ export interface SheetRowData {
   'Event end time (MUST when volunteer needed)'?: string;
   'Pick up time'?: string;
   Staffing?: string;
+  /** What the sheet's Apps Script actually sends for the staffing column. */
+  'Volunteer/Driver Needed'?: string;
   'Estimate # sandwiches'?: string | number;
   'Deli or PBJ?'?: string;
   'Final # sandwiches made'?: string | number;
@@ -519,8 +521,9 @@ export function buildRowUpdatePlan(
 
   // --- Staffing (update) -----------------------------------------------------
   // A blank Staffing cell means "not filled in", so leave staffing alone.
-  if (clean(row.Staffing)) {
-    const staffing = parsePlanningStaffing(row.Staffing);
+  const staffingCell = staffingCellOf(row);
+  if (clean(staffingCell)) {
+    const staffing = parsePlanningStaffing(staffingCell);
     const usersById = new Map(users.map((u) => [u.id, u]));
 
     for (const role of ['driver', 'speaker', 'volunteer'] as const) {
@@ -637,6 +640,18 @@ export function selectUpdates(
 export function planToken(eventId: number, changes: RowChange[]): string {
   const canonical = JSON.stringify([eventId, changes.map((c) => [c.field, c.from, c.to])]);
   return createHash('sha256').update(canonical).digest('hex').slice(0, 32);
+}
+
+/**
+ * The staffing cell from a sheet payload. The planning sheet's Apps Script
+ * sends it as 'Volunteer/Driver Needed' (the sheet header); 'Staffing' is
+ * accepted too.
+ */
+export function staffingCellOf(row: {
+  Staffing?: string;
+  'Volunteer/Driver Needed'?: string;
+}): string {
+  return clean(row['Volunteer/Driver Needed']) || clean(row.Staffing);
 }
 
 /**
