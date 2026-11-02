@@ -681,9 +681,11 @@ describe('numbered role codes and unreadable cells (live sheet format)', () => {
     expect(b.volunteer).toMatchObject({ names: ['Dawn M.'], slots: 2 });
     expect(b.unread).toEqual(['V2: VD']);
 
+    // V/D = volunteer AND driver (VD is van driver).
     const c = parsePlanningStaffing('V/D: Dawn M. D: Jeff Gross');
-    expect(c.driver).toMatchObject({ names: ['Dawn M.', 'Jeff Gross'], van: true, vanNames: ['Dawn M.'], slots: 2 });
-    expect(c.volunteer.listed).toBe(false);
+    expect(c.driver).toMatchObject({ names: ['Dawn M.', 'Jeff Gross'], van: false, vanNames: [], slots: 2 });
+    expect(c.volunteer).toMatchObject({ listed: true, names: ['Dawn M.'], slots: 1 });
+    expect(parsePlanningStaffing('VD: Luz').driver).toMatchObject({ van: true, names: ['Luz'] });
 
     const d = parsePlanningStaffing('D: Luz S: Brigith (9:15 pickup or go for event)');
     expect(d.volunteer.names).toEqual(['Brigith']);

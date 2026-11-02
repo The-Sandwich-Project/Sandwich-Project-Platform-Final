@@ -247,27 +247,29 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   // Role codes, optionally numbered per slot ("D1:", "V2:"), or spelled out
   // ("Driver:", "Volunteers:", "Van driver:"). Speakers were folded into
   // volunteers, so S counts as a volunteer.
-  const roleFor = (code: string): { role: 'driver' | 'volunteer'; van: boolean } | null => {
+  const roleFor = (code: string): { role: 'driver' | 'volunteer' | 'both'; van: boolean } | null => {
     const c = code.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\d+$/, '').trim();
+    if (c === 'VANDD') return { role: 'both', van: false }; // "V/D" placeholder, see below
     if (c === 'VD' || c === 'VAN DRIVER' || c === 'VAN DRIVERS') return { role: 'driver', van: true };
     if (c === 'D' || c === 'DRIVER' || c === 'DRIVERS') return { role: 'driver', van: false };
     if (c === 'V' || c === 'VOLUNTEER' || c === 'VOLUNTEERS') return { role: 'volunteer', van: false };
     if (c === 'S' || c === 'SPEAKER' || c === 'SPEAKERS') return { role: 'volunteer', van: false };
     return null;
   };
-  const ROLE_CODE = String.raw`(?:van\s+drivers?|drivers?|volunteers?|speakers?|VD|D|S|V)\d*\s*:`;
+  const ROLE_CODE = String.raw`(?:van\s+drivers?|drivers?|volunteers?|speakers?|VANDD|VD|D|S|V)\d*\s*:`;
 
   // Formats seen on the live sheet, all handled here:
   //   "D: Katie, Kim"  "D: Katie & Kim"  "V: Ann and Bo"   (name separators)
   //   "D1: Karen V1: Karen  V2: Bev Lowe + Alicia"         (numbered slots, "+")
   //   "V1: Sibet/Bruce"                                    (slash between names)
   //   "D: (VD: Luz for event)"                             (a code in parentheses)
-  //   "V/D: Dawn M."                                       (V/D = van driver)
+  //   "V/D: Dawn M."                                       (V/D = volunteer AND driver; VD = van driver)
   //   "D: Brigith (9:15 pickup or go for event)"           (a note in parentheses)
   //   "D: Katie V: Kim"                                    (no comma before a code)
   let cell = s
-    // "V/D:" is a van-driver code, not two names.
-    .replace(/\bV\s*\/\s*D(?=\d*\s*:)/gi, 'VD')
+    // "V/D:" means the person both volunteers and drives (not two names, and
+    // not "VD", which is van driver). Swap in a placeholder code first.
+    .replace(/\bV\s*\/\s*D(?=\d*\s*:)/gi, 'VANDD')
     // A code inside parentheses is just a code: "(VD: Luz)" -> " VD: Luz ".
     .replace(new RegExp(String.raw`\(\s*(${ROLE_CODE}[^)]*)\)`, 'gi'), ' $1 ')
     // Any other parenthetical is a note about the person, not a name.
@@ -290,14 +292,14 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     return kept.join(' ');
   };
 
-  type Segment = { role: 'driver' | 'volunteer'; van: boolean; names: string[]; head: string };
+  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string };
   const segments: Segment[] = [];
   let current: Segment | null = null;
   const addTo = (seg: Segment, raw: string) => {
     const name = cleanName(raw);
     if (!name) return;
     if (roleFor(name)) {
-      out.unread.push(`${seg.head}: ${name}`);
+      out.unread.push(`${seg.head.replace(/^VANDD/i, 'V/D')}: ${name}`);
       return;
     }
     seg.names.push(name);
@@ -324,22 +326,26 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     (seg, i) =>
       !(seg.role === 'driver' && !seg.van && seg.names.length === 0 && segments[i + 1]?.role === 'driver' && segments[i + 1]?.van)
   );
+  const rolesOf = (seg: Segment): Array<'driver' | 'volunteer'> =>
+    seg.role === 'both' ? ['volunteer', 'driver'] : [seg.role];
   for (const seg of merged) {
-    const r = out[seg.role];
-    r.listed = true;
-    r.slots += 1;
-    r.names.push(...seg.names);
-    if (seg.role === 'driver') {
-      if (seg.van) {
-        out.driver.van = true;
-        out.driver.vanNames.push(...seg.names);
-      } else {
-        out.driver.plainListed = true;
+    for (const role of rolesOf(seg)) {
+      const r = out[role];
+      r.listed = true;
+      r.slots += 1;
+      r.names.push(...seg.names);
+      if (role === 'driver') {
+        if (seg.van) {
+          out.driver.van = true;
+          out.driver.vanNames.push(...seg.names);
+        } else {
+          out.driver.plainListed = true;
+        }
       }
     }
   }
   // A code with nothing at all (a label merged away) still means the role is listed.
-  for (const seg of segments) out[seg.role].listed = true;
+  for (const seg of segments) for (const role of rolesOf(seg)) out[role].listed = true;
   return out;
 }
 
