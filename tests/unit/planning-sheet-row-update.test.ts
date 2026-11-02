@@ -718,3 +718,36 @@ describe('numbered role codes and unreadable cells (live sheet format)', () => {
     expect(plan.notes.some((n) => n.includes('wasn\'t understood'))).toBe(true);
   });
 });
+
+describe('Copilot review on the staffing parser', () => {
+  it('keeps "Van driver:" as one code', () => {
+    const p = parsePlanningStaffing('Van driver: Luz');
+    expect(p.driver).toMatchObject({ van: true, names: ['Luz'] });
+    expect(staffingForNewEvent('Van driver: Luz').vanDriverNeeded).toBe(true);
+  });
+
+  it('keeps lowercase name parts, cuts only note phrases', () => {
+    expect(parsePlanningStaffing('V: Ann de la Cruz').volunteer.names).toEqual(['Ann de la Cruz']);
+    expect(parsePlanningStaffing('VD: Luz for event').driver.names).toEqual(['Luz']);
+    expect(parsePlanningStaffing('V: Kim maybe, Bo - backup').volunteer.names).toEqual(['Kim', 'Bo']);
+  });
+
+  it('treats an unknown label as unread, not as a name', () => {
+    const p = parsePlanningStaffing('D: Katie, Helper: Kim');
+    expect(p.driver.names).toEqual(['Katie']);
+    expect(p.unread).toEqual(['Helper: Kim']);
+  });
+
+  it('keeps a separate empty numbered driver slot', () => {
+    expect(parsePlanningStaffing('D1: , VD1: Luz').driver).toMatchObject({ names: ['Luz'], slots: 2 });
+    expect(parsePlanningStaffing('D: (VD: Luz)').driver).toMatchObject({ names: ['Luz'], slots: 1 });
+  });
+
+  it('only adds people when part of the cell is unclear', () => {
+    const event = makeEvent({ volunteersNeeded: 2, assignedVolunteerIds: ['u-kim', 'u-ann1'] });
+    const a = buildRowUpdatePlan(event, makeRow({ Staffing: 'V1: VD' }), USERS);
+    expect(a.updatesByField.volunteers?.assignedVolunteerIds).toBeUndefined();
+    const b = buildRowUpdatePlan(event, makeRow({ Staffing: 'V1: Katie V2: VD' }), USERS);
+    expect(b.updatesByField.volunteers?.assignedVolunteerIds).toEqual(['u-kim', 'u-ann1', 'u-katie']);
+  });
+});

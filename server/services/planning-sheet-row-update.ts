@@ -256,6 +256,7 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     if (c === 'S' || c === 'SPEAKER' || c === 'SPEAKERS') return { role: 'volunteer', van: false };
     return null;
   };
+  const PAREN = '\u0001';
   const ROLE_CODE = String.raw`(?:van\s+drivers?|drivers?|volunteers?|speakers?|VANDD|VD|D|S|V)\d*\s*:`;
 
   // Formats seen on the live sheet, all handled here:
@@ -271,28 +272,28 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     // not "VD", which is van driver). Swap in a placeholder code first.
     .replace(/\bV\s*\/\s*D(?=\d*\s*:)/gi, 'VANDD')
     // A code inside parentheses is just a code: "(VD: Luz)" -> " VD: Luz ".
-    .replace(new RegExp(String.raw`\(\s*(${ROLE_CODE}[^)]*)\)`, 'gi'), ' $1 ')
+    // PAREN marks it so the code just before it can be merged as its label.
+    .replace(new RegExp(String.raw`\(\s*(${ROLE_CODE}[^)]*)\)`, 'gi'), ` ${PAREN}$1 `)
     // Any other parenthetical is a note about the person, not a name.
     .replace(/\([^)]*\)/g, ' ')
     // A slash between two names separates them; inside numbers (11/5) it doesn't.
     .replace(/(?<=[A-Za-z])\s*\/\s*(?=[A-Za-z])/g, ' + ')
-    // Break before every role code, even without a comma.
-    .replace(new RegExp(String.raw`\s+(?=${ROLE_CODE})`, 'gi'), ',');
+    // Break before every role code, even without a comma, but never inside
+    // a spelled-out code ("Van driver:" must stay one code).
+    .replace(new RegExp(String.raw`(?<!\bvan)\s+(?=${PAREN}?${ROLE_CODE})`, 'gi'), ',');
 
-  // A person's name is its leading words; trailing lowercase words are a note
-  // ("Luz for event" -> "Luz"). A name that is only a role code ("V2: VD")
+  // A note after a name ("Luz for event", "Kim maybe", "Ann - backup") is cut
+  // at a recognizable note word or a dash; ordinary lowercase name parts
+  // ("Ann de la Cruz") are kept. A name that is only a role code ("V2: VD")
   // refers to another role, not a person.
+  const NOTE_START = /\s+(?:[-–—]\s|for\b|to\b|at\b|from\b|until\b|after\b|before\b|if\b|maybe\b|tbd\b|tentative\b|backup\b|pick\s?up\b|drop\s?off\b|driving\b|available\b|confirmed\b|\?)/i;
   const cleanName = (raw: string): string => {
-    const words = raw.replace(/^[:\s]+/, '').trim().split(/\s+/).filter(Boolean);
-    const kept: string[] = [];
-    for (const w of words) {
-      if (kept.length && /^[a-z]/.test(w)) break;
-      kept.push(w);
-    }
-    return kept.join(' ');
+    const t = raw.replace(/^[:\s]+/, '').trim();
+    const cut = t.search(NOTE_START);
+    return (cut > 0 ? t.slice(0, cut) : t).trim();
   };
 
-  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string };
+  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean };
   const segments: Segment[] = [];
   let current: Segment | null = null;
   const addTo = (seg: Segment, raw: string) => {
@@ -304,15 +305,23 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     }
     seg.names.push(name);
   };
-  for (const token of cell.split(/[,;\n&+]|\s+and\s+/i).map((t) => t.trim())) {
+  for (const rawToken of cell.split(/[,;\n&+]|\s+and\s+/i).map((t) => t.trim())) {
+    if (!rawToken) continue;
+    const fromParen = rawToken.startsWith(PAREN);
+    const token = rawToken.replace(new RegExp(PAREN, 'g'), '').trim();
     if (!token) continue;
     const colon = token.indexOf(':');
     const head = colon >= 0 ? token.slice(0, colon) : token;
     const hit = roleFor(head);
     if (hit) {
-      current = { role: hit.role, van: hit.van, names: [], head: head.trim() };
+      current = { role: hit.role, van: hit.van, names: [], head: head.trim(), fromParen };
       segments.push(current);
       addTo(current, colon >= 0 ? token.slice(colon + 1) : '');
+    } else if (colon > 0) {
+      // An unknown label ("Helper: Kim"): not a name for the previous role.
+      // It and anything after it until the next known code are unread.
+      out.unread.push(token);
+      current = null;
     } else if (current) {
       addTo(current, token);
     } else {
@@ -322,10 +331,11 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
 
   // "D: (VD: Luz)" = one driver slot, filled by the van driver: a nameless
   // driver code straight before a van-driver code is its label, not a slot.
-  const merged = segments.filter(
-    (seg, i) =>
-      !(seg.role === 'driver' && !seg.van && seg.names.length === 0 && segments[i + 1]?.role === 'driver' && segments[i + 1]?.van)
-  );
+  const merged = segments.filter((seg, i) => {
+    const next = segments[i + 1];
+    const isWrapper = seg.role === 'driver' && !seg.van && seg.names.length === 0 && !!next && next.fromParen && next.role === 'driver';
+    return !isWrapper;
+  });
   const rolesOf = (seg: Segment): Array<'driver' | 'volunteer'> =>
     seg.role === 'both' ? ['volunteer', 'driver'] : [seg.role];
   for (const seg of merged) {
@@ -721,6 +731,9 @@ export function buildRowUpdatePlan(
           return resolveSheetName(name, users);
         });
         newIds = Array.from(new Set(newIds));
+        // Part of the cell couldn't be read: only add people, never drop
+        // someone already assigned (they may be in the unread part).
+        if (partlyUnread) newIds = Array.from(new Set([...appIds, ...newIds]));
         // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned).
         newNeeded = Math.max(appNeeded, sheet.slots, newIds.length, 1);
       }
