@@ -2550,7 +2550,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                       if (!hasCount && !hasTypes) {
                         return <span className="text-gray-400 italic font-normal">not recorded</span>;
                       }
-                      return formatSandwichTypesDisplay(typesRaw, count ?? undefined);
+                      return formatSandwichTypesDisplay(typesRaw, count ?? undefined, { unknownAmounts: false });
                     })()}
                   </strong>
                 </span>

@@ -1,4 +1,6 @@
+import { totalFromFields } from '@shared/sandwich-estimate';
 import React, { useState, useEffect, useCallback } from 'react';
+import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -196,8 +198,20 @@ function buildStructuredUpdates(
   // sandwich_count — free text → integer.
   const sandwichValue = itemAnswers.sandwich_count?.trim();
   if (sandwichValue) {
+    // A range ("200-300", "200 to 300") is kept as a range; anything else
+    // takes the first number. The server's estimate rule keeps the type
+    // breakdown and range fields consistent with whichever is sent.
+    const asRange = parseSandwichCountInput(sandwichValue);
     const n = parseNumberFromText(sandwichValue);
-    if (n !== null) {
+    if (asRange.isRange && asRange.min && asRange.max) {
+      updates.estimatedSandwichCountMin = asRange.min;
+      updates.estimatedSandwichCountMax = asRange.max;
+      mapped.push({
+        itemId: 'sandwich_count',
+        column: 'estimated sandwich count',
+        display: `${asRange.min}–${asRange.max}`,
+      });
+    } else if (n !== null) {
       updates.estimatedSandwichCount = n;
       mapped.push({
         itemId: 'sandwich_count',
@@ -538,8 +552,13 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
         initialChecked.add('event_date');
       }
     }
-    if (req.estimatedSandwichCount != null) {
-      initialAnswers.sandwich_count = String(req.estimatedSandwichCount);
+    // Prefill the estimate the way the app shows it: an active range as
+    // "200-300" (so saving unrelated answers doesn't collapse it to its
+    // midpoint), otherwise the count.
+    const estTotal = totalFromFields(req);
+    if (estTotal) {
+      initialAnswers.sandwich_count =
+        estTotal.min === estTotal.max ? String(estTotal.min) : `${estTotal.min}-${estTotal.max}`;
       initialChecked.add('sandwich_count');
     }
     if (req.estimatedAttendance != null) {

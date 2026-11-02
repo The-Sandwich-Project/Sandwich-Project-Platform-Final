@@ -45,7 +45,7 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
   const addSandwichType = () => {
     setFormData(prev => ({
       ...prev,
-      sandwichTypes: [...(prev.sandwichTypes || []), { type: 'turkey', quantity: 0 }]
+      sandwichTypes: [...(prev.sandwichTypes || []), { type: 'deli_turkey', quantity: 0 }]
     }));
   };
 
