@@ -137,6 +137,24 @@ const parseLocalDate = (dateString: string): Date => {
   return new Date(year, month - 1, day);
 };
 
+// Staffing badge colors (TSP color rule): light teal when filled, gold when
+// short, red only when short AND the event is within 3 days.
+const staffingBadgeClass = (
+  fulfilled: boolean,
+  event: { scheduledEventDate?: string | null; desiredEventDate?: string | null } | null | undefined,
+): string => {
+  if (fulfilled) return 'bg-tsp-sky/15 text-tsp-navy border-tsp-sky';
+  const dateStr = event ? getEffectiveEventDate(event) : null;
+  if (dateStr) {
+    const eventDate = parseLocalDate(String(dateStr));
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const cutoff = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+    if (eventDate >= today && eventDate <= cutoff) return 'bg-tsp-red text-white border-tsp-red';
+  }
+  return 'bg-tsp-cream text-tsp-navy border-tsp-gold';
+};
+
 // Haversine formula for accurate distance calculation between coordinates
 const calculateDistanceInMiles = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const toRad = (deg: number) => deg * Math.PI / 180;
@@ -2811,7 +2829,7 @@ export default function DriverPlanningDashboard() {
                       size="sm"
                       onClick={handleQuickLookup}
                       disabled={!quickLookupAddress.trim() || isGeocodingQuickLookup}
-                      className="h-7 px-2 bg-orange-600 hover:bg-orange-700"
+                      className="h-7 px-2"
                     >
                       {isGeocodingQuickLookup ? (
                         <Loader2 className="w-3 h-3 animate-spin" />
@@ -2883,10 +2901,10 @@ export default function DriverPlanningDashboard() {
                           {(() => {
                             const status = (event.status || '').toLowerCase();
                             if (status === 'new') return (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-700 bg-amber-50 flex-shrink-0">New</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-tsp-navy/40 text-tsp-navy bg-tsp-mist flex-shrink-0">New</Badge>
                             );
                             if (status === 'in_process') return (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-400 text-blue-700 bg-blue-50 flex-shrink-0">In Process</Badge>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-tsp-gold text-tsp-navy bg-tsp-cream flex-shrink-0">In Process</Badge>
                             );
                             return null;
                           })()}
@@ -2911,7 +2929,7 @@ export default function DriverPlanningDashboard() {
                       {event.estimatedSandwichCount && event.estimatedSandwichCount > 0 && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Package className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span className={event.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={event.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                          <span className={event.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={event.estimatedSandwichCount > 400 ? { color: '#114154' } : undefined}>
                             {formatSandwichSummary(event)}
                           </span>
                         </div>
@@ -2931,8 +2949,8 @@ export default function DriverPlanningDashboard() {
                           </Badge>
                         ) : hasDriverRequirement ? (
                           <Badge
-                            variant={driversFulfilled ? 'default' : 'destructive'}
-                            className="text-xs"
+                            variant="outline"
+                            className={`text-xs ${staffingBadgeClass(driversFulfilled, event)}`}
                           >
                             <Truck className="w-3 h-3 mr-1" />
                             {event.vanDriverNeeded ? (
@@ -2943,7 +2961,7 @@ export default function DriverPlanningDashboard() {
                                 const totalNeeded = driversNeeded + 1; // +1 for van driver
                                 return (
                                   <>
-                                    {totalAssigned}{driversTentative > 0 && <span className="text-amber-300">+{driversTentative}?</span>}/{totalNeeded} {driversNeeded > 0 ? 'drivers+van' : 'Van'}
+                                    {totalAssigned}{driversTentative > 0 && <span className="opacity-75">+{driversTentative}?</span>}/{totalNeeded} {driversNeeded > 0 ? 'drivers+van' : 'Van'}
                                     {vanDriverAssigned === 0 && ' needed'}
                                     {event.isDhlVan && ' (DHL)'}
                                   </>
@@ -2952,7 +2970,7 @@ export default function DriverPlanningDashboard() {
                             ) : driversNeeded > 0 ? (
                               // Regular drivers only
                               <>
-                                {totalDriversAssigned}{driversTentative > 0 && <span className="text-amber-300">+{driversTentative}?</span>}/{driversNeeded} drivers
+                                {totalDriversAssigned}{driversTentative > 0 && <span className="opacity-75">+{driversTentative}?</span>}/{driversNeeded} drivers
                               </>
                             ) : (
                               // No driver requirements but has assigned drivers
@@ -2969,8 +2987,8 @@ export default function DriverPlanningDashboard() {
                         {/* Volunteers - only show if needed > 0 */}
                         {volunteersNeeded > 0 && (
                           <Badge
-                            variant={volunteersAssigned < volunteersNeeded ? 'destructive' : 'default'}
-                            className="text-xs"
+                            variant="outline"
+                            className={`text-xs ${staffingBadgeClass(volunteersAssigned >= volunteersNeeded, event)}`}
                             title={getAssignedVolunteersLabel(event) ? `Volunteers: ${getAssignedVolunteersLabel(event)}` : undefined}
                           >
                             <Users className="w-3 h-3 mr-1" />
@@ -3197,7 +3215,7 @@ export default function DriverPlanningDashboard() {
                       <h3 className="font-semibold">{event.organizationName}</h3>
                       <p className="text-sm text-gray-600">{event.eventAddress}</p>
                       {event.estimatedSandwichCount && event.estimatedSandwichCount > 0 && (
-                        <p className="text-sm" style={event.estimatedSandwichCount > 400 ? { color: '#a31c41', fontWeight: 600 } : undefined}>
+                        <p className="text-sm" style={event.estimatedSandwichCount > 400 ? { color: '#114154', fontWeight: 600 } : undefined}>
                           {formatSandwichSummary(event)}
                         </p>
                       )}
@@ -3366,7 +3384,7 @@ export default function DriverPlanningDashboard() {
                       <Truck className="w-3 h-3" />
                       {selectedDriver.name}
                     </h3>
-                    <p className="text-xs text-green-600 mt-1">Selected for trip planning</p>
+                    <p className="text-xs text-tsp-teal mt-1">Selected for trip planning</p>
                   </div>
                 </Popup>
               </Marker>
@@ -3411,7 +3429,7 @@ export default function DriverPlanningDashboard() {
                     </p>
                     <p className="text-xs text-gray-500 mt-1">{distance.toFixed(1)} miles away</p>
                     {driver.vanApproved && (
-                      <p className="text-xs text-green-600 mt-1">Van Approved</p>
+                      <p className="text-xs text-tsp-teal mt-1">Van Approved</p>
                     )}
                   </div>
                 </Popup>
@@ -3581,7 +3599,7 @@ export default function DriverPlanningDashboard() {
                           setDrivingRoute(null);
                           setFocusedItem(null);
                         }}
-                        className="text-gray-400 hover:text-red-500 p-1 hover:bg-gray-100 rounded"
+                        className="text-gray-400 hover:text-tsp-red p-1 hover:bg-gray-100 rounded"
                         title="Clear selections"
                       >
                         <X className="w-4 h-4" />
@@ -3601,14 +3619,14 @@ export default function DriverPlanningDashboard() {
                           <Truck className="w-4 h-4 text-amber-600" />
                           <span className="text-sm font-medium text-gray-800">{selectedDriver.name}</span>
                           {assignedDrivers.some(d => String(d.id) === String(selectedDriver.id)) && (
-                            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                            <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                               Assigned
                             </span>
                           )}
                         </div>
                         <button
                           onClick={() => setSelectedDriver(null)}
-                          className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                          className="text-gray-400 hover:text-tsp-red transition-colors p-1"
                           title="Unselect driver"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -3633,14 +3651,14 @@ export default function DriverPlanningDashboard() {
                       <MapPin className="w-4 h-4 text-purple-600" />
                       <span className="text-sm font-medium text-gray-800">{selectedDestination.name}</span>
                       {selectedDestination.type === 'recipient' && designatedRecipients.some(r => r.id === selectedDestination.id) && (
-                        <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                        <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                           Assigned
                         </span>
                       )}
                     </div>
                     <button
                       onClick={() => setSelectedDestination(null)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      className="text-gray-400 hover:text-tsp-red transition-colors p-1"
                       title="Unselect destination"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -3656,7 +3674,7 @@ export default function DriverPlanningDashboard() {
                     <Navigation className="w-3.5 h-3.5" />
                     <span className="font-medium">Route to {focusedItem.name}</span>
                     {drivingRoute.durationInTraffic && (
-                      <span className="text-[9px] text-green-600 ml-auto">✓ Traffic</span>
+                      <span className="text-[9px] text-tsp-teal ml-auto">✓ Traffic</span>
                     )}
                   </div>
                   <div className="flex gap-2 text-sm">
@@ -3669,7 +3687,7 @@ export default function DriverPlanningDashboard() {
                           <span className="flex items-center gap-1">
                             {dur.text} min
                             {!!(dur.trafficDelay && dur.trafficDelay > 0) && (
-                              <span className="text-[10px] text-red-500" title="Traffic delay">+{dur.trafficDelay}</span>
+                              <span className="text-[10px] text-tsp-navy font-semibold" title="Traffic delay">+{dur.trafficDelay}</span>
                             )}
                           </span>
                         ) : `~${dur.text} min`;
@@ -3706,7 +3724,7 @@ export default function DriverPlanningDashboard() {
                     <Navigation className="w-3.5 h-3.5" />
                     <span className="font-medium">Driver → Event</span>
                     {drivingRoute.durationInTraffic && (
-                      <span className="text-[9px] text-green-600 ml-auto">✓ Traffic</span>
+                      <span className="text-[9px] text-tsp-teal ml-auto">✓ Traffic</span>
                     )}
                   </div>
                   <div className="flex gap-2 text-sm">
@@ -3719,7 +3737,7 @@ export default function DriverPlanningDashboard() {
                           <span className="flex items-center gap-1">
                             {dur.text} min
                             {!!(dur.trafficDelay && dur.trafficDelay > 0) && (
-                              <span className="text-[10px] text-red-500" title="Traffic delay">+{dur.trafficDelay}</span>
+                              <span className="text-[10px] text-tsp-navy font-semibold" title="Traffic delay">+{dur.trafficDelay}</span>
                             )}
                           </span>
                         ) : `~${dur.text} min`;
@@ -3744,7 +3762,7 @@ export default function DriverPlanningDashboard() {
               {selectedDriver && assignedDrivers.some(d => String(d.id) === String(selectedDriver.id)) && drivingRoute && (
                 <button
                   onClick={() => setDrivingRoute(null)}
-                  className="w-full mt-3 px-3 py-2 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  className="w-full mt-3 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
                   <EyeOff className="w-4 h-4" />
                   Hide Driver's Route
@@ -3805,7 +3823,7 @@ export default function DriverPlanningDashboard() {
                           {dur.text} min drive
                           {/* Coerce to boolean so React doesn't render literal `0` when trafficDelay is 0/null */}
                           {!!(dur.trafficDelay && dur.trafficDelay > 0) && (
-                            <span className="text-xs text-red-500" title="Traffic delay">(+{dur.trafficDelay} traffic)</span>
+                            <span className="text-xs text-tsp-navy font-semibold" title="Traffic delay">(+{dur.trafficDelay} traffic)</span>
                           )}
                         </span>
                       ) : `${dur.text} min drive`;
@@ -3813,7 +3831,7 @@ export default function DriverPlanningDashboard() {
                   </span>
                 </div>
                 {drivingRoute.durationInTraffic && (
-                  <div className="text-xs text-green-600 text-center">✓ Includes traffic estimate</div>
+                  <div className="text-xs text-tsp-teal text-center">✓ Includes traffic estimate</div>
                 )}
               </div>
               {isLoadingRoute && (
@@ -4019,7 +4037,7 @@ export default function DriverPlanningDashboard() {
                           <span className="inline-flex items-center gap-1">
                             {dur.text} min
                             {!!(dur.trafficDelay && dur.trafficDelay > 0) && (
-                              <span className="text-[10px] text-red-500" title="Traffic delay">+{dur.trafficDelay}</span>
+                              <span className="text-[10px] text-tsp-navy font-semibold" title="Traffic delay">+{dur.trafficDelay}</span>
                             )}
                           </span>
                         ) : `~${dur.text} min`;
@@ -4041,7 +4059,7 @@ export default function DriverPlanningDashboard() {
                           <span className="inline-flex items-center gap-1">
                             {dur.text} min
                             {!!(dur.trafficDelay && dur.trafficDelay > 0) && (
-                              <span className="text-[10px] text-red-500" title="Traffic delay">+{dur.trafficDelay}</span>
+                              <span className="text-[10px] text-tsp-navy font-semibold" title="Traffic delay">+{dur.trafficDelay}</span>
                             )}
                           </span>
                         ) : `~${dur.text} min`;
@@ -4065,7 +4083,7 @@ export default function DriverPlanningDashboard() {
                     </span>
                   </span>
                   {(fullTripRoute.leg1.durationInTraffic || fullTripRoute.leg2.durationInTraffic) && (
-                    <span className="text-[10px] text-green-600 shrink-0">✓ traffic</span>
+                    <span className="text-[10px] text-tsp-teal shrink-0">✓ traffic</span>
                   )}
                   {isLoadingFullTrip && (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
@@ -4108,13 +4126,13 @@ export default function DriverPlanningDashboard() {
                           <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-yellow-400 shrink-0" />
                           <span className="text-xs font-medium text-gray-800">{selectedDriver.name}</span>
                           {assignedDrivers.some(d => String(d.id) === String(selectedDriver.id)) && (
-                            <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                            <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                               Assigned
                             </span>
                           )}
                           <button
                             onClick={() => setSelectedDriver(null)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            className="text-gray-400 hover:text-tsp-red transition-colors"
                             title="Unselect driver"
                           >
                             <X className="w-3 h-3" />
@@ -4127,13 +4145,13 @@ export default function DriverPlanningDashboard() {
                           <span className="text-xs font-medium text-gray-800">{selectedDestination.name}</span>
                           {selectedDestination.type === 'recipient' &&
                             designatedRecipients.some(r => r.id === selectedDestination.id) && (
-                              <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                              <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                                 Designated
                               </span>
                           )}
                           <button
                             onClick={() => setSelectedDestination(null)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            className="text-gray-400 hover:text-tsp-red transition-colors"
                             title="Unselect destination"
                           >
                             <X className="w-3 h-3" />
@@ -4155,14 +4173,14 @@ export default function DriverPlanningDashboard() {
                                 <span className="inline-flex items-center gap-1">
                                   {dur.text} min
                                   {!!(dur.trafficDelay && dur.trafficDelay > 0) && (
-                                    <span className="text-[10px] text-red-500">+{dur.trafficDelay}</span>
+                                    <span className="text-[10px] text-tsp-navy font-semibold">+{dur.trafficDelay}</span>
                                   )}
                                 </span>
                               ) : `~${dur.text} min`;
                             })()}
                           </span>
                           {drivingRoute.durationInTraffic && (
-                            <span className="text-[10px] text-green-600">✓ traffic</span>
+                            <span className="text-[10px] text-tsp-teal">✓ traffic</span>
                           )}
                         </div>
                       )}
@@ -4187,7 +4205,7 @@ export default function DriverPlanningDashboard() {
                           setDrivingRoute(null);
                           setFocusedItem(null);
                         }}
-                        className="text-gray-400 hover:text-red-500 p-1 hover:bg-gray-100 rounded shrink-0"
+                        className="text-gray-400 hover:text-tsp-red p-1 hover:bg-gray-100 rounded shrink-0"
                         title="Clear selections"
                       >
                         <X className="w-4 h-4" />
@@ -4213,14 +4231,14 @@ export default function DriverPlanningDashboard() {
                           <span className="inline-flex items-center gap-1">
                             {dur.text} min
                             {!!(dur.trafficDelay && dur.trafficDelay > 0) && (
-                              <span className="text-[10px] text-red-500" title="Traffic delay">+{dur.trafficDelay}</span>
+                              <span className="text-[10px] text-tsp-navy font-semibold" title="Traffic delay">+{dur.trafficDelay}</span>
                             )}
                           </span>
                         ) : `~${dur.text} min`;
                       })()}
                     </span>
                     {drivingRoute.durationInTraffic && (
-                      <span className="text-[10px] text-green-600">✓ traffic</span>
+                      <span className="text-[10px] text-tsp-teal">✓ traffic</span>
                     )}
                   </div>
                   {isLoadingRoute && (
@@ -4336,7 +4354,7 @@ export default function DriverPlanningDashboard() {
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] text-gray-500 uppercase">Driver</span>
                                 {assignedDrivers.some(d => d.id === selectedDriver.id) && (
-                                  <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                  <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                                     Assigned
                                   </span>
                                 )}
@@ -4346,7 +4364,7 @@ export default function DriverPlanningDashboard() {
                           </div>
                           <button
                             onClick={() => setSelectedDriver(null)}
-                            className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                            className="text-gray-400 hover:text-tsp-red transition-colors p-1"
                             title="Unselect driver"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -4378,7 +4396,7 @@ export default function DriverPlanningDashboard() {
                                   {selectedDestination.type === 'host' ? 'Host' : 'Recipient'}
                                 </span>
                                 {selectedDestination.type === 'recipient' && designatedRecipients.some(r => r.id === selectedDestination.id) && (
-                                  <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                  <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                                     Assigned
                                   </span>
                                 )}
@@ -4388,7 +4406,7 @@ export default function DriverPlanningDashboard() {
                           </div>
                           <button
                             onClick={() => setSelectedDestination(null)}
-                            className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                            className="text-gray-400 hover:text-tsp-red transition-colors p-1"
                             title="Unselect destination"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -4490,7 +4508,7 @@ export default function DriverPlanningDashboard() {
                             className={`px-2 flex items-center justify-center border-l transition-colors ${
                               selectedDestination?.type === 'host' && selectedDestination?.id === host.id
                                 ? 'bg-[#236383] text-white border-[#236383]'
-                                : 'bg-green-100 text-green-700 border-green-200 hover:bg-[#236383] hover:text-white hover:border-[#236383]'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-tsp-teal hover:text-white hover:border-tsp-teal'
                             }`}
                             title={selectedDestination?.type === 'host' && selectedDestination?.id === host.id ? 'Unselect destination' : 'Select as destination'}
                           >
@@ -4505,7 +4523,7 @@ export default function DriverPlanningDashboard() {
                       {nearbyHosts.length > 3 && (
                         <button
                           onClick={() => setShowAllHosts(!showAllHosts)}
-                          className="w-full text-xs text-green-700 hover:text-green-900 font-medium py-1"
+                          className="w-full text-xs text-tsp-teal hover:text-tsp-navy font-medium py-1"
                         >
                           {showAllHosts ? 'Show less' : `View ${nearbyHosts.length - 3} more hosts`}
                         </button>
@@ -4592,7 +4610,7 @@ export default function DriverPlanningDashboard() {
                               className={`px-2 flex items-center justify-center border-l transition-colors ${
                                 selectedDestination?.type === 'recipient' && selectedDestination?.id === recipient.id
                                   ? 'bg-[#236383] text-white border-[#236383]'
-                                  : 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-[#236383] hover:text-white hover:border-[#236383]'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-tsp-teal hover:text-white hover:border-tsp-teal'
                               }`}
                               title={selectedDestination?.type === 'recipient' && selectedDestination?.id === recipient.id ? 'Unselect destination' : 'Select as destination'}
                             >
@@ -4674,7 +4692,7 @@ export default function DriverPlanningDashboard() {
                             className={`px-2 flex items-center justify-center border-l transition-colors ${
                               selectedDestination?.type === 'recipient' && selectedDestination?.id === recipient.id
                                 ? 'bg-[#236383] text-white border-[#236383]'
-                                : 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-[#236383] hover:text-white hover:border-[#236383]'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-tsp-teal hover:text-white hover:border-tsp-teal'
                             }`}
                             title={selectedDestination?.type === 'recipient' && selectedDestination?.id === recipient.id ? 'Unselect destination' : 'Select as destination'}
                           >
@@ -4689,7 +4707,7 @@ export default function DriverPlanningDashboard() {
                       {nonDesignatedNearbyRecipients.length > 3 && (
                         <button
                           onClick={() => setShowAllRecipients(!showAllRecipients)}
-                          className="w-full text-xs text-purple-700 hover:text-purple-900 font-medium py-1"
+                          className="w-full text-xs text-tsp-teal hover:text-tsp-navy font-medium py-1"
                         >
                           {showAllRecipients ? 'Show less' : `View ${nonDesignatedNearbyRecipients.length - 3} more recipients`}
                         </button>
@@ -4759,8 +4777,8 @@ export default function DriverPlanningDashboard() {
                             }}
                             className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
                               selectedDriver && String(selectedDriver.id) === String(driver.id)
-                                ? 'bg-[#236383] text-white'
-                                : 'bg-green-600 text-white hover:bg-[#236383]'
+                                ? 'bg-tsp-teal text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-tsp-teal hover:text-white hover:border-tsp-teal'
                             }`}
                             title={selectedDriver && String(selectedDriver.id) === String(driver.id) ? 'Unselect driver' : 'Select driver for trip'}
                           >
@@ -4776,7 +4794,7 @@ export default function DriverPlanningDashboard() {
                               </>
                             )}
                           </button>
-                          <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                          <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                             Assigned
                           </span>
                         </div>
@@ -4823,7 +4841,7 @@ export default function DriverPlanningDashboard() {
                           ? 'Other nearby drivers'
                           : 'Closest drivers'}
                       {selectedEvent?.vanDriverNeeded && (
-                        <span className="text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Van Approved Only</span>
+                        <span className="text-[10px] font-medium text-gray-700 bg-white border border-gray-300 px-1.5 py-0.5 rounded">Van Approved Only</span>
                       )}
                     </h3>
                     {(showAllNearbyDrivers ? (driverSearchResults || nearbyDrivers) : (driverSearchResults || nearbyDrivers).slice(0, 5)).map(({ driver, distance }) => (
@@ -4862,8 +4880,8 @@ export default function DriverPlanningDashboard() {
                             }}
                             className={`px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors ${
                               selectedDriver && String(selectedDriver.id) === String(driver.id)
-                                ? 'bg-[#236383] text-white'
-                                : 'bg-yellow-100 text-yellow-800 hover:bg-[#236383] hover:text-white'
+                                ? 'bg-tsp-teal text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-tsp-teal hover:text-white hover:border-tsp-teal'
                             }`}
                             title={selectedDriver && String(selectedDriver.id) === String(driver.id) ? 'Unselect driver' : 'Select driver for trip'}
                           >
@@ -4898,7 +4916,7 @@ export default function DriverPlanningDashboard() {
                               <h4 className="font-medium text-sm flex items-center gap-1.5">
                                 {driver.name}
                                 {assignedDrivers.some(d => d.id === driver.id) && (
-                                  <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                  <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                                     Assigned
                                   </span>
                                 )}
@@ -4991,7 +5009,7 @@ export default function DriverPlanningDashboard() {
                     {(driverSearchResults || nearbyDrivers).length > 5 && (
                       <button
                         onClick={() => setShowAllNearbyDrivers(!showAllNearbyDrivers)}
-                        className="w-full text-xs text-purple-700 hover:text-purple-900 font-medium py-1"
+                        className="w-full text-xs text-tsp-teal hover:text-tsp-navy font-medium py-1"
                       >
                         {showAllNearbyDrivers
                           ? 'Show top 5'
@@ -5005,18 +5023,18 @@ export default function DriverPlanningDashboard() {
                 {/* Drivers needing geocoding (have address but no coordinates) */}
                 {driversNeedingGeocoding.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <h4 className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                    <div className="bg-tsp-cream border border-tsp-gold rounded-lg p-3">
+                      <h4 className="text-xs font-semibold text-tsp-navy flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5" />
                         {driversNeedingGeocoding.length} drivers need geocoding
                       </h4>
-                      <p className="text-xs text-blue-700 mt-1">
+                      <p className="text-xs text-tsp-navy mt-1">
                         These drivers have addresses but haven't been geocoded yet. Run batch geocode in Driver Management.
                       </p>
                       <Button
                         variant="link"
                         size="sm"
-                        className="text-xs p-0 h-auto mt-2 text-blue-800"
+                        className="text-xs p-0 h-auto mt-2 text-tsp-teal"
                         onClick={() => window.location.href = '/dashboard?section=drivers'}
                       >
                         Go to Driver Management →
@@ -5028,18 +5046,18 @@ export default function DriverPlanningDashboard() {
                 {/* Drivers needing location data */}
                 {driversWithoutLocation.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                      <h4 className="text-xs font-semibold text-amber-800 flex items-center gap-1">
+                    <div className="bg-tsp-cream border border-tsp-gold rounded-lg p-3">
+                      <h4 className="text-xs font-semibold text-tsp-navy flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5" />
                         {driversWithoutLocation.length} drivers need location data
                       </h4>
-                      <p className="text-xs text-amber-700 mt-1">
+                      <p className="text-xs text-tsp-navy mt-1">
                         Add area/location info to these drivers to see them in suggestions.
                       </p>
                       <Button
                         variant="link"
                         size="sm"
-                        className="text-xs p-0 h-auto mt-2 text-amber-800"
+                        className="text-xs p-0 h-auto mt-2 text-tsp-teal"
                         onClick={() => window.location.href = '/dashboard?section=drivers'}
                       >
                         Go to Driver Management →
@@ -5114,10 +5132,10 @@ export default function DriverPlanningDashboard() {
                         {(() => {
                           const status = (event.status || '').toLowerCase();
                           if (status === 'new') return (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-400 text-amber-700 bg-amber-50 flex-shrink-0">New</Badge>
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-tsp-navy/40 text-tsp-navy bg-tsp-mist flex-shrink-0">New</Badge>
                           );
                           if (status === 'in_process') return (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-blue-400 text-blue-700 bg-blue-50 flex-shrink-0">In Process</Badge>
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-tsp-gold text-tsp-navy bg-tsp-cream flex-shrink-0">In Process</Badge>
                           );
                           return null;
                         })()}
@@ -5131,7 +5149,7 @@ export default function DriverPlanningDashboard() {
                           <Package className="w-3 h-3 mt-0.5 flex-shrink-0" />
                           <span
                             className={event.estimatedSandwichCount > 400 ? 'font-semibold' : ''}
-                            style={event.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}
+                            style={event.estimatedSandwichCount > 400 ? { color: '#114154' } : undefined}
                           >
                             {formatSandwichSummary(event)}
                           </span>
@@ -5149,10 +5167,10 @@ export default function DriverPlanningDashboard() {
                           const isFulfilled = totalAssigned >= totalNeeded;
                           return (
                             <Badge
-                              variant={isFulfilled ? 'default' : 'destructive'}
-                              className="text-[10px] px-1 py-0"
+                              variant="outline"
+                              className={`text-[10px] px-1 py-0 ${staffingBadgeClass(isFulfilled, event)}`}
                             >
-                              {totalAssigned}{driversTentative > 0 && <span className="text-amber-300">+{driversTentative}?</span>}/{totalNeeded}
+                              {totalAssigned}{driversTentative > 0 && <span className="opacity-75">+{driversTentative}?</span>}/{totalNeeded}
                               {event.vanDriverNeeded && (event.isDhlVan ? '+DHL' : (event.assignedVanDriverId ? '+Van' : '!'))}
                             </Badge>
                           );
@@ -5400,7 +5418,7 @@ export default function DriverPlanningDashboard() {
                       <Truck className="w-3 h-3" />
                       {selectedDriver.name}
                     </h3>
-                    <p className="text-xs text-green-600 mt-1">Selected for trip planning</p>
+                    <p className="text-xs text-tsp-teal mt-1">Selected for trip planning</p>
                   </div>
                 </Popup>
               </Marker>
@@ -5439,7 +5457,7 @@ export default function DriverPlanningDashboard() {
                       </p>
                     )}
                     {driver.vanApproved && (
-                      <p className="text-xs text-green-600 mt-1">Van Approved</p>
+                      <p className="text-xs text-tsp-teal mt-1">Van Approved</p>
                     )}
                   </div>
                 </Popup>
@@ -6033,10 +6051,10 @@ export default function DriverPlanningDashboard() {
                       if (needed > 0) {
                         return (
                           <Badge
-                            variant={fulfilled ? 'default' : 'destructive'}
-                            className="text-[10px] px-1.5"
+                            variant="outline"
+                            className={`text-[10px] px-1.5 ${staffingBadgeClass(fulfilled, selectedEvent)}`}
                           >
-                            {totalDrivers}{tentative > 0 && <span className="text-amber-300">+{tentative}?</span>}/{needed}
+                            {totalDrivers}{tentative > 0 && <span className="opacity-75">+{tentative}?</span>}/{needed}
                             {selectedEvent.isDhlVan
                               ? ' DHL'
                               : selectedEvent.assignedVanDriverId
@@ -6218,7 +6236,7 @@ export default function DriverPlanningDashboard() {
                       {selectedEvent.estimatedSandwichCount && selectedEvent.estimatedSandwichCount > 0 && (
                         <div className="flex items-center gap-2 text-sm">
                           <Package className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                          <span className={selectedEvent.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={selectedEvent.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                          <span className={selectedEvent.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={selectedEvent.estimatedSandwichCount > 400 ? { color: '#114154' } : undefined}>
                             {formatSandwichSummary(selectedEvent)}
                           </span>
                         </div>
@@ -6485,10 +6503,10 @@ export default function DriverPlanningDashboard() {
                                 {(() => {
                                   const status = (event.status || '').toLowerCase();
                                   if (status === 'new') return (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-700 bg-amber-50 flex-shrink-0">New</Badge>
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-tsp-navy/40 text-tsp-navy bg-tsp-mist flex-shrink-0">New</Badge>
                                   );
                                   if (status === 'in_process') return (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-blue-400 text-blue-700 bg-blue-50 flex-shrink-0">In Process</Badge>
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-tsp-gold text-tsp-navy bg-tsp-cream flex-shrink-0">In Process</Badge>
                                   );
                                   return null;
                                 })()}
@@ -6525,8 +6543,8 @@ export default function DriverPlanningDashboard() {
                                   
                                   return (
                                     <Badge
-                                      variant={isFulfilled ? 'default' : 'destructive'}
-                                      className="text-xs px-2 py-0.5"
+                                      variant="outline"
+                                      className={`text-xs px-2 py-0.5 ${staffingBadgeClass(isFulfilled, event)}`}
                                     >
                                       <Truck className="w-3.5 h-3.5 mr-1" />
                                       {totalAssigned}/{totalNeeded} {event.vanDriverNeeded ? (driversNeeded > 0 ? 'drivers+van' : 'Van') : 'drivers'}
@@ -6543,8 +6561,8 @@ export default function DriverPlanningDashboard() {
                               {/* Volunteers - only show if needed > 0 */}
                               {volunteersNeeded > 0 && (
                                 <Badge
-                                  variant={volunteersAssigned < volunteersNeeded ? 'destructive' : 'default'}
-                                  className="text-xs px-2 py-0.5"
+                                  variant="outline"
+                                  className={`text-xs px-2 py-0.5 ${staffingBadgeClass(volunteersAssigned >= volunteersNeeded, event)}`}
                                   title={getAssignedVolunteersLabel(event) ? `Volunteers: ${getAssignedVolunteersLabel(event)}` : undefined}
                                 >
                                   <Users className="w-3.5 h-3.5 mr-1" />
@@ -6569,7 +6587,7 @@ export default function DriverPlanningDashboard() {
                                 </Badge>
                               )}
                               {event.estimatedSandwichCount && event.estimatedSandwichCount > 0 && (
-                                <span className={`text-xs ${event.estimatedSandwichCount > 400 ? 'font-semibold' : 'text-gray-500'}`} style={event.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                                <span className={`text-xs ${event.estimatedSandwichCount > 400 ? 'font-semibold' : 'text-gray-500'}`} style={event.estimatedSandwichCount > 400 ? { color: '#114154' } : undefined}>
                                   {formatSandwichSummary(event)}
                                 </span>
                               )}
@@ -6653,7 +6671,7 @@ export default function DriverPlanningDashboard() {
                   {selectedEvent.estimatedSandwichCount && selectedEvent.estimatedSandwichCount > 0 && (
                     <div className="flex items-center gap-2 text-sm">
                       <Package className="w-4 h-4 text-gray-500" />
-                      <span className={selectedEvent.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={selectedEvent.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                      <span className={selectedEvent.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={selectedEvent.estimatedSandwichCount > 400 ? { color: '#114154' } : undefined}>
                         {formatSandwichSummary(selectedEvent)}
                       </span>
                     </div>
@@ -6844,7 +6862,7 @@ export default function DriverPlanningDashboard() {
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-medium text-sm truncate flex items-center gap-2">
                                     {driver.name}
-                                    <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
+                                    <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
                                       Assigned
                                     </span>
                                   </h4>
@@ -6888,7 +6906,7 @@ export default function DriverPlanningDashboard() {
                         ? `Other Nearby Drivers (${nearbyDrivers.length})`
                         : `Closest Drivers (${nearbyDrivers.length})`}
                     {selectedEvent?.vanDriverNeeded && (
-                      <span className="text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">Van Approved Only</span>
+                      <span className="text-[10px] font-medium text-gray-700 bg-white border border-gray-300 px-1.5 py-0.5 rounded">Van Approved Only</span>
                     )}
                   </h3>
                   {(driverSearchResults && driverSearchResults.length > 0) || nearbyDrivers.length > 0 ? (
