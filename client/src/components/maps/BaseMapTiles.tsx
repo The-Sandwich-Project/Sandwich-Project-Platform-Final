@@ -157,6 +157,9 @@ function CartoTiles({ reason }: { reason?: string }) {
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxNativeZoom={OSM_MAX_NATIVE_ZOOM}
         maxZoom={BASEMAP_MAX_ZOOM}
+        // OSM's tile policy rejects requests without a Referer, and Helmet's
+        // default page-wide policy is no-referrer. Send just our origin.
+        referrerPolicy="strict-origin-when-cross-origin"
       />
       {reason ? <FallbackNotice reason={reason} /> : null}
     </>

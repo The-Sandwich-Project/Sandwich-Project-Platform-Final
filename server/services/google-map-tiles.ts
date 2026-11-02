@@ -155,9 +155,14 @@ export function safeReasonFromGoogle(status: number, body: string): string {
   if (status === 429 || lower.includes('quota') || lower.includes('rate limit')) {
     return 'Google Maps tile quota was exceeded. Try again later.';
   }
-  const detail = (reason || message || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  // Redact before truncating, so a key or token cut by the length limit
+  // can't slip through as an unmatched fragment.
+  const detail = redactMapSecrets(reason || message || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
   return `Google Maps tiles are temporarily unavailable (Google returned HTTP ${status}${
-    detail ? `: ${redactMapSecrets(detail)}` : ''
+    detail ? `: ${detail}` : ''
   }).`;
 }
 
