@@ -497,8 +497,11 @@ export function resolveSheetName(
   const scored = people
     .map((u) => ({ u, kind: nameMatchKind(name, personFirstName(u), personLastName(u), personFullNames(u)) }))
     .filter((x) => x.kind);
-  // A full-name match beats first-name-only matches.
-  const best = scored.some((x) => x.kind === 'full') ? scored.filter((x) => x.kind === 'full') : scored;
+  // A full-name match beats first-name-only matches, but only when the sheet
+  // gives more than a first name: a record whose whole name is just "Ann"
+  // mustn't hide Ann Lee and Ann Park when the sheet says "Ann".
+  const oneWord = !normName(name).includes(' ');
+  const best = !oneWord && scored.some((x) => x.kind === 'full') ? scored.filter((x) => x.kind === 'full') : scored;
   if (best.length === 0) return typed;
 
   // Different people? Compare their full names (first + last).

@@ -1550,7 +1550,8 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                                 <div className="font-medium text-amber-900">
                                   {formatSandwichTypesDisplay(
                                     request.actualSandwichTypes,
-                                    request.actualSandwichCount ?? undefined
+                                    request.actualSandwichCount ?? undefined,
+                                    { unknownAmounts: false }
                                   )}
                                 </div>
                                 {request.actualSandwichCount && (

@@ -142,19 +142,38 @@ function formatSandwichTypeName(type: string): string {
 /**
  * Format sandwich types for display
  * Returns a human-readable string
+ *
+ * Estimates can name types whose amounts aren't decided yet (stored as
+ * quantity 0, "TBD"; see shared/sandwich-estimate.ts). Those types are still
+ * shown, next to the known total: "300 total: Deli, PBJ (split TBD)" or
+ * "300 total: 150 Deli, PBJ TBD". Pass { unknownAmounts: false } for actual
+ * (delivered) counts, where a 0 line just means none.
  */
 export function formatSandwichTypesDisplay(
   sandwichTypes: any,
-  fallbackCount?: number
+  fallbackCount?: number,
+  options: { unknownAmounts?: boolean } = {}
 ): string {
   const parsed = parseSandwichTypes(sandwichTypes);
+  const showUnknown = options.unknownAmounts !== false;
 
   if (parsed && parsed.length > 0) {
     // Filter out "unknown" types completely
-    const validTypes = parsed.filter(item => 
-      item.quantity > 0 && 
-      item.type.toLowerCase() !== 'unknown'
-    );
+    const named = parsed.filter(item => item.type.toLowerCase() !== 'unknown');
+    const validTypes = named.filter(item => item.quantity > 0);
+    const tbdTypes = showUnknown ? named.filter(item => !(item.quantity > 0)) : [];
+
+    if (tbdTypes.length > 0) {
+      const tbdNames = tbdTypes.map(item => formatSandwichTypeName(item.type));
+      const known = validTypes.map(item => `${item.quantity} ${formatSandwichTypeName(item.type)}`);
+      const prefix = fallbackCount ? `${fallbackCount} total: ` : '';
+      if (known.length === 0) {
+        // One type with no amount is simply all of the total.
+        if (tbdNames.length === 1) return fallbackCount ? `${fallbackCount} ${tbdNames[0]}` : tbdNames[0];
+        return `${prefix}${tbdNames.join(', ')} (split TBD)`;
+      }
+      return `${prefix}${[...known, ...tbdNames.map(n => `${n} TBD`)].join(', ')}`;
+    }
 
     // If no valid types after filtering, don't show anything
     if (validTypes.length === 0) {

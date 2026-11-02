@@ -12,6 +12,8 @@
 --    (min > max) are swapped.
 -- 3. A one-sided range (only a min or only a max) becomes that one number.
 --    Before, cards showed "Not specified" while reports counted it.
+--    (Before 3 and 4 clear the range type, a type stored only there is
+--    copied into the breakdown: step 2b.)
 -- 4. Stale range bounds next to a different exact count are cleared. The app
 --    already ignores them; they only confused later edits.
 -- 5. A single-type breakdown whose quantity no longer matches the count
@@ -51,6 +53,35 @@ SET estimated_sandwich_count = round((estimated_sandwich_count_min + estimated_s
 WHERE estimated_sandwich_count IS NULL
   AND estimated_sandwich_count_min > 0
   AND estimated_sandwich_count_max > 0;
+
+-- 2b. Steps 3 and 4 clear the range type. On older events that's the ONLY
+--     place the type is stored (no breakdown), so first copy it into the
+--     breakdown, with the count those steps will leave. An existing
+--     breakdown is never overwritten.
+UPDATE event_requests
+SET sandwich_types = jsonb_build_array(jsonb_build_object(
+      'type', estimated_sandwich_range_type,
+      'quantity', CASE
+        WHEN (COALESCE(estimated_sandwich_count_min, 0) > 0) <> (COALESCE(estimated_sandwich_count_max, 0) > 0)
+          THEN COALESCE(
+            NULLIF(estimated_sandwich_count, 0),
+            NULLIF(GREATEST(COALESCE(estimated_sandwich_count_min, 0), COALESCE(estimated_sandwich_count_max, 0)), 0),
+            0)
+        ELSE COALESCE(estimated_sandwich_count, 0)
+      END))
+WHERE NULLIF(trim(estimated_sandwich_range_type), '') IS NOT NULL
+  AND (sandwich_types IS NULL
+       OR jsonb_typeof(sandwich_types) <> 'array'
+       OR jsonb_array_length(sandwich_types) = 0)
+  AND (
+    -- rows step 3 will touch
+    (COALESCE(estimated_sandwich_count_min, 0) > 0) <> (COALESCE(estimated_sandwich_count_max, 0) > 0)
+    -- rows step 4 will touch
+    OR (estimated_sandwich_count > 0
+        AND estimated_sandwich_count_min > 0
+        AND estimated_sandwich_count_max > 0
+        AND estimated_sandwich_count <> round((estimated_sandwich_count_min + estimated_sandwich_count_max) / 2.0))
+  );
 
 -- 3. One-sided ranges: keep the count if there is one, else use the one bound.
 UPDATE event_requests

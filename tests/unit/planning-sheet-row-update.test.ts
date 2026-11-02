@@ -857,3 +857,22 @@ describe('matching sheet names to every app directory', () => {
     expect(custom.changes).toEqual([]);
   });
 });
+
+describe('Copilot review: a first-name-only record does not hide others', () => {
+  it('"Ann" with a user named just Ann plus Ann Lee and Ann Park stays typed', () => {
+    const people: MatchableUser[] = [
+      { id: 'user_ann', firstName: 'Ann', lastName: null, displayName: null, kind: 'user' },
+      { id: 'volunteer-40', firstName: 'Ann', lastName: 'Lee', displayName: 'Ann Lee', kind: 'volunteer' },
+      { id: '600', firstName: 'Ann', lastName: 'Park', displayName: 'Ann Park', kind: 'driver' },
+    ];
+    expect(resolveSheetName('Ann', people, 'volunteer')).toBe('Ann');
+  });
+
+  it('"Karen" with a user named just Karen and driver Karen Smith: one person, driver record', () => {
+    const people: MatchableUser[] = [
+      { id: 'user_karen', firstName: 'Karen', lastName: null, displayName: 'Karen', kind: 'user' },
+      { id: '443', firstName: 'Karen', lastName: 'Smith', displayName: 'Karen Smith', kind: 'driver' },
+    ];
+    expect(resolveSheetName('Karen', people, 'driver')).toBe('443');
+  });
+});

@@ -206,3 +206,49 @@ describe('audit bugs the server now prevents', () => {
     }
   });
 });
+
+describe('Copilot review: a new total is never undone by old amounts', () => {
+  it('a smaller total drops a partial split that no longer fits', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 200 }, { type: 'pbj', quantity: 0 }] },
+      { estimatedSandwichCount: 100 }
+    );
+    expect(out.estimatedSandwichCount).toBe(100);
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
+  });
+
+  it('a partial split that still fits is kept', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 100 }, { type: 'pbj', quantity: 0 }] },
+      { estimatedSandwichCount: 250 }
+    );
+    expect(out.estimatedSandwichCount).toBe(250);
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 100 }, { type: 'pbj', quantity: 0 }]);
+  });
+
+  it('clearing the total clears a complete split instead of re-adding it', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 50 }] },
+      { estimatedSandwichCount: null, estimatedSandwichCountMin: null, estimatedSandwichCountMax: null }
+    );
+    expect(out.estimatedSandwichCount).toBeNull();
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
+  });
+
+  it('the inline editor saving a total keeps the event\'s types', () => {
+    // What buildInlineSandwichPatch sends in total mode.
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }] },
+      { estimatedSandwichCount: 300, estimatedSandwichCountMin: null, estimatedSandwichCountMax: null }
+    );
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
+  });
+
+  it('a types-only edit with amounts TBD keeps the known total', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 300 },
+      { sandwichTypes: [{ type: 'deli', quantity: 50 }, { type: 'pbj', quantity: 0 }] }
+    );
+    expect(out.estimatedSandwichCount).toBe(300);
+  });
+});

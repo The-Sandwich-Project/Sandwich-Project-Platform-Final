@@ -1,5 +1,5 @@
 import { normalizeEventContacts } from './services/event-contact-directory';
-import { resolveEstimatePatch, touchesEstimate } from '@shared/sandwich-estimate';
+import { ESTIMATE_FIELDS, resolveEstimatePatch, touchesEstimate } from '@shared/sandwich-estimate';
 import { hasEventContactPatch } from '@shared/event-contact-resolution';
 import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import {
@@ -183,6 +183,7 @@ import {
   notInArray,
   like,
   ilike,
+  type SQL,
 } from 'drizzle-orm';
 import type { IStorage } from './storage';
 import { logger } from './utils/production-safe-logger';
@@ -4331,12 +4332,30 @@ export class DatabaseStorage implements IStorage {
       // saved together and consistent, whichever screen sent which subset.
       // See shared/sandwich-estimate.ts.
       let rawUpdateData: Partial<EventRequest> = patchData;
+      // Estimate fields the caller did NOT send but the rule rewrote from the
+      // snapshot. Guarded below like the note fields, so a concurrent estimate
+      // edit (count-only vs types-only saves) can't be overwritten with the
+      // snapshot's values: the write misses and is re-done from a fresh read.
+      let estimateGuards: SQL[] = [];
       if (touchesEstimate(patchData as Record<string, unknown>)) {
         const before = await this.getEventRequest(id);
         rawUpdateData = {
           ...patchData,
           ...(resolveEstimatePatch(before ?? null, patchData as Record<string, unknown>) as Partial<EventRequest>),
         };
+        if (before) {
+          estimateGuards = ESTIMATE_FIELDS
+            .filter((field) => (patchData as Record<string, unknown>)[field] === undefined)
+            .map((field) => {
+              const was = (before as any)[field] ?? null;
+              if (field === 'sandwichTypes') {
+                return was === null
+                  ? sql`${eventRequests.sandwichTypes} IS NULL`
+                  : sql`${eventRequests.sandwichTypes} = ${JSON.stringify(was)}::jsonb`;
+              }
+              return sql`${eventRequests[field]} IS NOT DISTINCT FROM ${was}`;
+            });
+        }
       }
       const previousEvent = hasEventContactPatch(rawUpdateData) || (typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus)
         ? await this.getEventRequest(id)
@@ -4404,7 +4423,7 @@ export class DatabaseStorage implements IStorage {
           ...filteredData,
           updatedAt: new Date(),
         })
-        .where(and(eq(eventRequests.id, id), ...noteGuards, ...versionGuards))
+        .where(and(eq(eventRequests.id, id), ...noteGuards, ...estimateGuards, ...versionGuards))
         .returning();
 
       if (updatedRows.length === 0 && versionGuards.length) {
@@ -4419,7 +4438,7 @@ export class DatabaseStorage implements IStorage {
 
       // A conditional write that matched no row must never enter the fallback
       // that merges intended values into a read. Re-read and normalize again.
-      if (noteGuards.length) continue;
+      if (noteGuards.length || estimateGuards.length) continue;
 
       // FALLBACK: RETURNING came back empty. Rare. Re-read to find out what actually
       // happened — and never report success for a row we can't confirm.
@@ -4474,7 +4493,7 @@ export class DatabaseStorage implements IStorage {
 
       return result;
     }
-    throw new Error('Conflict: Event notes changed while saving the contact. Please refresh and try again.');
+    throw new Error('Conflict: The event changed while saving (notes or sandwich estimate). Please refresh and try again.');
   }
 
   async deleteEventRequest(id: number, userId?: string): Promise<boolean> {

@@ -307,16 +307,23 @@ export function resolveEstimatePatch(
     }
   }
 
-  // A new total with the old lines: lines that no longer add up lose their
-  // amounts (types kept); a single line just takes the new total.
+  // A new total with the old lines: lines that no longer fit lose their
+  // amounts (types kept), so old amounts can never undo the total just
+  // entered; a single line just takes the new total.
   if (touchedTotal && !touchedLines && lines.length > 0) {
-    if (lines.length === 1) {
-      lines = [{ type: lines[0].type, amount: null }];
-    } else if (total && lines.every((l) => l.amount)) {
-      const sum = sumAmounts(lines);
-      if (!(sum.min >= total.min && sum.max <= total.max)) {
-        lines = lines.map((l) => ({ type: l.type, amount: null }));
-      }
+    const drop = () => lines.map((l) => ({ type: l.type, amount: null }));
+    const known = lines.filter((l) => l.amount);
+    if (lines.length === 1 || !total) {
+      // One line follows the total; a cleared total clears the split too
+      // (otherwise the old amounts would add back up to the old total).
+      lines = drop();
+    } else if (known.length > 0) {
+      const sum = sumAmounts(known);
+      const fits =
+        known.length === lines.length
+          ? sum.min >= total.min && sum.max <= total.max // complete split must add up
+          : sum.min <= total.min && sum.max <= total.max; // partial split must not exceed it
+      if (!fits) lines = drop();
     }
   }
 

@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { totalFromFields } from '@shared/sandwich-estimate';
 import { parsePlanningStaffing, indexPeople } from './services/planning-sheet-row-update';
-import { loadAssigneeDirectory } from './services/assignee-directory';
+import { loadAssigneesByIds } from './services/assignee-directory';
 import { extractNameFromAssignmentId } from '@shared/assignment-ids';
 import { JWT } from 'google-auth-library';
 import { db } from './db';
@@ -1136,7 +1136,7 @@ export class PlanningSheetSyncService {
     // Assignees can be team members OR people from the Drivers, Volunteers
     // and Host Contacts directories ("443", "volunteer-12", "host-contact-5"),
     // whatever the assignment picker saved. Look them all up.
-    const byId = indexPeople(await loadAssigneeDirectory(userIds));
+    const byId = indexPeople(await loadAssigneesByIds(userIds));
 
     // Return names in the same order as userIds. Assignment columns also hold
     // free-text names (people typed on the sheet who don't match anyone);

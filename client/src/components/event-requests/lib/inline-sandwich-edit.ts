@@ -42,35 +42,36 @@ export function inlineSandwichStateFromEvent(event: any): InlineSandwichState {
   };
 }
 
-/** The PATCH body for the editor's current state. */
+/**
+ * The PATCH body for the editor's current state. Each mode sends only what it
+ * edits; the server's estimate rule keeps the rest. So saving the total never
+ * deletes the event's types, and a breakdown with some amounts TBD never
+ * replaces a known total.
+ */
 export function buildInlineSandwichPatch(state: InlineSandwichState): Record<string, unknown> {
   if (state.mode === 'total') {
+    // An exact total: clear any range, keep the types (amounts that no longer
+    // fit are dropped by the server rule).
     return {
       estimatedSandwichCount: state.totalCount > 0 ? state.totalCount : null,
-      sandwichTypes: null,
       estimatedSandwichCountMin: null,
       estimatedSandwichCountMax: null,
-      estimatedSandwichRangeType: null,
     };
   }
   if (state.mode === 'range') {
-    return {
+    const patch: Record<string, unknown> = {
       // 0 means "not entered", not a bound of zero.
       estimatedSandwichCountMin: state.rangeMin > 0 ? state.rangeMin : null,
       estimatedSandwichCountMax: state.rangeMax > 0 ? state.rangeMax : null,
-      estimatedSandwichRangeType: state.rangeType || null,
       estimatedSandwichCount: null,
-      sandwichTypes: null,
     };
+    // A picked range type names the one type; no pick leaves the types alone.
+    if (state.rangeType) patch.estimatedSandwichRangeType = state.rangeType;
+    return patch;
   }
-  const types = state.types.filter((t) => t.type);
-  return {
-    sandwichTypes: types,
-    estimatedSandwichCount: types.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0) || null,
-    estimatedSandwichCountMin: null,
-    estimatedSandwichCountMax: null,
-    estimatedSandwichRangeType: null,
-  };
+  // By type: send the lines only. Amounts left at 0 are "TBD"; the server keeps
+  // the known total unless the amounts are all filled in.
+  return { sandwichTypes: state.types.filter((t) => t.type) };
 }
 
 /** Default type for a newly added row: a value the type dropdown actually offers. */
