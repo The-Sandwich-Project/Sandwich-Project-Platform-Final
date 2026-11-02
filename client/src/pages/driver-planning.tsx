@@ -93,8 +93,8 @@ const customMarkerStyles = `
     margin-left: -18px;
     margin-top: -18px;
     border-radius: 50%;
-    background: rgba(255, 0, 0, 0.35);
-    box-shadow: 0 0 0 4px rgba(255, 0, 0, 0.18);
+    background: rgba(17, 65, 84, 0.30);
+    box-shadow: 0 0 0 4px rgba(17, 65, 84, 0.15);
     animation: selected-event-pulse 1.8s ease-out infinite;
     pointer-events: none;
     z-index: 0;
@@ -302,9 +302,13 @@ const createEventIcon = (color: string) => {
   });
 };
 
+// Focused pins keep their category color; they get bigger and a navy ring
+// instead of switching to a separate "focused" color.
+const FOCUS_RING = '0 0 0 3px #114154, 0 2px 6px rgba(0,0,0,0.4)';
+
 // Hosts: Circle shape
-const createHostIcon = (color: string) => {
-  const size = 20;
+const createHostIcon = (color: string, focused = false) => {
+  const size = focused ? 26 : 20;
   const html = `
     <div style="
       width: ${size}px;
@@ -312,7 +316,7 @@ const createHostIcon = (color: string) => {
       background-color: ${color};
       border: 3px solid white;
       border-radius: 50%;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      box-shadow: ${focused ? FOCUS_RING : '0 2px 4px rgba(0,0,0,0.3)'};
     "></div>
   `;
   return L.divIcon({
@@ -325,8 +329,8 @@ const createHostIcon = (color: string) => {
 };
 
 // Recipients: Square shape
-const createRecipientIcon = (color: string) => {
-  const size = 20;
+const createRecipientIcon = (color: string, focused = false) => {
+  const size = focused ? 26 : 20;
   const html = `
     <div style="
       width: ${size}px;
@@ -334,7 +338,7 @@ const createRecipientIcon = (color: string) => {
       background-color: ${color};
       border: 3px solid white;
       border-radius: 2px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      box-shadow: ${focused ? FOCUS_RING : '0 2px 4px rgba(0,0,0,0.3)'};
       transform: rotate(45deg);
     "></div>
   `;
@@ -348,8 +352,8 @@ const createRecipientIcon = (color: string) => {
 };
 
 // Drivers: Triangle shape using SVG for proper rendering
-const createDriverIcon = (color: string) => {
-  const size = 24;
+const createDriverIcon = (color: string, focused = false) => {
+  const size = focused ? 32 : 24;
   const html = `
     <div style="
       position: relative;
@@ -357,7 +361,7 @@ const createDriverIcon = (color: string) => {
       height: ${size}px;
     ">
       <svg viewBox="0 0 24 24" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2L22 20H2L12 2Z" fill="${color}" stroke="white" stroke-width="2"/>
+        <path d="M12 2L22 20H2L12 2Z" fill="${color}" stroke="${focused ? '#114154' : 'white'}" stroke-width="${focused ? 2.5 : 2}" stroke-linejoin="round"/>
         <circle cx="12" cy="14" r="3" fill="white"/>
       </svg>
     </div>
@@ -443,23 +447,25 @@ const createTeamMemberIcon = (color: string) => {
 };
 
 // Color mappings
+// Pin colors. Brand colors where they fit (events teal, drivers gold, selected
+// navy); hosts/recipients/people use the MAP-ONLY colors from the `map` block
+// in tailwind.config.ts. Shapes carry category too (pin / circle / diamond /
+// triangle / star / square), and focus is shown by size + navy ring.
 const colors = {
-  event: '#3388ff',      // Blue
-  selectedEvent: '#ff0000', // Red
-  host: '#2ecc71',       // Green
-  hostFocused: '#ff9500', // Orange
-  recipient: '#9b59b6',  // Violet/Purple
-  recipientFocused: '#ff9500', // Orange
-  volunteer: '#8b5cf6',  // Purple/violet for volunteers/speakers
-  driver: '#f1c40f',     // Yellow
-  customLocation: '#ea580c', // Orange for custom/quick lookup locations
-  teamMember: '#e74c3c', // Coral/red for team members
+  event: '#236383',         // tsp-teal
+  selectedEvent: '#114154', // tsp-navy (big pin + pulsing halo)
+  host: '#6B8F71',          // map-host (sage)
+  recipient: '#7D4E6D',     // map-recipient (plum)
+  volunteer: '#64748B',     // map-person (slate) — star
+  driver: '#FBAD3F',        // tsp-gold — triangle
+  customLocation: '#6B7280',// map-custom (gray)
+  teamMember: '#64748B',    // map-person (slate) — rounded square
 };
 
 const eventIcon = createEventIcon(colors.event);
 
 // Selected event pin — intentionally much larger than regular event pins, with
-// a pulsing red halo behind it. Designed to remain visible when surrounded by
+// a pulsing navy halo behind it. Designed to remain visible when surrounded by
 // host/recipient/driver/volunteer pins. Anchor is at the tip of the pin (40,60).
 const selectedEventIcon = (() => {
   const html = `
@@ -482,13 +488,13 @@ const selectedEventIcon = (() => {
     popupAnchor: [0, -52],
   });
 })();
-const customLocationIcon = createEventIcon(colors.customLocation); // Orange pin for custom locations
+const customLocationIcon = createEventIcon(colors.customLocation); // Gray pin for custom locations
 const hostIcon = createHostIcon(colors.host);
-const hostFocusedIcon = createHostIcon(colors.hostFocused);
+const hostFocusedIcon = createHostIcon(colors.host, true);
 const recipientIcon = createRecipientIcon(colors.recipient);
-const recipientFocusedIcon = createRecipientIcon(colors.recipientFocused);
+const recipientFocusedIcon = createRecipientIcon(colors.recipient, true);
 const driverIcon = createDriverIcon(colors.driver);
-const driverFocusedIcon = createDriverIcon('#ff9500'); // Orange when focused/clicked
+const driverFocusedIcon = createDriverIcon(colors.driver, true); // bigger + navy outline when focused
 const hostDriverIcon = createHostDriverIcon(colors.host, colors.driver); // Combined icon for host+driver
 const volunteerIcon = createVolunteerIcon(colors.volunteer);
 const teamMemberIcon = createTeamMemberIcon(colors.teamMember);
@@ -2763,7 +2769,7 @@ export default function DriverPlanningDashboard() {
                 type="checkbox"
                 checked={showVolunteersSpeakers}
                 onChange={(e) => setShowVolunteersSpeakers(e.target.checked)}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-600"
+                className="rounded border-gray-300 text-map-person focus:ring-map-person"
               />
               <span className="text-gray-600">Show volunteers on map</span>
             </label>
@@ -2772,11 +2778,11 @@ export default function DriverPlanningDashboard() {
                 type="checkbox"
                 checked={showTeamMembers}
                 onChange={(e) => setShowTeamMembers(e.target.checked)}
-                className="rounded border-gray-300 text-red-500 focus:ring-red-500"
+                className="rounded border-gray-300 text-map-person focus:ring-map-person"
               />
               <span className="text-gray-600">Show team members on map</span>
               {showTeamMembers && teamMembersForMap.length > 0 && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-gray-100 text-gray-700">
                   {teamMembersForMap.length}
                 </Badge>
               )}
@@ -2789,16 +2795,16 @@ export default function DriverPlanningDashboard() {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowQuickLookup(true)}
-                  className="w-full text-xs h-7 border-dashed border-orange-300 text-orange-700 hover:bg-orange-50"
+                  className="w-full text-xs h-7 border-dashed border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   <MapPin className="w-3 h-3 mr-1" />
                   Quick Location Lookup
                 </Button>
               ) : customLocation ? (
-                <div className="bg-orange-50 border border-orange-200 rounded-md p-2">
+                <div className="bg-gray-50 border border-gray-200 border-l-4 border-l-map-custom rounded-md p-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="text-[10px] uppercase text-orange-600 font-semibold">Custom Location</div>
+                      <div className="text-[10px] uppercase text-gray-500 font-semibold">Custom Location</div>
                       <div className="text-xs font-medium text-gray-900 truncate" title={customLocation.address}>
                         {customLocation.address}
                       </div>
@@ -2807,7 +2813,7 @@ export default function DriverPlanningDashboard() {
                       variant="ghost"
                       size="sm"
                       onClick={clearCustomLocation}
-                      className="h-6 w-6 p-0 text-orange-600 hover:text-orange-800 hover:bg-orange-100"
+                      className="h-6 w-6 p-0 text-gray-500 hover:text-tsp-red hover:bg-gray-100"
                     >
                       <X className="w-3.5 h-3.5" />
                     </Button>
@@ -3236,7 +3242,7 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -35]}
-                  className="!bg-orange-600/90 !border-orange-600 !text-white !text-[10px] !font-medium !px-1.5 !py-0.5 !rounded !shadow-sm"
+                  className="!bg-map-custom !border-map-custom !text-white !text-[10px] !font-medium !px-1.5 !py-0.5 !rounded !shadow-sm"
                 >
                   <span className="truncate max-w-[120px] block">
                     {customLocation.address}
@@ -3244,7 +3250,7 @@ export default function DriverPlanningDashboard() {
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[200px]">
-                    <div className="text-[10px] uppercase text-orange-600 font-semibold">Quick Lookup Location</div>
+                    <div className="text-[10px] uppercase text-gray-500 font-semibold">Quick Lookup Location</div>
                     <h3 className="font-semibold">{customLocation.address}</h3>
                     <p className="text-xs text-gray-500 mt-1">
                       Use this to view nearby hosts, recipients, and drivers
@@ -3274,13 +3280,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-green-50 !border-green-300 !text-green-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-host !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {host.contactName || host.hostLocationName}
                 </Tooltip>
                 <Popup>
                   <div className="p-2">
-                    <h3 className="font-semibold text-green-700">{host.contactName}</h3>
+                    <h3 className="font-semibold text-tsp-navy">{host.contactName}</h3>
                     <p className="text-xs text-gray-600">{host.hostLocationName}</p>
                     <p className="text-xs text-gray-500 mt-1">{host.distance.toFixed(1)} miles away</p>
                   </div>
@@ -3308,14 +3314,14 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-recipient !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {recipient.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">Assigned Recipient</div>
-                    <h3 className="font-semibold text-purple-700">{recipient.name}</h3>
+                    <div className="text-[10px] font-semibold text-tsp-navy uppercase tracking-wide">Assigned Recipient</div>
+                    <h3 className="font-semibold text-tsp-navy">{recipient.name}</h3>
                     {recipient.address && (
                       <p className="text-xs text-gray-600">{recipient.address}</p>
                     )}
@@ -3344,13 +3350,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-recipient !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {recipient.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <h3 className="font-semibold text-purple-700">{recipient.name}</h3>
+                    <h3 className="font-semibold text-tsp-navy">{recipient.name}</h3>
                     {recipient.address && (
                       <p className="text-xs text-gray-600">{recipient.address}</p>
                     )}
@@ -3374,13 +3380,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-yellow-100 !border-yellow-400 !text-yellow-900 !text-xs !font-semibold !px-2 !py-1 !rounded !shadow-md"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-tsp-gold !text-tsp-navy !text-xs !font-semibold !px-2 !py-1 !rounded !shadow-md"
                 >
                   {selectedDriver.name} (Selected)
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <h3 className="font-semibold text-yellow-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <Truck className="w-3 h-3" />
                       {selectedDriver.name}
                     </h3>
@@ -3391,7 +3397,7 @@ export default function DriverPlanningDashboard() {
             )}
 
             {/* Nearby driver markers (triangles) when event or custom location selected */}
-            {/* Show drivers and volunteers (who are flagged as drivers), not hosts - hosts show as green circles */}
+            {/* Show drivers and volunteers (who are flagged as drivers), not hosts - hosts show as sage circles */}
             {layerVisibility.drivers && effectiveSelectedEvent && nearbyDriversAll
               .filter(({ driver }) => driver.latitude && driver.longitude && driver.id !== selectedDriver?.id && (driver.source === 'driver' || driver.source === 'volunteer'))
               .slice(0, 15)
@@ -3414,13 +3420,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-yellow-50 !border-yellow-300 !text-yellow-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-tsp-gold !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {driver.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <h3 className="font-semibold text-yellow-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <Truck className="w-3 h-3" />
                       {driver.name}
                     </h3>
@@ -3441,9 +3447,9 @@ export default function DriverPlanningDashboard() {
               <Polyline
                 positions={drivingRoute.coordinates}
                 pathOptions={{
-                  color: '#2563eb',
+                  color: '#236383',
                   weight: 4,
-                  opacity: 0.8,
+                  opacity: 0.85,
                   dashArray: '10, 10',
                 }}
               />
@@ -3452,23 +3458,24 @@ export default function DriverPlanningDashboard() {
             {/* Full trip route polylines (when both driver and destination are selected) */}
             {fullTripRoute && (
               <>
-                {/* Leg 1: Driver home -> Event (dashed yellow/orange) */}
+                {/* Leg 1: Driver home -> Event (dashed gold) */}
                 <Polyline
                   positions={fullTripRoute.leg1.coordinates}
                   pathOptions={{
-                    color: '#f59e0b',
+                    color: '#FBAD3F',
                     weight: 5,
                     opacity: 0.9,
                     dashArray: '10, 6',
                   }}
                 />
-                {/* Leg 2: Event -> Destination (solid purple) */}
+                {/* Leg 2: Event -> Destination (dashed navy) */}
                 <Polyline
                   positions={fullTripRoute.leg2.coordinates}
                   pathOptions={{
-                    color: '#9333ea',
+                    color: '#114154',
                     weight: 5,
                     opacity: 0.9,
+                    dashArray: '4, 8',
                   }}
                 />
               </>
@@ -3485,13 +3492,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-person !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {volunteer.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[200px]">
-                    <h3 className="font-semibold text-purple-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <Megaphone className="w-3 h-3" />
                       {volunteer.name}
                     </h3>
@@ -3505,12 +3512,12 @@ export default function DriverPlanningDashboard() {
                       </p>
                     )}
                     {volunteer.assignedEvents.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-purple-200">
-                        <p className="text-xs text-purple-600 font-medium">Assigned to:</p>
+                      <div className="mt-2 pt-2 border-t border-gray-200">
+                        <p className="text-xs text-gray-600 font-medium">Assigned to:</p>
                         <ul className="text-xs text-gray-600 mt-1">
                           {volunteer.assignedEvents.map((evt, i) => (
                             <li key={i} className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#a78bfa' }} />
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#64748B' }} />
                               {evt.eventName} ({evt.role})
                             </li>
                           ))}
@@ -3533,16 +3540,16 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-red-50 !border-red-300 !text-red-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-person !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {member.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[200px]">
-                    <h3 className="font-semibold text-red-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {member.name}
-                      <span className="text-red-400 text-[11px]">({member.role})</span>
+                      <span className="text-gray-500 text-[11px]">({member.role})</span>
                     </h3>
                     {member.address && (
                       <p className="text-xs text-gray-600">{member.address}</p>
@@ -3611,12 +3618,12 @@ export default function DriverPlanningDashboard() {
                   {selectedDriver && (
                     <div className="mb-3">
                       <div className="flex items-center gap-2 text-xs text-gray-500 mb-1.5">
-                        <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-yellow-400" />
+                        <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-tsp-gold" />
                         <span className="font-medium">Driver Selected</span>
                       </div>
-                      <div className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2">
+                      <div className="flex items-center justify-between bg-gray-50 border-l-4 border-l-tsp-gold rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <Truck className="w-4 h-4 text-amber-600" />
+                          <Truck className="w-4 h-4 text-tsp-navy" />
                           <span className="text-sm font-medium text-gray-800">{selectedDriver.name}</span>
                           {assignedDrivers.some(d => String(d.id) === String(selectedDriver.id)) && (
                             <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
@@ -3640,15 +3647,15 @@ export default function DriverPlanningDashboard() {
                 <div className="mb-3">
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-1.5">
                     {selectedDestination.type === 'host' ? (
-                      <div className="w-3 h-3 rounded-full bg-green-500 border border-white shadow-sm" />
+                      <div className="w-3 h-3 rounded-full bg-map-host border border-white shadow-sm" />
                     ) : (
-                      <div className="w-3 h-3 bg-purple-500 border border-white shadow-sm rotate-45" style={{ borderRadius: '1px' }} />
+                      <div className="w-3 h-3 bg-map-recipient border border-white shadow-sm rotate-45" style={{ borderRadius: '1px' }} />
                     )}
                     <span className="font-medium">{selectedDestination.type === 'host' ? 'Host' : 'Recipient'} Selected</span>
                   </div>
-                  <div className="flex items-center justify-between bg-purple-50 rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between bg-gray-50 border-l-4 border-l-map-recipient rounded-lg px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-purple-600" />
+                      <MapPin className="w-4 h-4 text-map-recipient" />
                       <span className="text-sm font-medium text-gray-800">{selectedDestination.name}</span>
                       {selectedDestination.type === 'recipient' && designatedRecipients.some(r => r.id === selectedDestination.id) && (
                         <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
@@ -3669,8 +3676,8 @@ export default function DriverPlanningDashboard() {
 
               {/* Route preview info - show when previewing a potential destination */}
               {drivingRoute && focusedItem && (
-                <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 text-xs text-blue-700 mb-1">
+                <div className="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200 border-l-4 border-l-tsp-teal">
+                  <div className="flex items-center gap-2 text-xs text-tsp-navy mb-1">
                     <Navigation className="w-3.5 h-3.5" />
                     <span className="font-medium">Route to {focusedItem.name}</span>
                     {drivingRoute.durationInTraffic && (
@@ -3719,8 +3726,8 @@ export default function DriverPlanningDashboard() {
 
               {/* Driver-to-event route info - show when driver is selected but no destination yet */}
               {drivingRoute && selectedDriver && !selectedDestination && !focusedItem && (
-                <div className="mb-3 p-2 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="flex items-center gap-2 text-xs text-amber-700 mb-1">
+                <div className="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200 border-l-4 border-l-tsp-gold">
+                  <div className="flex items-center gap-2 text-xs text-tsp-navy mb-1">
                     <Navigation className="w-3.5 h-3.5" />
                     <span className="font-medium">Driver → Event</span>
                     {drivingRoute.durationInTraffic && (
@@ -3809,12 +3816,12 @@ export default function DriverPlanningDashboard() {
                 </button>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center gap-3 bg-blue-50 rounded-lg p-2.5">
-                  <Truck className="w-5 h-5 text-blue-600" />
+                <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2.5">
+                  <Truck className="w-5 h-5 text-tsp-teal" />
                   <span className="text-base font-medium text-gray-800">{(drivingRoute.distance / 1609.34).toFixed(1)} miles</span>
                 </div>
-                <div className="flex items-center gap-3 bg-blue-50 rounded-lg p-2.5">
-                  <Clock className="w-5 h-5 text-blue-600" />
+                <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2.5">
+                  <Clock className="w-5 h-5 text-tsp-teal" />
                   <span className="text-base font-medium text-gray-800">
                     {(() => {
                       const dur = formatDuration(drivingRoute.duration, drivingRoute.durationInTraffic);
@@ -3917,15 +3924,15 @@ export default function DriverPlanningDashboard() {
                 >
                   <LayerToggleCheck checked={layerVisibility.events} />
                   <svg viewBox="0 0 12 18" className="w-3 h-4" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#3388ff" stroke="white" strokeWidth="0.5"/>
+                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#236383" stroke="white" strokeWidth="0.5"/>
                   </svg>
                   <span>Event{layerVisibility.events ? '' : ' (hidden)'}</span>
                 </button>
                 <div className="flex items-center gap-2">
                   <svg viewBox="0 0 12 18" className="w-3.5 h-5" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#ff0000" stroke="white" strokeWidth="1"/>
+                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#114154" stroke="white" strokeWidth="1"/>
                     <circle cx="6" cy="6" r="2.5" fill="white"/>
-                    <circle cx="6" cy="6" r="1.2" fill="#ff0000"/>
+                    <circle cx="6" cy="6" r="1.2" fill="#114154"/>
                   </svg>
                   <span className="font-semibold">Selected Event (pulses)</span>
                 </div>
@@ -3940,7 +3947,7 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-hosts"
                     >
                       <LayerToggleCheck checked={layerVisibility.hosts} />
-                      <div className="w-3 h-3 rounded-full bg-green-500 border border-white shadow-sm" />
+                      <div className="w-3 h-3 rounded-full bg-map-host border border-white shadow-sm" />
                       <span>Host (circle){layerVisibility.hosts ? '' : ' (hidden)'}</span>
                     </button>
                     <button
@@ -3952,7 +3959,7 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-recipients"
                     >
                       <LayerToggleCheck checked={layerVisibility.recipients} />
-                      <div className="w-3 h-3 bg-purple-500 border border-white shadow-sm rotate-45" style={{ borderRadius: '1px' }} />
+                      <div className="w-3 h-3 bg-map-recipient border border-white shadow-sm rotate-45" style={{ borderRadius: '1px' }} />
                       <span>Recipient (diamond){layerVisibility.recipients ? '' : ' (hidden)'}</span>
                     </button>
                     <button
@@ -3964,7 +3971,7 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-drivers"
                     >
                       <LayerToggleCheck checked={layerVisibility.drivers} />
-                      <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[10px] border-b-yellow-400" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.2))' }} />
+                      <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[10px] border-b-tsp-gold" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.2))' }} />
                       <span>Driver (triangle){layerVisibility.drivers ? '' : ' (hidden)'}</span>
                     </button>
                     <button
@@ -3977,7 +3984,7 @@ export default function DriverPlanningDashboard() {
                     >
                       <LayerToggleCheck checked={showVolunteersSpeakers} />
                       <svg viewBox="0 0 24 24" className="w-4 h-4 drop-shadow-sm" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" fill="#8b5cf6" stroke="white" strokeWidth="1.5"/>
+                        <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" fill="#64748B" stroke="white" strokeWidth="1.5"/>
                       </svg>
                       <span>Volunteers (star){showVolunteersSpeakers ? '' : ' (hidden)'}</span>
                     </button>
@@ -3990,18 +3997,18 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-team-members"
                     >
                       <LayerToggleCheck checked={showTeamMembers} />
-                      <div className="w-3.5 h-3.5 rounded-[4px] bg-red-500 border border-white shadow-sm" />
+                      <div className="w-3.5 h-3.5 rounded-[4px] bg-map-person border border-white shadow-sm" />
                       <span>Team Members (rounded square){showTeamMembers ? '' : ' (hidden)'}</span>
                     </button>
                     <div className="flex items-center gap-2">
                       <svg viewBox="0 0 26 26" className="w-4 h-4" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="13" cy="13" r="11" fill="#2ecc71" stroke="white" strokeWidth="2"/>
-                        <path d="M13 6L19 18H7L13 6Z" fill="#f1c40f" stroke="white" strokeWidth="1.5"/>
+                        <circle cx="13" cy="13" r="11" fill="#6B8F71" stroke="white" strokeWidth="2"/>
+                        <path d="M13 6L19 18H7L13 6Z" fill="#FBAD3F" stroke="white" strokeWidth="1.5"/>
                       </svg>
                       <span>Host+Driver</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-orange-500 border border-white shadow-sm" />
+                      <div className="w-3 h-3 rounded-full bg-map-custom border border-white shadow-sm" />
                       <span>Selected item = orange</span>
                     </div>
                   </>
@@ -4022,14 +4029,14 @@ export default function DriverPlanningDashboard() {
               {fullTripRoute && selectedDriver && selectedDestination && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-sm font-semibold text-gray-800 shrink-0">Full Trip</span>
-                  <div className="flex items-center gap-1.5 bg-amber-50 rounded-md px-2 py-1 text-xs">
-                    <Home className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <div className="flex items-center gap-1.5 bg-gray-50 border-l-4 border-l-tsp-gold rounded-md px-2 py-1 text-xs">
+                    <Home className="w-3.5 h-3.5 text-tsp-navy shrink-0" />
                     <span className="font-medium text-gray-700 max-w-[140px] truncate">{selectedDriver.name}</span>
                     <span className="text-gray-400">→</span>
                     <span className="text-gray-600">Event</span>
-                    <Truck className="w-3.5 h-3.5 text-amber-600" />
+                    <Truck className="w-3.5 h-3.5 text-tsp-navy" />
                     <span className="font-medium text-gray-700">{(fullTripRoute.leg1.distance / 1609.34).toFixed(1)} mi</span>
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <Clock className="w-3.5 h-3.5 text-tsp-navy" />
                     <span className="font-medium text-gray-700">
                       {(() => {
                         const dur = formatDuration(fullTripRoute.leg1.duration, fullTripRoute.leg1.durationInTraffic);
@@ -4044,14 +4051,14 @@ export default function DriverPlanningDashboard() {
                       })()}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 bg-purple-50 rounded-md px-2 py-1 text-xs">
-                    <MapPin className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <div className="flex items-center gap-1.5 bg-gray-50 border-l-4 border-l-tsp-navy rounded-md px-2 py-1 text-xs">
+                    <MapPin className="w-3.5 h-3.5 text-map-recipient shrink-0" />
                     <span className="text-gray-600">Event</span>
                     <span className="text-gray-400">→</span>
                     <span className="font-medium text-gray-700 max-w-[140px] truncate">{selectedDestination.name}</span>
-                    <Truck className="w-3.5 h-3.5 text-purple-600" />
+                    <Truck className="w-3.5 h-3.5 text-map-recipient" />
                     <span className="font-medium text-gray-700">{(fullTripRoute.leg2.distance / 1609.34).toFixed(1)} mi</span>
-                    <Clock className="w-3.5 h-3.5 text-purple-600" />
+                    <Clock className="w-3.5 h-3.5 text-map-recipient" />
                     <span className="font-medium text-gray-700">
                       {(() => {
                         const dur = formatDuration(fullTripRoute.leg2.duration, fullTripRoute.leg2.durationInTraffic);
@@ -4122,8 +4129,8 @@ export default function DriverPlanningDashboard() {
                       <Target className="w-4 h-4 text-[#236383] shrink-0" />
                       <span className="text-sm font-semibold text-gray-800 shrink-0">Trip Planning</span>
                       {selectedDriver && (
-                        <div className="flex items-center gap-1.5 bg-amber-50 rounded-md px-2 py-1">
-                          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-yellow-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 bg-gray-50 border-l-4 border-l-tsp-gold rounded-md px-2 py-1">
+                          <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-tsp-gold shrink-0" />
                           <span className="text-xs font-medium text-gray-800">{selectedDriver.name}</span>
                           {assignedDrivers.some(d => String(d.id) === String(selectedDriver.id)) && (
                             <span className="text-[9px] bg-tsp-sky/15 text-tsp-navy border border-tsp-sky px-1.5 py-0.5 rounded-full font-medium">
@@ -4140,8 +4147,8 @@ export default function DriverPlanningDashboard() {
                         </div>
                       )}
                       {selectedDestination && (
-                        <div className="flex items-center gap-1.5 bg-purple-50 rounded-md px-2 py-1">
-                          <div className="w-2.5 h-2.5 bg-purple-500 rotate-45 shrink-0" style={{ borderRadius: '1px' }} />
+                        <div className="flex items-center gap-1.5 bg-gray-50 border-l-4 border-l-tsp-navy rounded-md px-2 py-1">
+                          <div className="w-2.5 h-2.5 bg-map-recipient rotate-45 shrink-0" style={{ borderRadius: '1px' }} />
                           <span className="text-xs font-medium text-gray-800">{selectedDestination.name}</span>
                           {selectedDestination.type === 'recipient' &&
                             designatedRecipients.some(r => r.id === selectedDestination.id) && (
@@ -4159,14 +4166,14 @@ export default function DriverPlanningDashboard() {
                         </div>
                       )}
                       {drivingRoute && (
-                        <div className="flex items-center gap-2 bg-blue-50 rounded-md px-2 py-1 text-xs">
-                          <span className="text-blue-700 font-medium">Route</span>
+                        <div className="flex items-center gap-2 bg-gray-50 border-l-4 border-l-tsp-teal rounded-md px-2 py-1 text-xs">
+                          <span className="text-tsp-navy font-medium">Route</span>
                           <span className="inline-flex items-center gap-1 font-medium text-gray-800">
-                            <Truck className="w-3.5 h-3.5 text-blue-600" />
+                            <Truck className="w-3.5 h-3.5 text-tsp-teal" />
                             {(drivingRoute.distance / 1609.34).toFixed(1)} mi
                           </span>
                           <span className="inline-flex items-center gap-1 font-medium text-gray-800">
-                            <Clock className="w-3.5 h-3.5 text-blue-600" />
+                            <Clock className="w-3.5 h-3.5 text-tsp-teal" />
                             {(() => {
                               const dur = formatDuration(drivingRoute.duration, drivingRoute.durationInTraffic);
                               return dur.hasTraffic ? (
@@ -4218,13 +4225,13 @@ export default function DriverPlanningDashboard() {
               {drivingRoute && !fullTripRoute && !selectedDriver && !selectedDestination && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-sm font-semibold text-gray-800 shrink-0">Route Preview</span>
-                  <div className="flex items-center gap-2 bg-blue-50 rounded-md px-2 py-1 text-xs">
+                  <div className="flex items-center gap-2 bg-gray-50 border-l-4 border-l-tsp-teal rounded-md px-2 py-1 text-xs">
                     <span className="inline-flex items-center gap-1 font-medium text-gray-800">
-                      <Truck className="w-3.5 h-3.5 text-blue-600" />
+                      <Truck className="w-3.5 h-3.5 text-tsp-teal" />
                       {(drivingRoute.distance / 1609.34).toFixed(1)} mi
                     </span>
                     <span className="inline-flex items-center gap-1 font-medium text-gray-800">
-                      <Clock className="w-3.5 h-3.5 text-blue-600" />
+                      <Clock className="w-3.5 h-3.5 text-tsp-teal" />
                       {(() => {
                         const dur = formatDuration(drivingRoute.duration, drivingRoute.durationInTraffic);
                         return dur.hasTraffic ? (
@@ -4349,7 +4356,7 @@ export default function DriverPlanningDashboard() {
                       {selectedDriver ? (
                         <div className="flex items-center justify-between bg-white rounded-md px-2.5 py-2 shadow-sm">
                           <div className="flex items-center gap-2">
-                            <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-yellow-400" />
+                            <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[8px] border-b-tsp-gold" />
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] text-gray-500 uppercase">Driver</span>
@@ -4386,9 +4393,9 @@ export default function DriverPlanningDashboard() {
                         <div className="flex items-center justify-between bg-white rounded-md px-2.5 py-2 shadow-sm">
                           <div className="flex items-center gap-2">
                             {selectedDestination.type === 'host' ? (
-                              <div className="w-3 h-3 rounded-full bg-green-500 border border-white shadow-sm" />
+                              <div className="w-3 h-3 rounded-full bg-map-host border border-white shadow-sm" />
                             ) : (
-                              <div className="w-3 h-3 bg-purple-500 border border-white shadow-sm rotate-45" style={{ borderRadius: '1px' }} />
+                              <div className="w-3 h-3 bg-map-recipient border border-white shadow-sm rotate-45" style={{ borderRadius: '1px' }} />
                             )}
                             <div>
                               <div className="flex items-center gap-1.5">
@@ -4443,7 +4450,7 @@ export default function DriverPlanningDashboard() {
                 <div data-testid="driver-planning-nearby-hosts">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-green-600" />
+                      <Building2 className="w-4 h-4 text-map-host" />
                       Nearby Hosts
                     </h3>
                     <span className="text-[9px] text-gray-400 italic" title="Click to preview driving route">distances are direct</span>
@@ -4457,8 +4464,8 @@ export default function DriverPlanningDashboard() {
                             selectedDestination?.type === 'host' && selectedDestination?.id === host.id
                               ? 'bg-[#236383]/10 border-[#236383] ring-2 ring-[#236383]/30'
                               : focusedItem?.type === 'host' && focusedItem?.id === host.id
-                                ? 'bg-green-100 border-green-400'
-                                : 'bg-green-50 border-green-200 hover:bg-green-100'
+                                ? 'bg-tsp-mist border-tsp-teal border-l-4 border-l-map-host'
+                                : 'bg-white border-gray-200 border-l-4 border-l-map-host hover:bg-gray-50'
                           }`}
                         >
                           <button
@@ -4477,10 +4484,10 @@ export default function DriverPlanningDashboard() {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <MapPin className="w-3.5 h-3.5 text-green-600" />
+                                <MapPin className="w-3.5 h-3.5 text-map-host" />
                                 <span className="font-medium">{host.contactName}</span>
                               </div>
-                              <span className="text-green-700">{host.distance.toFixed(1)} mi</span>
+                              <span className="text-tsp-navy">{host.distance.toFixed(1)} mi</span>
                             </div>
                             <div className="text-gray-500 pl-5 mt-0.5 text-[10px]">
                               {host.hostLocationName}
@@ -4542,7 +4549,7 @@ export default function DriverPlanningDashboard() {
                 <div data-testid="driver-planning-nearby-recipients">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
-                      <Heart className="w-4 h-4 text-purple-600" />
+                      <Heart className="w-4 h-4 text-map-recipient" />
                       Nearby Recipients
                     </h3>
                     <span className="text-[9px] text-gray-400 italic" title="Click to preview driving route">click for driving distance</span>
@@ -4558,8 +4565,8 @@ export default function DriverPlanningDashboard() {
                               selectedDestination?.type === 'recipient' && selectedDestination?.id === recipient.id
                                 ? 'bg-[#236383]/10 border-[#236383] ring-2 ring-[#236383]/30'
                                 : focusedItem?.type === 'recipient' && focusedItem?.id === recipient.id
-                                  ? 'bg-purple-100 border-purple-400'
-                                  : 'bg-purple-50 border-purple-200 hover:bg-purple-100'
+                                  ? 'bg-tsp-mist border-tsp-teal border-l-4 border-l-map-recipient'
+                                  : 'bg-white border-gray-200 border-l-4 border-l-map-recipient hover:bg-gray-50'
                             }`}
                           >
                             <button
@@ -4577,10 +4584,10 @@ export default function DriverPlanningDashboard() {
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                                  <MapPin className="w-3.5 h-3.5 text-map-recipient" />
                                   <span className="font-medium">{recipient.name}</span>
                                 </div>
-                                <span className="text-purple-700">Assigned</span>
+                                <span className="text-tsp-navy">Assigned</span>
                               </div>
                               {recipient.address && (
                                 <div className="text-gray-500 pl-5 mt-0.5 text-[10px] line-clamp-1">
@@ -4634,8 +4641,8 @@ export default function DriverPlanningDashboard() {
                             selectedDestination?.type === 'recipient' && selectedDestination?.id === recipient.id
                               ? 'bg-[#236383]/10 border-[#236383] ring-2 ring-[#236383]/30'
                               : focusedItem?.type === 'recipient' && focusedItem?.id === recipient.id
-                                ? 'bg-purple-100 border-purple-400'
-                                : 'bg-purple-50 border-purple-200 hover:bg-purple-100'
+                                ? 'bg-tsp-mist border-tsp-teal border-l-4 border-l-map-recipient'
+                                : 'bg-white border-gray-200 border-l-4 border-l-map-recipient hover:bg-gray-50'
                           }`}
                         >
                           <button
@@ -4654,10 +4661,10 @@ export default function DriverPlanningDashboard() {
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                                <MapPin className="w-3.5 h-3.5 text-map-recipient" />
                                 <span className="font-medium">{recipient.name}</span>
                               </div>
-                              <span className="text-purple-700">{recipient.distance.toFixed(1)} mi</span>
+                              <span className="text-tsp-navy">{recipient.distance.toFixed(1)} mi</span>
                             </div>
                             {recipient.estimatedSandwiches && (
                               <div className="mt-1 text-gray-600 pl-5">
@@ -4740,19 +4747,19 @@ export default function DriverPlanningDashboard() {
                 {/* Assigned Drivers - Show first if any */}
                 {assignedDrivers.length > 0 && (
                   <div className="space-y-2">
-                    <h3 className="text-xs font-semibold text-green-700 uppercase tracking-wide flex items-center gap-2">
+                    <h3 className="text-xs font-semibold text-tsp-navy uppercase tracking-wide flex items-center gap-2">
                       <Check className="w-4 h-4" />
                       Assigned Driver{assignedDrivers.length > 1 ? 's' : ''}
                     </h3>
                     {assignedDrivers.map((driver) => (
                       <Card
                         key={`assigned-${driver.id}`}
-                        className={`p-3 transition-colors border-green-200 bg-green-50 ${
+                        className={`p-3 transition-colors border-gray-200 border-l-4 border-l-tsp-gold bg-white ${
                           selectedDriver?.id === driver.id
                             ? 'ring-2 ring-[#236383] bg-[#236383]/10'
                             : focusedItem?.type === 'driver' && focusedItem?.id === driver.id
-                              ? 'ring-2 ring-orange-400 bg-orange-50'
-                              : 'hover:bg-green-100 cursor-pointer'
+                              ? 'ring-2 ring-tsp-navy bg-tsp-mist'
+                              : 'hover:bg-gray-50 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-start gap-2 mb-2">
@@ -4851,7 +4858,7 @@ export default function DriverPlanningDashboard() {
                           selectedDriver?.id === driver.id
                             ? 'ring-2 ring-[#236383] bg-[#236383]/10'
                             : focusedItem?.type === 'driver' && focusedItem?.id === driver.id
-                              ? 'ring-2 ring-orange-400 bg-orange-50'
+                              ? 'ring-2 ring-tsp-navy bg-tsp-mist'
                               : 'hover:bg-gray-50 cursor-pointer'
                         }`}
                       >
@@ -5324,7 +5331,7 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -35]}
-                  className="!bg-orange-600/90 !border-orange-600 !text-white !text-[10px] !font-medium !px-1.5 !py-0.5 !rounded !shadow-sm"
+                  className="!bg-map-custom !border-map-custom !text-white !text-[10px] !font-medium !px-1.5 !py-0.5 !rounded !shadow-sm"
                 >
                   {customLocation.address}
                 </Tooltip>
@@ -5340,13 +5347,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-green-50 !border-green-300 !text-green-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-host !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {host.contactName || host.hostLocationName}
                 </Tooltip>
                 <Popup>
                   <div className="p-2">
-                    <h3 className="font-semibold text-green-700 text-sm">{host.contactName}</h3>
+                    <h3 className="font-semibold text-tsp-navy text-sm">{host.contactName}</h3>
                     <p className="text-xs text-gray-500">{host.distance.toFixed(1)} mi away</p>
                   </div>
                 </Popup>
@@ -5362,14 +5369,14 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-recipient !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {recipient.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2">
-                    <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">Assigned Recipient</div>
-                    <h3 className="font-semibold text-purple-700 text-sm">{recipient.name}</h3>
+                    <div className="text-[10px] font-semibold text-tsp-navy uppercase tracking-wide">Assigned Recipient</div>
+                    <h3 className="font-semibold text-tsp-navy text-sm">{recipient.name}</h3>
                   </div>
                 </Popup>
               </Marker>
@@ -5385,13 +5392,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-recipient !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {recipient.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2">
-                    <h3 className="font-semibold text-purple-700 text-sm">{recipient.name}</h3>
+                    <h3 className="font-semibold text-tsp-navy text-sm">{recipient.name}</h3>
                     <p className="text-xs text-gray-500">{recipient.distance.toFixed(1)} mi away</p>
                   </div>
                 </Popup>
@@ -5408,13 +5415,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-yellow-100 !border-yellow-400 !text-yellow-900 !text-xs !font-semibold !px-2 !py-1 !rounded !shadow-md"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-tsp-gold !text-tsp-navy !text-xs !font-semibold !px-2 !py-1 !rounded !shadow-md"
                 >
                   {selectedDriver.name} (Selected)
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <h3 className="font-semibold text-yellow-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <Truck className="w-3 h-3" />
                       {selectedDriver.name}
                     </h3>
@@ -5424,7 +5431,7 @@ export default function DriverPlanningDashboard() {
               </Marker>
             )}
             {/* Show driver candidates with geocoded coordinates (drivers + volunteers, not hosts) */}
-            {/* Hosts show as green circles via nearbyHosts */}
+            {/* Hosts show as sage circles via nearbyHosts */}
             {layerVisibility.drivers && driverCandidates
               .filter((driver) => driver.latitude && driver.longitude && (driver.source === 'driver' || driver.source === 'volunteer'))
               .map((driver) => (
@@ -5437,13 +5444,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-yellow-50 !border-yellow-300 !text-yellow-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-tsp-gold !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {driver.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <h3 className="font-semibold text-yellow-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <Truck className="w-3 h-3" />
                       {driver.name} <span className="text-gray-400 text-[11px]">({driver.source})</span>
                     </h3>
@@ -5474,13 +5481,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-person !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {volunteer.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[200px]">
-                    <h3 className="font-semibold text-purple-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <Megaphone className="w-3 h-3" />
                       {volunteer.name}
                     </h3>
@@ -5494,12 +5501,12 @@ export default function DriverPlanningDashboard() {
                       </p>
                     )}
                     {volunteer.assignedEvents.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-purple-200">
-                        <p className="text-xs text-purple-600 font-medium">Assigned to:</p>
+                      <div className="mt-2 pt-2 border-t border-gray-200">
+                        <p className="text-xs text-gray-600 font-medium">Assigned to:</p>
                         <ul className="text-xs text-gray-600 mt-1">
                           {volunteer.assignedEvents.map((evt, i) => (
                             <li key={i} className="flex items-center gap-1">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#a78bfa' }} />
+                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#64748B' }} />
                               {evt.eventName} ({evt.role})
                             </li>
                           ))}
@@ -5522,16 +5529,16 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-red-50 !border-red-300 !text-red-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-person !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {member.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[200px]">
-                    <h3 className="font-semibold text-red-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {member.name}
-                      <span className="text-red-400 text-[11px]">({member.role})</span>
+                      <span className="text-gray-500 text-[11px]">({member.role})</span>
                     </h3>
                     {member.address && (
                       <p className="text-xs text-gray-600">{member.address}</p>
@@ -5569,14 +5576,14 @@ export default function DriverPlanningDashboard() {
                 {/* Nearby Hosts */}
                 <div>
                   <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                    <Building2 className="w-3 h-3 text-green-600" />
+                    <Building2 className="w-3 h-3 text-map-host" />
                     Nearby Hosts ({nearbyHosts.length})
                   </h4>
                   <div className="flex gap-2 overflow-x-auto pb-2">
                     {nearbyHosts.slice(0, 5).map((host) => (
-                      <div key={host.id} className="flex-shrink-0 text-xs p-2 bg-green-50 border border-green-200 rounded min-w-[120px]">
+                      <div key={host.id} className="flex-shrink-0 text-xs p-2 bg-white border border-gray-200 border-l-4 border-l-map-host rounded min-w-[120px]">
                         <div className="font-medium">{host.contactName}</div>
-                        <div className="text-green-700">{host.distance.toFixed(1)} mi</div>
+                        <div className="text-tsp-navy">{host.distance.toFixed(1)} mi</div>
                       </div>
                     ))}
                   </div>
@@ -5584,14 +5591,14 @@ export default function DriverPlanningDashboard() {
                 {/* Nearby Recipients */}
                 <div>
                   <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                    <Heart className="w-3 h-3 text-purple-600" />
+                    <Heart className="w-3 h-3 text-map-recipient" />
                     Nearby Recipients ({nearbyRecipients.length}{allRecipientsWithDistance.length > nearbyRecipients.length ? ` of ${allRecipientsWithDistance.length}` : ''})
                   </h4>
                   <div className="flex gap-2 overflow-x-auto pb-2">
                     {nearbyRecipients.slice(0, 5).map((recipient) => (
-                      <div key={recipient.id} className="flex-shrink-0 text-xs p-2 bg-purple-50 border border-purple-200 rounded min-w-[120px]">
+                      <div key={recipient.id} className="flex-shrink-0 text-xs p-2 bg-white border border-gray-200 border-l-4 border-l-map-recipient rounded min-w-[120px]">
                         <div className="font-medium">{recipient.name}</div>
-                        <div className="text-purple-700">{recipient.distance.toFixed(1)} mi</div>
+                        <div className="text-tsp-navy">{recipient.distance.toFixed(1)} mi</div>
                       </div>
                     ))}
                   </div>
@@ -5719,7 +5726,7 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -35]}
-                  className="!bg-orange-600/90 !border-orange-600 !text-white !text-[10px] !font-medium !px-1.5 !py-0.5 !rounded !shadow-sm"
+                  className="!bg-map-custom !border-map-custom !text-white !text-[10px] !font-medium !px-1.5 !py-0.5 !rounded !shadow-sm"
                 >
                   {customLocation.address}
                 </Tooltip>
@@ -5735,13 +5742,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-green-50 !border-green-300 !text-green-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-host !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {host.contactName || host.hostLocationName}
                 </Tooltip>
                 <Popup>
                   <div className="p-2">
-                    <h3 className="font-semibold text-green-700 text-sm">{host.contactName}</h3>
+                    <h3 className="font-semibold text-tsp-navy text-sm">{host.contactName}</h3>
                     <p className="text-xs">{host.distance.toFixed(1)} mi</p>
                   </div>
                 </Popup>
@@ -5757,14 +5764,14 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-recipient !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {recipient.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2">
-                    <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">Assigned Recipient</div>
-                    <h3 className="font-semibold text-purple-700 text-sm">{recipient.name}</h3>
+                    <div className="text-[10px] font-semibold text-tsp-navy uppercase tracking-wide">Assigned Recipient</div>
+                    <h3 className="font-semibold text-tsp-navy text-sm">{recipient.name}</h3>
                   </div>
                 </Popup>
               </Marker>
@@ -5780,13 +5787,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-recipient !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {recipient.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2">
-                    <h3 className="font-semibold text-purple-700 text-sm">{recipient.name}</h3>
+                    <h3 className="font-semibold text-tsp-navy text-sm">{recipient.name}</h3>
                     <p className="text-xs">{recipient.distance.toFixed(1)} mi</p>
                   </div>
                 </Popup>
@@ -5804,7 +5811,7 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-yellow-100 !border-yellow-400 !text-yellow-900 !text-xs !font-semibold !px-2 !py-1 !rounded !shadow-md"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-tsp-gold !text-tsp-navy !text-xs !font-semibold !px-2 !py-1 !rounded !shadow-md"
                 >
                   {selectedDriver.name} (Selected)
                 </Tooltip>
@@ -5822,13 +5829,13 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-purple-50 !border-purple-300 !text-purple-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-person !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {volunteer.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <h3 className="font-semibold text-purple-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <Megaphone className="w-3 h-3" />
                       {volunteer.name}
                     </h3>
@@ -5853,16 +5860,16 @@ export default function DriverPlanningDashboard() {
                   permanent
                   direction="top"
                   offset={[0, -10]}
-                  className="!bg-red-50 !border-red-300 !text-red-800 !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
+                  className="!bg-white !border-gray-300 !border-l-4 !border-l-map-person !text-tsp-navy !text-xs !font-medium !px-2 !py-1 !rounded !shadow-sm"
                 >
                   {member.name}
                 </Tooltip>
                 <Popup>
                   <div className="p-2 min-w-[200px]">
-                    <h3 className="font-semibold text-red-700 text-sm flex items-center gap-1">
+                    <h3 className="font-semibold text-tsp-navy text-sm flex items-center gap-1">
                       <User className="w-3 h-3" />
                       {member.name}
-                      <span className="text-red-400 text-[11px]">({member.role})</span>
+                      <span className="text-gray-500 text-[11px]">({member.role})</span>
                     </h3>
                     {member.address && (
                       <p className="text-xs text-gray-600">{member.address}</p>
@@ -5947,13 +5954,13 @@ export default function DriverPlanningDashboard() {
                 >
                   <LayerToggleCheck checked={layerVisibility.events} compact />
                   <svg viewBox="0 0 12 18" className="w-2 h-3" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#3388ff" stroke="white" strokeWidth="0.5"/>
+                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#236383" stroke="white" strokeWidth="0.5"/>
                   </svg>
                   <span>Event{layerVisibility.events ? '' : ' (hidden)'}</span>
                 </button>
                 <div className="flex items-center gap-1">
                   <svg viewBox="0 0 12 18" className="w-2 h-3" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#ff0000" stroke="white" strokeWidth="0.5"/>
+                    <path d="M6 0C2.7 0 0 2.7 0 6c0 4.5 6 12 6 12s6-7.5 6-12c0-3.3-2.7-6-6-6z" fill="#114154" stroke="white" strokeWidth="0.5"/>
                   </svg>
                   <span>Selected Event</span>
                 </div>
@@ -5967,7 +5974,7 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-hosts-mobile"
                     >
                       <LayerToggleCheck checked={layerVisibility.hosts} compact />
-                      <div className="w-2 h-2 rounded-full bg-green-500 border border-white" />
+                      <div className="w-2 h-2 rounded-full bg-map-host border border-white" />
                       <span>Host{layerVisibility.hosts ? '' : ' (hidden)'}</span>
                     </button>
                     <button
@@ -5978,7 +5985,7 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-recipients-mobile"
                     >
                       <LayerToggleCheck checked={layerVisibility.recipients} compact />
-                      <div className="w-2 h-2 bg-purple-500 border border-white rotate-45" style={{ borderRadius: '1px' }} />
+                      <div className="w-2 h-2 bg-map-recipient border border-white rotate-45" style={{ borderRadius: '1px' }} />
                       <span>Recipient{layerVisibility.recipients ? '' : ' (hidden)'}</span>
                     </button>
                     <button
@@ -5989,7 +5996,7 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-drivers-mobile"
                     >
                       <LayerToggleCheck checked={layerVisibility.drivers} compact />
-                      <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-yellow-400" />
+                      <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-tsp-gold" />
                       <span>Driver{layerVisibility.drivers ? '' : ' (hidden)'}</span>
                     </button>
                     <button
@@ -6001,7 +6008,7 @@ export default function DriverPlanningDashboard() {
                     >
                       <LayerToggleCheck checked={showVolunteersSpeakers} compact />
                       <svg viewBox="0 0 24 24" className="w-3 h-3 drop-shadow-sm" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" fill="#8b5cf6" stroke="white" strokeWidth="1.5"/>
+                        <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" fill="#64748B" stroke="white" strokeWidth="1.5"/>
                       </svg>
                       <span>Volunteer{showVolunteersSpeakers ? '' : ' (hidden)'}</span>
                     </button>
@@ -6013,11 +6020,11 @@ export default function DriverPlanningDashboard() {
                       data-testid="toggle-layer-team-members-mobile"
                     >
                       <LayerToggleCheck checked={showTeamMembers} compact />
-                      <div className="w-2.5 h-2.5 rounded-[3px] bg-red-500 border border-white shadow-sm" />
+                      <div className="w-2.5 h-2.5 rounded-[3px] bg-map-person border border-white shadow-sm" />
                       <span>Team Member{showTeamMembers ? '' : ' (hidden)'}</span>
                     </button>
                     <div className="flex items-center gap-1 pt-0.5 border-t border-gray-200 mt-0.5">
-                      <div className="w-2 h-2 rounded-full bg-orange-500 border border-white" />
+                      <div className="w-2 h-2 rounded-full bg-map-custom border border-white" />
                       <span>Selected item = orange</span>
                     </div>
                   </>
@@ -6303,7 +6310,7 @@ export default function DriverPlanningDashboard() {
                     {/* Nearby Hosts */}
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-green-600" />
+                        <Building2 className="w-4 h-4 text-map-host" />
                         Nearby Hosts ({nearbyHosts.length})
                       </h3>
                       {nearbyHosts.length > 0 ? (
@@ -6322,14 +6329,14 @@ export default function DriverPlanningDashboard() {
                               }}
                               className={`w-full text-left text-sm p-3 border rounded-lg transition-colors ${
                                 focusedItem?.type === 'host' && focusedItem?.id === host.id
-                                  ? 'bg-green-100 border-green-400'
-                                  : 'bg-green-50 border-green-200 hover:bg-green-100'
+                                  ? 'bg-tsp-mist border-tsp-teal border-l-4 border-l-map-host'
+                                  : 'bg-white border-gray-200 border-l-4 border-l-map-host hover:bg-gray-50'
                               }`}
                               aria-label={`Focus on host ${host.contactName}`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-medium break-words">{host.contactName}</span>
-                                <span className="text-green-700 flex-shrink-0 ml-2">{host.distance.toFixed(1)} mi</span>
+                                <span className="text-tsp-navy flex-shrink-0 ml-2">{host.distance.toFixed(1)} mi</span>
                               </div>
                               <div className="text-xs text-gray-500 mt-1 break-words">{host.hostLocationName}</div>
                             </button>
@@ -6337,7 +6344,7 @@ export default function DriverPlanningDashboard() {
                           {nearbyHosts.length > 3 && (
                             <button
                               onClick={() => setShowAllHosts(!showAllHosts)}
-                              className="w-full text-sm text-green-700 font-medium py-2"
+                              className="w-full text-sm text-tsp-navy font-medium py-2"
                               aria-label={showAllHosts ? 'Show fewer hosts' : `Show ${nearbyHosts.length - 3} more hosts`}
                             >
                               {showAllHosts ? 'Show less' : `View ${nearbyHosts.length - 3} more hosts`}
@@ -6352,7 +6359,7 @@ export default function DriverPlanningDashboard() {
                     {/* Nearby Recipients */}
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <Heart className="w-4 h-4 text-purple-600" />
+                        <Heart className="w-4 h-4 text-map-recipient" />
                         Nearby Recipients ({nearbyRecipients.length}{allRecipientsWithDistance.length > nearbyRecipients.length ? ` of ${allRecipientsWithDistance.length}` : ''})
                       </h3>
                       {nearbyRecipients.length > 0 ? (
@@ -6371,14 +6378,14 @@ export default function DriverPlanningDashboard() {
                               }}
                               className={`w-full text-left text-sm p-3 border rounded-lg transition-colors ${
                                 focusedItem?.type === 'recipient' && focusedItem?.id === recipient.id
-                                  ? 'bg-purple-100 border-purple-400'
-                                  : 'bg-purple-50 border-purple-200 hover:bg-purple-100'
+                                  ? 'bg-tsp-mist border-tsp-teal border-l-4 border-l-map-recipient'
+                                  : 'bg-white border-gray-200 border-l-4 border-l-map-recipient hover:bg-gray-50'
                               }`}
                               aria-label={`Focus on recipient ${recipient.name}`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-medium break-words">{recipient.name}</span>
-                                <span className="text-purple-700 flex-shrink-0 ml-2">{recipient.distance.toFixed(1)} mi</span>
+                                <span className="text-tsp-navy flex-shrink-0 ml-2">{recipient.distance.toFixed(1)} mi</span>
                               </div>
                               {recipient.estimatedSandwiches && (
                                 <div className="text-xs text-gray-600 mt-1">
@@ -6390,7 +6397,7 @@ export default function DriverPlanningDashboard() {
                           {nearbyRecipients.length > 3 && (
                             <button
                               onClick={() => setShowAllRecipients(!showAllRecipients)}
-                              className="w-full text-sm text-purple-700 font-medium py-2"
+                              className="w-full text-sm text-tsp-navy font-medium py-2"
                               aria-label={
                                 showAllRecipients
                                   ? 'Show fewer recipients'
@@ -6409,7 +6416,7 @@ export default function DriverPlanningDashboard() {
                     {/* Suggested Drivers */}
                     <div>
                       <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <Truck className="w-4 h-4 text-yellow-600" />
+                        <Truck className="w-4 h-4 text-tsp-navy" />
                         Suggested Drivers ({nearbyDrivers.length})
                       </h3>
                       {nearbyDrivers.length > 0 ? (
@@ -6417,11 +6424,11 @@ export default function DriverPlanningDashboard() {
                           {nearbyDrivers.slice(0, 5).map(({ driver, distance }) => (
                             <div
                               key={driver.id}
-                              className="w-full text-left text-sm p-3 border rounded-lg bg-yellow-50 border-yellow-200"
+                              className="w-full text-left text-sm p-3 border rounded-lg bg-white border-gray-200 border-l-4 border-l-tsp-gold"
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-medium break-words">{driver.name}</span>
-                                <span className="text-yellow-700 flex-shrink-0 ml-2">{distance.toFixed(1)} mi</span>
+                                <span className="text-tsp-navy flex-shrink-0 ml-2">{distance.toFixed(1)} mi</span>
                               </div>
                               {/* Only show assignment buttons for real events, not custom locations */}
                               {selectedEvent && (
@@ -6734,7 +6741,7 @@ export default function DriverPlanningDashboard() {
                 {/* Nearby Hosts */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-green-600" />
+                    <Building2 className="w-4 h-4 text-map-host" />
                     Nearby Hosts ({nearbyHosts.length})
                   </h3>
                   {nearbyHosts.length > 0 ? (
@@ -6754,13 +6761,13 @@ export default function DriverPlanningDashboard() {
                           }}
                           className={`w-full text-left text-sm p-3 border rounded-lg transition-colors ${
                             focusedItem?.type === 'host' && focusedItem?.id === host.id
-                              ? 'bg-green-100 border-green-400'
-                              : 'bg-green-50 border-green-200 hover:bg-green-100'
+                              ? 'bg-tsp-mist border-tsp-teal border-l-4 border-l-map-host'
+                              : 'bg-white border-gray-200 border-l-4 border-l-map-host hover:bg-gray-50'
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{host.contactName}</span>
-                            <span className="text-green-700">{host.distance.toFixed(1)} mi</span>
+                            <span className="text-tsp-navy">{host.distance.toFixed(1)} mi</span>
                           </div>
                           <div className="text-xs text-gray-500 mt-1">{host.hostLocationName}</div>
                         </button>
@@ -6768,7 +6775,7 @@ export default function DriverPlanningDashboard() {
                       {nearbyHosts.length > 3 && (
                         <button
                           onClick={() => setShowAllHosts(!showAllHosts)}
-                          className="w-full text-sm text-green-700 font-medium py-2"
+                          className="w-full text-sm text-tsp-navy font-medium py-2"
                         >
                           {showAllHosts ? 'Show less' : `View ${nearbyHosts.length - 3} more hosts`}
                         </button>
@@ -6782,7 +6789,7 @@ export default function DriverPlanningDashboard() {
                 {/* Nearby Recipients */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-purple-600" />
+                    <Heart className="w-4 h-4 text-map-recipient" />
                     Nearby Recipients ({nearbyRecipients.length}{allRecipientsWithDistance.length > nearbyRecipients.length ? ` of ${allRecipientsWithDistance.length}` : ''})
                   </h3>
                   {nearbyRecipients.length > 0 ? (
@@ -6802,13 +6809,13 @@ export default function DriverPlanningDashboard() {
                           }}
                           className={`w-full text-left text-sm p-3 border rounded-lg transition-colors ${
                             focusedItem?.type === 'recipient' && focusedItem?.id === recipient.id
-                              ? 'bg-purple-100 border-purple-400'
-                              : 'bg-purple-50 border-purple-200 hover:bg-purple-100'
+                              ? 'bg-tsp-mist border-tsp-teal border-l-4 border-l-map-recipient'
+                              : 'bg-white border-gray-200 border-l-4 border-l-map-recipient hover:bg-gray-50'
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-medium">{recipient.name}</span>
-                            <span className="text-purple-700">{recipient.distance.toFixed(1)} mi</span>
+                            <span className="text-tsp-navy">{recipient.distance.toFixed(1)} mi</span>
                           </div>
                           {recipient.estimatedSandwiches && (
                             <div className="text-xs text-gray-600 mt-1">
@@ -6820,7 +6827,7 @@ export default function DriverPlanningDashboard() {
                       {nearbyRecipients.length > 3 && (
                         <button
                           onClick={() => setShowAllRecipients(!showAllRecipients)}
-                          className="w-full text-sm text-purple-700 font-medium py-2"
+                          className="w-full text-sm text-tsp-navy font-medium py-2"
                         >
                           {showAllRecipients ? 'Show less' : `View ${nearbyRecipients.length - 3} more recipients`}
                         </button>
@@ -6834,7 +6841,7 @@ export default function DriverPlanningDashboard() {
                 {/* Assigned Drivers - Show first if any */}
                 {assignedDrivers.length > 0 && (
                   <div className="mb-4">
-                    <h3 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-tsp-navy mb-2 flex items-center gap-2">
                       <Check className="w-4 h-4" />
                       Assigned Driver{assignedDrivers.length > 1 ? 's' : ''}
                     </h3>
@@ -6842,7 +6849,7 @@ export default function DriverPlanningDashboard() {
                       {assignedDrivers.map((driver) => (
                         <Card
                           key={`assigned-mobile-${driver.id}`}
-                          className="p-3 border-green-200 bg-green-50"
+                          className="p-3 border-gray-200 border-l-4 border-l-tsp-gold bg-white"
                         >
                           <button
                             className="w-full text-left"
@@ -6916,7 +6923,7 @@ export default function DriverPlanningDashboard() {
                           key={driver.id}
                           className={`p-3 transition-colors ${
                             focusedItem?.type === 'driver' && focusedItem?.id === driver.id
-                              ? 'ring-2 ring-orange-400 bg-orange-50'
+                              ? 'ring-2 ring-tsp-navy bg-tsp-mist'
                               : ''
                           }`}
                         >
@@ -7072,12 +7079,12 @@ export default function DriverPlanningDashboard() {
 
                 {/* Drivers needing geocoding */}
                 {driversNeedingGeocoding.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2">
-                    <h4 className="text-xs font-semibold text-blue-800 flex items-center gap-1">
+                  <div className="bg-tsp-cream border border-tsp-gold rounded-lg p-3 mb-2">
+                    <h4 className="text-xs font-semibold text-tsp-navy flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5" />
                       {driversNeedingGeocoding.length} drivers need geocoding
                     </h4>
-                    <p className="text-xs text-blue-700 mt-1">
+                    <p className="text-xs text-tsp-navy mt-1">
                       Run batch geocode in Driver Management.
                     </p>
                   </div>
@@ -7085,12 +7092,12 @@ export default function DriverPlanningDashboard() {
 
                 {/* Drivers needing location */}
                 {driversWithoutLocation.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <h4 className="text-xs font-semibold text-amber-800 flex items-center gap-1">
+                  <div className="bg-tsp-cream border border-tsp-gold rounded-lg p-3">
+                    <h4 className="text-xs font-semibold text-tsp-navy flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5" />
                       {driversWithoutLocation.length} drivers need location data
                     </h4>
-                    <p className="text-xs text-amber-700 mt-1">
+                    <p className="text-xs text-tsp-navy mt-1">
                       Add area/location info to see more driver suggestions.
                     </p>
                   </div>

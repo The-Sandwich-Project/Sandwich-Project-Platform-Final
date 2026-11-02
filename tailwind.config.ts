@@ -117,6 +117,15 @@ export default {
           'red-tint': '#FAE7ED',
           mist: '#E9EFF3',
         },
+        // MAP-ONLY category colors (Driver Planning Map pins + matching swatches).
+        // Never use these for buttons, badges, or backgrounds elsewhere.
+        // Events = tsp-teal, drivers = tsp-gold; these fill the gaps.
+        map: {
+          host: '#6B8F71',      // muted sage
+          recipient: '#7D4E6D', // muted plum
+          person: '#64748B',    // slate — volunteers (star) and team members (square)
+          custom: '#6B7280',    // gray — quick-lookup / custom address
+        },
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar-background))',
           foreground: 'hsl(var(--sidebar-foreground))',

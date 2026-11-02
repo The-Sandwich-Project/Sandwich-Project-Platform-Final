@@ -1116,7 +1116,7 @@ export const TOURS: Tour[] = [
       {
         id: 'driver-planning-map',
         title: 'Interactive Event Map',
-        description: 'Events appear as blue markers on the map. Click any marker to select it. When selected, it turns red and shows nearby hosts (green) and recipients (purple).',
+        description: 'Events appear as teal pins on the map. Click any pin to select it. When selected, it grows into a large navy pin and shows nearby hosts (sage circles) and recipients (plum diamonds).',
         targetSelector: '[data-testid="driver-planning-map"]',
         position: 'left',
         highlightPadding: 16,
@@ -1125,7 +1125,7 @@ export const TOURS: Tour[] = [
       {
         id: 'driver-planning-legend',
         title: 'Map Legend',
-        description: 'Use the legend to understand marker colors: Blue = Event, Red = Selected Event, Green = Nearby Host, Purple = Nearby Recipient.',
+        description: 'Use the legend to read the map: teal pin = event, large navy pin = selected event, sage circle = host, plum diamond = recipient, gold triangle = driver, gray star/square = volunteers and team.',
         targetSelector: '[data-testid="driver-planning-legend"]',
         position: 'top',
         highlightPadding: 8

@@ -133,7 +133,8 @@ Separately, `server/background-sync-service.ts` reads the Event Requests Google 
 - `tsp-red` #A31C41 — destructive or blocking (e.g. staffing gap ≤3 days out), with an icon
 - Everything else: neutral outline (`variant="outline"`, no color classes). No purple, orange, or green, and no **#007E8C** — that teal was dropped from the brand palette. The legacy `brand-teal` / `brand-primary-muted` tokens and `BrandColors.teal` now resolve to #236383; prefer `tsp-teal` in new code.
 - Status colors (`constants.ts`): new = navy, in process = gold, scheduled = teal, completed = sky, declined/cancelled = red, standby = slate, stalled = gray.
-Applied so far to `client/src/components/event-requests/`; badge tones are centralized in `cards/card-ui.tsx` (`badgeTone`).
+- **Map-only exception:** the `map` block in `tailwind.config.ts` (sage hosts, plum recipients, slate people, gray custom) exists only for Driver Planning Map pins and the small swatches/left borders that link list items to pins. Never use `map-*` colors for buttons, badges, or backgrounds. Focus/selection on the map = bigger pin + navy ring, not a new color.
+Applied so far to `client/src/components/event-requests/` and `client/src/pages/driver-planning.tsx`; badge tones are centralized in `cards/card-ui.tsx` (`badgeTone`).
 
 ### Onboarding System
 `client/src/hooks/useOnboarding.ts` — localStorage-based step tracking. Add new steps to the `OnboardingStep` type and `onboardingContent` map. Wrap UI elements with `<OnboardingTooltip>` from `client/src/components/ui/onboarding-tooltip.tsx`.
