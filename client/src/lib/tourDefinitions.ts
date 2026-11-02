@@ -14,12 +14,16 @@ export interface TourStep {
 }
 
 
-/** Switch the Resources page to its Logos & Branding tab (Radix tabs activate on mousedown, not click). */
-function openResourcesLogosTab() {
-  const tab = document.querySelector('[data-tour="resources-logos-tab"]');
-  if (tab instanceof HTMLElement) {
-    tab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-    tab.focus();
+/**
+ * Switch the Resources page to one of its tabs. Radix tabs activate on
+ * mousedown/focus, not click(), and unmount inactive panels — so tours that
+ * target the library (filters, resource list) must switch back to it first.
+ */
+function openResourcesTab(tab: 'library' | 'logos') {
+  const trigger = document.querySelector(`[data-tour="resources-${tab}-tab"]`);
+  if (trigger instanceof HTMLElement && trigger.getAttribute('data-state') !== 'active') {
+    trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    trigger.focus();
   }
 }
 
@@ -148,7 +152,7 @@ export const TOURS: Tour[] = [
         highlightPadding: 8,
         waitForElement: true,
         beforeShow: () => {
-          setTimeout(openResourcesLogosTab, 200);
+          setTimeout(() => openResourcesTab('logos'), 200);
         }
       },
       {
@@ -162,7 +166,7 @@ export const TOURS: Tour[] = [
       }
     ],
     afterComplete: () => {
-      setTimeout(openResourcesLogosTab, 300);
+      setTimeout(() => openResourcesTab('logos'), 300);
     }
   },
   {
@@ -206,6 +210,8 @@ export const TOURS: Tour[] = [
         highlightPadding: 8,
         waitForElement: true,
         beforeShow: () => {
+          // The filters only exist on the Documents & Links tab.
+          openResourcesTab('library');
           // Category buttons live inside the Filters panel, which is collapsed by
           // default on a fresh Resources page — open it first so the button mounts.
           const clickCategory = () => {
@@ -216,13 +222,16 @@ export const TOURS: Tour[] = [
             }
             return false;
           };
-          if (!clickCategory()) {
-            const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
-            if (toggle instanceof HTMLElement) {
-              toggle.click();
+          // Give the tab switch a render before looking for its controls.
+          setTimeout(() => {
+            if (!clickCategory()) {
+              const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
+              if (toggle instanceof HTMLElement) {
+                toggle.click();
+              }
+              setTimeout(clickCategory, 200);
             }
-            setTimeout(clickCategory, 200);
-          }
+          }, 100);
         }
       },
       {
@@ -1174,7 +1183,11 @@ export const TOURS: Tour[] = [
         targetSelector: '[data-testid="resources-categories"], [data-testid="category-filter"]',
         position: 'bottom',
         highlightPadding: 12,
-        waitForElement: true
+        waitForElement: true,
+        beforeShow: () => {
+          // Categories, search and the list only exist on the Documents & Links tab.
+          openResourcesTab('library');
+        }
       },
       {
         id: 'resources-search',

@@ -742,6 +742,54 @@ function SandwichGuideEditDialog({
   );
 }
 
+// Files uploaded with category 'confidential' through the old Important
+// Documents page live in the documents table, not in confidential_documents,
+// so ConfidentialDocuments doesn't show them. /api/documents only returns them
+// to users with DOCUMENTS_CONFIDENTIAL, and the download route re-checks that.
+interface UploadedDocument {
+  id: number;
+  title: string;
+  description: string | null;
+  category: string;
+  originalName: string;
+}
+
+function useConfidentialUploads() {
+  const { data } = useQuery<UploadedDocument[]>({ queryKey: ['/api/documents'] });
+  return (data || []).filter((d) => d.category === 'confidential');
+}
+
+function ConfidentialUploadsList({ docs }: { docs: UploadedDocument[] }) {
+  if (docs.length === 0) return null;
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-4 mb-6" data-testid="confidential-uploads">
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">Confidential uploads</h2>
+      <p className="text-sm text-gray-500 mb-3">
+        Files uploaded as confidential through the old Important Documents page.
+      </p>
+      <ul className="divide-y divide-gray-100">
+        {docs.map((doc) => (
+          <li key={doc.id} className="py-2 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 truncate">{doc.title}</p>
+              {doc.description && (
+                <p className="text-sm text-gray-500 truncate">{doc.description}</p>
+              )}
+            </div>
+            <a
+              href={`/api/documents/${doc.id}/download`}
+              className="text-sm text-[#236383] hover:underline flex items-center gap-1 shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function Resources() {
   const { user } = useAuth();
   const isAdmin =
@@ -756,10 +804,12 @@ export function Resources() {
   const hasConfidentialAccess =
     user?.email === 'admin@sandwich.project' ||
     user?.email === 'katielong2316@gmail.com';
+  const confidentialUploads = useConfidentialUploads();
+  const showConfidentialTab = hasConfidentialAccess || confidentialUploads.length > 0;
   const [activeTab, setActiveTab] = useState(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
     if (tab === 'logos') return 'logos';
-    if (tab === 'confidential' && hasConfidentialAccess) return 'confidential';
+    if (tab === 'confidential') return 'confidential';
     return 'library';
   });
 
@@ -1308,15 +1358,18 @@ export function Resources() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs
+          value={activeTab === 'confidential' && !showConfidentialTab ? 'library' : activeTab}
+          onValueChange={setActiveTab}
+        >
           <TabsList className="mb-6">
-            <TabsTrigger value="library" data-testid="tab-resources-library">
+            <TabsTrigger value="library" data-testid="tab-resources-library" data-tour="resources-library-tab">
               Documents & Links
             </TabsTrigger>
             <TabsTrigger value="logos" data-testid="tab-resources-logos" data-tour="resources-logos-tab">
               Logos & Branding
             </TabsTrigger>
-            {hasConfidentialAccess && (
+            {showConfidentialTab && (
               <TabsTrigger value="confidential" data-testid="tab-resources-confidential">
                 Confidential
               </TabsTrigger>
@@ -1616,9 +1669,10 @@ export function Resources() {
             <LogosPage />
           </TabsContent>
 
-          {hasConfidentialAccess && (
+          {showConfidentialTab && (
             <TabsContent value="confidential">
-              <ConfidentialDocuments />
+              <ConfidentialUploadsList docs={confidentialUploads} />
+              {hasConfidentialAccess && <ConfidentialDocuments />}
             </TabsContent>
           )}
         </Tabs>
