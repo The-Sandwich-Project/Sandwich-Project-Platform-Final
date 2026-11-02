@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { parseDateOnly, toDateOnlyString } from '@shared/date-utils';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
-import { getRangeMidpoint, parseSandwichCountInput } from '@shared/sandwich-count-utils';
+import { getRangeMidpoint, hasActiveSandwichRange, parseSandwichCountInput } from '@shared/sandwich-count-utils';
 
 /**
  * Planning sheet → app UPDATE ("send row to app" on a row that already exists).
@@ -45,6 +45,8 @@ export interface RowUpdateEvent {
   /** Folded into the plan token so any app save after the preview is caught. */
   updatedAt?: Date | string | null;
   actualSandwichCount: number | null;
+  /** Reference-only breakdown of the final count, kept adding up to it. */
+  actualSandwichTypes?: unknown;
   sandwichTypes: unknown;
   firstName: string | null;
   lastName: string | null;
@@ -478,14 +480,17 @@ export function buildRowUpdatePlan(
       const appMin = event.estimatedSandwichCountMin ?? null;
       const appMax = event.estimatedSandwichCountMax ?? null;
       const appHasRange = appMin !== null || appMax !== null;
-      // A range on the sheet is compared by its bounds (range-mode events keep
-      // the count null); an exact number must match the count with no range left.
+      // Read the app's estimate the way the app shows it: a range only counts
+      // when it's ACTIVE (both bounds, and no exact count that disagrees with
+      // the midpoint). Stale bounds next to an exact count are ignored there,
+      // so they're ignored here too.
+      const appRangeActive = hasActiveSandwichRange(appMin, appMax, event.estimatedSandwichCount);
       const same = parsed.isRange
-        ? appMin === parsed.min && appMax === parsed.max
+        ? appRangeActive && appMin === parsed.min && appMax === parsed.max
         : event.estimatedSandwichCount === parsed.count && !appHasRange;
       if (!same) {
-        const appShown = appHasRange
-          ? `${appMin ?? '?'}–${appMax ?? '?'}`
+        const appShown = appRangeActive
+          ? `${appMin}–${appMax}`
           : event.estimatedSandwichCount ? String(event.estimatedSandwichCount) : '';
         changes.push({
           field: 'estimatedSandwichCount',
@@ -507,6 +512,18 @@ export function buildRowUpdatePlan(
         const existing = appSandwichTypeArray(event.sandwichTypes);
         if (existing.length) {
           set('estimatedSandwichCount', 'sandwichTypes', rescaleTypes(existing, parsed.count));
+        } else if (!parsed.isRange && event.estimatedSandwichRangeType) {
+          // A range-mode event keeps its only type in the range type, which an
+          // exact number clears. Carry it into the breakdown so the type isn't lost.
+          set('estimatedSandwichCount', 'sandwichTypes', [
+            { type: event.estimatedSandwichRangeType, quantity: parsed.count },
+          ]);
+        }
+        // Going into range mode: name the event's one existing type, if it has
+        // exactly one (a ticked types change still decides, in selectUpdates).
+        if (parsed.isRange && !event.estimatedSandwichRangeType) {
+          const keys = appSandwichTypeKeys(event.sandwichTypes);
+          if (keys.length === 1) set('estimatedSandwichCount', 'estimatedSandwichRangeType', keys[0]);
         }
       }
     } else {
@@ -559,6 +576,11 @@ export function buildRowUpdatePlan(
         kind: event.actualSandwichCount ? 'update' : 'fill',
       });
       set('actualSandwichCount', 'actualSandwichCount', parsed.count);
+      // Cards show the final breakdown before the count, so keep it adding up.
+      const actualTypes = appSandwichTypeArray(event.actualSandwichTypes);
+      if (actualTypes.length) {
+        set('actualSandwichCount', 'actualSandwichTypes', rescaleTypes(actualTypes, parsed.count));
+      }
     }
   }
 

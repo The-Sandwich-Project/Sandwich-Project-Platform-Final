@@ -138,6 +138,16 @@ export interface StaffingInfo {
   volunteer: { needed: boolean; assigned: string | null };
 }
 
+/** user_<ms>_<rand> (current), UUIDs, or bare numbers (legacy) are IDs; anything else is a typed name. */
+export function assignmentLabelForUnknownId(idOrName: string): string {
+  const v = (idOrName || '').trim();
+  const looksLikeId =
+    /^user_\d+_[a-z0-9]+$/i.test(v) ||
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ||
+    /^\d+$/.test(v);
+  return !v || looksLikeId ? 'Unknown' : v;
+}
+
 /**
  * Parse a staffing column string into structured staffing information.
  *
@@ -1094,8 +1104,11 @@ export class PlanningSheetSyncService {
       ])
     );
 
-    // Return names in the same order as userIds
-    return userIds.map(id => userMap.get(id) || 'Unknown');
+    // Return names in the same order as userIds. Assignment columns also hold
+    // free-text names (people typed on the sheet who don't match one app user);
+    // write those back as typed so they survive the round trip. Only something
+    // that looks like a user ID with no matching user becomes "Unknown".
+    return userIds.map(id => userMap.get(id) || assignmentLabelForUnknownId(id));
   }
 
   /**

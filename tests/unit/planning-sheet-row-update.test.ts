@@ -579,3 +579,44 @@ describe('Copilot review fixes, round 2', () => {
     expect(q.every((n) => n >= 0)).toBe(true);
   });
 });
+
+describe('Copilot review fixes, round 4', () => {
+  it('treats stale bounds next to a different exact count as no range', () => {
+    const stale = makeEvent({ estimatedSandwichCount: 500, estimatedSandwichCountMin: 490, estimatedSandwichCountMax: 506 });
+    const plan = buildRowUpdatePlan(stale, makeRow({ 'Estimate # sandwiches': '490-506' }), USERS);
+    expect(plan.changes.find((c) => c.field === 'estimatedSandwichCount')).toMatchObject({ from: '500', to: '490–506' });
+  });
+
+  it('keeps a range-mode event\'s only type when an exact number is applied', () => {
+    const ranged = makeEvent({
+      estimatedSandwichCount: null,
+      estimatedSandwichCountMin: 200,
+      estimatedSandwichCountMax: 300,
+      estimatedSandwichRangeType: 'deli_turkey',
+      sandwichTypes: null,
+    });
+    const plan = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '350', 'Deli or PBJ?': '' }), USERS);
+    expect(plan.updatesByField.estimatedSandwichCount).toMatchObject({
+      estimatedSandwichCount: 350,
+      estimatedSandwichRangeType: null,
+      sandwichTypes: [{ type: 'deli_turkey', quantity: 350 }],
+    });
+  });
+
+  it('carries the one existing type into range mode; a ticked types change still decides', () => {
+    const exact = makeEvent({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'pbj', quantity: 200 }] });
+    const plan = buildRowUpdatePlan(exact, makeRow({ 'Estimate # sandwiches': '200-300', 'Deli or PBJ?': 'PBJ' }), USERS);
+    expect(selectUpdates(plan, ['estimatedSandwichCount'], exact).updates.estimatedSandwichRangeType).toBe('pbj');
+    const swap = buildRowUpdatePlan(exact, makeRow({ 'Estimate # sandwiches': '200-300', 'Deli or PBJ?': 'Deli' }), USERS);
+    expect(selectUpdates(swap, ['estimatedSandwichCount', 'sandwichTypes'], exact).updates.estimatedSandwichRangeType).toBe('deli');
+  });
+
+  it('keeps the final breakdown adding up to a new final count', () => {
+    const done = makeEvent({ actualSandwichCount: 200, actualSandwichTypes: [{ type: 'deli', quantity: 200 }] });
+    const plan = buildRowUpdatePlan(done, makeRow({ 'Final # sandwiches made': '300' }), USERS);
+    expect(plan.updatesByField.actualSandwichCount).toEqual({
+      actualSandwichCount: 300,
+      actualSandwichTypes: [{ type: 'deli', quantity: 300 }],
+    });
+  });
+});
