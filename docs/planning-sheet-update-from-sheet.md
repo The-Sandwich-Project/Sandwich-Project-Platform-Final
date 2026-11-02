@@ -10,11 +10,12 @@ person clicks it** on the sheet. Nothing runs on a timer.
    (or answers "yes" when **Send Row to App** says the event already exists).
 2. The script sends the row to `POST /api/event-requests/import-from-sheets/preview-update`.
    This call is read-only: the app finds the matching event and returns what would change.
-3. The script shows the changes as a checklist, all ticked. The person picks the
-   right event if there's more than one, unticks anything they don't want sent, and
-   clicks **Update selected**. Values can't be edited in the dialog on purpose: to
-   change one, fix the cell on the sheet and run it again, so the sheet and the app agree.
-4. The script sends the row, the preview's `token` and the ticked `fields` to
+3. The script asks Yes/No about each change (plain pop-ups, not an HTML checklist,
+   which breaks for people signed into several Google accounts). The person picks the
+   right event if there's more than one, and answers No to anything they don't want sent.
+   Values can't be edited in the pop-ups on purpose: to change one, fix the cell on
+   the sheet and run it again, so the sheet and the app agree.
+4. The script sends the row, the preview's `token` and the `fields` answered Yes to
    `POST /api/event-requests/import-from-sheets/apply-update`. The app works out the
    changes again and **refuses** if they no longer match what was shown (someone edited
    the event or the row in between).
@@ -60,8 +61,8 @@ What changes:
    same row data. **The payload itself is unchanged.**
 2. `sendRowToApp()` works as before. When the app answers "already exists" (409), it now
    offers to run an update instead.
-3. New **`updateRowInApp()`**: asks for a row number (like send does), shows the checklist,
-   and applies what's ticked.
+3. New **`updateRowInApp()`**: asks for a row number (like send does), asks Yes/No per change,
+   and applies the Yes answers.
 
 Add `updateRowInApp` to the sheet's custom menu next to `sendRowToApp`, for example
 `.addItem('Update Row in App', 'updateRowInApp')` in your existing `onOpen()`.
@@ -176,8 +177,8 @@ function sendRowToApp() {
 
 // ============================ UPDATE ROW IN APP ===========================
 //
-// For a row that's already in the app: shows what would change as a checklist,
-// and applies only what's ticked. Blank cells never clear anything in the app.
+// For a row that's already in the app: asks Yes/No about each change,
+// and applies only the Yes answers. Blank cells never clear anything in the app.
 
 function updateRowInApp() {
   const sheet = SpreadsheetApp.getActiveSheet();
@@ -226,48 +227,54 @@ function runRowUpdate_(sheet, rowNum, apiKey) {
     return;
   }
 
-  showUpdateDialog_(payload, pick, sheet.getName(), rowNum);
-}
+  // One Yes/No per change. (Plain pop-ups, not an HTML checklist: an HTML
+  // dialog's button runs under Chrome's FIRST signed-in Google account, which
+  // breaks for anyone signed into more than one account. These pop-ups run as
+  // the person using the sheet.)
+  const intro =
+    'Row ' + rowNum + ' → "' + pick.organizationName + '" in the app.\n\n' +
+    (pick.dateMatches ? '' : '⚠ The app has a different date for this event (' + (pick.appDate || 'none') +
+      '). Make sure this is the right one.\n\n') +
+    pick.changes.length + ' change' + (pick.changes.length === 1 ? '' : 's') +
+    ' found. You\'ll be asked about each one.' +
+    (pick.notes.length ? '\n\nNot changed:\n- ' + pick.notes.join('\n- ') : '');
+  if (ui.alert('Update row in app', intro, ui.ButtonSet.OK_CANCEL) !== ui.Button.OK) return;
 
-/** Checkbox dialog: every change starts ticked; untick anything to skip it. */
-function showUpdateDialog_(payload, pick, sheetName, rowNum) {
-  const esc = function (v) {
-    return String(v == null ? '' : v)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  };
-  const rows = pick.changes.map(function (c) {
-    return '<label class="row"><input type="checkbox" name="f" value="' + esc(c.field) + '" checked>' +
-      '<span><b>' + esc(c.label) + '</b><br><span class="from">' + esc(c.from || '(empty)') +
-      '</span> &rarr; ' + esc(c.to) + '</span></label>';
-  }).join('');
-  const notes = pick.notes.length
-    ? '<p class="notes"><b>Not changed:</b><br>' + pick.notes.map(esc).join('<br>') + '</p>' : '';
-  const warn = pick.dateMatches ? '' : '<p class="warn">The app has a different date for this event (' +
-    esc(pick.appDate || 'none') + '). Make sure this is the right one.</p>';
+  const fields = [];
+  for (let i = 0; i < pick.changes.length; i++) {
+    const c = pick.changes[i];
+    const answer = ui.alert(
+      'Change ' + (i + 1) + ' of ' + pick.changes.length + ': ' + c.label,
+      'App now:  ' + (c.from || '(empty)') + '\nSheet says:  ' + c.to +
+        '\n\nSend this to the app?\n(Cancel stops without sending anything.)',
+      ui.ButtonSet.YES_NO_CANCEL
+    );
+    if (answer === ui.Button.CANCEL || answer === ui.Button.CLOSE) {
+      ui.alert('Stopped. Nothing was sent to the app.');
+      return;
+    }
+    if (answer === ui.Button.YES) fields.push(c.field);
+  }
+  if (fields.length === 0) { ui.alert('Nothing was picked, so nothing was sent.'); return; }
 
-  const html =
-    '<style>body{font:13px Arial,sans-serif;margin:12px}.row{display:flex;gap:8px;padding:6px 0;' +
-    'border-bottom:1px solid #eee}.from{color:#888;text-decoration:line-through}.warn{color:#b45309}' +
-    '.notes{color:#555;font-size:12px}button{margin-top:12px;padding:6px 14px}#msg{margin-top:10px}</style>' +
-    '<p>Update <b>' + esc(pick.organizationName) + '</b> in the app. Untick anything you don\'t want sent. ' +
-    'To change a value, fix the cell on the sheet and run this again.</p>' + warn +
-    '<form id="f">' + rows + '</form>' + notes +
-    '<button id="go" onclick="send()">Update selected</button> <button onclick="google.script.host.close()">Cancel</button>' +
-    '<div id="msg"></div>' +
-    '<script>var DATA=' + JSON.stringify({ rowPrint: rowFingerprint_(payload), eventId: pick.eventId, token: pick.token, sheetName: sheetName, rowNum: rowNum })
-      .replace(/</g, '\\u003c') + ';' +
-    'function send(){var fields=[].slice.call(document.querySelectorAll("input[name=f]:checked")).map(function(i){return i.value});' +
-    'if(!fields.length){document.getElementById("msg").textContent="Nothing selected.";return;}' +
-    'document.getElementById("go").disabled=true;document.getElementById("msg").textContent="Updating...";' +
-    'google.script.run.withSuccessHandler(function(m){document.getElementById("msg").textContent=m;})' +
-    '.withFailureHandler(function(e){document.getElementById("msg").textContent="Error: "+e.message;' +
-    'document.getElementById("go").disabled=false;})' +
-    '.applyRowUpdate(DATA.rowPrint,DATA.eventId,DATA.token,fields,DATA.sheetName,DATA.rowNum);}</script>';
-
-  SpreadsheetApp.getUi().showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(480).setHeight(Math.min(600, 220 + pick.changes.length * 52)),
-    'Update row in app'
-  );
+  // Re-read the row: if someone edited it while the questions were open, stop
+  // instead of sending what the person saw (which is no longer the sheet).
+  const fresh = buildAppPayload_(sheet, rowNum);
+  if (rowFingerprint_(fresh) !== rowFingerprint_(payload)) {
+    ui.alert('Row ' + rowNum + ' was edited while you were answering, so nothing was sent. Run Update Row in App again.');
+    return;
+  }
+  fresh.eventId = pick.eventId;
+  fresh.token = pick.token;
+  fresh.fields = fields;
+  const res = postToApp_('/apply-update', fresh, apiKey);
+  if (res.code === 200) {
+    ui.alert(res.body.updated
+      ? 'Updated in the app (' + fields.length + ' change' + (fields.length === 1 ? '' : 's') + ').'
+      : (res.body.message || 'Nothing to update.'));
+    return;
+  }
+  ui.alert('The app did not update: ' + (res.body.error || ('HTTP ' + res.code)));
 }
 
 /** A short fingerprint of the row payload, made the same way every time. */
@@ -279,31 +286,6 @@ function rowFingerprint_(payload) {
     return k + '=' + s;
   }).join('\n');
   return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text, Utilities.Charset.UTF_8));
-}
-
-/** Called from the dialog. (No trailing underscore: google.script.run can't call private functions.) */
-function applyRowUpdate(rowPrint, eventId, token, fields, sheetName, rowNum) {
-  const apiKey = getApiKey_();
-  if (!apiKey) throw new Error('Missing APP_API_KEY script property.');
-  // Re-read the row: if someone edited it while the checklist was open, stop
-  // instead of sending what the person saw (which is no longer the sheet).
-  // Both fingerprints are made here in the script, from the row as read, so
-  // dates and blanks can't look "changed" after a trip through the dialog.
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  const payload = buildAppPayload_(sheet, rowNum);
-  if (rowFingerprint_(payload) !== rowPrint) {
-    throw new Error('Row ' + rowNum + ' changed while this was open. Close this and run Update Row in App again.');
-  }
-  payload.eventId = eventId;
-  payload.token = token;
-  payload.fields = fields;
-  const res = postToApp_('/apply-update', payload, apiKey);
-  if (res.code === 200) {
-    return res.body.updated
-      ? 'Updated in the app (' + fields.length + ' change' + (fields.length === 1 ? '' : 's') + '). You can close this.'
-      : (res.body.message || 'Nothing to update.');
-  }
-  throw new Error(res.body.error || ('HTTP ' + res.code));
 }
 
 function setApiKeyHelp() {
