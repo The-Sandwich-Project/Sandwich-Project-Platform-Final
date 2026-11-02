@@ -194,6 +194,14 @@ const UNASSIGNED_PROJECT_STATUSES: Array<Project['status']> = [
   'available' as Project['status'],
 ];
 
+/** The event changed (or was deleted) since the caller read it. */
+export class EventRequestChangedError extends Error {
+  constructor(id: number) {
+    super(`Event request ${id} changed since it was read`);
+    this.name = 'EventRequestChangedError';
+  }
+}
+
 export class DatabaseStorage implements IStorage {
   // Users (required for authentication)
   async getUser(id: string): Promise<User | undefined> {
@@ -4257,10 +4265,19 @@ export class DatabaseStorage implements IStorage {
 
   async updateEventRequest(
     id: number,
-    updates: Partial<EventRequest> & { expectedVersion?: Date }
+    updates: Partial<EventRequest> & {
+      expectedVersion?: Date;
+      /**
+       * Atomic optimistic lock: the UPDATE only applies if the row's updatedAt
+       * still equals this (to the millisecond) and it isn't deleted. Checked in
+       * the UPDATE's WHERE clause, not a separate read. On a mismatch this
+       * throws EventRequestChangedError instead of retrying or merging.
+       */
+      ifUnchangedSince?: Date | string | null;
+    }
   ): Promise<EventRequest | undefined> {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const { expectedVersion, ...rawUpdateData } = updates;
+      const { expectedVersion, ifUnchangedSince, ...rawUpdateData } = updates as typeof updates;
       const previousEvent = hasEventContactPatch(rawUpdateData) || (typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus)
         ? await this.getEventRequest(id)
         : undefined;
@@ -4311,14 +4328,28 @@ export class DatabaseStorage implements IStorage {
       // An empty result is NOT assumed to be success — it means the driver gave us no
       // row back (either nothing matched, or a rare flake), so we fall through to the
       // verify-and-heal path rather than fabricating a saved record.
+      const versionGuards =
+        ifUnchangedSince === undefined
+          ? []
+          : [
+              isNull(eventRequests.deletedAt),
+              ifUnchangedSince === null
+                ? isNull(eventRequests.updatedAt)
+                : sql`date_trunc('milliseconds', ${eventRequests.updatedAt}) = ${eventRequests.updatedAt.mapToDriverValue(new Date(ifUnchangedSince as any))}`,
+            ];
+
       const updatedRows = await db
         .update(eventRequests)
         .set({
           ...filteredData,
           updatedAt: new Date(),
         })
-        .where(and(eq(eventRequests.id, id), ...noteGuards))
+        .where(and(eq(eventRequests.id, id), ...noteGuards, ...versionGuards))
         .returning();
+
+      if (updatedRows.length === 0 && versionGuards.length) {
+        throw new EventRequestChangedError(id);
+      }
 
       if (updatedRows.length > 0) {
         const updated = updatedRows[0] as EventRequest;

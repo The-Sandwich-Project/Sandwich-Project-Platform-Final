@@ -197,7 +197,8 @@ function runRowUpdate_(sheet, rowNum, apiKey) {
   const candidates = preview.body.candidates || [];
   if (candidates.length === 0) { ui.alert(preview.body.message || 'No matching event in the app.'); return; }
 
-  let pick = candidates[0];
+  // The exact same-day match when there is one (don't assume it's first).
+  let pick = (preview.body.match === 'exact' && candidates.find(function (c) { return c.dateMatches; })) || candidates[0];
   // Ask which event when it isn't a clean single match on the same date.
   if (preview.body.match === 'ambiguous' || (preview.body.match === 'date_differs' && candidates.length > 1)) {
     const list = candidates.map(function (c, i) {
@@ -217,11 +218,11 @@ function runRowUpdate_(sheet, rowNum, apiKey) {
     return;
   }
 
-  showUpdateDialog_(payload, pick);
+  showUpdateDialog_(payload, pick, sheet.getName(), rowNum);
 }
 
 /** Checkbox dialog: every change starts ticked; untick anything to skip it. */
-function showUpdateDialog_(payload, pick) {
+function showUpdateDialog_(payload, pick, sheetName, rowNum) {
   const esc = function (v) {
     return String(v == null ? '' : v)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -245,7 +246,7 @@ function showUpdateDialog_(payload, pick) {
     '<form id="f">' + rows + '</form>' + notes +
     '<button id="go" onclick="send()">Update selected</button> <button onclick="google.script.host.close()">Cancel</button>' +
     '<div id="msg"></div>' +
-    '<script>var DATA=' + JSON.stringify({ payload: payload, eventId: pick.eventId, token: pick.token })
+    '<script>var DATA=' + JSON.stringify({ payload: payload, eventId: pick.eventId, token: pick.token, sheetName: sheetName, rowNum: rowNum })
       .replace(/</g, '\\u003c') + ';' +
     'function send(){var fields=[].slice.call(document.querySelectorAll("input[name=f]:checked")).map(function(i){return i.value});' +
     'if(!fields.length){document.getElementById("msg").textContent="Nothing selected.";return;}' +
@@ -253,7 +254,7 @@ function showUpdateDialog_(payload, pick) {
     'google.script.run.withSuccessHandler(function(m){document.getElementById("msg").textContent=m;})' +
     '.withFailureHandler(function(e){document.getElementById("msg").textContent="Error: "+e.message;' +
     'document.getElementById("go").disabled=false;})' +
-    '.applyRowUpdate(DATA.payload,DATA.eventId,DATA.token,fields);}</script>';
+    '.applyRowUpdate(DATA.payload,DATA.eventId,DATA.token,fields,DATA.sheetName,DATA.rowNum);}</script>';
 
   SpreadsheetApp.getUi().showModalDialog(
     HtmlService.createHtmlOutput(html).setWidth(480).setHeight(Math.min(600, 220 + pick.changes.length * 52)),
@@ -262,9 +263,17 @@ function showUpdateDialog_(payload, pick) {
 }
 
 /** Called from the dialog. (No trailing underscore: google.script.run can't call private functions.) */
-function applyRowUpdate(payload, eventId, token, fields) {
+function applyRowUpdate(payload, eventId, token, fields, sheetName, rowNum) {
   const apiKey = getApiKey_();
   if (!apiKey) throw new Error('Missing APP_API_KEY script property.');
+  // Re-read the row: if someone edited it while the checklist was open, stop
+  // instead of sending what the person saw (which is no longer the sheet).
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const fresh = buildAppPayload_(sheet, rowNum);
+  if (JSON.stringify(fresh) !== JSON.stringify(payload)) {
+    throw new Error('Row ' + rowNum + ' changed while this was open. Close this and run Update Row in App again.');
+  }
+  payload = fresh;
   payload.eventId = eventId;
   payload.token = token;
   payload.fields = fields;

@@ -750,11 +750,15 @@ const findSheetRowCandidates = async (groupName: string, sheetDateIso: string | 
     if (!d || target === null) return Number.MAX_SAFE_INTEGER;
     return Math.abs(new Date(d as any).getTime() - target);
   };
+  // Same calendar day as the sheet first, then nearest. Raw timestamp distance
+  // alone can tie (e.g. two midnight-stored events either side of the date).
+  const sameDay = (e: EventRequest) =>
+    !!sheetDateIso && toDateOnlyString(getEffectiveEventDate(e) as any) === sheetDateIso;
   return rows
     // Drop events more than ~6 months from the sheet date: that's a repeat
     // event from the same group, not this row.
     .filter((e) => distance(e) <= 183 * 24 * 60 * 60 * 1000 || distance(e) === Number.MAX_SAFE_INTEGER)
-    .sort((a, b) => distance(a) - distance(b))
+    .sort((a, b) => Number(sameDay(b)) - Number(sameDay(a)) || distance(a) - distance(b))
     .slice(0, 5);
 };
 
@@ -813,7 +817,7 @@ router.post('/import-from-sheets/preview-update', validateSheetsApiKey, async (r
         dateMatches: !!sheetDateIso && appDate === sheetDateIso,
         changes: plan.changes,
         notes,
-        token: planToken(event.id, plan.changes),
+        token: planToken(event as unknown as RowUpdateEvent, plan),
         link: `/event-requests/${event.id}`,
       };
     });
@@ -861,7 +865,7 @@ router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req
 
     const allUsers = await fetchActiveUsersForRowUpdate();
     const plan = buildRowUpdatePlan(event as unknown as RowUpdateEvent, row, allUsers);
-    if (planToken(eventId, plan.changes) !== extras.data.token) {
+    if (planToken(event as unknown as RowUpdateEvent, plan) !== extras.data.token) {
       return res.status(409).json({
         success: false,
         error: 'The event or the sheet row changed since you previewed it. Run it again to see the current changes.',
@@ -885,17 +889,41 @@ router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req
       });
     }
 
-    const updated = await storage.updateEventRequest(eventId, {
-      ...selected.updates,
-      lastSyncedAt: new Date(),
-      updatedAt: new Date(),
-    } as Partial<EventRequest>);
+    let patch: Partial<EventRequest> = { ...(selected.updates as Partial<EventRequest>) };
+    // Keep pickupDateTime in step with pickupTime (cards prefer pickupDateTime),
+    // the same way the normal PATCH does, using the event's date after this update.
+    if (patch.pickupTime) {
+      patch = processPickupTimeFields(patch, { ...event, ...patch });
+    }
+    if (patch.status === 'cancelled') {
+      const now = new Date();
+      patch.statusChangedAt = now;
+      patch.cancelledAt = now;
+    }
+
+    let updated: EventRequest | undefined;
+    try {
+      updated = await storage.updateEventRequest(eventId, {
+        ...patch,
+        lastSyncedAt: new Date(),
+        // Atomic: only writes if nobody saved the event since we read it above.
+        ifUnchangedSince: event.updatedAt ?? null,
+      } as Partial<EventRequest>);
+    } catch (writeError) {
+      if ((writeError as Error)?.name === 'EventRequestChangedError') {
+        return res.status(409).json({
+          success: false,
+          error: 'The event was just changed in the app. Run it again to see the current changes.',
+        });
+      }
+      throw writeError;
+    }
 
     try {
       await AuditLogger.logEventRequestChange(
         String(eventId),
         event,
-        updated ?? { ...event, ...selected.updates },
+        updated ?? { ...event, ...patch },
         { userId: 'planning-sheet' },
         {
           actionType: 'PLANNING_SHEET_UPDATE',
@@ -907,8 +935,8 @@ router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req
       logger.error('Failed to audit planning sheet row update', auditError);
     }
 
-    if (selected.updates.eventAddress) {
-      geocodeEventInBackground(eventId, selected.updates.eventAddress as string);
+    if (patch.eventAddress) {
+      geocodeEventInBackground(eventId, patch.eventAddress as string);
     }
     if (updated) emitEventRequestUpdate('event_request_updated', updated);
 

@@ -241,8 +241,9 @@ describe('buildRowUpdatePlan', () => {
   it('produces a token that changes when the plan changes', () => {
     const a = buildRowUpdatePlan(makeEvent(), makeRow({ 'Estimate # sandwiches': '300' }), USERS);
     const b = buildRowUpdatePlan(makeEvent(), makeRow({ 'Estimate # sandwiches': '350' }), USERS);
-    expect(planToken(42, a.changes)).toBe(planToken(42, a.changes));
-    expect(planToken(42, a.changes)).not.toBe(planToken(42, b.changes));
+    const ev = makeEvent();
+    expect(planToken(ev, a)).toBe(planToken(ev, a));
+    expect(planToken(ev, a)).not.toBe(planToken(ev, b));
   });
 
   it('applies only the changes a person picks', () => {
@@ -427,5 +428,71 @@ describe('cancelled on the sheet', () => {
     const done = buildRowUpdatePlan(makeEvent({ status: 'completed' }), makeRow({ Cancelled: 'yes' }), USERS);
     expect(done.updatesByField.status).toBeUndefined();
     expect(done.notes.some((n) => n.includes('completed'))).toBe(true);
+  });
+});
+
+describe('Copilot review fixes', () => {
+  it('token changes when the event was saved after the preview', () => {
+    const row = makeRow({ 'Estimate # sandwiches': '300' });
+    const before = makeEvent({ updatedAt: '2026-11-01T10:00:00.000Z' });
+    const after = makeEvent({ updatedAt: '2026-11-01T10:05:00.000Z' });
+    expect(planToken(before, buildRowUpdatePlan(before, row, USERS))).not.toBe(
+      planToken(after, buildRowUpdatePlan(after, row, USERS))
+    );
+  });
+
+  it('token covers the written values, not just the labels', () => {
+    // Blank sheet estimate, Deli -> Deli & PBJ: labels are the same, but the
+    // per-type quantities depend on the app estimate.
+    const row = makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'Deli & PBJ' });
+    const e200 = makeEvent({ estimatedSandwichCount: 200 });
+    const e400 = makeEvent({ estimatedSandwichCount: 400 });
+    const p200 = buildRowUpdatePlan(e200, row, USERS);
+    const p400 = buildRowUpdatePlan(e400, row, USERS);
+    expect(p200.changes).toEqual(p400.changes);
+    expect(planToken(e200, p200)).not.toBe(planToken(e400, p400));
+  });
+
+  it('rejects impossible dates', () => {
+    expect(normalizeSheetDate('2026-13-01')).toBeNull();
+    expect(normalizeSheetDate('2/31/26')).toBeNull();
+    expect(normalizeSheetDate('2/29/28')).toBe('2028-02-29');
+  });
+
+  it('catches range-only estimate changes', () => {
+    const ranged = makeEvent({ estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 });
+    const narrower = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '225-275' }), USERS);
+    expect(narrower.changes.find((c) => c.field === 'estimatedSandwichCount')).toMatchObject({ from: '200–300', to: '225–275' });
+    const exact = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '250' }), USERS);
+    expect(exact.updatesByField.estimatedSandwichCount).toEqual({
+      estimatedSandwichCount: 250,
+      estimatedSandwichCountMin: null,
+      estimatedSandwichCountMax: null,
+    });
+    // A range-mode event (count null) with the same range: no change.
+    const rangeMode = makeEvent({ estimatedSandwichCount: null, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 });
+    expect(buildRowUpdatePlan(rangeMode, makeRow({ 'Estimate # sandwiches': '200-300' }), USERS).changes).toEqual([]);
+  });
+
+  it('splits types using the range midpoint for range-mode events', () => {
+    const rangeMode = makeEvent({ estimatedSandwichCount: null, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 });
+    const plan = buildRowUpdatePlan(rangeMode, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
+    expect(plan.updates.sandwichTypes).toEqual([
+      { type: 'deli', quantity: 125 },
+      { type: 'pbj', quantity: 125 },
+    ]);
+    const picked = selectUpdates(plan, ['sandwichTypes'], rangeMode);
+    expect(picked.updates.sandwichTypes).toEqual([
+      { type: 'deli', quantity: 125 },
+      { type: 'pbj', quantity: 125 },
+    ]);
+  });
+
+  it('keeps the plan free of wall-clock timestamps so the token is stable', () => {
+    const plan = buildRowUpdatePlan(makeEvent(), makeRow({ Cancelled: 'yes' }), USERS);
+    expect(plan.updatesByField.status).toEqual({
+      status: 'cancelled',
+      cancelledReason: 'Marked cancelled on the planning sheet',
+    });
   });
 });

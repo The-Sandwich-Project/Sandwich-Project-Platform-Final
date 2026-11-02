@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { parseDateOnly, toDateOnlyString } from '@shared/date-utils';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
-import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
+import { getRangeMidpoint, parseSandwichCountInput } from '@shared/sandwich-count-utils';
 
 /**
  * Planning sheet → app UPDATE ("send row to app" on a row that already exists).
@@ -37,6 +37,11 @@ export interface RowUpdateEvent {
   eventEndTime: string | null;
   pickupTime: string | null;
   estimatedSandwichCount: number | null;
+  /** Range-mode events keep their estimate here, with estimatedSandwichCount null. */
+  estimatedSandwichCountMin?: number | null;
+  estimatedSandwichCountMax?: number | null;
+  /** Folded into the plan token so any app save after the preview is caught. */
+  updatedAt?: Date | string | null;
   actualSandwichCount: number | null;
   sandwichTypes: unknown;
   firstName: string | null;
@@ -162,18 +167,22 @@ function displayTime(raw: unknown): string {
   return `${h12}:${String(mm).padStart(2, '0')} ${hh >= 12 ? 'PM' : 'AM'}`;
 }
 
+/** "YYYY-MM-DD" only if it's a real calendar day (rejects 2026-13-01, 2/31/26). */
+function realDay(year: number, month: number, day: number): string | null {
+  const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return toDateOnlyString(parseDateOnly(iso)) === iso ? iso : null;
+}
+
 /** Sheet date → "YYYY-MM-DD". Accepts YYYY-MM-DD, M/D/YY and M/D/YYYY. */
 export function normalizeSheetDate(raw: unknown): string | null {
   const s = clean(raw);
   if (!s) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return realDay(+iso[1], +iso[2], +iso[3]);
   const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
   if (m) {
     const year = m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10);
-    const month = parseInt(m[1], 10);
-    const day = parseInt(m[2], 10);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return realDay(year, parseInt(m[1], 10), parseInt(m[2], 10));
   }
   // Apps Script can send a full Date string; take its calendar day.
   const d = parseDateOnly(s);
@@ -448,13 +457,24 @@ export function buildRowUpdatePlan(
   if (clean(estRaw)) {
     const parsed = parseSandwichCountInput(estRaw as any);
     if (parsed.count && parsed.count > 0) {
-      if (parsed.count !== event.estimatedSandwichCount) {
+      const appMin = event.estimatedSandwichCountMin ?? null;
+      const appMax = event.estimatedSandwichCountMax ?? null;
+      const appHasRange = appMin !== null || appMax !== null;
+      // A range on the sheet is compared by its bounds (range-mode events keep
+      // the count null); an exact number must match the count with no range left.
+      const same = parsed.isRange
+        ? appMin === parsed.min && appMax === parsed.max
+        : event.estimatedSandwichCount === parsed.count && !appHasRange;
+      if (!same) {
+        const appShown = appHasRange
+          ? `${appMin ?? '?'}–${appMax ?? '?'}`
+          : event.estimatedSandwichCount ? String(event.estimatedSandwichCount) : '';
         changes.push({
           field: 'estimatedSandwichCount',
           label: 'Sandwich estimate',
-          from: event.estimatedSandwichCount ? String(event.estimatedSandwichCount) : '',
-          to: parsed.isRange ? `${parsed.count} (${parsed.min}–${parsed.max})` : String(parsed.count),
-          kind: event.estimatedSandwichCount ? 'update' : 'fill',
+          from: appShown,
+          to: parsed.isRange ? `${parsed.min}–${parsed.max}` : String(parsed.count),
+          kind: appShown ? 'update' : 'fill',
         });
         set('estimatedSandwichCount', 'estimatedSandwichCount', parsed.count);
         set('estimatedSandwichCount', 'estimatedSandwichCountMin', parsed.min);
@@ -473,7 +493,7 @@ export function buildRowUpdatePlan(
       sheetTypes.length === appTypes.length && sheetTypes.every((t) => appTypes.includes(t));
     if (!same) {
       const total =
-        (updates.estimatedSandwichCount as number | undefined) ?? event.estimatedSandwichCount ?? 0;
+        (updates.estimatedSandwichCount as number | undefined) ?? appEstimateTotal(event);
       const per = Math.floor(total / sheetTypes.length);
       set('sandwichTypes', 'sandwichTypes', sheetTypes.map((type, i) => ({
         type,
@@ -622,8 +642,8 @@ export function buildRowUpdatePlan(
       const from = STATUS_LABELS[event.status] ?? event.status;
       changes.push({ field: 'status', label: 'Status', from, to: 'Cancelled', kind: 'update' });
       set('status', 'status', 'cancelled');
-      set('status', 'statusChangedAt', new Date());
-      set('status', 'cancelledAt', new Date());
+      // statusChangedAt / cancelledAt are stamped by the route at apply time,
+      // so the plan (and its token) stays the same between preview and apply.
       // Cancelling needs a recorded reason (shared/event-status-workflow.ts).
       if (!clean(event.cancelledReason)) {
         set('status', 'cancelledReason', 'Marked cancelled on the planning sheet');
@@ -705,7 +725,7 @@ export function sheetNoteParts(row: {
 export function selectUpdates(
   plan: RowUpdatePlan,
   fields: string[],
-  event: Pick<RowUpdateEvent, 'estimatedSandwichCount'>
+  event: Pick<RowUpdateEvent, 'estimatedSandwichCount' | 'estimatedSandwichCountMin' | 'estimatedSandwichCountMax'>
 ): { changes: RowChange[]; updates: Record<string, unknown> } {
   const known = new Set(plan.changes.map((c) => c.field));
   const unknown = fields.filter((f) => !known.has(f));
@@ -720,7 +740,7 @@ export function selectUpdates(
   // re-split them using the count the app keeps.
   if (chosen.has('sandwichTypes') && !chosen.has('estimatedSandwichCount') && Array.isArray(updates.sandwichTypes)) {
     const types = updates.sandwichTypes as { type: string; quantity: number }[];
-    const total = event.estimatedSandwichCount ?? 0;
+    const total = appEstimateTotal(event);
     const per = Math.floor(total / types.length);
     updates.sandwichTypes = types.map((t, i) => ({
       type: t.type,
@@ -736,9 +756,32 @@ export function selectUpdates(
  * won't match and the apply is refused instead of writing something the
  * person never saw.
  */
-export function planToken(eventId: number, changes: RowChange[]): string {
-  const canonical = JSON.stringify([eventId, changes.map((c) => [c.field, c.from, c.to])]);
+export function planToken(
+  event: Pick<RowUpdateEvent, 'id' | 'updatedAt'>,
+  plan: Pick<RowUpdatePlan, 'changes' | 'updatesByField'>
+): string {
+  const revision = event.updatedAt ? new Date(event.updatedAt as any).getTime() : null;
+  // The labels AND the exact values that would be written, plus the event's
+  // revision: an app save after the preview, or a change in what would be
+  // written (e.g. per-type quantities), produces a different token.
+  const canonical = JSON.stringify([
+    event.id,
+    revision,
+    plan.changes.map((c) => [c.field, c.from, c.to]),
+    plan.updatesByField,
+  ]);
   return createHash('sha256').update(canonical).digest('hex').slice(0, 32);
+}
+
+/** The app's current planned total: exact count, else the range midpoint. */
+function appEstimateTotal(
+  event: Pick<RowUpdateEvent, 'estimatedSandwichCount' | 'estimatedSandwichCountMin' | 'estimatedSandwichCountMax'>
+): number {
+  return (
+    event.estimatedSandwichCount ??
+    getRangeMidpoint(event.estimatedSandwichCountMin, event.estimatedSandwichCountMax) ??
+    0
+  );
 }
 
 /**
