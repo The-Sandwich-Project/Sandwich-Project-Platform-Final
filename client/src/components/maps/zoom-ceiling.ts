@@ -1,6 +1,6 @@
 import type L from 'leaflet';
 
-/** Highest zoom both basemaps (Google and CARTO) serve tiles for. */
+/** Map zoom ceiling. Google serves z20; the OSM fallback upscales past z19. */
 export const BASEMAP_MAX_ZOOM = 20;
 
 /**
