@@ -335,6 +335,24 @@ export async function reconcileWeek(
 }
 
 /**
+ * Total sandwiches on a collection row, same formula as the rest of the app:
+ * individual + sum(groupCollections[].count), falling back to the legacy
+ * group1Count + group2Count columns.
+ */
+function collectionTotal(row: {
+  individualSandwiches: number | null;
+  groupCollections: unknown;
+  group1Count: number | null;
+  group2Count: number | null;
+}): number {
+  const groups =
+    Array.isArray(row.groupCollections) && row.groupCollections.length > 0
+      ? (row.groupCollections as Array<{ count?: number }>).reduce((sum, g) => sum + (g.count || 0), 0)
+      : (row.group1Count || 0) + (row.group2Count || 0);
+  return (row.individualSandwiches || 0) + groups;
+}
+
+/**
  * A real log for this host in the given week: any live, non-auto entry whose
  * host matches the configured name, or that started as one of our auto
  * entries and was converted by a hand edit (matched by its stable createdBy,
@@ -342,7 +360,13 @@ export async function reconcileWeek(
  */
 async function findManualEntry(config: AutoLogConfig, weekOf: string) {
   const [row] = await db
-    .select({ id: sandwichCollections.id, count: sandwichCollections.individualSandwiches })
+    .select({
+      id: sandwichCollections.id,
+      individualSandwiches: sandwichCollections.individualSandwiches,
+      groupCollections: sandwichCollections.groupCollections,
+      group1Count: sandwichCollections.group1Count,
+      group2Count: sandwichCollections.group2Count,
+    })
     .from(sandwichCollections)
     .where(
       and(
@@ -404,8 +428,15 @@ export async function prepareAutoEntryEdit<T extends Record<string, unknown>>(
           });
         }
       : undefined;
-  // Already converted by an earlier edit: just the move handling above.
-  if (row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD) return { updates, afterSave };
+  // Already converted by an earlier edit: just the move handling above. A
+  // full-row payload (e.g. restoring an older version from version control)
+  // can still carry submissionMethod 'auto_recurring'; never let a hand edit
+  // turn a converted entry back into an estimate.
+  if (row.submissionMethod !== AUTO_RECURRING_SUBMISSION_METHOD) {
+    return updates.submissionMethod === AUTO_RECURRING_SUBMISSION_METHOD
+      ? { updates: { ...updates, submissionMethod: 'standard' }, afterSave }
+      : { updates, afterSave };
+  }
   log.info(`Auto entry ${collectionId} edited in Collections log; converting to a regular log entry`);
   return {
     updates: {
@@ -709,7 +740,9 @@ export async function getAutoLogStatus() {
     currentWeekOf,
     currentWeekHoliday: holidayFor(currentWeekOf),
     // What's actually in the log this week, so the card doesn't have to guess
-    currentWeekManual: currentWeekManual ?? null,
+    currentWeekManual: currentWeekManual
+      ? { id: currentWeekManual.id, count: collectionTotal(currentWeekManual) }
+      : null,
     currentWeekAuto: currentWeekAuto ?? null,
     overrides,
     recentAutoEntries,
