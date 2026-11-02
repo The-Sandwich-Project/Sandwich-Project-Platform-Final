@@ -35,65 +35,62 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Custom marker icons
-// Red marker for highlighted hosts
-const highlightedHostIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+// Custom marker icons — same shapes and colors as the Driver Planning Map
+// (see `map` + `tsp` blocks in tailwind.config.ts): host = sage circle,
+// recipient = plum diamond, driver = gold triangle, volunteer = slate star,
+// search result = gray pin. A selected pin keeps its color and gets bigger
+// with a navy ring instead of switching colors.
+const PIN = {
+  host: '#6B8F71',
+  recipient: '#7D4E6D',
+  driver: '#FBAD3F',
+  person: '#64748B',
+  custom: '#6B7280',
+  ring: '#114154',
+};
+const FOCUS_SHADOW = `0 0 0 3px ${PIN.ring}, 0 2px 6px rgba(0,0,0,0.4)`;
+const NORMAL_SHADOW = '0 2px 4px rgba(0,0,0,0.3)';
+
+const makeDotIcon = (color: string, shape: 'circle' | 'diamond', focused = false) => {
+  const size = focused ? 26 : 20;
+  return L.divIcon({
+    html: `<div style="
+      width:${size}px;height:${size}px;background:${color};
+      border:3px solid white;border-radius:${shape === 'circle' ? '50%' : '2px'};
+      box-shadow:${focused ? FOCUS_SHADOW : NORMAL_SHADOW};
+      ${shape === 'diamond' ? 'transform:rotate(45deg);' : ''}
+    "></div>`,
+    className: 'route-map-marker',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+};
+
+const hostIcon = makeDotIcon(PIN.host, 'circle');
+const highlightedHostIcon = makeDotIcon(PIN.host, 'circle', true);
+const recipientIcon = makeDotIcon(PIN.recipient, 'diamond');
+const highlightedRecipientIcon = makeDotIcon(PIN.recipient, 'diamond', true);
+
+// Search result: gray teardrop pin
+const searchIcon = L.divIcon({
+  html: `
+    <svg viewBox="0 0 25 41" width="25" height="41" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">
+      <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 9.4 12.5 28.5 12.5 28.5S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z" fill="${PIN.custom}" stroke="white" stroke-width="1.5"/>
+      <circle cx="12.5" cy="12.5" r="5" fill="white"/>
+    </svg>
+  `,
+  className: 'route-map-marker',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
-  shadowSize: [41, 41]
 });
 
-// Orange marker for highlighted recipients (stands out from purple)
-const highlightedRecipientIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Blue marker for hosts
-const hostIcon = new L.Icon({
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Purple marker for recipients
-const recipientIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Green marker for searched address
-const searchIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Yellow triangle marker for drivers (matches the driver-planning page style).
-// Rendered as an inline SVG via L.divIcon so it visually distinguishes drivers
-// from the host/recipient pin shapes.
+// Drivers: gold triangle
 const driverIcon = L.divIcon({
   html: `
     <svg viewBox="0 0 20 20" width="22" height="22" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">
-      <polygon points="10,2 18,18 2,18" fill="#f1c40f" stroke="white" stroke-width="1.5" />
+      <polygon points="10,2 18,18 2,18" fill="${PIN.driver}" stroke="white" stroke-width="1.5" stroke-linejoin="round" />
     </svg>
   `,
   className: 'driver-marker-locations-map',
@@ -102,14 +99,17 @@ const driverIcon = L.divIcon({
   popupAnchor: [0, -16],
 });
 
-// Gold pin marker for volunteers — warm/distinct from hosts (blue) and recipients (violet).
-const volunteerIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+// Volunteers: slate star
+const volunteerIcon = L.divIcon({
+  html: `
+    <svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));">
+      <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.6-6.3 4.6 2.3-7-6-4.6h7.6z" fill="${PIN.person}" stroke="white" stroke-width="1.5"/>
+    </svg>
+  `,
+  className: 'route-map-marker',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+  popupAnchor: [0, -11],
 });
 
 // Haversine formula for distance calculation (returns miles)
@@ -612,7 +612,7 @@ export default function LocationsMapView() {
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-teal-100">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-tsp-mist">
                 <MapPin className="w-5 h-5 text-[#236383]" />
               </div>
               <div>
@@ -665,7 +665,7 @@ export default function LocationsMapView() {
                   onCheckedChange={(checked) => setShowHosts(checked === true)}
                 />
                 <Label htmlFor="show-hosts" className="text-sm flex items-center gap-1 cursor-pointer">
-                  <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                  <span className="w-3 h-3 rounded-full bg-map-host border border-white shadow-sm"></span>
                   Hosts
                 </Label>
               </div>
@@ -676,7 +676,7 @@ export default function LocationsMapView() {
                   onCheckedChange={(checked) => setShowRecipients(checked === true)}
                 />
                 <Label htmlFor="show-recipients" className="text-sm flex items-center gap-1 cursor-pointer">
-                  <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                  <span className="w-2.5 h-2.5 bg-map-recipient border border-white shadow-sm rotate-45 rounded-[1px]"></span>
                   Recipients
                 </Label>
               </div>
@@ -688,8 +688,8 @@ export default function LocationsMapView() {
                     onCheckedChange={(checked) => setShowDrivers(checked === true)}
                   />
                   <Label htmlFor="show-drivers" className="text-sm flex items-center gap-1 cursor-pointer">
-                    {/* Mini yellow triangle to match the marker shape */}
-                    <span className="inline-block w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-yellow-400" />
+                    {/* Mini gold triangle to match the marker shape */}
+                    <span className="inline-block w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-tsp-gold" />
                     Drivers
                   </Label>
                 </div>
@@ -702,7 +702,7 @@ export default function LocationsMapView() {
                     onCheckedChange={(checked) => setShowVolunteers(checked === true)}
                   />
                   <Label htmlFor="show-volunteers" className="text-sm flex items-center gap-1 cursor-pointer">
-                    <span className="w-3 h-3 rounded-full bg-amber-400"></span>
+                    <span className="text-map-person text-sm leading-none" aria-hidden="true">★</span>
                     Volunteers
                   </Label>
                 </div>
@@ -739,16 +739,16 @@ export default function LocationsMapView() {
             >
               {/* Searched Location Info - show at top when search is active */}
               {searchedLocation && (
-                <div className="p-3 bg-green-50 border-b border-green-200 flex-shrink-0">
+                <div className="p-3 bg-gray-50 border-b border-gray-200 border-l-4 border-l-map-custom flex-shrink-0">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-green-800 flex items-center gap-1">
+                      <div className="text-xs font-medium text-tsp-navy flex items-center gap-1">
                         <Navigation className="w-3 h-3" />
                         Searched Location
                       </div>
-                      <div className="text-sm text-green-700 mt-1 truncate">{searchedLocation.address}</div>
+                      <div className="text-sm text-gray-700 mt-1 truncate">{searchedLocation.address}</div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={clearSearch} className="h-6 w-6 p-0 text-green-700 hover:text-green-900 hover:bg-green-100">
+                    <Button variant="ghost" size="sm" onClick={clearSearch} className="h-6 w-6 p-0 text-gray-500 hover:text-tsp-navy hover:bg-gray-100">
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
@@ -794,7 +794,7 @@ export default function LocationsMapView() {
                       <div
                         key={contact.id}
                         className={`cursor-pointer hover:bg-gray-50 transition-all px-2 py-1.5 rounded-md border ${
-                          selectedId === `host-${contact.id}` ? 'ring-2 ring-blue-500 bg-blue-50 border-blue-200' : 'border-gray-100'
+                          selectedId === `host-${contact.id}` ? 'ring-2 ring-tsp-navy bg-tsp-mist border-tsp-teal' : 'border-gray-100'
                         }`}
                         onClick={() => handleHostClick(contact)}
                       >
@@ -844,7 +844,7 @@ export default function LocationsMapView() {
                       <Card
                         key={recipient.id}
                         className={`cursor-pointer hover:shadow-md transition-all ${
-                          selectedId === `recipient-${recipient.id}` ? 'ring-2 ring-purple-500 bg-purple-50' : ''
+                          selectedId === `recipient-${recipient.id}` ? 'ring-2 ring-tsp-navy bg-tsp-mist' : ''
                         }`}
                         onClick={() => handleRecipientClick(recipient)}
                       >
@@ -900,7 +900,7 @@ export default function LocationsMapView() {
                       <div
                         key={driver.id}
                         className={`cursor-pointer hover:bg-gray-50 transition-all px-2 py-1.5 rounded-md border ${
-                          selectedId === `driver-${driver.id}` ? 'ring-2 ring-yellow-500 bg-yellow-50 border-yellow-200' : 'border-gray-100'
+                          selectedId === `driver-${driver.id}` ? 'ring-2 ring-tsp-navy bg-tsp-mist border-tsp-teal' : 'border-gray-100'
                         }`}
                         onClick={() => handleDriverClick(driver)}
                       >
@@ -909,7 +909,7 @@ export default function LocationsMapView() {
                             <div className="font-medium text-gray-900 text-sm truncate leading-tight">{driver.name}</div>
                             <div className="text-xs text-gray-500 flex items-center gap-1">
                               {driver.vehicleType && <span className="truncate">{driver.vehicleType}</span>}
-                              {driver.vanApproved && <Badge variant="outline" className="text-[10px] py-0 px-1 border-green-400 text-green-700">Van</Badge>}
+                              {driver.vanApproved && <Badge variant="outline" className="text-[10px] py-0 px-1 border-tsp-sky bg-tsp-sky/15 text-tsp-navy">Van</Badge>}
                             </div>
                           </div>
                           {driver.distance !== undefined && (
@@ -949,7 +949,7 @@ export default function LocationsMapView() {
                       <div
                         key={volunteer.id}
                         className={`cursor-pointer hover:bg-gray-50 transition-all px-2 py-1.5 rounded-md border ${
-                          selectedId === `volunteer-${volunteer.id}` ? 'ring-2 ring-amber-500 bg-amber-50 border-amber-200' : 'border-gray-100'
+                          selectedId === `volunteer-${volunteer.id}` ? 'ring-2 ring-tsp-navy bg-tsp-mist border-tsp-teal' : 'border-gray-100'
                         }`}
                         onClick={() => handleVolunteerClick(volunteer)}
                       >
@@ -957,7 +957,7 @@ export default function LocationsMapView() {
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-gray-900 text-sm truncate leading-tight">{volunteer.name}</div>
                             <div className="text-xs text-gray-500 flex items-center gap-1 flex-wrap">
-                              {volunteer.isDriver && <Badge variant="outline" className="text-[10px] py-0 px-1 border-yellow-400 text-yellow-700">Driver</Badge>}
+                              {volunteer.isDriver && <Badge variant="outline" className="text-[10px] py-0 px-1 border-gray-300 text-gray-700">Driver</Badge>}
                             </div>
                           </div>
                           {volunteer.distance !== undefined && (
@@ -1021,7 +1021,7 @@ export default function LocationsMapView() {
               >
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <div className="font-semibold text-blue-600 mb-1">{contact.contactName}</div>
+                    <div className="font-semibold text-tsp-navy mb-1">{contact.contactName}</div>
                     <div className="text-sm text-gray-600 mb-2">
                       <Building2 className="inline w-3 h-3 mr-1" />
                       {contact.hostLocationName}
@@ -1036,13 +1036,13 @@ export default function LocationsMapView() {
                       {contact.phone && (
                         <div className="flex items-center gap-1 text-xs text-gray-600">
                           <Phone className="w-3 h-3" />
-                          <a href={`tel:${contact.phone}`} className="hover:text-blue-600">{contact.phone}</a>
+                          <a href={`tel:${contact.phone}`} className="hover:text-tsp-teal">{contact.phone}</a>
                         </div>
                       )}
                       {contact.email && (
                         <div className="flex items-center gap-1 text-xs text-gray-600">
                           <Mail className="w-3 h-3" />
-                          <a href={`mailto:${contact.email}`} className="hover:text-blue-600">{contact.email}</a>
+                          <a href={`mailto:${contact.email}`} className="hover:text-tsp-teal">{contact.email}</a>
                         </div>
                       )}
                     </div>
@@ -1051,7 +1051,7 @@ export default function LocationsMapView() {
                         href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(searchedLocation.address)}&destination=${encodeURIComponent(contact.address || `${contact.latitude},${contact.longitude}`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium mt-2 pt-2 border-t border-gray-200"
+                        className="flex items-center gap-1 text-xs text-tsp-teal hover:text-tsp-navy font-medium mt-2 pt-2 border-t border-gray-200"
                       >
                         <Navigation className="w-3 h-3" />
                         Get Directions
@@ -1080,7 +1080,7 @@ export default function LocationsMapView() {
               >
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <div className="font-semibold text-purple-600 mb-1">{recipient.name}</div>
+                    <div className="font-semibold text-tsp-navy mb-1">{recipient.name}</div>
                     {getRecipientDisplayRegion(recipient) && (
                       <Badge variant="outline" className="mb-2 text-xs">{getRecipientDisplayRegion(recipient)}</Badge>
                     )}
@@ -1096,7 +1096,7 @@ export default function LocationsMapView() {
                     {recipient.phone && (
                       <div className="flex items-center gap-1 text-xs text-gray-600 pt-2 border-t border-gray-200">
                         <Phone className="w-3 h-3" />
-                        <a href={`tel:${recipient.phone}`} className="hover:text-purple-600">{recipient.phone}</a>
+                        <a href={`tel:${recipient.phone}`} className="hover:text-tsp-teal">{recipient.phone}</a>
                       </div>
                     )}
                     {searchedLocation && (
@@ -1104,7 +1104,7 @@ export default function LocationsMapView() {
                         href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(searchedLocation.address)}&destination=${encodeURIComponent(recipient.address || `${recipient.latitude},${recipient.longitude}`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium mt-2 pt-2 border-t border-gray-200"
+                        className="flex items-center gap-1 text-xs text-tsp-teal hover:text-tsp-navy font-medium mt-2 pt-2 border-t border-gray-200"
                       >
                         <Navigation className="w-3 h-3" />
                         Get Directions
@@ -1133,12 +1133,12 @@ export default function LocationsMapView() {
               >
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <div className="font-semibold text-yellow-700 mb-1">{driver.name}</div>
+                    <div className="font-semibold text-tsp-navy mb-1">{driver.name}</div>
                     {driver.vehicleType && (
                       <div className="text-xs text-gray-600 mb-1">{driver.vehicleType}</div>
                     )}
                     {driver.vanApproved && (
-                      <Badge variant="outline" className="mb-2 text-[10px] border-green-400 text-green-700">Van approved</Badge>
+                      <Badge variant="outline" className="mb-2 text-[10px] border-tsp-sky bg-tsp-sky/15 text-tsp-navy">Van approved</Badge>
                     )}
                     {(driver.address || driver.homeAddress) && (
                       <div className="text-xs text-gray-600 mb-2">{driver.address || driver.homeAddress}</div>
@@ -1146,13 +1146,13 @@ export default function LocationsMapView() {
                     {driver.phone && (
                       <div className="flex items-center gap-1 text-xs text-gray-600 pt-2 border-t border-gray-200">
                         <Phone className="w-3 h-3" />
-                        <a href={`tel:${driver.phone}`} className="hover:text-yellow-700">{driver.phone}</a>
+                        <a href={`tel:${driver.phone}`} className="hover:text-tsp-teal">{driver.phone}</a>
                       </div>
                     )}
                     {driver.email && (
                       <div className="flex items-center gap-1 text-xs text-gray-600">
                         <Mail className="w-3 h-3" />
-                        <a href={`mailto:${driver.email}`} className="hover:text-yellow-700 truncate">{driver.email}</a>
+                        <a href={`mailto:${driver.email}`} className="hover:text-tsp-teal truncate">{driver.email}</a>
                       </div>
                     )}
                   </div>
@@ -1177,10 +1177,10 @@ export default function LocationsMapView() {
               >
                 <Popup>
                   <div className="p-2 min-w-[180px]">
-                    <div className="font-semibold text-amber-700 mb-1">{volunteer.name}</div>
+                    <div className="font-semibold text-tsp-navy mb-1">{volunteer.name}</div>
                     <div className="flex items-center gap-1 flex-wrap mb-2">
                       {volunteer.isDriver && (
-                        <Badge variant="outline" className="text-[10px] border-yellow-400 text-yellow-700">Driver</Badge>
+                        <Badge variant="outline" className="text-[10px] border-gray-300 text-gray-700">Driver</Badge>
                       )}
                     </div>
                     {(volunteer.address || volunteer.homeAddress) && (
@@ -1189,13 +1189,13 @@ export default function LocationsMapView() {
                     {volunteer.phone && (
                       <div className="flex items-center gap-1 text-xs text-gray-600 pt-2 border-t border-gray-200">
                         <Phone className="w-3 h-3" />
-                        <a href={`tel:${volunteer.phone}`} className="hover:text-amber-700">{volunteer.phone}</a>
+                        <a href={`tel:${volunteer.phone}`} className="hover:text-tsp-teal">{volunteer.phone}</a>
                       </div>
                     )}
                     {volunteer.email && (
                       <div className="flex items-center gap-1 text-xs text-gray-600">
                         <Mail className="w-3 h-3" />
-                        <a href={`mailto:${volunteer.email}`} className="hover:text-amber-700 truncate">{volunteer.email}</a>
+                        <a href={`mailto:${volunteer.email}`} className="hover:text-tsp-teal truncate">{volunteer.email}</a>
                       </div>
                     )}
                   </div>
@@ -1211,7 +1211,7 @@ export default function LocationsMapView() {
               >
                 <Popup>
                   <div className="p-2">
-                    <div className="font-semibold text-green-600 mb-1">Searched Location</div>
+                    <div className="font-semibold text-tsp-navy mb-1">Searched Location</div>
                     <div className="text-sm text-gray-600">{searchedLocation.address}</div>
                   </div>
                 </Popup>
@@ -1224,28 +1224,28 @@ export default function LocationsMapView() {
             <div className="text-xs font-semibold text-gray-700 mb-2">Legend</div>
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                <span className="w-3 h-3 rounded-full bg-map-host border border-white shadow-sm"></span>
                 <span>Hosts ({hosts.length})</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                <span className="w-2.5 h-2.5 bg-map-recipient border border-white shadow-sm rotate-45 rounded-[1px]"></span>
                 <span>Recipients ({recipientsWithCoords.length})</span>
               </div>
               {canViewDrivers && (
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="inline-block w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-yellow-400" />
+                  <span className="inline-block w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-tsp-gold" />
                   <span>Drivers ({driversWithCoords.length})</span>
                 </div>
               )}
               {canViewVolunteers && (
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="w-3 h-3 rounded-full bg-amber-400"></span>
+                  <span className="text-map-person text-sm leading-none" aria-hidden="true">★</span>
                   <span>Volunteers ({volunteersWithCoords.length})</span>
                 </div>
               )}
               {searchedLocation && (
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                  <span className="w-3 h-3 rounded-full bg-map-custom border border-white shadow-sm"></span>
                   <span>Search Result</span>
                 </div>
               )}
