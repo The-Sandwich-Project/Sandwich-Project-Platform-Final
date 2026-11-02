@@ -28,6 +28,12 @@ interface PushToSheetButtonProps {
   className?: string;
   /** When true, render an inline "Push to Sheet" text label next to the icon. Defaults to icon-only. */
   showLabel?: boolean;
+  /**
+   * The event is already on the planning sheet (addedToOfficialSheet). The
+   * button then reads "Update Sheet" so people know it sends later changes to
+   * the existing row, not just new events.
+   */
+  isOnSheet?: boolean;
 }
 
 type MergeDecision = 'use_app' | 'keep_sheet' | 'append';
@@ -80,6 +86,7 @@ export function PushToSheetButton({
   size = 'sm',
   className = '',
   showLabel = false,
+  isOnSheet = false,
 }: PushToSheetButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [showAllFields, setShowAllFields] = useState(false);
@@ -228,11 +235,13 @@ export function PushToSheetButton({
             data-testid="button-push-to-sheet"
           >
             <FileSpreadsheet className={`w-4 h-4 ${showLabel ? 'mr-1' : ''}`} />
-            {showLabel && <span>Push to Sheet</span>}
+            {showLabel && <span>{isOnSheet ? 'Update Sheet' : 'Push to Sheet'}</span>}
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          Push to Planning Sheet
+          {isOnSheet
+            ? "Send this event's latest changes to its row on the Planning Sheet"
+            : 'Add this event to the Planning Sheet'}
         </TooltipContent>
       </Tooltip>
 
@@ -241,10 +250,11 @@ export function PushToSheetButton({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-blue-600" />
-              Push to Planning Sheet
+              {hasExistingRow || isOnSheet ? 'Update Planning Sheet' : 'Push to Planning Sheet'}
             </DialogTitle>
             <DialogDescription>
-              Review exactly what will be added to the Planning Sheet, then push when ready.
+              Review what will change on the Planning Sheet, then confirm. If the event is
+              already on the sheet, this updates its existing row.
             </DialogDescription>
           </DialogHeader>
 

@@ -4006,6 +4006,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               variant="outline"
               size="sm"
               showLabel
+              isOnSheet={!!request.addedToOfficialSheet}
             />
 
             {/* For users who type the event into the Google Sheet by hand instead of
