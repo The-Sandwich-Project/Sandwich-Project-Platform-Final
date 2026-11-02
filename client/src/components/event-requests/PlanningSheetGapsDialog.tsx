@@ -104,7 +104,7 @@ export function PlanningSheetGapsDialog({
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-green-600" />
+            <ShieldCheck className="w-5 h-5 text-tsp-teal" />
             Planning Sheet Gaps
           </DialogTitle>
           <DialogDescription>
@@ -134,7 +134,7 @@ export function PlanningSheetGapsDialog({
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2 text-sm">
                 <Badge variant="outline">{data.sheetRowCount} rows on sheet</Badge>
-                <Badge variant="outline" className="text-green-700 border-green-300">
+                <Badge variant="outline" className="text-tsp-teal border-tsp-sky">
                   {data.inAppCount} already in the app
                 </Badge>
                 <Badge variant="outline" className="text-blue-700 border-blue-300">
@@ -148,7 +148,7 @@ export function PlanningSheetGapsDialog({
               </div>
 
               {gaps.length === 0 ? (
-                <p className="text-sm text-green-700 py-2">
+                <p className="text-sm text-tsp-teal py-2">
                   Every group event on the planning sheet appears to be represented
                   in the app. No gaps found.
                 </p>

@@ -112,7 +112,7 @@ const StaffNeedBadge: React.FC<StaffNeedBadgeProps> = ({ field, needed, unfilled
         <button
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
             isFilled
-              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+              ? 'bg-tsp-sky/15 text-tsp-teal hover:bg-tsp-sky/25'
               : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
           }`}
           title={`${label}: ${needed} needed, ${unfilled} unfilled. Click to edit.`}
@@ -2349,7 +2349,7 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
                         driversNeeded === 0
                           ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           : driversAssigned >= driversNeeded
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            ? 'bg-tsp-sky/15 text-tsp-teal hover:bg-tsp-sky/25'
                             : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                       }`}
                     >
@@ -2404,7 +2404,7 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
                         volunteersNeeded === 0
                           ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           : volunteersAssigned >= volunteersNeeded
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            ? 'bg-tsp-sky/15 text-tsp-teal hover:bg-tsp-sky/25'
                             : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                       }`}
                     >
@@ -2786,7 +2786,7 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
                             variant="outline"
                             className={`text-xs ${
                               totalDriversAssigned >= event.driversNeeded
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                ? 'bg-tsp-sky/15 text-tsp-teal border-tsp-sky'
                                 : 'bg-amber-50 text-amber-700 border-amber-300'
                             }`}
                           >
@@ -2800,7 +2800,7 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
                           variant="outline"
                           className={`text-xs ${
                             getVolunteerCount(event) >= event.volunteersNeeded
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              ? 'bg-tsp-sky/15 text-tsp-teal border-tsp-sky'
                               : 'bg-amber-50 text-amber-700 border-amber-300'
                           }`}
                         >

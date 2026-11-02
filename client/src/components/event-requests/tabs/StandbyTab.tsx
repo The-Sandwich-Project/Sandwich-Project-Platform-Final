@@ -67,7 +67,7 @@ export const StandbyTab: React.FC = () => {
 
       {/* Info banner explaining standby status */}
       <div className="mb-4 px-4">
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
+        <div className="bg-tsp-mist border border-tsp-teal/30 rounded-lg p-3 text-sm text-tsp-navy">
           <strong>Standby events</strong> are waiting for the organizer to work out details on their end.
           Check back periodically to follow up, especially when expected response dates pass.
         </div>

@@ -293,7 +293,7 @@ export function AiIntakeAssistantDialog({
   ) => {
     const styles = {
       complete:
-        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200 dark:border-green-800',
+        'bg-tsp-sky/15 text-tsp-teal dark:bg-tsp-navy dark:text-tsp-sky border-tsp-sky dark:border-tsp-teal',
       needs_attention:
         'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-800',
       critical_missing:
@@ -814,8 +814,8 @@ export function AiIntakeAssistantDialog({
                           title.toLowerCase().includes('verify')
                         ) {
                           icon = CheckCircle2;
-                          iconColor = 'text-green-600 dark:text-green-400';
-                          borderLeftColor = 'border-l-green-500';
+                          iconColor = 'text-tsp-teal dark:text-tsp-sky';
+                          borderLeftColor = 'border-l-tsp-sky';
                         } else if (
                           title.toLowerCase().includes('refrigeration')
                         ) {
@@ -1003,12 +1003,12 @@ export function AiIntakeAssistantDialog({
               {analysis.criticalIssues.length === 0 &&
                 analysis.warnings.length === 0 &&
                 analysis.suggestions.length === 0 && (
-                  <div className="text-center py-8 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                    <CheckCircle2 className="h-12 w-12 text-green-600 dark:text-green-400 mx-auto mb-3" />
-                    <h3 className="font-semibold text-lg text-green-900 dark:text-green-100 mb-2">
+                  <div className="text-center py-8 bg-tsp-sky/15 dark:bg-tsp-navy border border-tsp-sky dark:border-tsp-teal rounded-lg">
+                    <CheckCircle2 className="h-12 w-12 text-tsp-teal dark:text-tsp-sky mx-auto mb-3" />
+                    <h3 className="font-semibold text-lg text-tsp-teal dark:text-tsp-sky mb-2">
                       All Set!
                     </h3>
-                    <p className="text-sm text-green-700 dark:text-green-300">
+                    <p className="text-sm text-tsp-teal dark:text-tsp-sky">
                       All critical information has been collected for this event
                       request.
                     </p>

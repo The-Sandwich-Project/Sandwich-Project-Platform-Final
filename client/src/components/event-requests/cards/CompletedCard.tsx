@@ -415,10 +415,10 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                   <Badge
                     onClick={() => startEditing?.('isConfirmed', (!request.isConfirmed).toString())}
                     className={`px-3 py-1 text-sm font-medium shadow-sm inline-flex items-center cursor-pointer hover:opacity-80 transition-opacity ${
-                      request.isConfirmed ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'
+                      request.isConfirmed ? 'bg-tsp-sky/15 text-tsp-navy border border-tsp-sky' : 'bg-tsp-gold text-tsp-navy border border-tsp-gold'
                     }`}
                   >
-                    {request.isConfirmed ? '✓ Date Confirmed' : 'Date Pending'}
+                    {request.isConfirmed ? '✓ Date Confirmed' : '⚠ Date Pending'}
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -543,7 +543,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               </div>
             )}
             {/* TSP Contact */}
-            <div className="text-sm text-[#D68319] mb-2 group relative">
+            <div className="text-sm text-tsp-navy mb-2 group relative">
               <span className="font-medium">TSP Contact: </span>
               {isEditingTspContact ? (
                 <div className="inline-flex items-center gap-2 ml-2 flex-wrap">
@@ -941,7 +941,7 @@ const CardAssignments: React.FC<CardAssignmentsProps> = ({
               <div className="flex items-center gap-1">
                 <Badge
                   variant="outline"
-                  className="bg-[#FBAD3F]/20 text-[#D68319] border-[#FBAD3F] font-medium text-xs px-2 py-0.5 cursor-pointer hover:bg-[#FBAD3F]/30 transition-colors"
+                  className="bg-white text-gray-700 border-gray-300 font-medium text-xs px-2 py-0.5 cursor-pointer hover:bg-gray-50 transition-colors"
                   title="Click to change to driver assignment"
                   onClick={() => {
                     if (canEdit && startEditing && saveEdit) {
@@ -2450,7 +2450,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     size="sm"
                     variant="default"
                     onClick={onCompleteNextAction}
-                    className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                    className="h-7 text-xs bg-tsp-teal hover:bg-brand-primary-dark text-white"
                   >
                     <CheckCircle className="w-3 h-3 mr-1" />
                     Complete
@@ -2782,7 +2782,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                   {request.selfTransport ? (
                     <Badge
                       variant="outline"
-                      className="bg-[#FBAD3F]/20 text-[#D68319] border-[#FBAD3F] font-medium text-xs px-2 py-0.5"
+                      className="bg-white text-gray-700 border-gray-300 font-medium text-xs px-2 py-0.5"
                       title={indicatorTooltips.selfTransport}
                     >
                       <Car className="w-3 h-3 mr-1" />
@@ -3020,7 +3020,6 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onFollowUp1Month}
-                    className="bg-purple-50 hover:bg-purple-100"
                   >
                     <MessageCircle className="w-4 h-4 mr-1" />
                     1-Month Follow-up
@@ -3083,7 +3082,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onAssignTspContact}
-                    className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                    className="bg-tsp-cream border-tsp-gold text-tsp-navy hover:bg-tsp-gold/20"
                   >
                     <UserPlus className="w-4 h-4 mr-1" />
                     Assign TSP Contact

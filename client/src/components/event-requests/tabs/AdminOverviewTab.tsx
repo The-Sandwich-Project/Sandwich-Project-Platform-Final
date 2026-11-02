@@ -195,7 +195,7 @@ export function AdminOverviewTab({ eventRequests }: AdminOverviewTabProps) {
           </div>
           <div className="premium-card-flat p-4">
             <div className="text-sm text-slate-600">Scheduled</div>
-            <div className="text-2xl font-bold text-green-600">{scheduledCount}</div>
+            <div className="text-2xl font-bold text-tsp-teal">{scheduledCount}</div>
             <div className="text-xs text-slate-500 mt-1">Ready to go</div>
           </div>
         </div>

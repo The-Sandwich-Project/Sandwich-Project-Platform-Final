@@ -49,7 +49,7 @@ const getStatusColor = (status: string) => {
     case 'in_process':
       return 'bg-yellow-100 text-yellow-800 border-yellow-300';
     case 'scheduled':
-      return 'bg-green-100 text-green-800 border-green-300';
+      return 'bg-tsp-sky/15 text-tsp-teal border-tsp-sky';
     case 'completed':
       return 'bg-navy-100 text-navy-800 border-navy-300';
     case 'cancelled':
@@ -262,7 +262,7 @@ export function EventDetailsDialog({
                 )}
                 {event.volunteersNeeded && event.volunteersNeeded > 0 && (
                   <p className="text-base flex items-center gap-2">
-                    <UserCheck className="h-4 w-4 text-green-600" />
+                    <UserCheck className="h-4 w-4 text-tsp-teal" />
                     {event.volunteersNeeded} volunteer{event.volunteersNeeded > 1 ? 's' : ''} needed
                   </p>
                 )}

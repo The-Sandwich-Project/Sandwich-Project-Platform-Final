@@ -221,7 +221,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             </div>
             {/* TSP Contact */}
             {(request.tspContact || request.customTspContact) && (
-              <div className="text-sm text-[#D68319] mb-2">
+              <div className="text-sm text-tsp-navy mb-2">
                 <span className="font-medium">TSP Contact: </span>
                 <span className="font-normal">
                   {request.tspContact ? (resolveUserName ? resolveUserName(request.tspContact) : request.tspContact) : request.customTspContact}

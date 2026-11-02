@@ -206,7 +206,7 @@ export function RecipientAllocationEditor({
             <span className="text-sm font-medium">
               Total allocated: <span className="text-lg">{totalAllocated}</span>
               {estimatedSandwichCount && (
-                <span className={totalAllocated !== estimatedSandwichCount ? 'text-amber-600 ml-2' : 'text-green-600 ml-2'}>
+                <span className={totalAllocated !== estimatedSandwichCount ? 'text-amber-600 ml-2' : 'text-tsp-teal ml-2'}>
                   / {estimatedSandwichCount}
                 </span>
               )}

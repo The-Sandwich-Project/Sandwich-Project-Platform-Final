@@ -18,7 +18,7 @@ export function MlkDayBadge({ className = '', showIcon = true }: MlkDayBadgeProp
       <Tooltip>
         <TooltipTrigger asChild>
           <Badge 
-            className={`bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold ${className}`}
+            className={`bg-tsp-navy text-white font-semibold ${className}`}
             data-testid="badge-mlk-day"
           >
             {showIcon && <Heart className="w-3 h-3 mr-1 fill-white" />}

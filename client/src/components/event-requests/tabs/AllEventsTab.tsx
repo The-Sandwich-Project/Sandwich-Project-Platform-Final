@@ -49,7 +49,7 @@ const statusLabels: Record<string, string> = {
 const statusStyles: Record<string, string> = {
   new: 'bg-blue-50 text-blue-700 border-blue-200',
   in_process: 'bg-amber-50 text-amber-700 border-amber-200',
-  scheduled: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  scheduled: 'bg-tsp-sky/15 text-tsp-teal border-tsp-sky',
   completed: 'bg-gray-100 text-gray-700 border-gray-200',
   declined: 'bg-rose-50 text-rose-700 border-rose-200',
   cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -126,7 +126,7 @@ export const AllEventsTab: React.FC = () => {
               </SelectItem>
               <SelectItem value="scheduled">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <div className="w-2 h-2 rounded-full bg-tsp-sky" />
                   Scheduled
                 </div>
               </SelectItem>

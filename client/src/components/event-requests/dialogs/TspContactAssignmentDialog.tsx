@@ -235,12 +235,12 @@ export const TspContactAssignmentDialog: React.FC<TspContactAssignmentDialogProp
                 {selectedUserId && (
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Selected TSP Contact</Label>
-                    <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200 p-2">
+                    <Badge variant="secondary" className="bg-tsp-sky/15 text-tsp-teal border-tsp-sky p-2">
                       <User className="w-4 h-4 mr-2" />
                       {getSelectedUserName(selectedUserId)}
                       <button
                         onClick={() => setSelectedUserId('')}
-                        className="ml-2 hover:bg-green-200 rounded-full w-4 h-4 flex items-center justify-center"
+                        className="ml-2 hover:bg-tsp-sky/25 rounded-full w-4 h-4 flex items-center justify-center"
                         data-testid="button-clear-user-selection"
                       >
                         <X className="w-3 h-3" />
@@ -275,7 +275,7 @@ export const TspContactAssignmentDialog: React.FC<TspContactAssignmentDialogProp
                               key={user.id}
                               className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                                 isSelected
-                                  ? 'bg-green-50 border-green-200 text-green-700'
+                                  ? 'bg-tsp-sky/15 border-tsp-sky text-tsp-teal'
                                   : 'bg-white border-gray-200 hover:bg-gray-50'
                               }`}
                               onClick={() => setSelectedUserId(user.id)}
@@ -295,7 +295,7 @@ export const TspContactAssignmentDialog: React.FC<TspContactAssignmentDialogProp
                                   </div>
                                 </div>
                                 {isSelected && (
-                                  <Check className="w-4 h-4 text-green-600" />
+                                  <Check className="w-4 h-4 text-tsp-teal" />
                                 )}
                               </div>
                             </div>

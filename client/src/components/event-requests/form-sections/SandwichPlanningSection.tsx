@@ -70,7 +70,7 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
       <div className="flex items-center gap-3 pb-2 border-b">
         <Sandwich className="w-5 h-5 text-[#236383]" />
         <span className="text-lg font-semibold text-[#236383]">Sandwich Planning</span>
-        {isComplete && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+        {isComplete && <CheckCircle2 className="w-4 h-4 text-tsp-teal" />}
       </div>
 
       {/* Mode Selector */}

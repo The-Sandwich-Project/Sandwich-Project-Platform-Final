@@ -129,8 +129,8 @@ export const DeliverySection: React.FC<DeliverySectionProps> = ({
               data-testid="input-overnight-location"
             />
             {formData.overnightHoldingLocation && (
-              <div className="ml-4 mt-2 space-y-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <h4 className="font-medium text-green-900">Next-Day Delivery Details</h4>
+              <div className="ml-4 mt-2 space-y-3 p-3 bg-tsp-sky/15 border border-tsp-sky rounded-lg">
+                <h4 className="font-medium text-tsp-teal">Next-Day Delivery Details</h4>
                 <div>
                   <Label htmlFor="overnightPickupTime">Pickup Time from Overnight Location</Label>
                   <Input

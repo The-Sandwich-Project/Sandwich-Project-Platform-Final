@@ -105,7 +105,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 </span>
               )}
             </h3>
-            <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold bg-gradient-to-br from-purple-100 to-purple-200 text-purple-800 border border-purple-400/50 text-sm whitespace-nowrap">
+            <Badge className="inline-flex items-center rounded-full px-2.5 py-0.5 font-semibold bg-tsp-navy text-white border border-tsp-navy text-sm whitespace-nowrap">
               <StatusIcon className="w-3 h-3 mr-1" />
               {getStatusLabel(request.status)}
             </Badge>
@@ -121,7 +121,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               )}
             </div>
             {(request.tspContact || request.customTspContact) && (
-              <div className="text-sm text-[#D68319] mb-2">
+              <div className="text-sm text-tsp-navy mb-2">
                 <span className="font-medium">TSP Contact: </span>
                 <span className="font-normal">
                   {request.tspContact ? (resolveUserName ? resolveUserName(request.tspContact) : request.tspContact) : request.customTspContact}
@@ -171,8 +171,8 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
   return (
     <Card
-      className={`transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-purple-50 shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl`}
-      style={{ borderLeftColor: '#9333EA' }}
+      className={`transition-all duration-200 hover:shadow-[0_2px_6px_rgba(0,0,0,0.10)] border-l-[4px] bg-tsp-mist shadow-[0_1px_4px_rgba(0,0,0,0.08)] border-[#D8DEE2] rounded-xl`}
+      style={{ borderLeftColor: '#114154' }}
       data-testid={`card-standby-${request.id}`}
     >
       <CardContent className="p-3">
@@ -185,14 +185,14 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
         {/* Standby Info - Prominent Display */}
         <div className="space-y-3 mb-4">
-          <div className={`rounded-lg p-4 border-2 ${isExpectedDatePast ? 'bg-red-100 border-red-300' : 'bg-purple-100 border-purple-300'}`}>
+          <div className={`rounded-lg p-4 border-2 ${isExpectedDatePast ? 'bg-tsp-cream border-tsp-gold' : 'bg-white border-tsp-navy/20'}`}>
             <div className="flex items-center gap-2 mb-2">
-              <Hourglass className={`w-5 h-5 ${isExpectedDatePast ? 'text-red-700' : 'text-purple-700'}`} />
-              <span className={`text-base font-semibold ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>
+              <Hourglass className={`w-5 h-5 text-tsp-navy`} />
+              <span className={`text-base font-semibold text-tsp-navy`}>
                 On Standby - Waiting for Organizer
               </span>
               {request.standbyMarkedAt && (
-                <span className={`text-sm ${isExpectedDatePast ? 'text-red-700' : 'text-purple-700'}`}>
+                <span className={`text-sm text-tsp-navy`}>
                   since {new Date(request.standbyMarkedAt).toLocaleDateString()}
                 </span>
               )}
@@ -200,17 +200,17 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
             {request.standbyReason && (
               <div className="mt-3">
-                <p className={`text-sm font-medium mb-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>Reason:</p>
-                <p className={`text-sm ${isExpectedDatePast ? 'text-red-800' : 'text-purple-800'}`}>{request.standbyReason}</p>
+                <p className={`text-sm font-medium mb-1 text-tsp-navy`}>Reason:</p>
+                <p className={`text-sm text-tsp-navy`}>{request.standbyReason}</p>
               </div>
             )}
 
             {request.standbyExpectedDate && (
-              <div className={`mt-3 rounded p-2 ${isExpectedDatePast ? 'bg-red-50' : 'bg-white/50'}`}>
-                <p className={`text-sm font-medium mb-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>
+              <div className={`mt-3 rounded p-2 ${isExpectedDatePast ? 'bg-white' : 'bg-white/50'}`}>
+                <p className={`text-sm font-medium mb-1 text-tsp-navy`}>
                   {isExpectedDatePast ? 'Expected Response (OVERDUE):' : 'Expected Response By:'}
                 </p>
-                <p className={`text-base font-semibold flex items-center gap-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>
+                <p className={`text-base font-semibold flex items-center gap-1 text-tsp-navy`}>
                   <Clock className="w-4 h-4" />
                   {expectedDateInfo?.text}
                   {isExpectedDatePast && (
@@ -224,8 +224,8 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
             {request.standbyNotes && (
               <div className="mt-3">
-                <p className={`text-sm font-medium mb-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>Notes:</p>
-                <p className={`text-sm whitespace-pre-wrap ${isExpectedDatePast ? 'text-red-800' : 'text-purple-800'}`}>{request.standbyNotes}</p>
+                <p className={`text-sm font-medium mb-1 text-tsp-navy`}>Notes:</p>
+                <p className={`text-sm whitespace-pre-wrap text-tsp-navy`}>{request.standbyNotes}</p>
               </div>
             )}
           </div>
@@ -304,7 +304,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                   size="sm"
                   variant="default"
                   onClick={onReactivate}
-                  className="bg-[#9333EA] hover:bg-[#7e22ce] text-white h-8"
+                  className="bg-tsp-teal hover:bg-brand-primary-dark text-white h-8"
                   data-testid="button-reactivate"
                 >
                   <RefreshCw className="w-4 h-4 mr-1" />

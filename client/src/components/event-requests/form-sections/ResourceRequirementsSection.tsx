@@ -46,7 +46,7 @@ export const ResourceRequirementsSection: React.FC<ResourceRequirementsSectionPr
       <div className="flex items-center gap-3 pb-2 border-b">
         <Car className="w-5 h-5 text-[#236383]" />
         <span className="text-lg font-semibold text-[#236383]">Resource Requirements</span>
-        {isComplete && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+        {isComplete && <CheckCircle2 className="w-4 h-4 text-tsp-teal" />}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Drivers */}
@@ -134,7 +134,7 @@ export const ResourceRequirementsSection: React.FC<ResourceRequirementsSectionPr
 
             {/* Van Driver Selection - Only show when van driver is needed and NOT self-transport */}
             {formData.vanDriverNeeded && !formData.selfTransport && (
-              <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="mt-3 p-3 bg-tsp-cream border border-tsp-gold rounded-lg">
                 <div className="flex items-center space-x-2 mb-2">
                   <input
                     type="checkbox"
@@ -174,7 +174,7 @@ export const ResourceRequirementsSection: React.FC<ResourceRequirementsSectionPr
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-sm text-orange-600 mt-1">
+                <p className="text-sm text-tsp-navy mt-1">
                   If no driver is selected, the event card will show "Van Driver Needed"
                 </p>
               </div>

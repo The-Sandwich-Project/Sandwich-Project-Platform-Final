@@ -131,7 +131,7 @@ const NextActionDialog: React.FC<NextActionDialogProps> = ({
           <DialogTitle className="flex items-center gap-2">
             {mode === 'complete' ? (
               <>
-                <CheckCircle className="w-5 h-5 text-green-600" />
+                <CheckCircle className="w-5 h-5 text-tsp-teal" />
                 Mark Action Complete
               </>
             ) : mode === 'edit' ? (
@@ -203,7 +203,7 @@ const NextActionDialog: React.FC<NextActionDialogProps> = ({
           <Button
             onClick={handleSubmit}
             disabled={updateNextActionMutation.isPending}
-            className={mode === 'complete' ? 'bg-green-600 hover:bg-green-700' : 'bg-[#007E8C] hover:bg-[#236383]'}
+            className={'bg-tsp-teal hover:bg-brand-primary-dark'}
           >
             {updateNextActionMutation.isPending
               ? 'Saving...'

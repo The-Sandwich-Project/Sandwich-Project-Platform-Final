@@ -119,7 +119,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               )}
             </div>
             {(request.tspContact || request.customTspContact) && (
-              <div className="text-sm text-[#D68319] mb-2 flex items-center gap-2 flex-wrap">
+              <div className="text-sm text-tsp-navy mb-2 flex items-center gap-2 flex-wrap">
                 <div>
                   <span className="font-medium">TSP Contact: </span>
                   <span className="font-normal">

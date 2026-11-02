@@ -116,7 +116,7 @@ export function AiDateSuggestionDialog({
 
   const getConfidenceBadge = (confidence: 'high' | 'medium' | 'low') => {
     const colors = {
-      high: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      high: 'bg-tsp-sky/15 text-tsp-teal dark:bg-tsp-navy dark:text-tsp-sky',
       medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
       low: 'bg-[#FBAD3F]/20 text-[#FBAD3F] dark:bg-[#FBAD3F]/30 dark:text-[#FBAD3F]',
     };
@@ -413,7 +413,7 @@ export function AiDateSuggestionDialog({
                       key={idx}
                       className={`p-3 sm:p-4 rounded-lg border transition-all ${
                         analysis.isOptimal
-                          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950'
+                          ? 'border-tsp-sky bg-tsp-sky/15 dark:border-tsp-teal dark:bg-tsp-navy'
                           : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900'
                       }`}
                     >
@@ -428,7 +428,7 @@ export function AiDateSuggestionDialog({
                               </p>
                               <div className="flex gap-2 flex-wrap">
                                 {analysis.isOptimal && (
-                                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                                  <Badge className="bg-tsp-sky/15 text-tsp-teal dark:bg-tsp-navy dark:text-tsp-sky text-xs">
                                     Good Balance
                                   </Badge>
                                 )}

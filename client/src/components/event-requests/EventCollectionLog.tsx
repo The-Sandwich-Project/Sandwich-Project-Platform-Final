@@ -120,10 +120,10 @@ const EventCollectionLog: React.FC<EventCollectionLogProps> = ({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                  <CheckCircle className="w-8 h-8 text-tsp-teal" />
                   <div>
                     <p className="text-sm text-[#236383]">Status</p>
-                    <p className="text-sm font-medium text-green-600">
+                    <p className="text-sm font-medium text-tsp-teal">
                       {collections.length > 0 ? 'Active' : 'No Collections'}
                     </p>
                   </div>

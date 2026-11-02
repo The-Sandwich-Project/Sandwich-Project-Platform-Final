@@ -807,7 +807,6 @@ const EventRequestsManagementContent: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
               >
                 <MapPin className="w-4 h-4 mr-1.5" />
                 {!isMobile && 'Driver Planning Map'}
@@ -850,7 +849,7 @@ const EventRequestsManagementContent: React.FC = () => {
                 </button>
                 <button
                   onClick={() => { setActiveTab('scheduled'); setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'needsVan' ? null : 'needsVan'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'needsVan' ? 'bg-[#D68319] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'needsVan' ? 'bg-[#007E8C] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Truck className="w-4 h-4" /> Needs Van
                 </button>
@@ -868,7 +867,7 @@ const EventRequestsManagementContent: React.FC = () => {
                 </button>
                 <button
                   onClick={() => { setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'corporatePriority' ? null : 'corporatePriority'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'corporatePriority' ? 'bg-amber-600 text-white' : 'hover:bg-gray-100 text-amber-700'}`}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'corporatePriority' ? 'bg-[#007E8C] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Shield className="w-4 h-4" /> Corporate Priority
                 </button>
@@ -1711,7 +1710,7 @@ const EventRequestsManagementContent: React.FC = () => {
           <div className="hidden sm:block fixed bottom-[calc(1.5rem+var(--chat-dock-height,0px))] right-6 z-50">
             <button
               onClick={handleSwitchToSpreadsheet}
-              className="h-14 w-14 rounded-full shadow-xl bg-green-600 hover:bg-green-700 active:bg-green-800 transition-all duration-200 flex items-center justify-center text-white hover:scale-105 active:scale-95"
+              className="h-14 w-14 rounded-full shadow-xl bg-tsp-teal hover:bg-brand-primary-dark active:bg-tsp-navy transition-all duration-200 flex items-center justify-center text-white hover:scale-105 active:scale-95"
               title="Switch to Spreadsheet View"
               aria-label="Switch to Spreadsheet View"
             >

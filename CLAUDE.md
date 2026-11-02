@@ -124,6 +124,16 @@ All in `server/services/cron-jobs.ts` (node-cron, `America/New_York`). Key jobs:
 
 Separately, `server/background-sync-service.ts` reads the Event Requests Google Sheet into the DB every 30 minutes.
 
+### Color Rule (UI)
+**Buttons stay quiet; color means state.** Tokens live in the `tsp` block of `tailwind.config.ts`.
+- `tsp-teal` #236383 — the one filled primary action per area, links
+- `tsp-navy` #114154 — text, headings
+- `tsp-sky` #47B3CB — OK / complete (fill or border only — fails as text)
+- `tsp-gold` #FBAD3F + `tsp-cream` #FEF3E2 — needs attention (fill/border only, navy text, ⚠ icon)
+- `tsp-red` #A31C41 — destructive or blocking (e.g. staffing gap ≤3 days out), with an icon
+- Everything else: neutral outline (`variant="outline"`, no color classes). No purple, orange, or green.
+Applied so far to `client/src/components/event-requests/`; badge tones are centralized in `cards/card-ui.tsx` (`badgeTone`).
+
 ### Onboarding System
 `client/src/hooks/useOnboarding.ts` — localStorage-based step tracking. Add new steps to the `OnboardingStep` type and `onboardingContent` map. Wrap UI elements with `<OnboardingTooltip>` from `client/src/components/ui/onboarding-tooltip.tsx`.
 

@@ -406,7 +406,7 @@ export function SandwichDestinationOverview({ eventRequests }: SandwichDestinati
                       variant="outline"
                       className={`text-xs ${
                         isScheduledOrRescheduled(event.status)
-                          ? 'border-green-300 text-green-700 bg-green-50'
+                          ? 'border-tsp-sky text-tsp-teal bg-tsp-sky/15'
                           : 'border-amber-300 text-amber-700 bg-amber-50'
                       }`}
                     >
@@ -464,7 +464,7 @@ export function SandwichDestinationOverview({ eventRequests }: SandwichDestinati
                       variant="outline"
                       className={`text-xs ${
                         isScheduledOrRescheduled(event.status)
-                          ? 'border-green-300 text-green-700 bg-green-50'
+                          ? 'border-tsp-sky text-tsp-teal bg-tsp-sky/15'
                           : 'border-amber-300 text-amber-700 bg-amber-50'
                       }`}
                     >

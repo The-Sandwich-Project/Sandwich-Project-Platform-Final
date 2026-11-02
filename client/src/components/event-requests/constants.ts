@@ -33,22 +33,20 @@ export const SANDWICH_TYPES = [
 // Status color scheme - VIBRANT BRAND COLORS: Using TSP brand palette with high saturation
 export const statusColors: Record<string, string> = {
   new: 'bg-gradient-to-br from-[#007E8C] to-[#47B3CB] text-white border-2 border-[#007E8C] shadow-md',
-  in_process:
-    'bg-gradient-to-br from-[#FBAD3F] to-[#ffc966] text-white border-2 border-[#FBAD3F] shadow-md',
+  // Gold and light teal fail as text backgrounds for white text — navy text instead.
+  in_process: 'bg-tsp-gold text-tsp-navy border-2 border-tsp-gold shadow-md',
   scheduled:
     'bg-gradient-to-br from-[#236383] to-[#2d7da5] text-white border-2 border-[#236383] shadow-md',
   rescheduled:
     'bg-gradient-to-br from-[#236383] to-[#2d7da5] text-white border-2 border-[#236383] shadow-md',
-  completed:
-    'bg-gradient-to-br from-[#47B3CB] to-[#6bc4d4] text-white border-2 border-[#47B3CB] shadow-md',
+  completed: 'bg-tsp-sky text-tsp-navy border-2 border-tsp-sky shadow-md',
   declined:
     'bg-gradient-to-br from-[#A31C41] to-[#c5245a] text-white border-2 border-[#A31C41] font-bold shadow-lg',
   cancelled:
     'bg-gradient-to-br from-[#A31C41] to-[#c5245a] text-white border-2 border-[#A31C41] font-bold shadow-lg',
   non_event:
     'bg-gradient-to-br from-[#78716C] to-[#A8A29E] text-white border-2 border-[#78716C] shadow-md',
-  standby:
-    'bg-gradient-to-br from-[#9333EA] to-[#A855F7] text-white border-2 border-[#9333EA] shadow-md',
+  standby: 'bg-tsp-navy text-white border-2 border-tsp-navy shadow-md',
   stalled:
     'bg-gradient-to-br from-[#6B7280] to-[#9CA3AF] text-white border-2 border-[#6B7280] shadow-md',
 };
@@ -56,28 +54,28 @@ export const statusColors: Record<string, string> = {
 // Card border colors for left border accent - VIBRANT BRAND COLORS
 export const statusBorderColors: Record<string, string> = {
   new: '#007E8C', // Vibrant teal
-  in_process: '#FBAD3F', // Vibrant orange
+  in_process: '#FBAD3F', // TSP gold
   scheduled: '#236383', // Vibrant dark blue
   rescheduled: '#236383', // Same as scheduled
   completed: '#47B3CB', // Vibrant light blue
   declined: '#A31C41', // Vibrant red
   cancelled: '#A31C41', // Vibrant red
   non_event: '#78716C', // Warm gray (stone)
-  standby: '#9333EA', // Purple
+  standby: '#114154', // TSP navy (purple isn't in the palette)
   stalled: '#6B7280', // Gray
 };
 
 // Card background colors - SOLID LIGHTER TINTS (no opacity mixing)
 export const statusBgColors: Record<string, string> = {
   new: 'bg-[#E2F5F6]', // Solid light teal
-  in_process: 'bg-[#FFF4E5]', // Solid light gold
+  in_process: 'bg-tsp-cream', // TSP cream
   scheduled: 'bg-[#E4EFF6]', // Solid light navy
   rescheduled: 'bg-[#E4EFF6]', // Same as scheduled
   completed: 'bg-[#E8F7FB]', // Solid light sky blue
   declined: 'bg-[#FAE7ED]', // Solid light crimson
   cancelled: 'bg-[#FAE7ED]', // Solid light crimson
   non_event: 'bg-[#F5F5F4]', // Light stone
-  standby: 'bg-[#F3E8FF]', // Light purple
+  standby: 'bg-tsp-mist', // TSP mist
   stalled: 'bg-[#F3F4F6]', // Light gray
 };
 

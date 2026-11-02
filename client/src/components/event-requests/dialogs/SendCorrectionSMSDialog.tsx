@@ -140,7 +140,7 @@ export function SendCorrectionSMSDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-orange-600">
+          <DialogTitle className="flex items-center gap-2 text-tsp-navy">
             <AlertTriangle className="w-5 h-5" />
             Send Correction SMS
           </DialogTitle>
@@ -152,8 +152,8 @@ export function SendCorrectionSMSDialog({
         <div className="space-y-4">
           {/* Event Info */}
           {eventRequest && (
-            <Alert className="border-orange-300 bg-orange-50">
-              <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <Alert className="border-tsp-gold bg-tsp-cream">
+              <AlertTriangle className="h-4 w-4 text-tsp-navy" />
               <AlertDescription>
                 <strong>Event:</strong> {eventRequest.organizationName}
               </AlertDescription>
@@ -273,8 +273,8 @@ export function SendCorrectionSMSDialog({
           )}
 
           {/* Warning */}
-          <Alert className="border-orange-300 bg-orange-50">
-            <AlertTriangle className="h-4 w-4 text-orange-600" />
+          <Alert className="border-tsp-gold bg-tsp-cream">
+            <AlertTriangle className="h-4 w-4 text-tsp-navy" />
             <AlertDescription className="text-xs">
               This will send a correction message acknowledging the previous error.
             </AlertDescription>
@@ -293,7 +293,7 @@ export function SendCorrectionSMSDialog({
           <Button
             onClick={handleSend}
             disabled={sendSmsMutation.isPending || selectedUserIds.length === 0 || !customMessage.trim()}
-            className="bg-orange-600 hover:bg-orange-700 text-white"
+            className="bg-tsp-teal hover:bg-brand-primary-dark text-white"
             data-testid="button-send-correction"
           >
             <AlertTriangle className="w-4 h-4 mr-2" />

@@ -1526,7 +1526,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                         isConfirmationItem ? 'flex items-start gap-3' : ''
                       } p-2 rounded-md transition-colors ${
                         checkedItems.has(item.id)
-                          ? 'bg-green-50 border border-green-200'
+                          ? 'bg-tsp-sky/15 border border-tsp-sky'
                           : 'hover:bg-gray-50'
                       } ${isUnderGated ? 'opacity-40 pointer-events-none' : ''}`}
                     >
@@ -1538,7 +1538,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                           aria-label={`Toggle ${item.label}`}
                         >
                           {checkedItems.has(item.id) ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                            <CheckCircle2 className="w-5 h-5 text-tsp-teal" />
                           ) : (
                             <Circle className="w-5 h-5 text-gray-400" />
                           )}
@@ -2122,7 +2122,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
                               key={area}
                               variant="outline"
                               className="text-xs"
-                              style={{ borderColor: '#FBAD3F', color: '#D68319' }}
+                              style={{ borderColor: '#FBAD3F', color: '#114154' }}
                             >
                               {area}
                             </Badge>
@@ -2166,7 +2166,7 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
         <div className="px-4 sm:px-6 py-4 border-t flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-shrink-0 bg-gray-50">
           <div className="text-sm text-gray-600 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
             {checkedRequiredCount === requiredCount ? (
-              <span className="text-green-600 font-medium">
+              <span className="text-tsp-teal font-medium">
                 ✓ All required items completed
               </span>
             ) : (

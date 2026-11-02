@@ -85,23 +85,17 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
   const totalNeeded = driverNeeded + volunteerNeeded;
   const staffingComplete = totalAssigned >= totalNeeded && totalNeeded > 0;
 
-  // Check if event is within next 7 days (for urgent staffing color)
-  const isWithin7Days = (() => {
+  // Staffing gaps: red only when the event is ≤3 days out (blocking), bold
+  // navy otherwise. Red stays rare so it means something.
+  const isWithin3Days = (() => {
     if (!displayDate) return false;
-    // Parse as local date to avoid timezone issues
-    const dateStr = displayDate.toString().split('T')[0];
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const eventDate = new Date(year, month - 1, day);
-
+    const [y, m, d] = displayDate.toString().split('T')[0].split('-').map(Number);
+    const eventDate = new Date(y, m - 1, d);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    return eventDate <= sevenDaysFromNow && eventDate >= today;
+    return eventDate >= today && eventDate <= new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
   })();
-
-  // Staffing text color - red if within 7 days, orange otherwise
-  const staffingNeededColor = isWithin7Days ? 'text-[#A31C41] font-semibold' : 'text-orange-700';
+  const staffingNeededColor = isWithin3Days ? 'text-tsp-red font-semibold' : 'text-tsp-navy font-semibold';
 
   // Get sandwich info
   const sandwichInfo = formatSandwichTypesDisplay(
@@ -158,7 +152,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
                 </Badge>
               )}
               {request.selfTransport && (
-                <Badge className="bg-[#FBAD3F]/10 text-[#D68319] border-[#FBAD3F]/40 shrink-0">
+                <Badge className="bg-white text-gray-700 border-gray-300 shrink-0">
                   <Car className="w-3 h-3 mr-1" />
                   Self-Transport
                 </Badge>
@@ -266,7 +260,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
                     return (
                       <div className="flex items-center gap-1">
                         <Car className="w-3 h-3 text-gray-500" />
-                        <span className={isFulfilled ? 'text-green-700 font-medium' : staffingNeededColor}>
+                        <span className={isFulfilled ? 'text-tsp-teal font-medium' : staffingNeededColor}>
                           {driverAssigned}/{totalNeeded} {driverNeeded > 0 ? 'drivers+van' : 'Van'}
                           {vanDriverAssigned === 0 && ' Needed'}
                           {request.isDhlVan && ' (DHL)'}
@@ -278,7 +272,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
                   // Regular drivers only
                   <div className="flex items-center gap-1">
                     <Car className="w-3 h-3 text-gray-500" />
-                    <span className={driverAssigned >= driverNeeded ? 'text-green-700 font-medium' : staffingNeededColor}>
+                    <span className={driverAssigned >= driverNeeded ? 'text-tsp-teal font-medium' : staffingNeededColor}>
                       {driverAssigned}/{driverNeeded} drivers
                     </span>
                   </div>
@@ -286,7 +280,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
                 {volunteerNeeded > 0 && (
                   <div className="flex items-center gap-1">
                     <UserPlus className="w-3 h-3 text-gray-500" />
-                    <span className={volunteerAssigned >= volunteerNeeded ? 'text-green-700 font-medium' : staffingNeededColor}>
+                    <span className={volunteerAssigned >= volunteerNeeded ? 'text-tsp-teal font-medium' : staffingNeededColor}>
                       {volunteerAssigned}/{volunteerNeeded} volunteers
                     </span>
                   </div>

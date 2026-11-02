@@ -610,7 +610,7 @@ export const MyAssignmentsTab: React.FC = () => {
               checked={myAssignmentsStatusFilter.includes('scheduled')}
               onCheckedChange={() => toggleStatusFilter('scheduled')}
             >
-              <Badge className="bg-green-100 text-green-800 border-green-300 mr-2">
+              <Badge className="bg-tsp-sky/15 text-tsp-teal border-tsp-sky mr-2">
                 Scheduled
               </Badge>
             </DropdownMenuCheckboxItem>
@@ -626,7 +626,7 @@ export const MyAssignmentsTab: React.FC = () => {
               checked={myAssignmentsStatusFilter.includes('declined')}
               onCheckedChange={() => toggleStatusFilter('declined')}
             >
-              <Badge className="bg-orange-100 text-orange-800 border-orange-300 mr-2">
+              <Badge className="bg-tsp-cream text-tsp-navy border-tsp-gold mr-2">
                 Declined
               </Badge>
             </DropdownMenuCheckboxItem>

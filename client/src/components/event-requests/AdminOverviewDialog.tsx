@@ -138,11 +138,11 @@ export function AdminOverviewDialog({
           </div>
           <div className="premium-card-flat p-4">
             <div className="text-sm text-slate-600">Assigned</div>
-            <div className="text-2xl font-bold text-green-600">{totalAssigned}</div>
+            <div className="text-2xl font-bold text-tsp-teal">{totalAssigned}</div>
           </div>
           <div className="premium-card-flat p-4">
             <div className="text-sm text-slate-600">Unassigned</div>
-            <div className="text-2xl font-bold text-orange-600">{totalUnassigned}</div>
+            <div className="text-2xl font-bold text-tsp-navy">{totalUnassigned}</div>
           </div>
         </div>
 
@@ -262,12 +262,12 @@ export function AdminOverviewDialog({
                       </Badge>
                     )}
                     {stat.byStatus.scheduled > 0 && (
-                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                      <Badge variant="outline" className="text-xs bg-tsp-mist text-tsp-navy border-tsp-teal/30">
                         Scheduled: {stat.byStatus.scheduled}
                       </Badge>
                     )}
                     {stat.byStatus.completed > 0 && (
-                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                      <Badge variant="outline" className="text-xs bg-tsp-sky/15 text-tsp-teal border-tsp-sky">
                         Completed: {stat.byStatus.completed}
                       </Badge>
                     )}

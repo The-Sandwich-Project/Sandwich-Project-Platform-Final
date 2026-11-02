@@ -484,7 +484,7 @@ function EventMapView({ onEventClick }: EventMapViewProps) {
               checked={eventStatusFilters.includes('scheduled')}
               onCheckedChange={() => toggleEventStatusFilter('scheduled')}
             >
-              <Badge className="bg-green-100 text-green-800 border-green-300 mr-2">Scheduled</Badge>
+              <Badge className="bg-tsp-sky/15 text-tsp-teal border-tsp-sky mr-2">Scheduled</Badge>
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={eventStatusFilters.includes('completed')}
@@ -639,7 +639,7 @@ function EventMapView({ onEventClick }: EventMapViewProps) {
               {routeResult.durationInTraffic && routeResult.durationInTraffic !== routeResult.duration && (
                 <>
                   <span className="text-gray-300">|</span>
-                  <span className="text-orange-600">{formatDuration(routeResult.durationInTraffic)} in traffic</span>
+                  <span className="text-tsp-navy">{formatDuration(routeResult.durationInTraffic)} in traffic</span>
                 </>
               )}
             </div>

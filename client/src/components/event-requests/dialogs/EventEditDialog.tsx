@@ -1193,7 +1193,7 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
 
                 {/* Selected recipients - detailed list */}
                 {assignedRecipientIds.length > 0 ? (
-                  <div className="space-y-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="space-y-2 p-3 bg-tsp-mist rounded-lg border border-tsp-teal/30">
                     {assignedRecipientIds.map(recipientId => {
                       const recipient = recipients.find((r: any) => String(r.id) === recipientId);
                       return (

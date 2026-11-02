@@ -69,10 +69,18 @@ const STATUS_TAB_COLOR: Record<string, string> = {
   completed: '#47B3CB',
   declined: '#A31C41',
   non_event: '#78716C',
-  standby: '#9333EA',
+  standby: '#114154',
   stalled: '#6B7280',
   my_assignments: '#236383',
 };
+
+/**
+ * Gold and light teal fail WCAG as text on white (≈1.9:1 / 2.4:1) and white
+ * fails as text on them. Those tabs use navy text and a full-strength border
+ * instead of tinted text.
+ */
+const LOW_CONTRAST_TAB_COLORS = new Set(['#FBAD3F', '#47B3CB']);
+const TSP_NAVY = '#114154';
 
 interface RequestFiltersProps {
   // Search and filter states
@@ -353,7 +361,7 @@ export default function RequestFilters({
                   <span>{tab.label}</span>
                   {tab.count !== undefined && <span className="text-gray-500">({formatCount(tab.count)})</span>}
                   {tab.hasNotification && !statusCountsLoading && (
-                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                    <div className="w-2 h-2 bg-tsp-red rounded-full" />
                   )}
                 </div>
               </SelectItem>
@@ -411,6 +419,7 @@ export default function RequestFilters({
               {tabConfig.filter(tab => !navTabs.some(nt => nt.value === tab.value)).map((tab) => {
                 const color = STATUS_TAB_COLOR[tab.value] || STATUS_TAB_COLOR.all;
                 const isActive = activeTab === tab.value;
+                const lowContrast = LOW_CONTRAST_TAB_COLORS.has(color);
                 return (
                   <TabsTrigger
                     key={tab.value}
@@ -424,15 +433,15 @@ export default function RequestFilters({
                             // icon, matching darker border.
                             backgroundColor: color,
                             borderColor: color,
-                            color: '#ffffff',
+                            color: lowContrast ? TSP_NAVY : '#ffffff',
                           }
                         : {
                             // Inactive: transparent fill, brand-tinted
                             // text + border so the workflow stage is
                             // still recognizable without selection.
                             backgroundColor: 'transparent',
-                            borderColor: `${color}55`,
-                            color: color,
+                            borderColor: lowContrast ? color : `${color}55`,
+                            color: lowContrast ? TSP_NAVY : color,
                           }
                     }
                   >
@@ -450,7 +459,7 @@ export default function RequestFilters({
                       )}
                     </div>
                     {tab.hasNotification && !statusCountsLoading && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-tsp-red rounded-full animate-pulse" />
                     )}
                   </TabsTrigger>
                 );

@@ -137,7 +137,7 @@ export function InlineRecipientAllocationEditor({
           <span className={`font-medium ${
             estimatedSandwichCount && totalAllocated !== estimatedSandwichCount
               ? 'text-amber-600'
-              : 'text-green-600'
+              : 'text-tsp-teal'
           }`}>
             Total: {totalAllocated}
             {estimatedSandwichCount && ` / ${estimatedSandwichCount}`}

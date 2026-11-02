@@ -344,11 +344,9 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                   <Badge
                     variant="outline"
                     className={`whitespace-nowrap cursor-help ${
-                      returningOrgData.isReturningContact
-                        ? 'bg-purple-50 text-purple-700 border-purple-300'
-                        : (request.email || request.firstName || request.lastName || request.phone)
-                          ? 'bg-amber-50 text-amber-700 border-amber-300'
-                          : 'bg-gray-50 text-gray-600 border-gray-300'
+                      (returningOrgData.isReturningContact || request.email || request.firstName || request.lastName || request.phone)
+                        ? 'bg-white text-tsp-navy border-tsp-sky'
+                        : 'bg-white text-gray-600 border-gray-300'
                     }`}
                   >
                     <RefreshCw className="w-3 h-3 mr-1" />
@@ -396,7 +394,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       </p>
                     )}
                     {returningOrgData.isReturningContact ? (
-                      <p className="text-xs text-purple-600 font-medium mt-2">
+                      <p className="text-xs text-tsp-teal font-medium mt-2">
                         Same contact as a previous event &mdash; personalize your outreach!
                       </p>
                     ) : (request.email || request.firstName || request.lastName || request.phone) ? (
@@ -406,7 +404,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                             Past contact: {returningOrgData.pastContactName}
                           </p>
                         )}
-                        <p className="text-xs text-amber-600 font-medium">
+                        <p className="text-xs text-tsp-navy font-medium">
                           New contact for this org &mdash; treat as a first-time outreach
                         </p>
                       </div>
@@ -437,8 +435,8 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                     variant="outline"
                     className={`whitespace-nowrap cursor-help ${
                       likelySameOrg
-                        ? 'bg-orange-50 text-orange-700 border-orange-300'
-                        : 'bg-purple-50 text-purple-700 border-purple-300'
+                        ? 'bg-tsp-cream text-tsp-navy border-tsp-gold'
+                        : 'bg-white text-tsp-navy border-tsp-sky'
                     }`}
                   >
                     <User className="w-3 h-3 mr-1" />
@@ -458,11 +456,11 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       </p>
                     )}
                     {likelySameOrg ? (
-                      <p className="text-xs text-orange-600 font-medium mt-2">
+                      <p className="text-xs text-tsp-navy font-medium mt-2">
                         The org name is similar to a past submission &mdash; likely the same organization with a slightly different name. Consider updating the org name on one to match.
                       </p>
                     ) : (
-                      <p className="text-xs text-purple-600 font-medium mt-2">
+                      <p className="text-xs text-tsp-teal font-medium mt-2">
                         Same person, different organization &mdash; personalize your outreach!
                       </p>
                     )}
@@ -630,8 +628,8 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                           variant="outline"
                           className={`flex items-center gap-1 text-xs px-2 py-0.5 cursor-help ${
                             request.dateFlexible === false
-                              ? 'border-red-300 bg-red-50 text-red-700'
-                              : 'border-green-300 bg-green-50 text-green-700'
+                              ? 'border-gray-300 bg-white text-tsp-navy'
+                              : 'border-tsp-sky bg-tsp-sky/15 text-tsp-navy'
                           }`}
                         >
                           {request.dateFlexible === false ? (
@@ -1034,7 +1032,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                     size="sm"
                     variant="default"
                     onClick={onCompleteNextAction}
-                    className="h-auto min-h-7 text-xs bg-green-600 hover:bg-green-700 text-white whitespace-normal break-words"
+                    className="h-auto min-h-7 text-xs bg-tsp-teal hover:bg-brand-primary-dark text-white whitespace-normal break-words"
                   >
                     <CheckCircle className="w-3 h-3 mr-1" />
                     Complete
@@ -1214,16 +1212,15 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
             {/* TSP Contact Assignment Status */}
             {(request.tspContact || request.customTspContact) && (
               <div
-                className="rounded-lg p-3 border border-[#FBAD3F] shadow-sm"
-                style={{ backgroundColor: '#FFF4E6', borderColor: '#FBAD3F' }}
+                className="rounded-lg p-3 border border-tsp-teal/30 bg-tsp-mist shadow-sm"
               >
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <UserPlus className="w-4 h-4 text-[#E5901A] flex-shrink-0" />
-                    <span className="font-semibold text-[#D68319] whitespace-nowrap">
+                    <UserPlus className="w-4 h-4 text-tsp-teal flex-shrink-0" />
+                    <span className="font-semibold text-tsp-navy whitespace-nowrap">
                       TSP Contact:
                     </span>
-                    <span className="font-medium text-[#C7761A] break-words min-w-0">
+                    <span className="font-medium text-tsp-teal break-words min-w-0">
                       {request.tspContact
                         ? getUserDisplayName(request.tspContact)
                         : request.customTspContact}
@@ -1234,7 +1231,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={onEditTspContact}
-                      className="h-7 px-2 text-[#D68319] hover:bg-[#FBAD3F]/20 flex-shrink-0"
+                      className="h-7 px-2 text-tsp-teal hover:bg-tsp-teal/10 flex-shrink-0"
                       data-testid="button-edit-tsp-contact"
                     >
                       <Edit className="w-3 h-3" />
@@ -1242,7 +1239,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                   )}
                 </div>
                 {request.tspContactAssignedDate && (
-                  <p className="text-sm text-[#D68319] mt-1">
+                  <p className="text-sm text-gray-600 mt-1">
                     Assigned on{' '}
                     {new Date(
                       request.tspContactAssignedDate
@@ -1315,7 +1312,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onAssignTspContact}
-                    className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                    className="bg-tsp-cream border-tsp-gold text-tsp-navy hover:bg-tsp-gold/20"
                   >
                     <UserPlus className="w-4 h-4 mr-1" />
                     <span className="sm:hidden">Assign TSP</span>

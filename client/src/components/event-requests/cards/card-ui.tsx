@@ -17,9 +17,9 @@ import { cn } from '@/lib/utils';
  *     previous white-on-gold (#FBAD3F ≈ 1.9:1) and white-on-light-blue
  *     (#47B3CB ≈ 2.4:1) surfaces, which failed.
  *
- * Colors are the existing TSP brand palette (see tailwind.config.ts:
- * brand-primary #236383, brand-teal #007E8C, brand-orange #FBAD3F,
- * brand-burgundy #A31C41, brand-light-blue #47B3CB).
+ * Colors follow the TSP state palette (see the `tsp` block in tailwind.config.ts:
+ * teal #236383, navy #114154, sky #47B3CB, gold #FBAD3F, cream #FEF3E2,
+ * red #A31C41). Gold and sky never carry text — navy text on a tint instead.
  */
 
 export type BadgeTone =
@@ -27,15 +27,15 @@ export type BadgeTone =
   | 'info'      // teal — brand-primary signal (returning contact, open date…)
   | 'attention' // gold — needs-attention / pending (follow-up, scheduled conflict…)
   | 'urgent'    // burgundy — time-critical / problem (past date, missing info…)
-  | 'positive'; // green — confirmed / complete / good-to-go
+  | 'positive'; // light teal (sky) — confirmed / complete / good-to-go
 
 /** AA-contrast class strings, one per tone (light fill + dark text + soft border). */
 export const badgeTone: Record<BadgeTone, string> = {
-  neutral: 'bg-gray-50 text-gray-700 border-gray-300',
-  info: 'bg-[#E2F5F6] text-[#1a4a63] border-[#9fd5db]',
-  attention: 'bg-amber-50 text-amber-800 border-amber-400',
-  urgent: 'bg-[#FAE7ED] text-[#A31C41] border-[#e0a0b1]',
-  positive: 'bg-green-50 text-green-700 border-green-300',
+  neutral: 'bg-white text-gray-700 border-gray-300',
+  info: 'bg-tsp-mist text-tsp-navy border-tsp-teal/40',
+  attention: 'bg-tsp-cream text-tsp-navy border-tsp-gold',
+  urgent: 'bg-tsp-red-tint text-tsp-red border-tsp-red/50',
+  positive: 'bg-tsp-sky/15 text-tsp-navy border-tsp-sky',
 };
 
 interface InfoBadgeProps extends React.HTMLAttributes<HTMLDivElement> {

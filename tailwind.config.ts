@@ -99,6 +99,24 @@ export default {
           'light-gray': 'hsl(0 0% 82%)' /* #D1D3D4 */,
           navy: '#1A2332',
         },
+        // TSP color rule: buttons stay quiet, color means STATE.
+        //   teal  = the one primary action per area, links
+        //   navy  = text, headings, nav
+        //   sky   = OK / complete — fill or border only (fails as text on white)
+        //   gold  = needs attention, not urgent — fill or border only, pair with an icon
+        //   cream = background tint behind gold items
+        //   red   = destructive or blocking — pair with an icon
+        //   mist  = secondary surfaces
+        tsp: {
+          teal: '#236383',
+          navy: '#114154',
+          sky: '#47B3CB',
+          gold: '#FBAD3F',
+          cream: '#FEF3E2',
+          red: '#A31C41',
+          'red-tint': '#FAE7ED',
+          mist: '#E9EFF3',
+        },
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar-background))',
           foreground: 'hsl(var(--sidebar-foreground))',

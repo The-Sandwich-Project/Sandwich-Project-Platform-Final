@@ -64,7 +64,7 @@ function formatStatusLabel(status: string): string {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     in_process: 'bg-amber-50 text-amber-700 border-amber-200',
-    scheduled: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    scheduled: 'bg-tsp-sky/15 text-tsp-teal border-tsp-sky',
     rescheduled: 'bg-blue-50 text-blue-700 border-blue-200',
   };
   return (
@@ -236,8 +236,8 @@ export function VanConflictsButton({ isMobile = false }: VanConflictsButtonProps
               {/* No conflicts */}
               {!hasAny && (
                 <div className="text-center py-10 text-gray-600">
-                  <Truck className="w-10 h-10 mx-auto mb-2 text-emerald-500" />
-                  <p className="font-semibold text-emerald-700">All clear.</p>
+                  <Truck className="w-10 h-10 mx-auto mb-2 text-tsp-sky" />
+                  <p className="font-semibold text-tsp-teal">All clear.</p>
                   <p className="text-sm">
                     No dates with multiple van-needed events were found.
                   </p>

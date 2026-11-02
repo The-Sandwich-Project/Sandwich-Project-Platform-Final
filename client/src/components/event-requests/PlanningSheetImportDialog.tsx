@@ -202,7 +202,7 @@ export function PlanningSheetImportDialog({
             Compare with Planning Sheet
           </DialogTitle>
           <DialogDescription className="flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-600" />
+            <ShieldCheck className="w-4 h-4 mt-0.5 flex-shrink-0 text-tsp-teal" />
             <span>
               This only reads your planning sheet — it never changes it. Nothing
               is added to the app until you click Import, and re-running this can
@@ -230,7 +230,7 @@ export function PlanningSheetImportDialog({
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2 text-sm">
                 <Badge variant="outline">{data.sheetRowCount} rows on sheet</Badge>
-                <Badge variant="outline" className="text-green-700 border-green-300">
+                <Badge variant="outline" className="text-tsp-teal border-tsp-sky">
                   {data.inApp.length} already in the app
                 </Badge>
                 <Badge variant="outline" className="text-blue-700 border-blue-300">
@@ -329,7 +329,7 @@ export function PlanningSheetImportDialog({
               )}
 
               {data.missing.length === 0 && data.possible.length === 0 && (
-                <p className="text-sm text-green-700 py-2">
+                <p className="text-sm text-tsp-teal py-2">
                   The app already has every event on the planning sheet — nothing to import.
                 </p>
               )}
