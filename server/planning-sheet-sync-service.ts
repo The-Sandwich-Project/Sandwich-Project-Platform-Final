@@ -1,5 +1,8 @@
 import { google } from 'googleapis';
-import { parsePlanningStaffing } from './services/planning-sheet-row-update';
+import { totalFromFields } from '@shared/sandwich-estimate';
+import { parsePlanningStaffing, indexPeople } from './services/planning-sheet-row-update';
+import { loadAssigneesByIds } from './services/assignee-directory';
+import { extractNameFromAssignmentId } from '@shared/assignment-ids';
 import { JWT } from 'google-auth-library';
 import { db } from './db';
 import { eq, desc, inArray, and, gte, sql } from 'drizzle-orm';
@@ -171,7 +174,8 @@ export function assignmentLabelForUnknownId(idOrName: string): string {
   const looksLikeId =
     /^user_\d+_[a-z0-9]+$/i.test(v) ||
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ||
-    /^\d+$/.test(v);
+    /^\d+$/.test(v) ||
+    /^(driver|volunteer|host-contact)-\d+$/i.test(v);
   return !v || looksLikeId ? 'Unknown' : v;
 }
 
@@ -1086,7 +1090,16 @@ export class PlanningSheetSyncService {
     row[PLANNING_SHEET_COLUMNS.VAN_BOOKED] = e.vanDriverNeeded ? 'Yes' : '';
     row[PLANNING_SHEET_COLUMNS.VAN_NEEDED_FOR] = formatVanNeededForCell(e.vanNeededFor);
     row[PLANNING_SHEET_COLUMNS.STAFFING] = formatStaffingColumn(staffing);
-    row[PLANNING_SHEET_COLUMNS.ESTIMATE_SANDWICHES] = e.estimatedSandwichCount?.toString() || '';
+    // A live range goes to the sheet as "min-max" (it used to export blank,
+    // or only the midpoint); otherwise the exact count.
+    {
+      const total = totalFromFields(e as any);
+      row[PLANNING_SHEET_COLUMNS.ESTIMATE_SANDWICHES] = !total
+        ? ''
+        : total.min === total.max
+          ? String(total.min)
+          : `${total.min}-${total.max}`;
+    }
     row[PLANNING_SHEET_COLUMNS.DELI_OR_PBJ] = deliOrPbj;
     // Final sandwich count written to the sheet is intentionally the event's
     // own actualSandwichCount reference field — NOT a total derived from the
@@ -1120,24 +1133,22 @@ export class PlanningSheetSyncService {
   private async getAssignedNames(userIds: string[]): Promise<string[]> {
     if (!userIds || userIds.length === 0) return [];
 
-    const userList = await db
-      .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, displayName: users.displayName })
-      .from(users)
-      .where(inArray(users.id, userIds));
-
-    // Create a map of user IDs to names
-    const userMap = new Map(
-      userList.map(u => [
-        u.id,
-        u.displayName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Unknown'
-      ])
-    );
+    // Assignees can be team members OR people from the Drivers, Volunteers
+    // and Host Contacts directories ("443", "volunteer-12", "host-contact-5"),
+    // whatever the assignment picker saved. Look them all up.
+    const byId = indexPeople(await loadAssigneesByIds(userIds));
 
     // Return names in the same order as userIds. Assignment columns also hold
-    // free-text names (people typed on the sheet who don't match one app user);
+    // free-text names (people typed on the sheet who don't match anyone);
     // write those back as typed so they survive the round trip. Only something
-    // that looks like a user ID with no matching user becomes "Unknown".
-    return userIds.map(id => userMap.get(id) || assignmentLabelForUnknownId(id));
+    // that looks like an ID with no matching person becomes "Unknown".
+    return userIds.map((id) => {
+      const person = byId.get(id);
+      if (person) {
+        return person.displayName || `${person.firstName || ''} ${person.lastName || ''}`.trim() || 'Unknown';
+      }
+      return assignmentLabelForUnknownId(extractNameFromAssignmentId(id) ?? id);
+    });
   }
 
   /**

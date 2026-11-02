@@ -931,8 +931,10 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
   const saveSandwichTypes = () => {
     if (!sandwichDialogEventId) return;
     
-    // Filter out any entries with quantity 0 or invalid types
-    const validTypes = dialogSandwichTypes.filter(st => st.quantity > 0);
+    // Keep every row that has a type. A type with no quantity is valid: the
+    // server's estimate rule treats it as "amount TBD" (one type takes the
+    // total; several are "split TBD"). Dropping it used to lose the type.
+    const validTypes = dialogSandwichTypes.filter(st => st.type);
     
     updateScheduledFieldMutation.mutate({
       id: sandwichDialogEventId,

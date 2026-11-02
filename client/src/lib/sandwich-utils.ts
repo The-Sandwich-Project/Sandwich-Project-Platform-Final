@@ -142,19 +142,48 @@ function formatSandwichTypeName(type: string): string {
 /**
  * Format sandwich types for display
  * Returns a human-readable string
+ *
+ * Estimates can name types whose amounts aren't decided yet (stored as
+ * quantity 0, "TBD"; see shared/sandwich-estimate.ts). Those types are still
+ * shown, next to the known total: "300 total: Deli, PBJ (split TBD)" or
+ * "300 total: 150 Deli, PBJ TBD". Pass { unknownAmounts: false } for actual
+ * (delivered) counts, where a 0 line just means none.
  */
 export function formatSandwichTypesDisplay(
   sandwichTypes: any,
-  fallbackCount?: number
+  fallbackCount?: number,
+  options: { unknownAmounts?: boolean } = {}
 ): string {
   const parsed = parseSandwichTypes(sandwichTypes);
+  const showUnknown = options.unknownAmounts !== false;
 
   if (parsed && parsed.length > 0) {
     // Filter out "unknown" types completely
-    const validTypes = parsed.filter(item => 
-      item.quantity > 0 && 
-      item.type.toLowerCase() !== 'unknown'
-    );
+    const named = parsed.filter(item => item.type.toLowerCase() !== 'unknown');
+    const validTypes = named.filter(item => item.quantity > 0);
+    const tbdTypes = showUnknown ? named.filter(item => !(item.quantity > 0)) : [];
+    // Estimates only: "Unknown" rows. An amount whose type isn't known yet
+    // still has to show (or a named type would look like the whole total), and
+    // an Unknown row without an amount means the rest of the total is untyped.
+    // (Only next to named types: Unknown alone is just "type not set".)
+    const unknownRows = showUnknown && named.length > 0 ? parsed.filter(item => item.type.toLowerCase() === 'unknown') : [];
+    const unknownAmount = unknownRows.reduce((sum, item) => sum + (item.quantity > 0 ? item.quantity : 0), 0);
+    const restUntyped = unknownRows.some(item => !(item.quantity > 0)) && named.length > 0;
+
+    if (tbdTypes.length > 0 || unknownAmount > 0 || restUntyped) {
+      const tbdNames = tbdTypes.map(item => formatSandwichTypeName(item.type));
+      const prefix = fallbackCount ? `${fallbackCount} total: ` : '';
+      // One named type with no amount (and nothing else) is all of the total.
+      if (validTypes.length === 0 && unknownAmount === 0 && !restUntyped) {
+        if (tbdNames.length === 1) return fallbackCount ? `${fallbackCount} ${tbdNames[0]}` : tbdNames[0];
+        return `${prefix}${tbdNames.join(', ')} (split TBD)`;
+      }
+      const parts = validTypes.map(item => `${item.quantity} ${formatSandwichTypeName(item.type)}`);
+      if (unknownAmount > 0) parts.push(`${unknownAmount} type TBD`);
+      parts.push(...tbdNames.map(n => `${n} TBD`));
+      if (restUntyped && unknownAmount === 0) parts.push('rest type TBD');
+      return `${prefix}${parts.join(', ')}`;
+    }
 
     // If no valid types after filtering, don't show anything
     if (validTypes.length === 0) {

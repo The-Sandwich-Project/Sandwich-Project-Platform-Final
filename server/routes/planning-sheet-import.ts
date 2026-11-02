@@ -5,6 +5,8 @@ import { db } from '../db';
 import { eventRequests } from '@shared/schema';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
+import { resolveEstimatePatch } from '@shared/sandwich-estimate';
+import { sandwichTypesForNewEvent } from '../services/planning-sheet-row-update';
 import {
   getPlanningSheetService,
   parseVanNeededForCell,
@@ -229,9 +231,14 @@ export function buildImportedEventRecord(
     statusChangedAt: new Date(),
     isConfirmed: c.status === 'scheduled' || c.status === 'completed',
     eventAddress: c.row.address?.trim() || null,
-    estimatedSandwichCount: est.count,
-    estimatedSandwichCountMin: est.min,
-    estimatedSandwichCountMax: est.max,
+    // Inserted directly (not through storage), so apply the shared estimate
+    // rule here: total + the sheet's type names, consistent from the start.
+    ...resolveEstimatePatch(null, {
+      estimatedSandwichCount: est.count,
+      estimatedSandwichCountMin: est.min,
+      estimatedSandwichCountMax: est.max,
+      sandwichTypes: sandwichTypesForNewEvent(c.row.deliOrPbj),
+    }),
     actualSandwichCount: c.status === 'completed' ? final.count : null,
     cancelledReason:
       c.status === 'cancelled'

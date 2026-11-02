@@ -1,7 +1,9 @@
 import { createHash } from 'crypto';
+import { extractNameFromAssignmentId } from '@shared/assignment-ids';
 import { parseDateOnly, toDateOnlyString } from '@shared/date-utils';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
-import { getRangeMidpoint, hasActiveSandwichRange, parseSandwichCountInput } from '@shared/sandwich-count-utils';
+import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
+import { estimateStateFromFields } from '@shared/sandwich-estimate';
 
 /**
  * Planning sheet → app UPDATE ("send row to app" on a row that already exists).
@@ -99,16 +101,29 @@ export interface SheetRowData {
   'Planned Recipient/Host Home'?: string;
 }
 
+/** Which app directory a person comes from (the assignment picker's sections). */
+export type PersonKind = 'user' | 'driver' | 'volunteer' | 'host-contact';
+
+/**
+ * Someone a sheet name can be matched to: a team member (user), or a person in
+ * the Drivers, Volunteers or Host Contacts directory. `id` is the ID the app's
+ * assignment picker saves for them (user ID, "443" for a driver,
+ * "volunteer-12", "host-contact-5"), so a match is the same as picking them.
+ */
 export interface MatchableUser {
   id: string;
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
   /**
-   * false = an inactive user, passed in only so an EXISTING assignee keeps
-   * their identity (the push writes their name). New names never match one.
+   * false = inactive, passed in only so an EXISTING assignee keeps their
+   * identity (the push writes their name). New names never match one.
    */
   isActive?: boolean;
+  /** Directory; missing = user. */
+  kind?: PersonKind;
+  /** Other IDs the app may have saved for the same record ("driver-443"). */
+  aliases?: string[];
 }
 
 export type ChangeKind = 'fill' | 'update';
@@ -131,12 +146,6 @@ export interface RowUpdatePlan {
   updates: Record<string, unknown>;
   /** The same patch, split by RowChange.field, so a person can pick which to apply. */
   updatesByField: Record<string, Record<string, unknown>>;
-  /**
-   * With a types change: the single type a range-mode estimate should name
-   * (null when the sheet lists several). Applied by selectUpdates, which knows
-   * whether the event stays in range mode given what was ticked.
-   */
-  sheetRangeType?: string | null;
   /** Things the person should know that we did NOT change. */
   notes: string[];
 }
@@ -393,22 +402,6 @@ export function parseSheetSandwichTypes(raw: unknown): string[] {
   return Array.from(new Set(keys));
 }
 
-function appSandwichTypeKeys(raw: unknown): string[] {
-  let arr: unknown = raw;
-  if (typeof raw === 'string') {
-    try {
-      arr = JSON.parse(raw);
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(arr)) return [];
-  const keys = arr
-    .map((t: any) => clean(t?.type).toLowerCase())
-    .filter((t) => t && t !== 'unknown')
-    .map((t) => SANDWICH_TYPE_KEYS[t] ?? t.replace(/\s+/g, '_'));
-  return Array.from(new Set(keys));
-}
 
 const TYPE_LABELS: Record<string, string> = {
   pbj: 'PBJ',
@@ -426,48 +419,127 @@ const typeLabel = (k: string) =>
 
 const lower = (s: string) => s.trim().toLowerCase();
 
+/** Lowercase, no periods, single spaces: "Dawn  M." -> "dawn m". */
+const normName = (s: unknown): string =>
+  clean(s).toLowerCase().replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+
 function userFullName(u: MatchableUser): string {
   return clean(u.displayName) || `${clean(u.firstName)} ${clean(u.lastName)}`.trim();
 }
 
+function personFirstName(u: MatchableUser): string {
+  return normName(u.firstName) || normName(userFullName(u)).split(' ')[0] || '';
+}
+
+function personLastName(u: MatchableUser): string {
+  const last = normName(u.lastName);
+  if (last) return last;
+  const words = normName(userFullName(u)).split(' ');
+  return words.length > 1 ? words.slice(1).join(' ') : '';
+}
+
+/** Every full spelling of a person's name. */
+function personFullNames(u: MatchableUser): Set<string> {
+  const out = new Set<string>();
+  const d = normName(u.displayName);
+  if (d) out.add(d);
+  const fl = normName(`${clean(u.firstName)} ${clean(u.lastName)}`);
+  if (fl) out.add(fl);
+  return out;
+}
+
+/**
+ * How a sheet name relates to one name: 'full' (same name), 'short' (just the
+ * first name, or first name + last initial like "Dawn M."), or none.
+ */
+function nameMatchKind(sheetName: string, first: string, last: string, fulls: Set<string>): 'full' | 'short' | null {
+  const n = normName(sheetName);
+  if (!n) return null;
+  if (fulls.has(n)) return 'full';
+  const words = n.split(' ');
+  if (words.length === 1 && first && words[0] === first) return 'short';
+  if (words.length === 2 && words[1].length === 1 && first && words[0] === first && last.startsWith(words[1])) {
+    return 'short';
+  }
+  return null;
+}
+
 /**
  * Does a name typed on the sheet refer to this app assignee?
- * The push writes full names, but people type first names ("Katie").
+ * The push writes full names, but people type first names ("Katie") or a
+ * first name and initial ("Dawn M.").
  */
 function nameMatchesAssignee(sheetName: string, assigneeName: string): boolean {
-  const a = lower(sheetName);
-  const b = lower(assigneeName);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  // Single-word sheet name matches the assignee's first word.
-  if (!a.includes(' ') && b.split(/\s+/)[0] === a) return true;
-  return false;
+  const b = normName(assigneeName);
+  if (!b) return false;
+  const words = b.split(' ');
+  return nameMatchKind(sheetName, words[0], words.slice(1).join(' '), new Set([b])) !== null;
 }
 
 /**
- * Resolve a new sheet name to a user ID. Only returns an ID when exactly one
- * active user matches; otherwise keeps the typed name as text (the assignment
- * columns accept free-text names, same as the existing sheet import).
+ * Resolve a new sheet name to the ID the app's assignment picker would save.
+ *
+ * Every directory is searched whatever the role (drivers volunteer and
+ * volunteers drive). The same person often has records in more than one
+ * directory; that's still one person, and the role decides which record:
+ * a driver slot prefers the Drivers directory, a volunteer slot the
+ * Volunteers directory, then the other one, then team members, then host
+ * contacts. Two DIFFERENT people matching (two Anns) keeps the typed name.
  */
-export function resolveSheetName(name: string, allUsers: MatchableUser[]): string {
-  const n = lower(name);
-  if (!n) return name;
-  const users = allUsers.filter((u) => u.isActive !== false);
-  const full = users.filter(
-    (u) =>
-      (u.displayName && lower(u.displayName) === n) ||
-      lower(`${clean(u.firstName)} ${clean(u.lastName)}`) === n
-  );
-  if (full.length === 1) return full[0].id;
-  if (full.length > 1) return name.trim();
-  const first = users.filter((u) => u.firstName && lower(u.firstName) === n);
-  return first.length === 1 ? first[0].id : name.trim();
+export function resolveSheetName(
+  name: string,
+  allPeople: MatchableUser[],
+  role: 'driver' | 'volunteer' = 'volunteer'
+): string {
+  const typed = name.trim();
+  if (!normName(name)) return name;
+  const people = allPeople.filter((u) => u.isActive !== false);
+  const scored = people
+    .map((u) => ({ u, kind: nameMatchKind(name, personFirstName(u), personLastName(u), personFullNames(u)) }))
+    .filter((x) => x.kind);
+  // A full-name match beats first-name-only matches, but only when the sheet
+  // gives more than a first name: a record whose whole name is just "Ann"
+  // mustn't hide Ann Lee and Ann Park when the sheet says "Ann".
+  const oneWord = !normName(name).includes(' ');
+  const best = !oneWord && scored.some((x) => x.kind === 'full') ? scored.filter((x) => x.kind === 'full') : scored;
+  if (best.length === 0) return typed;
+
+  // Different people? Compare their full names (first + last).
+  const who = new Set(best.map((x) => `${personFirstName(x.u)} ${personLastName(x.u)}`.trim()));
+  if (who.size > 1) {
+    // "Karen" on a user with no last name and "Karen Smith" in Drivers are
+    // the same person only if every match shares the one last name given.
+    const lasts = new Set(best.map((x) => personLastName(x.u)).filter(Boolean));
+    if (lasts.size > 1) return typed;
+  }
+
+  const order: PersonKind[] =
+    role === 'driver'
+      ? ['driver', 'volunteer', 'user', 'host-contact']
+      : ['volunteer', 'driver', 'user', 'host-contact'];
+  for (const kind of order) {
+    const inKind = best.filter((x) => (x.u.kind ?? 'user') === kind);
+    // Duplicate records in one directory: try the next directory.
+    if (inKind.length === 1) return inKind[0].u.id;
+  }
+  return typed;
 }
 
-/** Name the app would show for an assignment entry (user ID or free text). */
-function assigneeName(idOrName: string, usersById: Map<string, MatchableUser>): string {
-  const u = usersById.get(idOrName);
-  return u ? userFullName(u) : idOrName;
+/** Look up people by every ID the app may have saved for them. */
+export function indexPeople(people: MatchableUser[]): Map<string, MatchableUser> {
+  const byId = new Map<string, MatchableUser>();
+  for (const p of people) {
+    byId.set(p.id, p);
+    for (const a of p.aliases ?? []) if (!byId.has(a)) byId.set(a, p);
+  }
+  return byId;
+}
+
+/** Name the app would show for an assignment entry (directory ID or free text). */
+export function assigneeName(idOrName: string, peopleById: Map<string, MatchableUser>): string {
+  const u = peopleById.get(idOrName);
+  if (u) return userFullName(u);
+  return extractNameFromAssignmentId(idOrName) ?? idOrName;
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +588,6 @@ export function buildRowUpdatePlan(
 ): RowUpdatePlan {
   const changes: RowChange[] = [];
   const notes: string[] = [];
-  let sheetRangeType: string | null | undefined;
   const updates: Record<string, unknown> = {};
   // Every DB write is recorded under the change it belongs to, so a person
   // can apply some changes and skip others.
@@ -556,79 +627,53 @@ export function buildRowUpdatePlan(
     set(field, field, sheetT);
   }
 
-  // --- Sandwich estimate (update) --------------------------------------------
+  // --- Sandwich estimate + types --------------------------------------------
+  // Only what the sheet says is sent: the total (exact or range) and the type
+  // names. The shared estimate rule (shared/sandwich-estimate.ts, applied by
+  // the storage layer on save) works out the rest - one type takes the total,
+  // several types without amounts are "split TBD", the range type, and so on.
+  // The sheet never has per-type amounts, so none are invented here.
+  const appEstimate = estimateStateFromFields(event as any);
+  const appTotal = appEstimate.total;
+  const fmtTotal = (t: { min: number; max: number } | null) =>
+    !t ? '' : t.min === t.max ? String(t.min) : `${t.min}–${t.max}`;
   const estRaw = row['Estimate # sandwiches'];
   if (clean(estRaw)) {
     const parsed = parseSandwichCountInput(estRaw as any);
     if (parsed.count && parsed.count > 0) {
-      const appMin = event.estimatedSandwichCountMin ?? null;
-      const appMax = event.estimatedSandwichCountMax ?? null;
-      const appHasRange = appMin !== null || appMax !== null;
-      // Read the app's estimate the way the app shows it: a range only counts
-      // when it's ACTIVE (both bounds, and no exact count that disagrees with
-      // the midpoint). Stale bounds next to an exact count are ignored there,
-      // so they're ignored here too.
-      const appRangeActive = hasActiveSandwichRange(appMin, appMax, event.estimatedSandwichCount);
-      const same = parsed.isRange
-        ? appRangeActive && appMin === parsed.min && appMax === parsed.max
-        : event.estimatedSandwichCount === parsed.count && !appHasRange;
+      const sheetTotal = parsed.isRange && parsed.min && parsed.max
+        ? { min: parsed.min, max: parsed.max }
+        : { min: parsed.count, max: parsed.count };
+      const same = !!appTotal && appTotal.min === sheetTotal.min && appTotal.max === sheetTotal.max;
       if (!same) {
-        const appShown = appRangeActive
-          ? `${appMin}–${appMax}`
-          : event.estimatedSandwichCount ? String(event.estimatedSandwichCount) : '';
+        const appShown = fmtTotal(appTotal);
         changes.push({
           field: 'estimatedSandwichCount',
           label: 'Sandwich estimate',
           from: appShown,
-          to: parsed.isRange ? `${parsed.min}–${parsed.max}` : String(parsed.count),
+          to: fmtTotal(sheetTotal),
           kind: appShown ? 'update' : 'fill',
         });
-        set('estimatedSandwichCount', 'estimatedSandwichCount', parsed.count);
-        set('estimatedSandwichCount', 'estimatedSandwichCountMin', parsed.min);
-        set('estimatedSandwichCount', 'estimatedSandwichCountMax', parsed.max);
-        // An exact number takes the event out of range mode (as the form does).
-        if (!parsed.isRange && event.estimatedSandwichRangeType) {
-          set('estimatedSandwichCount', 'estimatedSandwichRangeType', null);
-        }
-        // Keep the per-type breakdown adding up to the new total, so cards
-        // don't keep showing the old quantities. A types change, if picked
-        // too, replaces this (selectUpdates).
-        const existing = appSandwichTypeArray(event.sandwichTypes);
-        if (existing.length) {
-          set('estimatedSandwichCount', 'sandwichTypes', rescaleTypes(existing, parsed.count));
-        } else if (!parsed.isRange && event.estimatedSandwichRangeType) {
-          // A range-mode event keeps its only type in the range type, which an
-          // exact number clears. Carry it into the breakdown so the type isn't lost.
-          set('estimatedSandwichCount', 'sandwichTypes', [
-            { type: event.estimatedSandwichRangeType, quantity: parsed.count },
-          ]);
-        }
-        // Going into range mode: name the event's one existing type, if it has
-        // exactly one (a ticked types change still decides, in selectUpdates).
-        if (parsed.isRange && !event.estimatedSandwichRangeType) {
-          const keys = appSandwichTypeKeys(event.sandwichTypes);
-          if (keys.length === 1) set('estimatedSandwichCount', 'estimatedSandwichRangeType', keys[0]);
-        }
+        const isRangeTotal = sheetTotal.min !== sheetTotal.max;
+        set('estimatedSandwichCount', 'estimatedSandwichCount', isRangeTotal ? Math.round((sheetTotal.min + sheetTotal.max) / 2) : sheetTotal.min);
+        set('estimatedSandwichCount', 'estimatedSandwichCountMin', isRangeTotal ? sheetTotal.min : null);
+        set('estimatedSandwichCount', 'estimatedSandwichCountMax', isRangeTotal ? sheetTotal.max : null);
       }
     } else {
       notes.push(`Sandwich estimate "${clean(estRaw)}" isn't a number, so it was left alone.`);
     }
   }
 
-  // --- Sandwich types (update when the SET of types differs) -----------------
+  // Types: update when the SET of types differs.
   const sheetTypes = parseSheetSandwichTypes(row['Deli or PBJ?']);
   if (sheetTypes.length > 0) {
-    const appTypes = appSandwichTypeKeys(event.sandwichTypes);
+    // Compare named types the way the sheet lists them: once each, without
+    // "unknown" (the sheet export never writes it).
+    const appTypes = Array.from(new Set(appEstimate.lines.map((l) => l.type).filter((t) => t !== 'unknown')));
     const same =
       sheetTypes.length === appTypes.length && sheetTypes.every((t) => appTypes.includes(t));
     if (!same) {
-      const total =
-        (updates.estimatedSandwichCount as number | undefined) ?? appEstimateTotal(event);
-      const per = Math.floor(total / sheetTypes.length);
-      set('sandwichTypes', 'sandwichTypes', sheetTypes.map((type, i) => ({
-        type,
-        quantity: i === sheetTypes.length - 1 ? total - per * (sheetTypes.length - 1) : per,
-      })));
+      set('sandwichTypes', 'sandwichTypes', sheetTypes.map((type) => ({ type, quantity: 0 })));
       changes.push({
         field: 'sandwichTypes',
         label: 'Sandwich types',
@@ -636,14 +681,6 @@ export function buildRowUpdatePlan(
         to: sheetTypes.map(typeLabel).join(', '),
         kind: appTypes.length ? 'update' : 'fill',
       });
-      // Range-mode estimates name ONE type: the sheet's type when it lists one,
-      // none when it lists several (the breakdown carries them). Whether the
-      // event ends up in range mode depends on which changes are ticked, so
-      // selectUpdates applies this.
-      sheetRangeType = sheetTypes.length === 1 ? sheetTypes[0] : null;
-      if (sheetTypes.length > 1 && total > 0) {
-        notes.push('Sandwich types changed, so the count was split evenly between them. Adjust per-type numbers in the app if needed.');
-      }
     }
   }
 
@@ -702,7 +739,7 @@ export function buildRowUpdatePlan(
     );
   } else if (staffingRead) {
     const staffing = staffingRead;
-    const usersById = new Map(users.map((u) => [u.id, u]));
+    const usersById = indexPeople(users);
     // Part of the cell couldn't be read: show it, and don't remove a role that
     // might be hiding in it.
     const partlyUnread = staffing.unread.length > 0;
@@ -735,7 +772,7 @@ export function buildRowUpdatePlan(
             kept.add(appIds[idx]);
             return appIds[idx];
           }
-          return resolveSheetName(name, users);
+          return resolveSheetName(name, users, role);
         });
         newIds = Array.from(new Set(newIds));
         // Part of the cell couldn't be read: only add people, never drop
@@ -762,12 +799,13 @@ export function buildRowUpdatePlan(
         set(changeField, cfg.ids, newIds.length ? newIds : null);
         // Keep per-person details for people who stay; new people start empty.
         const oldDetails = asDetailsObject(event[cfg.details]);
+        // New people get their name in the details, like the app's picker saves.
         set(changeField, cfg.details, newIds.length
-          ? Object.fromEntries(newIds.map((id) => [id, oldDetails[id] ?? {}]))
+          ? Object.fromEntries(newIds.map((id) => [id, oldDetails[id] ?? { name: assigneeName(id, usersById) }]))
           : null);
         const unmatched = newIds.filter((id) => !usersById.has(id) && !appIds.includes(id));
         if (unmatched.length) {
-          notes.push(`${cfg.label}: couldn't match ${unmatched.map((n) => `"${n}"`).join(', ')} to one app user, so they're saved as typed names.`);
+          notes.push(`${cfg.label}: couldn't match ${unmatched.map((n) => `"${n}"`).join(', ')} to exactly one person in the app (team members, drivers, volunteers or host contacts), so they're saved as typed names. Use the full name on the sheet if there are two people with that first name.`);
         }
       }
     }
@@ -838,7 +876,7 @@ export function buildRowUpdatePlan(
     set('planningNotes', 'planningNotes', appNotes ? `${appNotes}\n\n${added}` : added);
   }
 
-  return { changes, updates, updatesByField, notes, sheetRangeType };
+  return { changes, updates, updatesByField, notes };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -896,10 +934,7 @@ export function sheetNoteParts(row: {
 export function selectUpdates(
   plan: RowUpdatePlan,
   fields: string[],
-  event: Pick<
-    RowUpdateEvent,
-    'estimatedSandwichCount' | 'estimatedSandwichCountMin' | 'estimatedSandwichCountMax' | 'estimatedSandwichRangeType'
-  >
+  _event?: unknown
 ): { changes: RowChange[]; updates: Record<string, unknown> } {
   const known = new Set(plan.changes.map((c) => c.field));
   const unknown = fields.filter((f) => !known.has(f));
@@ -908,38 +943,9 @@ export function selectUpdates(
   }
   const chosen = new Set(fields);
   const updates: Record<string, unknown> = {};
-  // A picked types change is applied last so its breakdown wins over the
-  // estimate's rescaled one.
-  for (const f of chosen) if (f !== 'sandwichTypes') Object.assign(updates, plan.updatesByField[f]);
-  if (chosen.has('sandwichTypes')) Object.assign(updates, plan.updatesByField.sandwichTypes);
-  // Range type, decided from what was actually ticked:
-  // - the event's range state after this apply (the ticked estimate's, else the current one)
-  // - an exact estimate means no range mode, so no range type
-  // - in range mode with a ticked types change, the sheet's single type (or none)
-  const endsInRange = chosen.has('estimatedSandwichCount')
-    ? updates.estimatedSandwichCountMin != null || updates.estimatedSandwichCountMax != null
-    : (event.estimatedSandwichCountMin ?? null) !== null || (event.estimatedSandwichCountMax ?? null) !== null;
-  if (!endsInRange) {
-    if (chosen.has('estimatedSandwichCount') && event.estimatedSandwichRangeType) {
-      updates.estimatedSandwichRangeType = null;
-    }
-  } else if (chosen.has('sandwichTypes') && plan.sheetRangeType !== undefined) {
-    if (plan.sheetRangeType !== (event.estimatedSandwichRangeType ?? null)) {
-      updates.estimatedSandwichRangeType = plan.sheetRangeType;
-    }
-  }
-
-  // Types were split using the NEW estimate. If the estimate was left out,
-  // re-split them using the count the app keeps.
-  if (chosen.has('sandwichTypes') && !chosen.has('estimatedSandwichCount') && Array.isArray(updates.sandwichTypes)) {
-    const types = updates.sandwichTypes as { type: string; quantity: number }[];
-    const total = appEstimateTotal(event);
-    const per = Math.floor(total / types.length);
-    updates.sandwichTypes = types.map((t, i) => ({
-      type: t.type,
-      quantity: i === types.length - 1 ? total - per * (types.length - 1) : per,
-    }));
-  }
+  for (const f of chosen) Object.assign(updates, plan.updatesByField[f]);
+  // Estimate fields that depend on each other (an estimate ticked without the
+  // types, or the reverse) are reconciled by the shared estimate rule on save.
   return { changes: plan.changes.filter((c) => chosen.has(c.field)), updates };
 }
 
@@ -998,16 +1004,6 @@ function rescaleTypes(types: { type: string; quantity: number }[], total: number
   });
 }
 
-/** The app's current planned total: exact count, else the range midpoint. */
-function appEstimateTotal(
-  event: Pick<RowUpdateEvent, 'estimatedSandwichCount' | 'estimatedSandwichCountMin' | 'estimatedSandwichCountMax'>
-): number {
-  return (
-    event.estimatedSandwichCount ??
-    getRangeMidpoint(event.estimatedSandwichCountMin, event.estimatedSandwichCountMax) ??
-    0
-  );
-}
 
 /**
  * The staffing cell from a sheet payload. The planning sheet's Apps Script
@@ -1047,18 +1043,12 @@ export function staffingForNewEvent(raw: unknown) {
  * Sandwich types for a NEW event: the app's own type keys ("pbj",
  * "deli_turkey", ...) as a real array, with the count split evenly.
  */
-export function sandwichTypesForNewEvent(
-  raw: unknown,
-  total: number | null | undefined
-): { type: string; quantity: number }[] | null {
+export function sandwichTypesForNewEvent(raw: unknown): { type: string; quantity: number }[] | null {
+  // Type names only: the sheet has no per-type amounts. The storage layer's
+  // estimate rule gives a single type the whole total, and marks several
+  // types "split TBD" instead of inventing an even split.
   const types = parseSheetSandwichTypes(raw);
-  if (types.length === 0) return null;
-  const count = total ?? 0;
-  const per = Math.floor(count / types.length);
-  return types.map((type, i) => ({
-    type,
-    quantity: i === types.length - 1 ? count - per * (types.length - 1) : per,
-  }));
+  return types.length ? types.map((type) => ({ type, quantity: 0 })) : null;
 }
 
 /** Lowercase, trim, collapse whitespace — for matching group names. */

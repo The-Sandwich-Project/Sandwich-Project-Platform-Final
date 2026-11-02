@@ -19,6 +19,12 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
+      # Replit's publish rewrites package-lock.json to download from its
+      # internal mirror (package-firewall.replit.internal), which GitHub can't
+      # reach. Point this run's copy back at the public registry: same
+      # packages, and npm ci still checks every integrity hash. Not committed,
+      # so Replit is unaffected.
+      - run: sed -i 's#http://package-firewall.replit.internal/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci
       - run: npm run check:undefined-refs
 
@@ -40,5 +46,11 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
+      # Replit's publish rewrites package-lock.json to download from its
+      # internal mirror (package-firewall.replit.internal), which GitHub can't
+      # reach. Point this run's copy back at the public registry: same
+      # packages, and npm ci still checks every integrity hash. Not committed,
+      # so Replit is unaffected.
+      - run: sed -i 's#http://package-firewall.replit.internal/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci
       - run: npm run inventory:routes:check
