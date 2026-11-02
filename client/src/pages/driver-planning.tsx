@@ -584,10 +584,17 @@ const eventHasSandwichRange = (event: SandwichEstimateFields): boolean =>
 const hasSandwichEstimate = (event: SandwichEstimateFields): boolean =>
   (event.estimatedSandwichCount ?? 0) > 0 || eventHasSandwichRange(event);
 
-// Size used for the large-event highlight: the exact count, or a range's max.
+// Size used for the large-event highlight: a range's max, else the exact
+// count. Range first: planning-sheet imports store the range midpoint in
+// estimatedSandwichCount too, so a 300-500 import would otherwise read as 400.
 const sandwichEstimateSize = (event: SandwichEstimateFields): number => {
-  if ((event.estimatedSandwichCount ?? 0) > 0) return event.estimatedSandwichCount as number;
-  return eventHasSandwichRange(event) ? Number(event.estimatedSandwichCountMax) || 0 : 0;
+  if (eventHasSandwichRange(event)) {
+    return Math.max(
+      Number(event.estimatedSandwichCountMin) || 0,
+      Number(event.estimatedSandwichCountMax) || 0
+    );
+  }
+  return event.estimatedSandwichCount ?? 0;
 };
 
 // Extract city from address
