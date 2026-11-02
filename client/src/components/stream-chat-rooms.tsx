@@ -66,6 +66,7 @@ import {
 import 'stream-chat-react/dist/css/v2/index.css';
 import { logger } from '@/lib/logger';
 import { getStreamClient } from '@/lib/stream-client';
+import { MessageEventContext, getMessageEventContext } from '@/components/chat/event-context';
 
 // Custom Message component with read receipts and permission-based actions
 const CustomMessage = () => {
@@ -119,6 +120,14 @@ const CustomMessage = () => {
 
   return (
     <>
+      {/* Event this message is about (sent from an event card, or a reply tied to one) */}
+      {getMessageEventContext(message) && (
+        <div className={`flex px-4 pt-1 ${isOwnMessage ? 'justify-end' : 'justify-start pl-14'}`}>
+          <div className="max-w-xs">
+            <MessageEventContext message={message} />
+          </div>
+        </div>
+      )}
       <Message
         message={message}
         messageActions={getMessageActions()}
