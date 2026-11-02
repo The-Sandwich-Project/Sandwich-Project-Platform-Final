@@ -12,6 +12,7 @@ import { PERMISSIONS } from '@shared/auth-utils';
 import { ObjectStorageService, ObjectNotFoundError } from '../replit_integrations/object_storage';
 import { db } from '../db';
 import { resources } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 const objectStorageService = new ObjectStorageService();
 
@@ -120,6 +121,44 @@ documentsRouter.post('/request-upload-url', async (req: AuthenticatedRequest, re
 });
 
 // POST /api/documents - Create document record (after file is uploaded to cloud)
+/**
+ * Give a non-confidential, active document a Resources (Reference Materials)
+ * entry if it doesn't have one yet. Confidential documents never get one —
+ * they're listed on the Resources page's Confidential tab. Never throws: the
+ * caller's upload/edit already succeeded.
+ */
+async function ensureLibraryResource(
+  document: { id: number; title: string; description: string | null; category: string; isActive?: boolean | null },
+  userId: string,
+  userName: string
+) {
+  if (document.category === 'confidential' || document.isActive === false) return;
+  try {
+    const existing = await db
+      .select({ id: resources.id })
+      .from(resources)
+      .where(eq(resources.documentId, document.id))
+      .limit(1);
+    if (existing.length > 0) return;
+
+    const resourceCategory: Record<string, string> = {
+      governance: 'legal_governance',
+      operations: 'operations_safety',
+    };
+    await db.insert(resources).values({
+      title: document.title,
+      description: document.description,
+      type: 'file',
+      category: resourceCategory[document.category] || 'toolkit',
+      documentId: document.id,
+      createdBy: userId,
+      createdByName: userName,
+    });
+  } catch (error) {
+    logger.error(`Failed to add document ${document.id} to resources:`, error);
+  }
+}
+
 documentsRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user = getUser(req);
@@ -167,27 +206,9 @@ documentsRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
     // Document Management uploads should show up in Reference Materials
     // (Resources), which replaced the Important Documents page that listed
     // every upload. Opt-in, because the Add Resource form uploads through this
-    // route and then creates its own resource. Confidential documents never get
-    // one; they're listed on the Resources page's Confidential tab instead.
-    if (addToResources === true && document.category !== 'confidential') {
-      try {
-        const resourceCategory: Record<string, string> = {
-          governance: 'legal_governance',
-          operations: 'operations_safety',
-        };
-        await db.insert(resources).values({
-          title: document.title,
-          description: document.description,
-          type: 'file',
-          category: resourceCategory[document.category] || 'toolkit',
-          documentId: document.id,
-          createdBy: user.id,
-          createdByName: documentData.uploadedByName,
-        });
-      } catch (resourceError) {
-        // The upload itself succeeded; don't fail it over the library entry.
-        logger.error(`Failed to add document ${document.id} to resources:`, resourceError);
-      }
+    // route and then creates its own resource.
+    if (addToResources === true) {
+      await ensureLibraryResource(document, user.id, documentData.uploadedByName);
     }
 
     res.status(201).json({ document });
@@ -518,6 +539,15 @@ documentsRouter.patch(
       logger.info(
         `Document updated by ${user.email}: ID ${documentId} fields=${Object.keys(updates).join(',')}`
       );
+
+      // A document uploaded as confidential never got a Resources entry; when
+      // it's reclassified, add one so it doesn't vanish from both the library
+      // and the Confidential tab.
+      if (document.category === 'confidential' && updated.category !== 'confidential') {
+        const userName =
+          user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email;
+        await ensureLibraryResource(updated, user.id, userName);
+      }
 
       res.json({ success: true, document: updated });
     } catch (error: any) {

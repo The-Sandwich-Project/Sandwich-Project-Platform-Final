@@ -34,7 +34,9 @@ const errorHandler = createErrorHandler('resources');
  */
 function linkedDocumentVisible(user: Parameters<typeof hasPermission>[0]) {
   const canViewConfidential = hasPermission(user, PERMISSIONS.DOCUMENTS_CONFIDENTIAL);
-  return sql`(${resources.documentId} IS NULL OR EXISTS (
+  // Only file resources are gated: a resource converted from file to link
+  // can keep its old document_id, and that stale link mustn't hide it.
+  return sql`(${resources.type} <> 'file' OR ${resources.documentId} IS NULL OR EXISTS (
     SELECT 1 FROM ${documents} AS linked_doc
     WHERE linked_doc.id = ${resources.documentId}
       AND linked_doc.is_active = true
