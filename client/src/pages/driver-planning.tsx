@@ -478,11 +478,19 @@ const teamMemberIcon = createTeamMemberIcon(colors.teamMember);
 // Format time to 12-hour format
 const formatTime12Hour = (time: string | null): string => {
   if (!time) return '';
-  // Pull the first H:MM (optionally with AM/PM) out of the string, so values
-  // like "Approx. 7:30 AM", "around 11:00", or "14:30:00" all parse.
-  // Anything without a recognizable time is shown as-is.
-  const match = time.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|A\.M\.|P\.M\.)?/i);
+  // Reformat a single time, optionally with a word prefix: "Approx. 7:30 AM",
+  // "around 11:00", "14:30:00". The time must end the string. Anything after
+  // it ("7:30-8:00 PM", "7:30 or 8", "7:30 (flexible)") is returned unchanged,
+  // because reformatting just the first time would drop the rest and could
+  // flip AM/PM in what drivers are texted.
+  const match = time
+    .trim()
+    .match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|A\.M\.|P\.M\.)?$/i);
   if (!match) return time;
+  const trimmed = time.trim();
+  const prefix = trimmed.slice(0, match.index).trim();
+  // A prefix holding another number means a range or list ("7-7:30 PM").
+  if (/\d/.test(prefix)) return time;
 
   let hours = parseInt(match[1], 10);
   const minutes = parseInt(match[2], 10);
@@ -497,7 +505,6 @@ const formatTime12Hour = (time: string | null): string => {
   const formatted = `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 
   // Keep any qualifier the coordinator typed ("Approx.", "around", etc.).
-  const prefix = time.slice(0, match.index).trim();
   return prefix ? `${prefix} ${formatted}` : formatted;
 };
 
