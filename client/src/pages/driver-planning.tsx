@@ -31,6 +31,8 @@ import {
 } from '@/lib/assignment-utils';
 import { getRecipientDisplayRegion } from '@/lib/atlanta-regions';
 import { formatSandwichTypesDisplay } from '@/lib/sandwich-utils';
+import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
+import { SANDWICH_TYPES } from '@/components/event-requests/constants';
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -168,6 +170,9 @@ interface EventMapData {
   scheduledEventDate: string | null;
   status: string;
   estimatedSandwichCount: number | null;
+  estimatedSandwichCountMin?: number | null;
+  estimatedSandwichCountMax?: number | null;
+  estimatedSandwichRangeType?: string | null;
   tspContactAssigned: string | null;
   tspContact: string | null;
   customTspContact: string | null;
@@ -517,7 +522,38 @@ const formatTime12Hour = (time: string | null): string => {
 // formatter in @/lib/sandwich-utils (the same one ScheduledCard uses),
 // so the Driver Planning tool and the Scheduled card always agree on
 // what a given event is making.
-const formatSandwichSummary = (event: Pick<EventMapData, 'estimatedSandwichCount' | 'sandwichTypes'>): string => {
+const formatSandwichSummary = (
+  event: Pick<
+    EventMapData,
+    | 'estimatedSandwichCount'
+    | 'estimatedSandwichCountMin'
+    | 'estimatedSandwichCountMax'
+    | 'estimatedSandwichRangeType'
+    | 'sandwichTypes'
+  >
+): string => {
+  // A range ("400-500 Turkey") keeps its type in estimatedSandwichRangeType,
+  // not sandwichTypes. Mirror ScheduledCardEnhanced so both agree.
+  if (
+    hasActiveSandwichRange(
+      event.estimatedSandwichCountMin,
+      event.estimatedSandwichCountMax,
+      event.estimatedSandwichCount
+    )
+  ) {
+    const rangeText = `~${event.estimatedSandwichCountMin}-${event.estimatedSandwichCountMax} sandwiches`;
+    const rangeType = event.estimatedSandwichRangeType;
+    const typeLabel = rangeType
+      ? SANDWICH_TYPES.find((t) => t.value === rangeType)?.label
+      : undefined;
+    if (typeLabel && rangeType !== 'unknown') return `${rangeText} (${typeLabel})`;
+    // A range may still carry a per-type breakdown.
+    const rangeBreakdown = formatSandwichTypesDisplay(event.sandwichTypes, undefined);
+    return rangeBreakdown !== 'Not specified'
+      ? `${rangeText} (${rangeBreakdown})`
+      : `${rangeText} (type not set)`;
+  }
+
   const count = event.estimatedSandwichCount || 0;
   const countText = count > 0 ? `~${count} sandwiches` : 'Sandwich count not set';
   const breakdown = formatSandwichTypesDisplay(event.sandwichTypes, undefined);
@@ -529,6 +565,36 @@ const formatSandwichSummary = (event: Pick<EventMapData, 'estimatedSandwichCount
     breakdown !== 'Not specified' &&
     !breakdown.endsWith(' total');
   return hasBreakdown ? `${countText} (${breakdown})` : `${countText} (type not set)`;
+};
+
+type SandwichEstimateFields = Pick<
+  EventMapData,
+  'estimatedSandwichCount' | 'estimatedSandwichCountMin' | 'estimatedSandwichCountMax'
+>;
+
+const eventHasSandwichRange = (event: SandwichEstimateFields): boolean =>
+  hasActiveSandwichRange(
+    event.estimatedSandwichCountMin,
+    event.estimatedSandwichCountMax,
+    event.estimatedSandwichCount
+  );
+
+// Saving a range clears estimatedSandwichCount (form-utils), so "has an
+// estimate" must accept either an exact count or an active range.
+const hasSandwichEstimate = (event: SandwichEstimateFields): boolean =>
+  (event.estimatedSandwichCount ?? 0) > 0 || eventHasSandwichRange(event);
+
+// Size used for the large-event highlight: a range's max, else the exact
+// count. Range first: planning-sheet imports store the range midpoint in
+// estimatedSandwichCount too, so a 300-500 import would otherwise read as 400.
+const sandwichEstimateSize = (event: SandwichEstimateFields): number => {
+  if (eventHasSandwichRange(event)) {
+    return Math.max(
+      Number(event.estimatedSandwichCountMin) || 0,
+      Number(event.estimatedSandwichCountMax) || 0
+    );
+  }
+  return event.estimatedSandwichCount ?? 0;
 };
 
 // Extract city from address
@@ -970,7 +1036,7 @@ const generateDriverSMS = (event: EventMapData, driver: SMSDriver): string => {
   const time = event.pickupTime || event.eventStartTime;
   const formattedTime = time ? formatTime12Hour(time) : 'TBD';
   const location = event.eventAddress || 'TBD';
-  const sandwichCount = event.estimatedSandwichCount
+  const sandwichCount = hasSandwichEstimate(event)
     ? formatSandwichSummary(event)
     : 'TBD';
   const firstName = driver.name?.split(' ')[0] || 'there';
@@ -2895,10 +2961,10 @@ export default function DriverPlanningDashboard() {
                       </div>
 
                       {/* Sandwich count and types - only show if > 0 */}
-                      {event.estimatedSandwichCount && event.estimatedSandwichCount > 0 && (
+                      {hasSandwichEstimate(event) && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Package className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span className={event.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={event.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                          <span className={sandwichEstimateSize(event) > 400 ? 'font-semibold' : ''} style={sandwichEstimateSize(event) > 400 ? { color: '#a31c41' } : undefined}>
                             {formatSandwichSummary(event)}
                           </span>
                         </div>
@@ -3183,8 +3249,8 @@ export default function DriverPlanningDashboard() {
                     <div className="p-2 min-w-[200px]">
                       <h3 className="font-semibold">{event.organizationName}</h3>
                       <p className="text-sm text-gray-600">{event.eventAddress}</p>
-                      {event.estimatedSandwichCount && event.estimatedSandwichCount > 0 && (
-                        <p className="text-sm" style={event.estimatedSandwichCount > 400 ? { color: '#a31c41', fontWeight: 600 } : undefined}>
+                      {hasSandwichEstimate(event) && (
+                        <p className="text-sm" style={sandwichEstimateSize(event) > 400 ? { color: '#a31c41', fontWeight: 600 } : undefined}>
                           {formatSandwichSummary(event)}
                         </p>
                       )}
@@ -5113,12 +5179,12 @@ export default function DriverPlanningDashboard() {
                         <Calendar className="w-3 h-3" />
                         {eventDate ? format(parseLocalDate(eventDate), 'MMM d') : 'No date'}
                       </div>
-                      {event.estimatedSandwichCount && event.estimatedSandwichCount > 0 && (
+                      {hasSandwichEstimate(event) && (
                         <div className="flex items-start gap-1 text-[11px] text-gray-600">
                           <Package className="w-3 h-3 mt-0.5 flex-shrink-0" />
                           <span
-                            className={event.estimatedSandwichCount > 400 ? 'font-semibold' : ''}
-                            style={event.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}
+                            className={sandwichEstimateSize(event) > 400 ? 'font-semibold' : ''}
+                            style={sandwichEstimateSize(event) > 400 ? { color: '#a31c41' } : undefined}
                           >
                             {formatSandwichSummary(event)}
                           </span>
@@ -6202,10 +6268,10 @@ export default function DriverPlanningDashboard() {
                           )}
                         </div>
                       </div>
-                      {selectedEvent.estimatedSandwichCount && selectedEvent.estimatedSandwichCount > 0 && (
+                      {hasSandwichEstimate(selectedEvent) && (
                         <div className="flex items-center gap-2 text-sm">
                           <Package className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                          <span className={selectedEvent.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={selectedEvent.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                          <span className={sandwichEstimateSize(selectedEvent) > 400 ? 'font-semibold' : ''} style={sandwichEstimateSize(selectedEvent) > 400 ? { color: '#a31c41' } : undefined}>
                             {formatSandwichSummary(selectedEvent)}
                           </span>
                         </div>
@@ -6555,8 +6621,8 @@ export default function DriverPlanningDashboard() {
                                   )}
                                 </Badge>
                               )}
-                              {event.estimatedSandwichCount && event.estimatedSandwichCount > 0 && (
-                                <span className={`text-xs ${event.estimatedSandwichCount > 400 ? 'font-semibold' : 'text-gray-500'}`} style={event.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                              {hasSandwichEstimate(event) && (
+                                <span className={`text-xs ${sandwichEstimateSize(event) > 400 ? 'font-semibold' : 'text-gray-500'}`} style={sandwichEstimateSize(event) > 400 ? { color: '#a31c41' } : undefined}>
                                   {formatSandwichSummary(event)}
                                 </span>
                               )}
@@ -6637,10 +6703,10 @@ export default function DriverPlanningDashboard() {
                     <MapPin className="w-4 h-4 text-gray-500" />
                     <span>{selectedEvent.eventAddress}</span>
                   </div>
-                  {selectedEvent.estimatedSandwichCount && selectedEvent.estimatedSandwichCount > 0 && (
+                  {hasSandwichEstimate(selectedEvent) && (
                     <div className="flex items-center gap-2 text-sm">
                       <Package className="w-4 h-4 text-gray-500" />
-                      <span className={selectedEvent.estimatedSandwichCount > 400 ? 'font-semibold' : ''} style={selectedEvent.estimatedSandwichCount > 400 ? { color: '#a31c41' } : undefined}>
+                      <span className={sandwichEstimateSize(selectedEvent) > 400 ? 'font-semibold' : ''} style={sandwichEstimateSize(selectedEvent) > 400 ? { color: '#a31c41' } : undefined}>
                         {formatSandwichSummary(selectedEvent)}
                       </span>
                     </div>
