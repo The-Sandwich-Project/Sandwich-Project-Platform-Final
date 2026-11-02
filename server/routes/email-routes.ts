@@ -597,9 +597,6 @@ export function createEmailRouter(deps: RouterDependencies) {
 
     // For actual emails, send directly via SendGrid without wrapper
     const { sendEmailWithResult } = await import('../sendgrid');
-    const { documents } = await import('@shared/schema');
-    const { inArray } = await import('drizzle-orm');
-    const path = await import('path');
 
     // Check if content is already full HTML (starts with <!DOCTYPE html>)
     const isFullHtml = content.trim().startsWith('<!DOCTYPE html>');
@@ -625,153 +622,23 @@ export function createEmailRouter(deps: RouterDependencies) {
       textContent = content;
     }
 
-    // Process attachments - fetch document metadata if attachments are document IDs
-    let processedAttachments: (string | { filePath: string; originalName?: string })[] = [];
-    if (attachments && attachments.length > 0) {
-      const numericIds = attachments
-        .map((attachment) => {
-          if (typeof attachment === 'number') {
-            return attachment;
-          }
+    // Resolve every selected attachment (document IDs, /objects/ storage
+    // paths, legacy hashes, local files) into base64 up front. If any can't be
+    // loaded, refuse to send rather than silently emailing without it.
+    const { resolveEmailAttachments, describeFailedAttachments } = await import('../utils/email-attachments');
+    const { resolved: attachmentsForSendgrid, failed: failedAttachments } =
+      await resolveEmailAttachments(attachments, { user: fullUserData || user });
 
-          if (typeof attachment === 'string') {
-            const trimmed = attachment.trim();
-            return /^\d+$/.test(trimmed) ? parseInt(trimmed, 10) : NaN;
-          }
-
-          return NaN;
-        })
-        .filter((id): id is number => !isNaN(id));
-
-      const documentMap = new Map<number, { filePath: string; originalName?: string }>();
-
-      if (numericIds.length > 0) {
-        const docs = await db
-          .select({
-            id: documents.id,
-            filePath: documents.filePath,
-            originalName: documents.originalName,
-          })
-          .from(documents)
-          .where(inArray(documents.id, numericIds));
-
-        docs.forEach((doc) => {
-          documentMap.set(doc.id, {
-            filePath: doc.filePath,
-            originalName: doc.originalName || undefined,
-          });
-        });
-      }
-
-      for (const attachment of attachments) {
-        if (typeof attachment === 'number') {
-          const docMeta = documentMap.get(attachment);
-          if (docMeta) {
-            processedAttachments.push(docMeta);
-          } else {
-            logger.warn(
-              `[Event Email API] Attachment document ID ${attachment} not found`
-            );
-          }
-          continue;
-        }
-
-        if (typeof attachment === 'string') {
-          const trimmed = attachment.trim();
-
-          if (/^\d+$/.test(trimmed)) {
-            const docId = parseInt(trimmed, 10);
-            const docMeta = documentMap.get(docId);
-            if (docMeta) {
-              processedAttachments.push(docMeta);
-            } else {
-              logger.warn(
-                `[Event Email API] Attachment document ID ${docId} not found`
-              );
-            }
-            continue;
-          }
-
-          // Check if it's a document hash pattern (uploads/documents/[hash])
-          if (trimmed.startsWith('uploads/documents/')) {
-            const hash = trimmed.split('/').pop();
-            if (hash) {
-              // Map document hashes to attached_assets files
-              const hashToFileMap: Record<string, { file: string; name: string }> = {
-                '015b0f68ddb511633e7696caab59bfa7': {
-                  file: 'attached_assets/20260506-TSP-Food+Safety+Volunteers.pdf',
-                  name: 'Food Safety Guide for Volunteers.pdf'
-                },
-                '3e375509b08b20265abdfa6afe632982': {
-                  file: 'attached_assets/PBJ Sandwich Making 2 101 03172026.pdf',
-                  name: 'PBJ Sandwich Making 101.pdf'
-                },
-                '56687eca96492549ba09d1bda0e5e6e0': {
-                  file: 'attached_assets/Deli Sandwich Making 101 03172026.pdf',
-                  name: 'Deli Sandwich Making 101.pdf'
-                },
-                '075839360400adce8b79a6a58a96dcfc': {
-                  file: 'attached_assets/Deli Labels_1756865384146.pdf',
-                  name: 'Deli Sandwich Labels.pdf'
-                },
-                'a9458021b23fca8d76e674597c691876': {
-                  file: 'attached_assets/PBJ Labels_1756865384146.pdf',
-                  name: 'PBJ Sandwich Labels.pdf'
-                }
-              };
-              
-              const fileInfo = hashToFileMap[hash];
-              if (fileInfo) {
-                processedAttachments.push({
-                  filePath: path.join(process.cwd(), fileInfo.file),
-                  originalName: fileInfo.name
-                });
-                logger.log(`[Event Email API] Mapped hash ${hash} to ${fileInfo.name}`);
-              } else {
-                logger.warn(`[Event Email API] Document hash not found in mapping: ${hash}`);
-              }
-            }
-            continue;
-          }
-
-          let resolvedPath: string;
-          if (trimmed.startsWith('/uploads/')) {
-            resolvedPath = path.join(process.cwd(), trimmed.substring(1));
-          } else if (path.isAbsolute(trimmed)) {
-            resolvedPath = trimmed;
-          } else {
-            resolvedPath = path.join(process.cwd(), trimmed);
-          }
-          
-          // Convert string path to object with filePath and originalName
-          processedAttachments.push({
-            filePath: resolvedPath,
-            originalName: path.basename(resolvedPath)
-          });
-          continue;
-        }
-
-        if (attachment && typeof attachment === 'object' && 'filePath' in attachment) {
-          const filePath = (attachment as { filePath: string }).filePath;
-          if (typeof filePath === 'string') {
-            let resolvedPath = filePath;
-
-            if (filePath.startsWith('/uploads/')) {
-              resolvedPath = path.join(process.cwd(), filePath);
-            } else if (!path.isAbsolute(filePath)) {
-              resolvedPath = path.join(process.cwd(), filePath);
-            }
-
-            processedAttachments.push({
-              ...attachment,
-              filePath: resolvedPath,
-            } as { filePath: string; originalName?: string });
-          }
-        }
-      }
+    if (failedAttachments.length > 0) {
+      logger.error(
+        `[Event Email API] Aborting send - ${failedAttachments.length} attachment(s) could not be loaded:`,
+        failedAttachments
+      );
+      return res.status(422).json({
+        message: describeFailedAttachments(failedAttachments),
+        failedAttachments,
+      });
     }
-
-    const attachmentsForSendgrid = processedAttachments;
 
     // Send clean professional email via SendGrid
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
@@ -813,7 +680,7 @@ export function createEmailRouter(deps: RouterDependencies) {
       text?: string;
       html: string;
       bcc?: string;
-      attachments?: (string | { filePath: string; originalName?: string })[];
+      attachments?: typeof attachmentsForSendgrid;
     } = {
       to: recipientEmail,
       from: fromEmail,
