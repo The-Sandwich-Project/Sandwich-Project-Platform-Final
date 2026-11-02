@@ -20,7 +20,8 @@ export interface MobileRoute {
 export const MOBILE_NAV_ITEMS: MobileNavItem[] = [
   { id: 'home', label: 'Home', icon: 'Home', href: '/' },
   { id: 'events', label: 'Events', icon: 'Calendar', href: '/events' },
-  { id: 'drivers', label: 'Drivers', icon: 'Truck', href: '/driver-planning' },
+  // Chat took this slot from Drivers (driver planning now lives under More)
+  { id: 'chat', label: 'Chat', icon: 'MessageCircle', href: '/chat' },
   { id: 'collections', label: 'Log', icon: 'ClipboardList', href: '/collections' },
   { id: 'more', label: 'More', icon: 'Menu', href: '/more' },
 ];

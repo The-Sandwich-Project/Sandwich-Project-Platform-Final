@@ -1449,7 +1449,7 @@ export function AgendaPlanningTab({
 
       {/* Floating Action Bar */}
       {(agendaSummary.agendaCount > 0 || agendaSummary.tabledCount > 0) && (
-        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
+        <div className="fixed bottom-[calc(1rem+var(--chat-dock-height,0px))] right-4 bg-white shadow-lg rounded-lg p-4 border border-gray-200 z-50">
           <div className="text-sm text-gray-600 mb-2 font-medium">
             {agendaSummary.agendaCount + agendaSummary.tabledCount} projects
             reviewed
