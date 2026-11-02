@@ -71,13 +71,13 @@ export function SMSAnnouncementModal() {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
-            <div className="bg-[#007E8C]/10 p-3 rounded-full">
-              <Smartphone className="w-6 h-6 text-[#007E8C]" />
+            <div className="bg-[#236383]/10 p-3 rounded-full">
+              <Smartphone className="w-6 h-6 text-[#236383]" />
             </div>
             <div>
               <DialogTitle className="text-xl flex items-center gap-2">
                 SMS Alerts Are Now Live! 🎉
-                <Badge variant="outline" className="bg-[#007E8C]/10 text-[#007E8C] border-[#007E8C]/30">
+                <Badge variant="outline" className="bg-[#236383]/10 text-[#236383] border-[#236383]/30">
                   New
                 </Badge>
               </DialogTitle>
@@ -127,7 +127,7 @@ export function SMSAnnouncementModal() {
           <Button
             onClick={handleGoToSettings}
             disabled={dismissMutation.isPending}
-            className="flex-1 bg-[#007E8C] hover:bg-[#006B75] text-white"
+            className="flex-1 bg-[#236383] hover:bg-[#1e5a75] text-white"
             data-testid="button-setup-sms"
           >
             <Smartphone className="w-4 h-4 mr-2" />

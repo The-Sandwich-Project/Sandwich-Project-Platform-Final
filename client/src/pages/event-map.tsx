@@ -330,11 +330,11 @@ const createClusterCustomIcon = (cluster: any) => {
 
   if (count < 5) {
     // Very light - soft teal
-    bgGradient = 'linear-gradient(135deg, #47B3CB 0%, #007E8C 100%)';
+    bgGradient = 'linear-gradient(135deg, #47B3CB 0%, #236383 100%)';
     glowIntensity = '0 2px 8px rgba(71, 179, 203, 0.4)';
   } else if (count < 10) {
     // Light - medium teal
-    bgGradient = 'linear-gradient(135deg, #007E8C 0%, #236383 100%)';
+    bgGradient = 'linear-gradient(135deg, #236383 0%, #236383 100%)';
     glowIntensity = '0 3px 10px rgba(0, 126, 140, 0.5)';
   } else if (count < 20) {
     // Medium - teal to navy
@@ -1145,7 +1145,7 @@ export default function EventMapView() {
         />
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#007E8C] to-[#005f6b] flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#236383] to-[#005f6b] flex items-center justify-center">
               <Navigation className="w-6 h-6 text-white" />
             </div>
             <div>

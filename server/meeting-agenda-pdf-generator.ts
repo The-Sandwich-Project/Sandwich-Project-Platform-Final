@@ -43,7 +43,7 @@ export async function generateMeetingAgendaPDF(agenda: MeetingAgenda): Promise<B
       lightBlue: '#47B3CB', 
       orange: '#FBAD3F',
       red: '#A31C41',
-      teal: '#007E8C',
+      teal: '#236383',
       darkGray: '#333333',
       lightGray: '#666666',
       white: '#FFFFFF',

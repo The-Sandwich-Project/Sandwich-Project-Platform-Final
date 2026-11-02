@@ -60,7 +60,7 @@ const MONTH_NAMES = [
 // TSP Brand Colors
 // #236383 (dark blue) - Primary
 // #fbad3f (golden/amber) - Secondary
-// #007e8c (teal) - Accent
+// #236383 (teal) - Accent
 // #47b3cb (light blue/cyan) - Accent
 // #a31c41 (burgundy/maroon) - Accent
 
@@ -75,15 +75,15 @@ interface ColorStyle {
 const DISTRICT_COLORS: Record<string, ColorStyle> = {
   'CCS': { bg: '#e8f4f8', text: '#236383', border: '#236383' },           // Primary blue
   'Columbus City': { bg: '#e8f4f8', text: '#236383', border: '#236383' }, // Primary blue
-  'Westerville': { bg: '#e6f7f8', text: '#007e8c', border: '#007e8c' },   // Teal
+  'Westerville': { bg: '#e6f7f8', text: '#236383', border: '#236383' },   // Teal
   'Worthington': { bg: '#ecf9fc', text: '#47b3cb', border: '#47b3cb' },   // Light blue
   'Dublin': { bg: '#fef6e8', text: '#b8860b', border: '#fbad3f' },        // Golden
   'Hilliard': { bg: '#f9e8ec', text: '#a31c41', border: '#a31c41' },      // Burgundy
-  'Upper Arlington': { bg: '#e6f7f8', text: '#007e8c', border: '#007e8c' }, // Teal
+  'Upper Arlington': { bg: '#e6f7f8', text: '#236383', border: '#236383' }, // Teal
   'Grandview': { bg: '#ecf9fc', text: '#47b3cb', border: '#47b3cb' },     // Light blue
   'Bexley': { bg: '#e8f4f8', text: '#236383', border: '#236383' },        // Primary blue
   'Gahanna': { bg: '#f9e8ec', text: '#a31c41', border: '#a31c41' },       // Burgundy
-  'New Albany': { bg: '#e6f7f8', text: '#007e8c', border: '#007e8c' },    // Teal
+  'New Albany': { bg: '#e6f7f8', text: '#236383', border: '#236383' },    // Teal
   'South-Western': { bg: '#fef6e8', text: '#b8860b', border: '#fbad3f' }, // Golden
   'Groveport': { bg: '#ecf9fc', text: '#47b3cb', border: '#47b3cb' },     // Light blue
   'Canal Winchester': { bg: '#e8f4f8', text: '#236383', border: '#236383' }, // Primary blue
@@ -96,7 +96,7 @@ const DISTRICT_COLORS: Record<string, ColorStyle> = {
 const CATEGORY_COLORS: Record<string, ColorStyle> = {
   // Tracked calendar categories
   school_breaks: { bg: '#fef6e8', text: '#b8860b', border: '#fbad3f' },   // Golden/amber
-  school_markers: { bg: '#e6f7f8', text: '#007e8c', border: '#007e8c' },  // Teal
+  school_markers: { bg: '#e6f7f8', text: '#236383', border: '#236383' },  // Teal
   religious_holidays: { bg: '#f3e8ff', text: '#6d28d9', border: '#8b5cf6' }, // Violet
   holiday: { bg: '#f9e8ec', text: '#a31c41', border: '#a31c41' },         // Burgundy
   // TSP calendar item categories
@@ -104,8 +104,8 @@ const CATEGORY_COLORS: Record<string, ColorStyle> = {
   'event-rush': { bg: '#f9e8ec', text: '#a31c41', border: '#a31c41' },    // Burgundy (urgent)
   event: { bg: '#fef6e8', text: '#b8860b', border: '#fbad3f' },           // Golden (events)
   planning: { bg: '#ecf9fc', text: '#47b3cb', border: '#47b3cb' },        // Light blue
-  staffing: { bg: '#e6f7f8', text: '#007e8c', border: '#007e8c' },        // Teal
-  board: { bg: '#e6f7f8', text: '#007e8c', border: '#007e8c' },           // Teal
+  staffing: { bg: '#e6f7f8', text: '#236383', border: '#236383' },        // Teal
+  board: { bg: '#e6f7f8', text: '#236383', border: '#236383' },           // Teal
   seasonal: { bg: '#e8f4f8', text: '#236383', border: '#236383' },        // Primary blue
   other: { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' },           // Gray
   default: { bg: '#e8f4f8', text: '#236383', border: '#236383' },         // Primary blue

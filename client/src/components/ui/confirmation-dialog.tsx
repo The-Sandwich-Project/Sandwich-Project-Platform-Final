@@ -55,7 +55,7 @@ export function ConfirmationDialog({
         {trigger}
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <AlertDialogHeader className="border-b border-[#007E8C]/10 pb-4">
+        <AlertDialogHeader className="border-b border-[#236383]/10 pb-4">
           <AlertDialogTitle className="text-[#236383] text-xl">{title}</AlertDialogTitle>
           <AlertDialogDescription className="text-gray-600 mt-2">{description}</AlertDialogDescription>
         </AlertDialogHeader>
@@ -67,7 +67,7 @@ export function ConfirmationDialog({
             onClick={handleConfirm}
             disabled={isLoading}
             className={
-              variant === 'destructive' ? 'bg-[#A31C41] hover:bg-[#A31C41]/90 text-white shadow-sm' : 'bg-[#007E8C] hover:bg-[#236383] text-white shadow-sm'
+              variant === 'destructive' ? 'bg-[#A31C41] hover:bg-[#A31C41]/90 text-white shadow-sm' : 'bg-[#236383] hover:bg-[#236383] text-white shadow-sm'
             }
           >
             {isLoading ? 'Processing...' : confirmText}
@@ -112,7 +112,7 @@ export function useConfirmation() {
       onOpenChange={(open) => !open && handleCancel()}
     >
       <AlertDialogContent>
-        <AlertDialogHeader className="border-b border-[#007E8C]/10 pb-4">
+        <AlertDialogHeader className="border-b border-[#236383]/10 pb-4">
           <AlertDialogTitle className="text-[#236383] text-xl">{dialogState.title}</AlertDialogTitle>
           <AlertDialogDescription className="text-gray-600 mt-2">
             {dialogState.description}
@@ -130,7 +130,7 @@ export function useConfirmation() {
             className={
               dialogState.variant === 'destructive'
                 ? 'bg-[#A31C41] hover:bg-[#A31C41]/90 text-white shadow-sm'
-                : 'bg-[#007E8C] hover:bg-[#236383] text-white shadow-sm'
+                : 'bg-[#236383] hover:bg-[#236383] text-white shadow-sm'
             }
           >
             Confirm

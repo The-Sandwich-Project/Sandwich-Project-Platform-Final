@@ -129,7 +129,7 @@ export default function AdminOnboardingKudos() {
     switch (role.toLowerCase()) {
       case 'admin':
       case 'super_admin':
-        return 'bg-[#007E8C] text-white hover:bg-[#006975]';
+        return 'bg-[#236383] text-white hover:bg-[#006975]';
       case 'core_team':
         return 'bg-[#236383] text-white hover:bg-[#1a4d6b]';
       default:
@@ -196,7 +196,7 @@ export default function AdminOnboardingKudos() {
 
       {/* Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-l-4 border-[#007E8C]">
+        <Card className="border-l-4 border-[#236383]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -205,7 +205,7 @@ export default function AdminOnboardingKudos() {
                   {filteredUsers.length}
                 </p>
               </div>
-              <User className="h-8 w-8 text-[#007E8C]" />
+              <User className="h-8 w-8 text-[#236383]" />
             </div>
           </CardContent>
         </Card>
@@ -287,7 +287,7 @@ export default function AdminOnboardingKudos() {
                       <CollapsibleTrigger className="w-full" asChild>
                         <div className="flex items-center justify-between cursor-pointer group">
                           <div className="flex items-center gap-4 flex-1">
-                            <div className="bg-gradient-to-br from-[#007E8C] to-[#236383] rounded-full w-12 h-12 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                            <div className="bg-gradient-to-br from-[#236383] to-[#236383] rounded-full w-12 h-12 flex items-center justify-center text-white font-bold text-lg shadow-lg">
                               {user.userName
                                 .split(' ')
                                 .map((n) => n[0])
@@ -326,7 +326,7 @@ export default function AdminOnboardingKudos() {
                             </div>
 
                             <div className="text-center">
-                              <p className="text-2xl font-bold text-[#007E8C]">
+                              <p className="text-2xl font-bold text-[#236383]">
                                 {user.completedChallenges}
                               </p>
                               <p className="text-xs text-gray-500">
@@ -430,7 +430,7 @@ export default function AdminOnboardingKudos() {
                                           })
                                         }
                                         disabled={sendKudosMutation.isPending}
-                                        className="bg-[#007E8C] hover:bg-[#006975] text-white"
+                                        className="bg-[#236383] hover:bg-[#006975] text-white"
                                         data-testid={`button-send-kudos-${completion.challengeId}`}
                                       >
                                         <Send className="h-3 w-3 mr-1" />
@@ -503,7 +503,7 @@ export default function AdminOnboardingKudos() {
                 }
               }}
               disabled={sendKudosMutation.isPending}
-              className="bg-[#007E8C] hover:bg-[#006975]"
+              className="bg-[#236383] hover:bg-[#006975]"
               data-testid="button-confirm-kudos"
             >
               {sendKudosMutation.isPending ? (

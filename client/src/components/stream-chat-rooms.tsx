@@ -231,7 +231,7 @@ const customChatStyles = `
   }
 
   .str-chat__send-button {
-    background: #007E8C !important;
+    background: #236383 !important;
   }
 
   .str-chat__send-button:hover {
@@ -271,7 +271,7 @@ const customChatStyles = `
   }
 
   .str-chat__message--other .str-chat__message-bubble a:hover {
-    color: #007E8C !important;
+    color: #236383 !important;
   }
 
   /* @mention styling - must override default royal blue for readability on teal bubbles */
@@ -297,7 +297,7 @@ const customChatStyles = `
   }
 
   .str-chat__message--other .str-chat__message-bubble .str-chat__message-mention:hover {
-    color: #007E8C !important;
+    color: #236383 !important;
     background: rgba(35, 99, 131, 0.2) !important;
   }
 
@@ -1121,7 +1121,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                         <div className={`relative flex items-center justify-center w-8 h-8 rounded-full ${
                           isActive
                             ? 'bg-[#236383] text-white'
-                            : 'bg-[#47B3CB]/20 text-[#007E8C]'
+                            : 'bg-[#47B3CB]/20 text-[#236383]'
                         }`}>
                           <Icon className="w-4 h-4" />
                           {/* Slack-style unread dot on the icon — small but unmissable */}
@@ -1165,7 +1165,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full border-dashed border-[#47B3CB] text-[#007E8C] hover:bg-[#47B3CB]/10"
+                    className="w-full border-dashed border-[#47B3CB] text-[#236383] hover:bg-[#47B3CB]/10"
                     onClick={() => setShowNewMessageDialog(true)}
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -1200,7 +1200,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                         <div className="flex items-center gap-3">
                           <div className="relative">
                             <Avatar className="w-8 h-8">
-                              <AvatarFallback className={isActive ? 'bg-[#236383] text-white' : 'bg-[#47B3CB]/20 text-[#007E8C]'}>
+                              <AvatarFallback className={isActive ? 'bg-[#236383] text-white' : 'bg-[#47B3CB]/20 text-[#236383]'}>
                                 {getDMInitials(channel)}
                               </AvatarFallback>
                             </Avatar>
@@ -1258,7 +1258,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full border-dashed border-[#47B3CB] text-[#007E8C] hover:bg-[#47B3CB]/10"
+                    className="w-full border-dashed border-[#47B3CB] text-[#236383] hover:bg-[#47B3CB]/10"
                     onClick={() => setShowNewGroupDialog(true)}
                   >
                     <Users className="w-4 h-4 mr-2" />
@@ -1308,7 +1308,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                       >
                         <div className="flex items-center gap-3">
                           <div className={`relative flex items-center justify-center w-8 h-8 rounded-full ${
-                            isActive ? 'bg-[#236383] text-white' : 'bg-[#47B3CB]/20 text-[#007E8C]'
+                            isActive ? 'bg-[#236383] text-white' : 'bg-[#47B3CB]/20 text-[#236383]'
                           }`}>
                             <Users className="w-4 h-4" />
                             {hasUnread && (
@@ -1338,7 +1338,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                                         e.preventDefault();
                                         openMembersDialog(channel);
                                       }}
-                                      className="ml-1 text-[#007E8C] hover:underline font-medium"
+                                      className="ml-1 text-[#236383] hover:underline font-medium"
                                       aria-label={`View all ${memberCount} members`}
                                     >
                                       +{additionalCount} more
@@ -1353,7 +1353,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                                     e.preventDefault();
                                     openMembersDialog(channel);
                                   }}
-                                  className="text-[#007E8C] hover:underline font-medium"
+                                  className="text-[#236383] hover:underline font-medium"
                                   aria-label={`View all ${memberCount} members`}
                                 >
                                   {memberCount} members
@@ -1486,7 +1486,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                     return (
                       <div key={m.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50">
                         <Avatar className="w-8 h-8">
-                          <AvatarFallback className="bg-[#47B3CB]/20 text-[#007E8C] text-xs">
+                          <AvatarFallback className="bg-[#47B3CB]/20 text-[#236383] text-xs">
                             {initials || 'TM'}
                           </AvatarFallback>
                         </Avatar>
@@ -1523,7 +1523,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="w-full border-dashed border-[#47B3CB] text-[#007E8C] hover:bg-[#47B3CB]/10"
+                      className="w-full border-dashed border-[#47B3CB] text-[#236383] hover:bg-[#47B3CB]/10"
                       onClick={() => setShowAddMembers(true)}
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
@@ -1562,7 +1562,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                             >
                               <Checkbox checked={membersToAdd.includes(u.id)} />
                               <Avatar className="w-8 h-8">
-                                <AvatarFallback className="bg-[#47B3CB]/20 text-[#007E8C] text-xs">
+                                <AvatarFallback className="bg-[#47B3CB]/20 text-[#236383] text-xs">
                                   {getUserInitials(u)}
                                 </AvatarFallback>
                               </Avatar>
@@ -1592,7 +1592,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                         <Button
                           type="button"
                           size="sm"
-                          className="flex-1 bg-[#007E8C] hover:bg-[#236383]"
+                          className="flex-1 bg-[#236383] hover:bg-[#236383]"
                           disabled={membersToAdd.length === 0 || isSavingMembers}
                           onClick={() =>
                             updateGroupMembers(membersDialogChannel!, { add: membersToAdd })
@@ -1664,7 +1664,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                   onClick={() => createDirectMessage(u.id)}
                 >
                   <Avatar className="w-10 h-10">
-                    <AvatarFallback className="bg-[#47B3CB]/20 text-[#007E8C]">
+                    <AvatarFallback className="bg-[#47B3CB]/20 text-[#236383]">
                       {getUserInitials(u)}
                     </AvatarFallback>
                   </Avatar>
@@ -1745,7 +1745,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
                     onCheckedChange={() => toggleUserSelection(u.id)}
                   />
                   <Avatar className="w-8 h-8">
-                    <AvatarFallback className="bg-[#47B3CB]/20 text-[#007E8C] text-xs">
+                    <AvatarFallback className="bg-[#47B3CB]/20 text-[#236383] text-xs">
                       {getUserInitials(u)}
                     </AvatarFallback>
                   </Avatar>
@@ -1757,7 +1757,7 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
               ))}
           </ScrollArea>
           <Button
-            className="w-full bg-[#007E8C] hover:bg-[#236383]"
+            className="w-full bg-[#236383] hover:bg-[#236383]"
             disabled={selectedUsers.length < 2}
             onClick={createGroupChat}
           >

@@ -267,7 +267,7 @@ function getDateRange(preset: string): { start: Date; end: Date } {
   return { start, end };
 }
 
-const COLORS = ['#236383', '#FBAD3F', '#47B3CB', '#007E8C', '#A31C41', '#6B7280', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B'];
+const COLORS = ['#236383', '#FBAD3F', '#47B3CB', '#236383', '#A31C41', '#6B7280', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B'];
 
 // Helper to create histogram buckets for sandwich distribution
 // Uses fixed buckets optimized for typical event sizes (most under 1000, few over 3000)
@@ -1729,7 +1729,7 @@ export default function EventImpactReports() {
 
         {/* Key Metrics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-[#236383] to-[#007E8C] text-white">
+          <Card className="bg-gradient-to-r from-[#236383] to-[#236383] text-white">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg font-medium flex items-center">
                 <CalendarDays className="w-5 h-5 mr-2" />

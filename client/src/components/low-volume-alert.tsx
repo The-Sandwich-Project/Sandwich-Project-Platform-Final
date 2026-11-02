@@ -387,7 +387,7 @@ export function LowVolumeAlert({ onNavigateToWeek }: LowVolumeAlertProps) {
                     : isLow
                       ? 'bg-amber-100 border-amber-300 dark:bg-amber-900/30 dark:border-amber-700'
                       : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700'
-                } ${isClickable ? 'cursor-pointer transition-shadow hover:shadow-md hover:border-[#007E8C]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#007E8C]' : ''}`}
+                } ${isClickable ? 'cursor-pointer transition-shadow hover:shadow-md hover:border-[#236383]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#236383]' : ''}`}
                 title={isClickable ? `View ${week.weekLabel} events in Event Requests` : undefined}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -431,7 +431,7 @@ export function LowVolumeAlert({ onNavigateToWeek }: LowVolumeAlertProps) {
                       <Calendar className="w-3 h-3" />
                       {week.eventCount} event{week.eventCount !== 1 ? 's' : ''}
                       {isClickable && (
-                        <ChevronRight className="w-3 h-3 ml-auto text-[#007E8C]" aria-hidden="true" />
+                        <ChevronRight className="w-3 h-3 ml-auto text-[#236383]" aria-hidden="true" />
                       )}
                     </div>
                   </>

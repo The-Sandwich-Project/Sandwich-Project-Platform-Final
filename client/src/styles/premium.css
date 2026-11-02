@@ -7,7 +7,7 @@
  *
  * Brand Colors:
  * - Primary Navy: #236383 (Trust, stability, primary CTAs)
- * - Teal: #007E8C (Active states, success, emphasis)
+ * - Teal: #236383 (Active states, success, emphasis)
  * - Light Cyan: #47B3CB (Hover states, secondary actions)
  * - Orange: #FBAD3F (Warnings, energy, important info)
  * - Burgundy: #A31C41 (Errors, premium features, urgency)
@@ -22,7 +22,7 @@
   .premium-status-success {
     @apply px-3 py-1.5 text-sm font-medium rounded-full;
     background: rgba(0, 126, 140, 0.08);
-    color: #006B75;
+    color: #1e5a75;
     border: 1px solid rgba(0, 126, 140, 0.2);
   }
 
@@ -36,7 +36,7 @@
   .premium-status-pending {
     @apply px-3 py-1.5 text-sm font-medium rounded-full;
     background: rgba(71, 179, 203, 0.1);
-    color: #007E8C;
+    color: #236383;
     border: 1px solid rgba(71, 179, 203, 0.25);
   }
 
@@ -275,7 +275,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, #236383, #007E8C, #47B3CB);
+    background: linear-gradient(90deg, #236383, #236383, #47B3CB);
     border-radius: 1rem 1rem 0 0;
   }
 
@@ -321,7 +321,7 @@
      ======================================== */
 
   .premium-gradient-primary {
-    background: linear-gradient(135deg, #236383 0%, #007E8C 100%);
+    background: linear-gradient(135deg, #236383 0%, #236383 100%);
   }
 
   .premium-gradient-warm {
@@ -329,7 +329,7 @@
   }
 
   .premium-gradient-cool {
-    background: linear-gradient(135deg, #47B3CB 0%, #007E8C 50%, #236383 100%);
+    background: linear-gradient(135deg, #47B3CB 0%, #236383 50%, #236383 100%);
   }
 
   .premium-gradient-subtle {
@@ -442,7 +442,7 @@
   .premium-badge-success {
     @apply premium-badge;
     background: rgba(0, 126, 140, 0.1);
-    color: #006B75;
+    color: #1e5a75;
   }
 
   .premium-badge-warning {
@@ -504,7 +504,7 @@
 
   .premium-progress-bar {
     @apply h-full rounded-full transition-all duration-500;
-    background: linear-gradient(90deg, #236383, #007E8C, #47B3CB);
+    background: linear-gradient(90deg, #236383, #236383, #47B3CB);
     box-shadow: 0 0 12px rgba(35, 99, 131, 0.3);
   }
 

@@ -254,7 +254,7 @@ export default function WeeklyMonitoringDashboard() {
         <title>Weekly Monitoring Report - ${weekLabel}</title>
         <style>
           :root {
-            --report-header-background: linear-gradient(135deg, #236383 0%, #007E8C 100%);
+            --report-header-background: linear-gradient(135deg, #236383 0%, #236383 100%);
           }
           body {
             font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -270,7 +270,7 @@ export default function WeeklyMonitoringDashboard() {
             padding: 30px;
             background: var(
               --report-header-background,
-              linear-gradient(135deg, #236383 0%, #007E8C 100%)
+              linear-gradient(135deg, #236383 0%, #236383 100%)
             );
             color: white;
             border-radius: 12px;

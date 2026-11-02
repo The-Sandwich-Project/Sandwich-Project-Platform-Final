@@ -584,7 +584,7 @@ Thank you for helping us spread the word about our mission!`,
               <p>Hello ${recipientName},</p>
               <p>A new social media graphic is now available for you to share!</p>
               <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #007E8C;">${graphic.title}</h3>
+                <h3 style="margin-top: 0; color: #236383;">${graphic.title}</h3>
                 ${graphic.fileType?.startsWith('image/') ? `
                   <div style="text-align: center; margin: 15px 0;">
                     <img src="${imageUrlForEmail}" alt="${graphic.title}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />

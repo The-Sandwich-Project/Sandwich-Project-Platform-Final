@@ -291,7 +291,7 @@ function EventPlanningDenied({
       {canViewVolunteerHub && (
         <Button
           onClick={onOpenVolunteerHub}
-          className="w-full bg-[#007E8C] hover:bg-[#236383] text-white"
+          className="w-full bg-[#236383] hover:bg-[#236383] text-white"
         >
           Open Volunteer Hub
         </Button>

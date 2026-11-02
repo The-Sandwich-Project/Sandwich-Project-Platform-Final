@@ -416,7 +416,7 @@ ${userEmail}`;
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
                     <!-- Header -->
                     <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
+                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #236383;">
                             <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
                         </td>
                     </tr>
@@ -455,7 +455,7 @@ ${userEmail}`;
                             <!-- What's Included Section -->
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
                                 <tr>
-                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #007E8C;">
+                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #236383;">
                                         <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📦 What's in Your Toolkit</h2>
                                         <p style="margin: 10px 0; color: #444444; font-size: 16px;">You'll find everything attached to this email:</p>
                                         <ul style="margin: 10px 0; padding-left: 20px;">
@@ -464,7 +464,7 @@ ${userEmail}`;
                                             <li style="margin: 8px 0; color: #444444; font-size: 16px;">Loaf bag labels (print & use)</li>
                                         </ul>
                                         <p style="margin: 15px 0 0 0; font-size: 16px;">
-                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #007E8C; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
+                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #236383; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
                                         </p>
                                     </td>
                                 </tr>
@@ -590,7 +590,7 @@ ${userEmail}`;
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
                     <!-- Header -->
                     <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
+                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #236383;">
                             <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
                         </td>
                     </tr>
@@ -629,7 +629,7 @@ ${userEmail}`;
                             <!-- What's Included Section -->
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
                                 <tr>
-                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #007E8C;">
+                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #236383;">
                                         <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📦 What's in Your Toolkit</h2>
                                         <p style="margin: 10px 0; color: #444444; font-size: 16px;">You'll find everything attached to this email:</p>
                                         <ul style="margin: 10px 0; padding-left: 20px;">
@@ -638,7 +638,7 @@ ${userEmail}`;
                                             <li style="margin: 8px 0; color: #444444; font-size: 16px;">Loaf bag labels (print & use)</li>
                                         </ul>
                                         <p style="margin: 15px 0 0 0; font-size: 16px;">
-                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #007E8C; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
+                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #236383; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
                                         </p>
                                     </td>
                                 </tr>
@@ -763,7 +763,7 @@ ${userEmail}`;
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
                     <!-- Header -->
                     <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
+                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #236383;">
                             <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
                         </td>
                     </tr>
@@ -911,7 +911,7 @@ ${userEmail}`;
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
                     <!-- Header -->
                     <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
+                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #236383;">
                             <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
                         </td>
                     </tr>
@@ -1048,7 +1048,7 @@ ${userEmail}`;
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
                     <!-- Header -->
                     <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
+                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #236383;">
                             <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
                         </td>
                     </tr>
@@ -1087,7 +1087,7 @@ ${userEmail}`;
                             <!-- What's Included Section -->
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
                                 <tr>
-                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #007E8C;">
+                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #236383;">
                                         <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📦 What's in Your Toolkit</h2>
                                         <p style="margin: 10px 0; color: #444444; font-size: 16px;">You'll find everything attached to this email:</p>
                                         <ul style="margin: 10px 0; padding-left: 20px;">
@@ -1096,7 +1096,7 @@ ${userEmail}`;
                                             <li style="margin: 8px 0; color: #444444; font-size: 16px;">Loaf bag labels (print & use)</li>
                                         </ul>
                                         <p style="margin: 15px 0 0 0; font-size: 16px;">
-                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #007E8C; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
+                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #236383; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
                                         </p>
                                     </td>
                                 </tr>
@@ -1221,7 +1221,7 @@ ${userEmail}`;
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
                     <!-- Header -->
                     <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
+                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #236383;">
                             <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
                         </td>
                     </tr>

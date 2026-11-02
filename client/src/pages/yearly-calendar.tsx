@@ -1038,7 +1038,7 @@ export default function YearlyCalendar() {
                 setFormRecurrenceEndDate('');
                 setIsCreateDialogOpen(true);
               }}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Calendar Event
@@ -1054,7 +1054,7 @@ export default function YearlyCalendar() {
                 setTrackedDistrict('');
                 setIsAddTrackedItemDialogOpen(true);
               }}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Item
@@ -1157,7 +1157,7 @@ export default function YearlyCalendar() {
                     size="sm"
                     onClick={() => setExpandedMonth(isExpanded ? null : monthNumber)}
                     className={isExpanded
-                      ? 'mt-3 w-full bg-[#236383] hover:bg-[#007E8C] text-white'
+                      ? 'mt-3 w-full bg-[#236383] hover:bg-[#236383] text-white'
                       : 'mt-3 w-full border-[#236383]/30 text-[#236383] hover:bg-[#e8f4f8]'
                     }
                   >
@@ -1380,7 +1380,7 @@ export default function YearlyCalendar() {
             <Button
               onClick={handleCreate}
               disabled={createItemMutation.isPending || !formTitle.trim()}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               {createItemMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
@@ -1566,7 +1566,7 @@ export default function YearlyCalendar() {
             <Button
               onClick={handleUpdate}
               disabled={updateItemMutation.isPending || !formTitle.trim()}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               {updateItemMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Updating...</>
@@ -1764,7 +1764,7 @@ export default function YearlyCalendar() {
             <Button
               onClick={handleAddTrackedItem}
               disabled={createTrackedItemMutation.isPending || !trackedTitle.trim() || !trackedStartDate || !trackedEndDate}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               {createTrackedItemMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Adding...</>
@@ -1851,7 +1851,7 @@ export default function YearlyCalendar() {
             <Button
               onClick={handleUpdateTrackedItem}
               disabled={updateTrackedItemMutation.isPending || !trackedTitle.trim() || !trackedStartDate || !trackedEndDate}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               {updateTrackedItemMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>

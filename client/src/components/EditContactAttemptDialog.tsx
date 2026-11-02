@@ -403,7 +403,7 @@ export default function EditContactAttemptDialog({
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !contactMethod || !contactOutcome || !attributedToUserId}
-              className="flex-1 bg-[#007E8C] hover:bg-[#006B75] text-white"
+              className="flex-1 bg-[#236383] hover:bg-[#1e5a75] text-white"
               data-testid="button-submit-contact-edit"
             >
               {isSubmitting ? (

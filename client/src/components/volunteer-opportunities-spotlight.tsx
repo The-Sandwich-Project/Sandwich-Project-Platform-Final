@@ -65,7 +65,7 @@ const getUrgency = (request: EventRequest): Urgency => {
   if (days <= 7) {
     return { level: 'soon', label: 'Needs help soon', badgeClass: 'bg-amber-100 text-amber-800', borderClass: 'border-l-amber-500' };
   }
-  return { level: 'upcoming', label: 'Upcoming', badgeClass: 'bg-[#007E8C]/10 text-[#007E8C]', borderClass: 'border-l-[#007E8C]' };
+  return { level: 'upcoming', label: 'Upcoming', badgeClass: 'bg-[#236383]/10 text-[#236383]', borderClass: 'border-l-[#236383]' };
 };
 
 export function VolunteerOpportunitiesSpotlight({ onNavigate }: VolunteerOpportunitiesSpotlightProps) {
@@ -113,7 +113,7 @@ export function VolunteerOpportunitiesSpotlight({ onNavigate }: VolunteerOpportu
 
   if (isLoading) {
     return (
-      <div className="premium-card-elevated p-6 mx-4 mb-8 animate-pulse" style={{ borderTop: '4px solid #007E8C' }}>
+      <div className="premium-card-elevated p-6 mx-4 mb-8 animate-pulse" style={{ borderTop: '4px solid #236383' }}>
         <div className="h-8 bg-gray-200 rounded w-64 mb-4"></div>
         <div className="space-y-3">
           <div className="h-20 bg-gray-100 rounded"></div>
@@ -125,10 +125,10 @@ export function VolunteerOpportunitiesSpotlight({ onNavigate }: VolunteerOpportu
 
   if (isError) {
     return (
-      <div className="premium-card-elevated p-6 mx-4 mb-8" style={{ borderTop: '4px solid #007E8C' }}>
+      <div className="premium-card-elevated p-6 mx-4 mb-8" style={{ borderTop: '4px solid #236383' }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="premium-text-h4 text-[#007E8C]">Volunteer Opportunities</h3>
+            <h3 className="premium-text-h4 text-[#236383]">Volunteer Opportunities</h3>
             <p className="premium-text-body-sm text-gray-600 mt-1">
               Couldn't load volunteer needs right now.
             </p>
@@ -147,13 +147,13 @@ export function VolunteerOpportunitiesSpotlight({ onNavigate }: VolunteerOpportu
 
   if (opportunities.length === 0) {
     return (
-      <div className="premium-card-elevated p-6 mx-4 mb-8" style={{ borderTop: '4px solid #007E8C' }}>
+      <div className="premium-card-elevated p-6 mx-4 mb-8" style={{ borderTop: '4px solid #236383' }}>
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
             <Users className="w-6 h-6 text-green-600" />
           </div>
           <div>
-            <h3 className="premium-text-h4 text-[#007E8C]">Volunteer Opportunities</h3>
+            <h3 className="premium-text-h4 text-[#236383]">Volunteer Opportunities</h3>
             <p className="premium-text-body-sm text-gray-600">
               🎉 Every upcoming event is fully staffed — nothing needs volunteers right now.
             </p>
@@ -164,14 +164,14 @@ export function VolunteerOpportunitiesSpotlight({ onNavigate }: VolunteerOpportu
   }
 
   return (
-    <div className="premium-card-elevated p-6 mx-4 mb-8" style={{ borderTop: '4px solid #007E8C' }}>
+    <div className="premium-card-elevated p-6 mx-4 mb-8" style={{ borderTop: '4px solid #236383' }}>
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-[#007E8C] rounded-lg flex items-center justify-center">
+          <div className="w-12 h-12 bg-[#236383] rounded-lg flex items-center justify-center">
             <Users className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="premium-text-h3 text-[#007E8C] flex items-center gap-2">
+            <h3 className="premium-text-h3 text-[#236383] flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-[#FBAD3F]" />
               Volunteer Opportunities
             </h3>

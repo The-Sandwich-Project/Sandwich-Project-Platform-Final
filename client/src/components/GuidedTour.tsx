@@ -376,7 +376,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
         onClick={toggleMenu}
         className={cn(
           "fixed bottom-[calc(1rem+var(--chat-dock-height,0px))] right-4 w-11 h-11 rounded-full shadow-2xl z-50",
-          "bg-gradient-to-br from-[#236383] to-[#007e8c] hover:from-[#1a4d66] hover:to-[#006270]",
+          "bg-gradient-to-br from-[#236383] to-[#236383] hover:from-[#1a4d66] hover:to-[#006270]",
           "text-white transition-all duration-300 hover:scale-110 hover:h-14 hover:w-14 active:scale-95",
           "border-2 border-white/20 hover:shadow-xl",
           isVisible || showMenu || activeTour ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
@@ -397,7 +397,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
             className="fixed bottom-[calc(5rem+var(--chat-dock-height,0px))] right-4 w-[calc(100vw-3rem)] sm:w-96 md:w-[440px] max-w-[calc(100vw-3rem)] shadow-2xl z-50"
             onClick={(e) => e.stopPropagation()}
           >
-            <CardHeader className="pb-4 bg-gradient-to-r from-[#236383] to-[#007e8c] text-white rounded-t-lg">
+            <CardHeader className="pb-4 bg-gradient-to-r from-[#236383] to-[#236383] text-white rounded-t-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <HelpCircle className="w-6 h-6" />
@@ -509,7 +509,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
                               <div className="flex items-center gap-2 mt-2">
                                 <Badge
                                   variant="secondary"
-                                  className="text-xs bg-[#007e8c]/10 text-[#007e8c] hover:bg-[#007e8c]/20"
+                                  className="text-xs bg-[#236383]/10 text-[#236383] hover:bg-[#236383]/20"
                                 >
                                   {TOUR_CATEGORIES[tour.category].label}
                                 </Badge>
@@ -593,7 +593,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
                       <Badge className="bg-[#236383] text-white">
                         Step {currentStepIndex + 1} of {activeTour.steps.length}
                       </Badge>
-                      <Badge variant="outline" className="text-[#007e8c] border-[#007e8c]">
+                      <Badge variant="outline" className="text-[#236383] border-[#236383]">
                         {activeTour.title}
                       </Badge>
                     </div>
@@ -622,7 +622,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
                 <div className="mb-4">
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-[#236383] to-[#007e8c] transition-all duration-300"
+                      className="h-full bg-gradient-to-r from-[#236383] to-[#236383] transition-all duration-300"
                       style={{
                         width: `${((currentStepIndex + 1) / activeTour.steps.length) * 100}%`,
                       }}
@@ -654,7 +654,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
                     
                     <Button
                       onClick={nextStep}
-                      className="bg-gradient-to-r from-[#236383] to-[#007e8c] hover:from-[#1a4d66] hover:to-[#006270] text-white px-6"
+                      className="bg-gradient-to-r from-[#236383] to-[#236383] hover:from-[#1a4d66] hover:to-[#006270] text-white px-6"
                       data-testid="tour-next"
                     >
                       {currentStepIndex === activeTour.steps.length - 1 ? (

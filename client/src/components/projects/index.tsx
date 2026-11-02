@@ -153,8 +153,8 @@ const ProjectsManagementContent: React.FC = () => {
             onClick={() => setActiveTab('standalone_tasks')}
             className={`font-roboto font-medium transition-all ${
               activeTab === 'standalone_tasks'
-                ? 'bg-[#007E8C] text-white hover:bg-[#007E8C]/90'
-                : 'text-[#007E8C] hover:text-[#007E8C]/80 hover:bg-[#007E8C]/10'
+                ? 'bg-[#236383] text-white hover:bg-[#236383]/90'
+                : 'text-[#236383] hover:text-[#236383]/80 hover:bg-[#236383]/10'
             }`}
           >
             <ListTodo className="w-4 h-4 mr-2" />

@@ -613,7 +613,7 @@ export default function LocationsMapView() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-teal-100">
-                <MapPin className="w-5 h-5 text-[#007E8C]" />
+                <MapPin className="w-5 h-5 text-[#236383]" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900 leading-tight">Locations Map</h1>

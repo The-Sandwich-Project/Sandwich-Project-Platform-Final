@@ -582,7 +582,7 @@ export default function ImportantLinks() {
           <Card className="flex-1 flex flex-col">
             <CardHeader className="p-4 sm:p-6">
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5 text-[#007E8C]" />
+                <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5 text-[#236383]" />
                 TSP Internal Hub
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm">
@@ -595,7 +595,7 @@ export default function ImportantLinks() {
                   <Button
                     size="lg"
                     onClick={() => window.open(internalHubUrl, '_blank')}
-                    className="bg-[#007E8C] hover:bg-[#006670] text-white font-semibold px-4 sm:px-8 py-3 text-sm sm:text-base flex-1 h-11"
+                    className="bg-[#236383] hover:bg-[#006670] text-white font-semibold px-4 sm:px-8 py-3 text-sm sm:text-base flex-1 h-11"
                   >
                     <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                     Open Internal Hub
@@ -611,7 +611,7 @@ export default function ImportantLinks() {
                         logger.error('Failed to copy:', error);
                       }
                     }}
-                    className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 px-4 sm:px-6 py-3 font-medium h-11"
+                    className="border-[#236383] text-[#236383] hover:bg-[#236383]/10 px-4 sm:px-6 py-3 font-medium h-11"
                   >
                     📋 Copy Link
                   </Button>
@@ -651,7 +651,7 @@ export default function ImportantLinks() {
                   <p className="text-sm text-gray-600 mb-3">For the best experience, open the internal hub in a new tab on mobile.</p>
                   <Button
                     onClick={() => window.open(internalHubUrl, '_blank')}
-                    className="bg-[#007E8C] text-white h-11"
+                    className="bg-[#236383] text-white h-11"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Open Hub

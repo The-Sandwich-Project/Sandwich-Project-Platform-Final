@@ -812,7 +812,7 @@ export function RecipientForm({
                         title={opt.description}
                         className={`px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
                           active
-                            ? opt.badgeClass + ' ring-2 ring-offset-1 ring-[#007E8C]/40'
+                            ? opt.badgeClass + ' ring-2 ring-offset-1 ring-[#236383]/40'
                             : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
                         }`}
                       >

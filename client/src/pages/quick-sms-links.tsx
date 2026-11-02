@@ -112,8 +112,8 @@ export default function QuickSMSLinks() {
       {lastSent && (
         <Card className="mb-6 border-[#47B3CB] bg-[#E8F7FB]">
           <CardContent className="p-4 flex items-center gap-3">
-            <Check className="w-5 h-5 text-[#007E8C]" />
-            <p className="text-sm font-medium text-[#007E8C]">
+            <Check className="w-5 h-5 text-[#236383]" />
+            <p className="text-sm font-medium text-[#236383]">
               Link to {lastSent} sent successfully!
             </p>
           </CardContent>
@@ -124,7 +124,7 @@ export default function QuickSMSLinks() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5" style={{ color: '#007E8C' }} />
+            <MessageSquare className="w-5 h-5" style={{ color: '#236383' }} />
             Send App Link
           </CardTitle>
           <CardDescription>
@@ -196,7 +196,7 @@ export default function QuickSMSLinks() {
             <Button
               type="submit"
               className="w-full"
-              style={{ backgroundColor: '#007E8C', color: 'white' }}
+              style={{ backgroundColor: '#236383', color: 'white' }}
               disabled={sendSMSMutation.isPending || !phoneNumber || !selectedSection}
               data-testid="button-send-link"
             >

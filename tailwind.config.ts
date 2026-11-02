@@ -81,7 +81,7 @@ export default {
         },
         brand: {
           primary: '#236383',
-          'primary-muted': '#007E8C',
+          'primary-muted': '#236383',
           'primary-dark': '#1e5a75',
           'primary-darker': '#1A2332',
           'primary-light': 'hsl(193 60% 91%)',
@@ -89,8 +89,8 @@ export default {
           'primary-soft': 'hsl(193 60% 88%)',
           'primary-border': 'hsl(193 60% 85%)',
           'primary-border-strong': 'hsl(193 60% 75%)',
-          teal: '#007E8C',
-          'teal-dark': '#006B75',
+          teal: '#236383', // was #007E8C (retired from the palette)
+          'teal-dark': '#1e5a75',
           orange: '#FBAD3F',
           'orange-dark': '#E89A2F',
           burgundy: '#A31C41',

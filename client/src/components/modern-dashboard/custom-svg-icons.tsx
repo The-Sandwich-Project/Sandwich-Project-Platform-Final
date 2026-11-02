@@ -229,7 +229,7 @@ export function NetworkIcon({
     <svg className={className} viewBox="0 0 24 24" fill="none">
       <defs>
         <linearGradient id="networkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style={{ stopColor: '#007E8C', stopOpacity: 1 }} />
+          <stop offset="0%" style={{ stopColor: '#236383', stopOpacity: 1 }} />
           <stop
             offset="100%"
             style={{ stopColor: '#47B3CB', stopOpacity: 1 }}

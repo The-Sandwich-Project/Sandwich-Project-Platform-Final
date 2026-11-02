@@ -554,7 +554,7 @@ function ChatWindowPanel({
             type="button"
             onClick={send}
             disabled={!draft.trim() || sending || !ready}
-            className="rounded-md bg-[#236383] p-2 text-white hover:bg-[#007E8C] disabled:opacity-40"
+            className="rounded-md bg-[#236383] p-2 text-white hover:bg-[#236383] disabled:opacity-40"
             aria-label="Send"
           >
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

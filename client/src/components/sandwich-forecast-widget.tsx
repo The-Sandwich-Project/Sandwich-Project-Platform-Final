@@ -626,7 +626,7 @@ export default function SandwichForecastWidget({ hideHeader = false }: SandwichF
                               )}
                             </div>
                             <div className="text-right">
-                              <div className="font-bold text-[#007E8C]">
+                              <div className="font-bold text-[#236383]">
                                 🥪 {sandwichCount.toLocaleString()}
                               </div>
                             </div>

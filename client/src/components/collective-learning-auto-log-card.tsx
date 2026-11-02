@@ -213,7 +213,7 @@ export default function CollectiveLearningAutoLogCard() {
         data-testid="button-toggle-cl-auto-log"
       >
         <div className="flex items-start gap-2 min-w-0">
-          <Repeat className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#007E8C' }} />
+          <Repeat className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#236383' }} />
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-900">
               {config.hostName} weekly auto-log
@@ -335,7 +335,7 @@ export default function CollectiveLearningAutoLogCard() {
               size="sm"
               disabled={!weekOf || !countValid || overrideMutation.isPending}
               onClick={() => overrideMutation.mutate()}
-              style={{ backgroundColor: '#007E8C' }}
+              style={{ backgroundColor: '#236383' }}
             >
               Save override
             </Button>

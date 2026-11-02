@@ -35,7 +35,7 @@ import { BrandColors, Spacing, Typography } from '@/lib/design-tokens';
 
 ```typescript
 BrandColors.primary        // #236383 - Main brand color
-BrandColors.teal          // #007E8C - Teal accent
+BrandColors.teal          // #236383 - same as primary (#007E8C was retired from the palette)
 BrandColors.orange        // #FBAD3F - Secondary accent
 BrandColors.burgundy      // #A31C41 - Tertiary accent
 BrandColors.navy          // #1A2332 - Dark accent

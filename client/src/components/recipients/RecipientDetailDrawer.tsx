@@ -76,7 +76,7 @@ export function RecipientDetailDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-0">
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-[#236383] to-[#007E8C] text-white px-6 py-5 pr-14">
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-[#236383] to-[#236383] text-white px-6 py-5 pr-14">
           <SheetHeader className="text-left space-y-1">
             <SheetTitle className="text-xl text-white">{recipient.name}</SheetTitle>
             <SheetDescription className="text-white/80 flex flex-wrap items-center gap-2">
@@ -136,10 +136,10 @@ export function RecipientDetailDrawer({
 
         <div className="px-6 py-5 space-y-6">
           {/* Schedules — prominent */}
-          <section className="rounded-lg border border-[#007E8C]/20 bg-[#E0F2F1]/40 p-4 space-y-3">
+          <section className="rounded-lg border border-[#236383]/20 bg-[#E0F2F1]/40 p-4 space-y-3">
             <h3 className="text-sm font-semibold text-[#236383]">Schedules</h3>
             <div>
-              <p className="text-xs font-medium text-[#007E8C] mb-1.5">Collection days</p>
+              <p className="text-xs font-medium text-[#236383] mb-1.5">Collection days</p>
               <ScheduleDayChips schedules={collectionSchedules} variant="collection" />
               {collectionSchedules.length > 0 && (
                 <ul className="mt-2 space-y-1">
@@ -278,7 +278,7 @@ export function RecipientDetailDrawer({
               {recipient.email && (
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 shrink-0" />
-                  <a href={`mailto:${recipient.email}`} className="hover:text-[#007E8C] underline">
+                  <a href={`mailto:${recipient.email}`} className="hover:text-[#236383] underline">
                     {recipient.email}
                   </a>
                 </div>
@@ -290,7 +290,7 @@ export function RecipientDetailDrawer({
                     href={website.startsWith('http') ? website : `https://${website}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-[#007E8C] underline truncate"
+                    className="hover:text-[#236383] underline truncate"
                   >
                     {website}
                   </a>
@@ -303,7 +303,7 @@ export function RecipientDetailDrawer({
                     href={`https://instagram.com/${instagramHandle.replace('@', '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-[#007E8C] underline"
+                    className="hover:text-[#236383] underline"
                   >
                     {instagramHandle}
                   </a>
@@ -324,7 +324,7 @@ export function RecipientDetailDrawer({
                         href={mapUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block text-xs text-[#007E8C] hover:underline mt-1"
+                        className="block text-xs text-[#236383] hover:underline mt-1"
                       >
                         Open in Google Maps
                       </a>
@@ -354,7 +354,7 @@ export function RecipientDetailDrawer({
                             href={extraMapUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block text-xs text-[#007E8C] hover:underline mt-1"
+                            className="block text-xs text-[#236383] hover:underline mt-1"
                           >
                             Open in Google Maps
                           </a>

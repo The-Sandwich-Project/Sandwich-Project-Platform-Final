@@ -2574,10 +2574,10 @@ export default function SandwichCollectionLog() {
         {user?.role && user.role !== 'super_admin' && user.role !== 'admin' && (
           <div className="mb-4 p-3 rounded border-l-4" style={{
             backgroundColor: 'rgba(0, 126, 140, 0.08)',
-            borderLeftColor: '#007E8C'
+            borderLeftColor: '#236383'
           }}>
             <div className="flex items-start gap-2">
-              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#007E8C' }} />
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#236383' }} />
               <p className="text-sm" style={{ color: '#236383' }}>
                 {getRoleViewDescription(user.role, 'collections')}
               </p>
@@ -2708,8 +2708,8 @@ export default function SandwichCollectionLog() {
                   data-testid={`chip-quick-filter-${value}`}
                   className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all ${
                     isActive
-                      ? 'bg-[#007E8C] text-white border-[#007E8C] shadow-sm'
-                      : 'bg-white text-slate-700 border-slate-300 hover:border-[#007E8C] hover:text-[#007E8C]'
+                      ? 'bg-[#236383] text-white border-[#236383] shadow-sm'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-[#236383] hover:text-[#236383]'
                   }`}
                   aria-pressed={isActive}
                 >
@@ -3293,7 +3293,7 @@ export default function SandwichCollectionLog() {
                               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                 {groupData.map((group: any, index: number) => {
                                 const hasTypes = group.deli || group.pbj || group.generic;
-                                const colors = ['#236383', '#FBAD3F', '#007E8C', '#47B3CB'];
+                                const colors = ['#236383', '#FBAD3F', '#236383', '#47B3CB'];
                                 const colorIndex = index % colors.length;
                                 const borderColor = colors[colorIndex];
                                 return (

@@ -11,12 +11,12 @@
  */
 export const BrandColors = {
   primary: '#236383',
-  primaryMuted: '#007E8C',
+  primaryMuted: '#236383',
   primaryDark: '#1e5a75',
   primaryDarker: '#1A2332',
-  teal: '#007E8C',
+  teal: '#236383', // was #236383 (retired from the palette)
   tealLight: '#47B3CB',
-  tealHover: '#006B75',
+  tealHover: '#1e5a75',
   tealDark: '#004F59',
   orange: '#FBAD3F',
   orangeDark: '#E89A2F',

@@ -859,9 +859,9 @@ function EventOperationalDashboardContent() {
                     <Line
                       type="monotone"
                       dataKey="requests"
-                      stroke="#007E8C"
+                      stroke="#236383"
                       strokeWidth={2}
-                      dot={{ fill: '#007E8C', strokeWidth: 2 }}
+                      dot={{ fill: '#236383', strokeWidth: 2 }}
                       activeDot={{ r: 6 }}
                     />
                   </LineChart>

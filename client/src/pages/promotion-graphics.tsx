@@ -520,7 +520,7 @@ export default function PromotionGraphics() {
         {canUpload && (
           <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
             <DialogTrigger asChild>
-              <Button style={{ backgroundColor: '#007E8C', color: 'white' }}>
+              <Button style={{ backgroundColor: '#236383', color: 'white' }}>
                 <Plus className="mr-2 h-4 w-4" />
                 Upload Graphic
               </Button>
@@ -652,7 +652,7 @@ export default function PromotionGraphics() {
                   <Button
                     type="submit"
                     disabled={!uploadedFile || isUploading}
-                    style={{ backgroundColor: '#007E8C', color: 'white' }}
+                    style={{ backgroundColor: '#236383', color: 'white' }}
                   >
                     {isUploading 
                       ? 'Uploading...' 
@@ -749,7 +749,7 @@ export default function PromotionGraphics() {
                   <Button
                     type="submit"
                     disabled={updateMutation.isPending || !title || !description}
-                    style={{ backgroundColor: '#007E8C', color: 'white' }}
+                    style={{ backgroundColor: '#236383', color: 'white' }}
                   >
                     {updateMutation.isPending ? 'Updating...' : 'Update Graphic'}
                   </Button>
@@ -813,7 +813,7 @@ export default function PromotionGraphics() {
                 {canUpload && (
                   <Button
                     onClick={() => setShowUploadDialog(true)}
-                    style={{ backgroundColor: '#007E8C', color: 'white' }}
+                    style={{ backgroundColor: '#236383', color: 'white' }}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Upload First Graphic
@@ -892,7 +892,7 @@ export default function PromotionGraphics() {
                       </div>
                       {graphic.viewCount !== undefined && graphic.viewCount > 0 && (
                         <div className="flex items-center text-gray-600">
-                          <Eye className="h-4 w-4 mr-2" style={{ color: '#007E8C' }} />
+                          <Eye className="h-4 w-4 mr-2" style={{ color: '#236383' }} />
                           <span>{graphic.viewCount} {graphic.viewCount === 1 ? 'view' : 'views'}</span>
                         </div>
                       )}
@@ -1076,7 +1076,7 @@ export default function PromotionGraphics() {
                             size="sm"
                             onClick={() => restoreMutation.mutate(graphic.id)}
                             title="Restore this graphic"
-                            style={{ borderColor: '#007E8C', color: '#007E8C' }}
+                            style={{ borderColor: '#236383', color: '#236383' }}
                           >
                             <RotateCcw className="h-4 w-4 mr-1" />
                             Restore
@@ -1185,7 +1185,7 @@ export default function PromotionGraphics() {
                           restoreMutation.mutate(selectedGraphic.id);
                           setSelectedGraphic(null);
                         }}
-                        style={{ borderColor: '#007E8C', color: '#007E8C' }}
+                        style={{ borderColor: '#236383', color: '#236383' }}
                       >
                         <RotateCcw className="h-4 w-4 mr-2" />
                         Restore

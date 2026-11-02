@@ -347,7 +347,7 @@ export const DELIVERY_CADENCE_OPTIONS: ReadonlyArray<{
     value: 'weekly_priority',
     label: 'Weekly priority',
     description: 'Regular committed orgs we serve every week.',
-    badgeClass: 'bg-[#007E8C]/15 text-[#236383] border-[#007E8C]/40',
+    badgeClass: 'bg-[#236383]/15 text-[#236383] border-[#236383]/40',
   },
   {
     value: 'as_requested_consistently',

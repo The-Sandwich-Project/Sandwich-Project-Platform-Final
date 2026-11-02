@@ -31,7 +31,7 @@ import { downloadCsv } from '@/lib/csv-download';
 const COLORS = {
   primary: '#236383',
   accent: '#FBAD3F',
-  teal: '#007E8C',
+  teal: '#236383',
   sky: '#47B3CB',
   red: '#A31C41',
 };

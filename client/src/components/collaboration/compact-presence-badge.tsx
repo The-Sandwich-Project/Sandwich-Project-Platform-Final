@@ -62,12 +62,12 @@ export function CompactPresenceBadge({
         <TooltipTrigger asChild>
           <div 
             className={cn(
-              "flex items-center gap-1 px-2 py-1 bg-[#007E8C]/10 rounded-full border border-[#007E8C]/20 cursor-pointer hover:bg-[#007E8C]/20 transition-colors",
+              "flex items-center gap-1 px-2 py-1 bg-[#236383]/10 rounded-full border border-[#236383]/20 cursor-pointer hover:bg-[#236383]/20 transition-colors",
               className
             )}
             data-testid="compact-presence-badge"
           >
-            <Eye className="h-3 w-3 text-[#007E8C]" />
+            <Eye className="h-3 w-3 text-[#236383]" />
             <div className="flex items-center -space-x-1.5">
               {displayUsers.map((user) => (
                 <Avatar 
@@ -94,14 +94,14 @@ export function CompactPresenceBadge({
                 </Avatar>
               )}
             </div>
-            <span className="text-xs font-medium text-[#007E8C]">
+            <span className="text-xs font-medium text-[#236383]">
               {otherUsers.length}
             </span>
           </div>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-[200px]">
           <div className="space-y-1">
-            <p className="text-xs font-semibold text-[#007E8C]">
+            <p className="text-xs font-semibold text-[#236383]">
               {otherUsers.length} {otherUsers.length === 1 ? 'person' : 'people'} viewing
             </p>
             <ul className="space-y-0.5">

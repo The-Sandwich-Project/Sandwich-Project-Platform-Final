@@ -55,7 +55,7 @@ interface AiAnalystApiResponse {
 
 const CHART_COLORS = [
   '#236383',
-  '#007E8C',
+  '#236383',
   '#FBAD3F',
   '#A31C41',
   '#10B981',
@@ -91,7 +91,7 @@ function renderChart(chart: AiAnalystChart) {
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#007E8C"
+              stroke="#236383"
               strokeWidth={2}
               dot={false}
             />

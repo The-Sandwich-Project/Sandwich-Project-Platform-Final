@@ -84,10 +84,10 @@ body {
     --color-brand-primary: #236383;
     --color-brand-secondary: #FBAD3F;
     --color-brand-accent: #A31C41;
-    --color-brand-muted: #007E8C;
-    --color-brand-teal: #007E8C;
+    --color-brand-muted: #236383;
+    --color-brand-teal: #236383;
     --color-brand-teal-light: #47B3CB;
-    --color-brand-teal-hover: #006B75;
+    --color-brand-teal-hover: #1e5a75;
     --color-brand-teal-dark: #1A4F61;
     --color-brand-orange: #FBAD3F;
     --color-brand-navy: #1A2332;
@@ -146,7 +146,7 @@ body {
   body {
     @apply font-sans antialiased text-base text-foreground;
     font-family: 'Roboto', system-ui, sans-serif;
-    background-color: #007E8C; /* Deep teal for app shell */
+    background-color: #236383; /* Deep teal for app shell */
   }
 
   .font-main-heading {

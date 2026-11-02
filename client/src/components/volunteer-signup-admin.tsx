@@ -56,7 +56,7 @@ function getRoleIcon(role: string) {
 function getRoleColor(role: string) {
   switch (role) {
     case 'driver': return 'bg-[#236383] text-white';
-    default: return 'bg-[#007e8c] text-white';
+    default: return 'bg-[#236383] text-white';
   }
 }
 

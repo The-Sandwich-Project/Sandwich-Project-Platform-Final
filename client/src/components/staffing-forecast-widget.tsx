@@ -660,7 +660,7 @@ export default function StaffingForecastWidget({ hideHeader = false }: StaffingF
                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.eventAddress)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-sm text-[#236383] hover:text-[#007E8C] hover:underline"
+                                className="flex items-center gap-1 text-sm text-[#236383] hover:text-[#236383] hover:underline"
                               >
                                 <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
                                 <span className="line-clamp-1">{event.eventAddress}</span>

@@ -375,7 +375,7 @@ export const EventMessageThread: React.FC<EventMessageThreadProps> = ({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 px-2 text-[#007E8C] hover:text-[#006B75] hover:bg-[#007E8C]/10"
+                        className="h-7 px-2 text-[#236383] hover:text-[#1e5a75] hover:bg-[#236383]/10"
                         onClick={() => item.attemptNumber && onEditContactAttempt(item.attemptNumber)}
                       >
                         <Edit2 className="h-3 w-3 mr-1" />

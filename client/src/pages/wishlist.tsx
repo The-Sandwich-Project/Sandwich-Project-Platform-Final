@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 const COLORS = {
   navy: '#236383',
-  teal: '#007E8C',
+  teal: '#236383',
   sky: '#47B3CB',
   crimson: '#A31C41',
   gold: '#FBAD3F',

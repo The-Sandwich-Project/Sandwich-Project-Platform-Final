@@ -162,7 +162,7 @@ export function RecentlyAccessedResources() {
               </p>
               <a
                 href="/dashboard?section=resources"
-                className="inline-flex items-center gap-1 text-sm text-[#236383] hover:text-[#007E8C] font-medium"
+                className="inline-flex items-center gap-1 text-sm text-[#236383] hover:text-[#236383] font-medium"
               >
                 Browse resources
                 <ArrowRight className="w-4 h-4" />
@@ -206,7 +206,7 @@ export function RecentlyAccessedResources() {
               <div className="mt-3 pt-3 border-t border-gray-200">
                 <a
                   href="/dashboard?section=resources"
-                  className="text-sm text-[#236383] hover:text-[#007E8C] font-medium flex items-center justify-center gap-1"
+                  className="text-sm text-[#236383] hover:text-[#236383] font-medium flex items-center justify-center gap-1"
                 >
                   View all resources
                   <ArrowRight className="w-4 h-4" />

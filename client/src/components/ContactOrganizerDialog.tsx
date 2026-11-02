@@ -130,17 +130,17 @@ export default function ContactOrganizerDialog({
 
         <div className="space-y-6">
           {/* Contact Information Card */}
-          <div className="bg-gradient-to-r from-[#e6f2f5] to-[#f0f7f9] border border-[#007E8C]/20 rounded-lg p-4">
+          <div className="bg-gradient-to-r from-[#e6f2f5] to-[#f0f7f9] border border-[#236383]/20 rounded-lg p-4">
             <div className="space-y-3">
               {/* Name */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
-                  <User className="w-5 h-5 text-[#007E8C] flex-shrink-0" />
+                  <User className="w-5 h-5 text-[#236383] flex-shrink-0" />
                   <div>
                     <h3 className="font-semibold text-[#1A2332] text-lg">
                       {contactName}
                     </h3>
-                    <p className="text-sm text-[#007E8C]">Event Contact</p>
+                    <p className="text-sm text-[#236383]">Event Contact</p>
                   </div>
                 </div>
                 <Button
@@ -161,12 +161,12 @@ export default function ContactOrganizerDialog({
               {/* Organization */}
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
-                  <Building className="w-5 h-5 text-[#007E8C] flex-shrink-0" />
+                  <Building className="w-5 h-5 text-[#236383] flex-shrink-0" />
                   <div>
                     <p className="font-medium text-[#1A2332]">
                       {eventRequest.organizationName}
                     </p>
-                    <p className="text-sm text-[#007E8C]">Organization</p>
+                    <p className="text-sm text-[#236383]">Organization</p>
                   </div>
                 </div>
                 <Button
@@ -199,7 +199,7 @@ export default function ContactOrganizerDialog({
                         day: 'numeric'
                       })}
                     </p>
-                    <p className="text-sm text-[#007E8C]">Requested Event Date</p>
+                    <p className="text-sm text-[#236383]">Requested Event Date</p>
                   </div>
                 </div>
               )}
@@ -213,7 +213,7 @@ export default function ContactOrganizerDialog({
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <Mail className="w-5 h-5 text-[#007E8C]" />
+                    <Mail className="w-5 h-5 text-[#236383]" />
                     <div>
                       <p className="font-medium text-[#1A2332]">{eventRequest.email}</p>
                       <p className="text-sm text-gray-600">Email Address</p>
@@ -223,7 +223,7 @@ export default function ContactOrganizerDialog({
                 <div className="flex space-x-2">
                   <Button
                     onClick={handleEmail}
-                    className="flex-1 bg-[#007E8C] hover:bg-[#006B75] text-white"
+                    className="flex-1 bg-[#236383] hover:bg-[#1e5a75] text-white"
                     data-testid="button-email-contact"
                   >
                     <Mail className="w-4 h-4 mr-2" />
@@ -251,7 +251,7 @@ export default function ContactOrganizerDialog({
               <div className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <Phone className="w-5 h-5 text-[#007E8C]" />
+                    <Phone className="w-5 h-5 text-[#236383]" />
                     <div>
                       <p className="font-medium text-[#1A2332]">{eventRequest.phone}</p>
                       <p className="text-sm text-gray-600">Phone Number</p>

@@ -134,19 +134,19 @@ type AssignmentStatusKey = 'new' | 'in_process' | 'scheduled' | 'rescheduled';
 const statusStyle: Record<string, string> = {
   new: 'bg-[#FBAD3F] text-[#3d2800] border-[#E8960C] shadow-md hover:shadow-lg',
   in_process: 'bg-[#236383] text-white border-[#1a4d63] shadow-md hover:shadow-lg',
-  scheduled: 'bg-[#007E8C] text-white border-[#005f6b] shadow-md hover:shadow-lg',
-  rescheduled: 'bg-[#47B3CB] text-[#0d3d4d] border-[#007E8C] shadow-md hover:shadow-lg',
+  scheduled: 'bg-[#236383] text-white border-[#005f6b] shadow-md hover:shadow-lg',
+  rescheduled: 'bg-[#47B3CB] text-[#0d3d4d] border-[#236383] shadow-md hover:shadow-lg',
 };
 const statusBadgeStyle: Record<string, string> = {
   new: 'bg-[#FBAD3F] text-[#3d2800] border-[#E8960C]',
   in_process: 'bg-[#236383] text-white border-[#236383]',
-  scheduled: 'bg-[#007E8C] text-white border-[#007E8C]',
-  rescheduled: 'bg-[#47B3CB] text-[#0d3d4d] border-[#007E8C]',
+  scheduled: 'bg-[#236383] text-white border-[#236383]',
+  rescheduled: 'bg-[#47B3CB] text-[#0d3d4d] border-[#236383]',
 };
 const statusRowAccent: Record<string, string> = {
   new: 'border-l-[#FBAD3F]',
   in_process: 'border-l-[#47B3CB]',
-  scheduled: 'border-l-[#007E8C]',
+  scheduled: 'border-l-[#236383]',
   rescheduled: 'border-l-[#236383]',
 };
 const statusLabel: Record<string, string> = {
@@ -252,11 +252,11 @@ function AssignmentEventRow({
       className={`w-full text-left p-3 rounded-lg border-l-4 transition-all shadow-sm hover:shadow-md ${
         isUrgent
           ? 'border-l-red-600 bg-red-50 border-y border-r border-red-400 ring-2 ring-red-200 hover:bg-red-100'
-          : `${rowAccent} bg-white border-y border-r border-[#47B3CB]/50 hover:border-[#007E8C] hover:bg-[#e8f4f8]/60`
+          : `${rowAccent} bg-white border-y border-r border-[#47B3CB]/50 hover:border-[#236383] hover:bg-[#e8f4f8]/60`
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className="shrink-0 w-[4.5rem] text-center rounded-lg bg-gradient-to-b from-[#007E8C] to-[#236383] border border-[#005f6b] px-2 py-2 shadow-sm">
+        <div className="shrink-0 w-[4.5rem] text-center rounded-lg bg-gradient-to-b from-[#236383] to-[#236383] border border-[#005f6b] px-2 py-2 shadow-sm">
           <div className="text-[10px] font-bold uppercase tracking-wide text-[#FBAD3F]">
             {dateParts.month}
           </div>
@@ -302,7 +302,7 @@ function AssignmentEventRow({
                 )}
               </div>
             </div>
-            <ArrowRight className="w-4 h-4 text-[#007E8C] shrink-0 mt-1" />
+            <ArrowRight className="w-4 h-4 text-[#236383] shrink-0 mt-1" />
           </div>
 
           {hasSandwichInfo && (
@@ -620,16 +620,16 @@ function MyAssignmentsView({
     <div className="mx-4 mb-8">
       <div
         className="premium-card-elevated p-6 bg-gradient-to-br from-white via-[#e8f4f8]/40 to-white"
-        style={{ borderTop: '5px solid #007E8C', boxShadow: '0 4px 24px rgba(35, 99, 131, 0.12)' }}
+        style={{ borderTop: '5px solid #236383', boxShadow: '0 4px 24px rgba(35, 99, 131, 0.12)' }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-11 h-11 bg-gradient-to-br from-[#007E8C] to-[#236383] rounded-xl flex items-center justify-center shadow-md">
+          <div className="w-11 h-11 bg-gradient-to-br from-[#236383] to-[#236383] rounded-xl flex items-center justify-center shadow-md">
             <Star className="w-5 h-5 text-[#FBAD3F]" />
           </div>
           <div>
             <h3 className="premium-text-h4 text-[#236383] font-bold">My Assignments</h3>
-            <p className="premium-text-body-sm text-[#007E8C] font-medium">
+            <p className="premium-text-body-sm text-[#236383] font-medium">
               {my.total} {my.total === 1 ? 'event' : 'events'} you're the TSP contact for
             </p>
           </div>
@@ -765,10 +765,10 @@ function MyAssignmentsView({
         {/* PRIORITY 3: Status breakdown — click a tile to expand event details */}
         <div className="rounded-xl border-2 border-[#47B3CB]/50 bg-gradient-to-br from-[#e8f4f8] to-white p-4 mb-6 shadow-sm">
           <h4 className="text-sm font-bold text-[#236383] mb-1 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[#007E8C]" />
+            <Calendar className="w-4 h-4 text-[#236383]" />
             Your assignments by status
           </h4>
-          <p className="text-xs font-medium text-[#007E8C] mb-3">
+          <p className="text-xs font-medium text-[#236383] mb-3">
             Click a status to expand details. Click an event to open it in Event Requests.
           </p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -811,7 +811,7 @@ function MyAssignmentsView({
                 <button
                   type="button"
                   onClick={() => drillToStatusTab(expandedStatus)}
-                  className="text-xs font-bold text-[#007E8C] hover:text-[#236383] hover:underline shrink-0"
+                  className="text-xs font-bold text-[#236383] hover:text-[#236383] hover:underline shrink-0"
                 >
                   Open in Event Requests →
                 </button>
@@ -835,7 +835,7 @@ function MyAssignmentsView({
         {otherEvents.length > 0 && (
           <div className="mb-6 rounded-xl border border-[#47B3CB]/40 bg-white p-4 shadow-sm">
             <h4 className="text-sm font-bold text-[#236383] mb-3 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#007E8C]" />
+              <Clock className="w-4 h-4 text-[#236383]" />
               {otherEvents.length === my.total ? 'Your events' : 'Your other events'}
             </h4>
             <div className="space-y-2">
@@ -851,7 +851,7 @@ function MyAssignmentsView({
                 <button
                   type="button"
                   onClick={() => onNavigate('event-requests')}
-                  className="w-full text-center text-sm font-bold text-[#007E8C] hover:text-[#236383] hover:underline py-2"
+                  className="w-full text-center text-sm font-bold text-[#236383] hover:text-[#236383] hover:underline py-2"
                 >
                   View all your events →
                 </button>
@@ -864,7 +864,7 @@ function MyAssignmentsView({
         <div className="flex flex-wrap gap-3">
           <Button
             onClick={() => onNavigate('event-requests')}
-            className="bg-[#236383] hover:bg-[#007E8C] text-white font-bold shadow-md"
+            className="bg-[#236383] hover:bg-[#236383] text-white font-bold shadow-md"
           >
             <Calendar className="w-4 h-4 mr-2" />
             Open Event Requests
@@ -873,7 +873,7 @@ function MyAssignmentsView({
             <Button
               variant="outline"
               onClick={() => onNavigate('volunteer-hub')}
-              className="border-2 border-[#007E8C] text-[#007E8C] font-bold hover:bg-[#007E8C] hover:text-white"
+              className="border-2 border-[#236383] text-[#236383] font-bold hover:bg-[#236383] hover:text-white"
             >
               <Users className="w-4 h-4 mr-2" />
               Volunteer Hub
@@ -963,7 +963,7 @@ export default function OperationalOverview({ onNavigate }: OperationalOverviewP
       <div className="mx-4 mb-8">
         <div
           className="premium-card-elevated p-6"
-          style={{ borderTop: '4px solid #007E8C' }}
+          style={{ borderTop: '4px solid #236383' }}
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
@@ -1008,7 +1008,7 @@ export default function OperationalOverview({ onNavigate }: OperationalOverviewP
 
   return (
     <div className="mx-4 mb-8">
-      <div className="premium-card-elevated p-6" style={{ borderTop: '4px solid #007E8C' }}>
+      <div className="premium-card-elevated p-6" style={{ borderTop: '4px solid #236383' }}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-brand-teal rounded-lg flex items-center justify-center">

@@ -113,7 +113,7 @@ export function TextIdeaAnnouncementModal() {
             <div className="bg-gray-50 p-3 rounded-lg border">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Example message:</p>
               <div className="bg-white border rounded-lg p-3 font-mono text-sm text-gray-700">
-                <MessageSquareText className="w-4 h-4 inline mr-2 text-[#007E8C]" />
+                <MessageSquareText className="w-4 h-4 inline mr-2 text-[#236383]" />
                 IDEA What if we partnered with the local food bank for distribution?
               </div>
             </div>

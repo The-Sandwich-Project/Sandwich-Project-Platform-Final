@@ -66,7 +66,7 @@ export function FirstLoginTourPrompt() {
       <AlertDialogContent className="sm:max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <Compass className="w-5 h-5 text-[#007e8c]" />
+            <Compass className="w-5 h-5 text-[#236383]" />
             Welcome to the platform
           </AlertDialogTitle>
           <AlertDialogDescription className="text-left space-y-2 pt-1">
@@ -90,7 +90,7 @@ export function FirstLoginTourPrompt() {
           <AlertDialogAction asChild>
             <Button
               onClick={handleStartTour}
-              className="bg-[#236383] hover:bg-[#007e8c]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               <PlayCircle className="w-4 h-4 mr-1.5" />
               Start quick tour

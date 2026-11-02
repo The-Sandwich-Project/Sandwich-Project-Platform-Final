@@ -85,7 +85,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { HostResource } from '@shared/schema';
 
-// Brand colors: #236383 (dark teal), #47b3cb (light teal), #007e8c (primary teal), #a31c41 (burgundy), #fbad3f (gold)
+// Brand colors: #236383 (dark teal), #47b3cb (light teal), #236383 (primary teal), #a31c41 (burgundy), #fbad3f (gold)
 
 // Admin-only overflow menu — delete is server-restricted to admin/super_admin as well
 function ResourceAdminMenu({ onDelete }: { onDelete: () => void }) {
@@ -135,13 +135,13 @@ function ResourceCard({
   variant?: 'default' | 'primary' | 'secondary';
 }) {
   const bgClass = variant === 'primary'
-    ? 'bg-[#007e8c]/10 border-[#007e8c]/30 hover:bg-[#007e8c]/20'
+    ? 'bg-[#236383]/10 border-[#236383]/30 hover:bg-[#236383]/20'
     : variant === 'secondary'
     ? 'bg-[#fbad3f]/10 border-[#fbad3f]/30 hover:bg-[#fbad3f]/20'
     : 'bg-white hover:bg-gray-50';
 
   const iconColor = variant === 'primary'
-    ? 'text-[#007e8c]'
+    ? 'text-[#236383]'
     : variant === 'secondary'
     ? 'text-[#fbad3f]'
     : 'text-[#236383]';
@@ -253,7 +253,7 @@ function ImageGuideCard({
   };
 
   return (
-    <Card className="bg-white hover:shadow-md transition-shadow overflow-hidden border-l-4 border-l-[#007e8c]">
+    <Card className="bg-white hover:shadow-md transition-shadow overflow-hidden border-l-4 border-l-[#236383]">
       <div className="aspect-[4/5] relative bg-gray-100">
         <img
           src={imageUrl}
@@ -268,7 +268,7 @@ function ImageGuideCard({
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5 bg-[#007e8c] hover:bg-[#236383] text-white border-none"
+            className="flex-1 gap-1.5 bg-[#236383] hover:bg-[#236383] text-white border-none"
             onClick={handleDownload}
           >
             <Download className="w-4 h-4" />
@@ -418,7 +418,7 @@ function DocumentCard({
               )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-full p-2">
-                  <Eye className="w-4 h-4 text-[#007e8c]" />
+                  <Eye className="w-4 h-4 text-[#236383]" />
                 </div>
               </div>
             </div>
@@ -450,7 +450,7 @@ function DocumentCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 flex-1 sm:flex-none bg-[#007e8c] hover:bg-[#236383] text-white border-none"
+                  className="gap-1.5 flex-1 sm:flex-none bg-[#236383] hover:bg-[#236383] text-white border-none"
                   onClick={handleDownload}
                 >
                   <Download className="w-4 h-4" />
@@ -485,7 +485,7 @@ function DocumentCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 bg-[#007e8c] hover:bg-[#236383] text-white border-none"
+                  className="gap-1.5 bg-[#236383] hover:bg-[#236383] text-white border-none"
                   onClick={handleDownload}
                 >
                   <Download className="w-4 h-4" />
@@ -584,7 +584,7 @@ function UploadResourceDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="w-5 h-5 text-[#007e8c]" />
+            <Upload className="w-5 h-5 text-[#236383]" />
             Upload Resource
           </DialogTitle>
         </DialogHeader>
@@ -653,7 +653,7 @@ function UploadResourceDialog({
             <Button
               type="submit"
               disabled={uploading || !file || !title || !description}
-              className="bg-[#007e8c] hover:bg-[#236383] text-white"
+              className="bg-[#236383] hover:bg-[#236383] text-white"
             >
               {uploading ? 'Uploading...' : 'Upload'}
             </Button>
@@ -727,8 +727,8 @@ export default function HostResources() {
       {/* Header */}
       <div className="text-center space-y-2">
         <div className="flex items-center justify-center gap-3">
-          <div className="p-3 bg-[#007e8c]/10 rounded-full">
-            <Building2 className="w-8 h-8 text-[#007e8c]" />
+          <div className="p-3 bg-[#236383]/10 rounded-full">
+            <Building2 className="w-8 h-8 text-[#236383]" />
           </div>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold">Host Resources</h1>
@@ -739,7 +739,7 @@ export default function HostResources() {
         {isAdmin && (
           <Button
             onClick={() => setUploadOpen(true)}
-            className="mt-3 bg-[#007e8c] hover:bg-[#236383] text-white gap-2"
+            className="mt-3 bg-[#236383] hover:bg-[#236383] text-white gap-2"
           >
             <Plus className="w-4 h-4" />
             Upload New Resource
@@ -784,10 +784,10 @@ export default function HostResources() {
           rel="noopener noreferrer"
           className="block"
         >
-          <Card className="bg-gradient-to-r from-[#007e8c]/10 to-[#236383]/10 border-[#007e8c]/30 hover:from-[#007e8c]/20 hover:to-[#236383]/20 transition-colors cursor-pointer">
+          <Card className="bg-gradient-to-r from-[#236383]/10 to-[#236383]/10 border-[#236383]/30 hover:from-[#236383]/20 hover:to-[#236383]/20 transition-colors cursor-pointer">
             <CardContent className="flex items-center gap-4 p-5">
               <div className="p-3 bg-white rounded-lg shadow-sm flex-shrink-0">
-                <BookOpen className="w-6 h-6 text-[#007e8c]" />
+                <BookOpen className="w-6 h-6 text-[#236383]" />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-semibold text-[#236383]">TSP Host Handbook</h3>
@@ -795,7 +795,7 @@ export default function HostResources() {
                   Complete guide for host collection sites — everything you need to know about hosting a sandwich collection.
                 </p>
               </div>
-              <ExternalLink className="w-5 h-5 text-[#007e8c] flex-shrink-0" />
+              <ExternalLink className="w-5 h-5 text-[#236383] flex-shrink-0" />
             </CardContent>
           </Card>
         </a>
@@ -829,7 +829,7 @@ export default function HostResources() {
       {/* Maps Section */}
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-[#007e8c]" />
+          <MapPin className="w-5 h-5 text-[#236383]" />
           Maps & Locations
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -885,7 +885,7 @@ export default function HostResources() {
       {/* Sandwich Assembly Guides Section */}
       <section>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Image className="w-5 h-5 text-[#007e8c]" />
+          <Image className="w-5 h-5 text-[#236383]" />
           Sandwich Assembly Guides
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
@@ -921,7 +921,7 @@ export default function HostResources() {
           <HelpCircle className="w-5 h-5 text-[#236383]" />
           Need Help?
         </h2>
-        <Card className="bg-gradient-to-r from-[#47b3cb]/10 to-[#007e8c]/10 border-[#007e8c]/30">
+        <Card className="bg-gradient-to-r from-[#47b3cb]/10 to-[#236383]/10 border-[#236383]/30">
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

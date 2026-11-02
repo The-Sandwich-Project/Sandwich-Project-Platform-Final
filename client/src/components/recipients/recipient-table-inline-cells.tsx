@@ -107,7 +107,7 @@ export function InlineTextCell({
         stopRowClick(e);
         setEditing(true);
       }}
-      className={`group text-left text-sm w-full truncate rounded px-1 py-0.5 hover:bg-white hover:ring-1 hover:ring-[#007E8C]/30 ${className}`}
+      className={`group text-left text-sm w-full truncate rounded px-1 py-0.5 hover:bg-white hover:ring-1 hover:ring-[#236383]/30 ${className}`}
     >
       {isSaving ? (
         <Loader2 className="w-3 h-3 animate-spin inline" />
@@ -166,7 +166,7 @@ export function InlineAddressCell({
         target="_blank"
         rel="noopener noreferrer"
         onClick={stopRowClick}
-        className="text-sm text-[#007E8C] hover:text-[#236383] hover:underline inline-flex items-center gap-1 truncate"
+        className="text-sm text-[#236383] hover:text-[#236383] hover:underline inline-flex items-center gap-1 truncate"
         title={`Open ${value} in Google Maps`}
       >
         <MapPin className="w-3 h-3 shrink-0" />
@@ -211,7 +211,7 @@ export function InlineAddressCell({
           stopRowClick(e);
           setEditing(true);
         }}
-        className="group text-left text-sm w-full truncate rounded px-1 py-0.5 hover:bg-white hover:ring-1 hover:ring-[#007E8C]/30"
+        className="group text-left text-sm w-full truncate rounded px-1 py-0.5 hover:bg-white hover:ring-1 hover:ring-[#236383]/30"
       >
         {isSaving ? (
           <Loader2 className="w-3 h-3 animate-spin inline" />
@@ -231,7 +231,7 @@ export function InlineAddressCell({
         href={mapsUrl!}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm text-[#007E8C] hover:text-[#236383] hover:underline inline-flex items-center gap-1 min-w-0 flex-1"
+        className="text-sm text-[#236383] hover:text-[#236383] hover:underline inline-flex items-center gap-1 min-w-0 flex-1"
         title={`Open ${value} in Google Maps`}
       >
         <MapPin className="w-3 h-3 shrink-0" />
@@ -316,7 +316,7 @@ export function InlineNumberCell({
         stopRowClick(e);
         setEditing(true);
       }}
-      className="group text-sm tabular-nums rounded px-1 py-0.5 hover:bg-white hover:ring-1 hover:ring-[#007E8C]/30"
+      className="group text-sm tabular-nums rounded px-1 py-0.5 hover:bg-white hover:ring-1 hover:ring-[#236383]/30"
     >
       {isSaving ? (
         <Loader2 className="w-3 h-3 animate-spin" />
@@ -866,7 +866,7 @@ export function InlineScheduleCell({
         <button
           type="button"
           onClick={stopRowClick}
-          className="group w-full text-left rounded p-0.5 hover:ring-1 hover:ring-[#007E8C]/30 min-h-[24px]"
+          className="group w-full text-left rounded p-0.5 hover:ring-1 hover:ring-[#236383]/30 min-h-[24px]"
         >
           {isSaving ? (
             <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
@@ -937,7 +937,7 @@ function ScheduleInlineEditor({
           const chipClass =
             label === 'Collection'
               ? selected
-                ? 'bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/40'
+                ? 'bg-[#236383]/20 text-[#236383] border-[#236383]/40'
                 : 'bg-white border-slate-200 text-slate-500'
               : selected
                 ? 'bg-[#FBAD3F]/25 text-[#B8860B] border-[#FBAD3F]/50'
@@ -1015,7 +1015,7 @@ export function InlineFocusAreasCell({
         <button
           type="button"
           onClick={stopRowClick}
-          className="group w-full text-left rounded p-0.5 hover:ring-1 hover:ring-[#007E8C]/30"
+          className="group w-full text-left rounded p-0.5 hover:ring-1 hover:ring-[#236383]/30"
         >
           {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : display}
         </button>
@@ -1146,7 +1146,7 @@ export function InlinePrimaryContactCell({
         <button
           type="button"
           onClick={stopRowClick}
-          className="group w-full text-left rounded p-0.5 hover:ring-1 hover:ring-[#007E8C]/30 min-h-[24px]"
+          className="group w-full text-left rounded p-0.5 hover:ring-1 hover:ring-[#236383]/30 min-h-[24px]"
         >
           {isSaving ? (
             <Loader2 className="w-3 h-3 animate-spin" />

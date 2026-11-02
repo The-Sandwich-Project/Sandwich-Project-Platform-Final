@@ -116,7 +116,7 @@ export const StandaloneTasksTab: React.FC<StandaloneTasksTabProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setShowCompleted(!showCompleted)}
-            className="text-[#007E8C] hover:text-[#007E8C]/80"
+            className="text-[#236383] hover:text-[#236383]/80"
           >
             {showCompleted ? 'Hide Completed' : 'Show Completed'}
           </Button>

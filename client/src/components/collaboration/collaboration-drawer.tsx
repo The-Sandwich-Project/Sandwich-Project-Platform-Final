@@ -158,7 +158,7 @@ export function CollaborationDrawer({
 
   const drawerContent = (
     <div className="flex flex-col h-full">
-      <SheetHeader className="px-4 py-3 border-b bg-[#007E8C]/5">
+      <SheetHeader className="px-4 py-3 border-b bg-[#236383]/5">
         <div className="flex items-center justify-between">
           <SheetTitle className="text-lg font-semibold text-[#236383]">
             Team Collaboration
@@ -219,7 +219,7 @@ export function CollaborationDrawer({
             <div className="p-4 space-y-4">
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-[#007E8C]" />
+                  <Eye className="w-4 h-4 text-[#236383]" />
                   Currently Viewing
                 </h4>
                 
@@ -231,8 +231,8 @@ export function CollaborationDrawer({
                         className={cn(
                           "flex items-center gap-3 p-3 rounded-lg border transition-colors",
                           user.userId === currentUserId 
-                            ? "bg-[#007E8C]/10 border-[#007E8C]/30" 
-                            : "bg-white border-gray-200 hover:border-[#007E8C]/30"
+                            ? "bg-[#236383]/10 border-[#236383]/30" 
+                            : "bg-white border-gray-200 hover:border-[#236383]/30"
                         )}
                         data-testid={`drawer-presence-user-${user.userId}`}
                       >
@@ -245,7 +245,7 @@ export function CollaborationDrawer({
                           <p className="text-sm font-medium text-gray-900 truncate">
                             {user.userName}
                             {user.userId === currentUserId && (
-                              <span className="text-[#007E8C] ml-1">(You)</span>
+                              <span className="text-[#236383] ml-1">(You)</span>
                             )}
                           </p>
                           <p className="text-xs text-gray-500 flex items-center gap-1">
@@ -316,13 +316,13 @@ export function CollaborationDrawer({
           <ScrollArea className="h-full">
             <div className="p-4">
               <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <History className="w-4 h-4 text-[#007E8C]" />
+                <History className="w-4 h-4 text-[#236383]" />
                 Edit History
               </h4>
               
               {revisionsLoading ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin w-6 h-6 border-2 border-[#007E8C] border-t-transparent rounded-full mx-auto mb-2" />
+                  <div className="animate-spin w-6 h-6 border-2 border-[#236383] border-t-transparent rounded-full mx-auto mb-2" />
                   <p className="text-sm text-gray-500">Loading history...</p>
                 </div>
               ) : revisions.length > 0 ? (
@@ -414,19 +414,19 @@ export function CollaborationTriggerButton({
             size="sm"
             onClick={onClick}
             className={cn(
-              "gap-2 border-[#007E8C]/30 hover:bg-[#007E8C]/10 hover:border-[#007E8C]/50",
-              otherUsers.length > 0 && "border-[#007E8C] bg-[#007E8C]/5"
+              "gap-2 border-[#236383]/30 hover:bg-[#236383]/10 hover:border-[#236383]/50",
+              otherUsers.length > 0 && "border-[#236383] bg-[#236383]/5"
             )}
             data-testid="collaboration-trigger-button"
           >
             <div className="relative">
-              <Users className="w-4 h-4 text-[#007E8C]" />
+              <Users className="w-4 h-4 text-[#236383]" />
               {isConnected && (
                 <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full" />
               )}
             </div>
             {otherUsers.length > 0 && (
-              <span className="text-[#007E8C] font-medium">{otherUsers.length}</span>
+              <span className="text-[#236383] font-medium">{otherUsers.length}</span>
             )}
             {commentsCount > 0 && (
               <>

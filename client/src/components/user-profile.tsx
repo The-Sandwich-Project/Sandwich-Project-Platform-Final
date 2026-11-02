@@ -83,7 +83,7 @@ type SMSFormData = z.infer<typeof smsSchema>;
 function ApprovalBadge({ approved }: { approved?: boolean | null }) {
   if (approved) {
     return (
-      <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#007e8c]">
+      <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#236383]">
         <CheckCircle2 className="w-3.5 h-3.5" />
         Coordinator approved
       </span>
@@ -646,8 +646,8 @@ export default function UserProfile() {
                     render={({ field }) => (
                       <FormItem className="flex items-center justify-between p-4 rounded-lg border bg-card">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-[#007e8c]/10">
-                            <HandHeart className="w-5 h-5 text-[#007e8c]" />
+                          <div className="p-2 rounded-lg bg-[#236383]/10">
+                            <HandHeart className="w-5 h-5 text-[#236383]" />
                           </div>
                           <div>
                             <FormLabel className="text-base font-medium">General Volunteer</FormLabel>

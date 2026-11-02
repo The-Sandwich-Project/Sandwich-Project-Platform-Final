@@ -154,11 +154,11 @@ export default function Landing() {
             </div>
 
             <div className="premium-card premium-interactive text-center p-6">
-              <Calendar className="h-12 w-12 mx-auto mb-4" style={{ color: '#007E8C' }} />
+              <Calendar className="h-12 w-12 mx-auto mb-4" style={{ color: '#236383' }} />
               <div className="premium-text-h2 mb-2">
                 {weeklyAverage.toLocaleString()}
               </div>
-              <div className="premium-text-body font-semibold mb-3" style={{ color: '#007E8C' }}>
+              <div className="premium-text-body font-semibold mb-3" style={{ color: '#236383' }}>
                 Weekly Average
               </div>
               <p className="premium-text-body-sm text-gray-600">collected each week</p>
@@ -208,7 +208,7 @@ export default function Landing() {
         {/* Efficiency Metrics Section */}
         <div className="premium-card-featured p-8">
           <div className="text-center mb-6">
-            <h2 className="premium-text-h2 mb-2" style={{ color: '#007E8C' }}>
+            <h2 className="premium-text-h2 mb-2" style={{ color: '#236383' }}>
               Proven Impact Efficiency
             </h2>
             <p className="premium-text-body text-gray-600">
@@ -271,9 +271,9 @@ export default function Landing() {
 
           <div className="premium-card premium-interactive text-center p-6 group">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all duration-300" style={{ backgroundColor: 'rgba(0, 126, 140, 0.1)' }}>
-              <Calendar className="h-8 w-8" style={{ color: '#007E8C' }} />
+              <Calendar className="h-8 w-8" style={{ color: '#236383' }} />
             </div>
-            <h3 className="premium-text-h4 mb-3 transition-colors duration-300" style={{ color: '#007E8C' }}>
+            <h3 className="premium-text-h4 mb-3 transition-colors duration-300" style={{ color: '#236383' }}>
               Project Coordination
             </h3>
             <p className="premium-text-body-sm text-gray-600">

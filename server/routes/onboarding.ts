@@ -166,9 +166,9 @@ router.post('/admin/send-announcement', isAuthenticated, async (req: any, res) =
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
-    .header { background: linear-gradient(135deg, #007E8C 0%, #236383 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header { background: linear-gradient(135deg, #236383 0%, #236383 100%); color: white; padding: 30px 20px; text-align: center; }
     .content { padding: 30px 20px; background: #f9f9f9; }
-    .highlight-box { background: #E6F4F6; border-left: 4px solid #007E8C; padding: 15px; margin: 20px 0; }
+    .highlight-box { background: #E6F4F6; border-left: 4px solid #236383; padding: 15px; margin: 20px 0; }
     .cta-button { display: inline-block; background: #A31C41; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
     .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
   </style>

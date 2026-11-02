@@ -74,7 +74,7 @@ function DaySection({
                   key={`${scheduleType}-${r.id}`}
                   type="button"
                   onClick={() => onRecipientClick(r)}
-                  className="w-full text-left px-2 py-1.5 rounded border border-slate-200 bg-white hover:border-[#007E8C] hover:bg-[#007E8C]/5 transition-colors"
+                  className="w-full text-left px-2 py-1.5 rounded border border-slate-200 bg-white hover:border-[#236383] hover:bg-[#236383]/5 transition-colors"
                 >
                   <div className="text-sm font-medium text-slate-800 truncate">{r.name}</div>
                   {time && (
@@ -138,8 +138,8 @@ export function RecipientWeeklyCalendar({
                 <DaySection
                   title="Collects"
                   count={collectionList.length}
-                  headerClass="bg-[#007E8C]/10 text-[#007E8C]"
-                  borderClass="border-[#007E8C]/20"
+                  headerClass="bg-[#236383]/10 text-[#236383]"
+                  borderClass="border-[#236383]/20"
                   recipients={collectionList}
                   day={day}
                   scheduleType="collection"
@@ -164,8 +164,8 @@ export function RecipientWeeklyCalendar({
       {(collectionUnscheduled.length > 0 || feedingUnscheduled.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {collectionUnscheduled.length > 0 && (
-            <div className="border border-dashed border-[#007E8C]/30 rounded-lg p-3 bg-[#007E8C]/5">
-              <p className="text-sm font-medium text-[#007E8C] mb-2">
+            <div className="border border-dashed border-[#236383]/30 rounded-lg p-3 bg-[#236383]/5">
+              <p className="text-sm font-medium text-[#236383] mb-2">
                 No collection day set ({collectionUnscheduled.length})
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -174,7 +174,7 @@ export function RecipientWeeklyCalendar({
                     key={`c-unsched-${r.id}`}
                     type="button"
                     onClick={() => onRecipientClick(r)}
-                    className="text-sm px-2.5 py-1 rounded bg-white border border-[#007E8C]/20 hover:border-[#007E8C] transition-colors"
+                    className="text-sm px-2.5 py-1 rounded bg-white border border-[#236383]/20 hover:border-[#236383] transition-colors"
                   >
                     {r.name}
                   </button>

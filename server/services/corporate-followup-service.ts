@@ -188,7 +188,7 @@ export async function sendCorporateImmediateCallNotification(
             .action-box { background: #FFF8DC; padding: 15px; border: 2px solid #B8860B; border-radius: 8px; margin: 15px 0; }
             .phone-number { font-size: 24px; font-weight: bold; color: #B8860B; }
             .btn { display: inline-block; background: #B8860B; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 5px; }
-            .btn-call { background: #007E8C; }
+            .btn-call { background: #236383; }
           </style>
         </head>
         <body>

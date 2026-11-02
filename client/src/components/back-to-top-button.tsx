@@ -26,7 +26,7 @@ export function BackToTopButton() {
   return (
     <Button
       onClick={scrollToTop}
-      className="md:hidden fixed bottom-20 left-4 z-40 h-10 w-10 rounded-full bg-[#236383] hover:bg-[#007E8C] text-white shadow-lg p-0"
+      className="md:hidden fixed bottom-20 left-4 z-40 h-10 w-10 rounded-full bg-[#236383] hover:bg-[#236383] text-white shadow-lg p-0"
       aria-label="Back to top"
     >
       <ArrowUp className="h-5 w-5" />

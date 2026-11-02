@@ -11,7 +11,7 @@ const COLORS = {
   primary: '#236383',
   primaryLight: '#F0FBFC',
   orange: '#FBAD3F',
-  teal: '#007E8C',
+  teal: '#236383',
   red: '#A31C41',
   green: '#22C55E',
   gray: '#646464',

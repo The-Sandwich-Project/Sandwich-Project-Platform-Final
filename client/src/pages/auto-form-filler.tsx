@@ -139,7 +139,7 @@ export function AutoFormFiller() {
                   htmlFor="file-upload"
                   className="cursor-pointer inline-block"
                 >
-                  <span className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#007E8C] transition-colors inline-block">
+                  <span className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#236383] transition-colors inline-block">
                     Choose File
                   </span>
                 </label>
@@ -180,7 +180,7 @@ export function AutoFormFiller() {
                 className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                   !selectedFile || !formType || loading
                     ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'bg-[#236383] text-white hover:bg-[#007E8C]'
+                    : 'bg-[#236383] text-white hover:bg-[#236383]'
                 }`}
               >
                 {loading ? (
@@ -212,7 +212,7 @@ export function AutoFormFiller() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-start gap-3 text-[#007E8C]">
+                <div className="flex items-start gap-3 text-[#236383]">
                   <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-semibold mb-1">Form Filled Successfully!</h3>
@@ -250,7 +250,7 @@ export function AutoFormFiller() {
                   className={`px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 w-full ${
                     !result?.filledFormUrl
                       ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : 'bg-[#007E8C] text-white hover:bg-[#236383]'
+                      : 'bg-[#236383] text-white hover:bg-[#236383]'
                   }`}
                 >
                   <Download className="w-5 h-5" />

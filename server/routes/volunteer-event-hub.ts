@@ -609,8 +609,8 @@ async function sendVolunteerApprovalEmail(
       <div class="section">
         <h3 style="color: #236383; margin: 0 0 8px;">Event Contact</h3>
         ${eventContactName ? `<div><strong>${eventContactName}</strong></div>` : ''}
-        ${event.email ? `<div><a href="mailto:${event.email}" style="color: #007E8C;">${event.email}</a></div>` : ''}
-        ${event.phone ? `<div><a href="tel:${event.phone}" style="color: #007E8C;">${event.phone}</a></div>` : ''}
+        ${event.email ? `<div><a href="mailto:${event.email}" style="color: #236383;">${event.email}</a></div>` : ''}
+        ${event.phone ? `<div><a href="tel:${event.phone}" style="color: #236383;">${event.phone}</a></div>` : ''}
         ${event.tspContact ? `<div style="margin-top: 6px; color: #555;"><em>TSP contact:</em> ${event.tspContact}</div>` : ''}
       </div>` : '';
 
@@ -624,7 +624,7 @@ async function sendVolunteerApprovalEmail(
     const calendarButtons = (googleLink || icsLink) ? `
       <div style="text-align: center; margin: 24px 0 8px;">
         <p style="margin: 0 0 12px; color: #236383; font-weight: 600;">Add this to your calendar</p>
-        ${googleLink ? `<a href="${googleLink}" style="display: inline-block; background: #007E8C; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin: 4px 6px; font-weight: 600;">Google Calendar</a>` : ''}
+        ${googleLink ? `<a href="${googleLink}" style="display: inline-block; background: #236383; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin: 4px 6px; font-weight: 600;">Google Calendar</a>` : ''}
         ${icsLink ? `<a href="${icsLink}" style="display: inline-block; background: #FBAD3F; color: #1a1a1a; padding: 10px 20px; text-decoration: none; border-radius: 6px; margin: 4px 6px; font-weight: 600;">Apple / Outlook (.ics)</a>` : ''}
       </div>` : '';
 
@@ -649,7 +649,7 @@ async function sendVolunteerApprovalEmail(
             .section { margin: 18px 0; padding: 14px 16px; background: #fafafa; border-radius: 6px; border: 1px solid #eee; }
             .section h3 { font-size: 15px; }
             .footer { text-align: center; color: #666; font-size: 12px; padding: 16px; }
-            a { color: #007E8C; }
+            a { color: #236383; }
           </style>
         </head>
         <body>
@@ -666,7 +666,7 @@ async function sendVolunteerApprovalEmail(
                 <div style="margin: 6px 0;">
                   <strong>Date:</strong> ${formattedDate}<br>
                   ${timeDisplay ? `<strong>Time:</strong> ${timeDisplay}<br>` : ''}
-                  ${event.eventAddress ? `<strong>Location:</strong> ${event.eventAddress}${mapsLink ? ` &nbsp;<a href="${mapsLink}" style="color: #007E8C; font-weight: 600;">View on Google Maps →</a>` : ''}<br>` : ''}
+                  ${event.eventAddress ? `<strong>Location:</strong> ${event.eventAddress}${mapsLink ? ` &nbsp;<a href="${mapsLink}" style="color: #236383; font-weight: 600;">View on Google Maps →</a>` : ''}<br>` : ''}
                 </div>
                 <div style="margin-top: 10px;">
                   <strong>Your role:</strong> <span class="role-pill">${roleDisplay}</span>
@@ -774,7 +774,7 @@ async function sendVolunteerRoleChangeEmail(
                 <div style="font-size: 17px;"><strong>${orgName}</strong></div>
                 <strong>Date:</strong> ${formattedDate}<br>
                 ${timeDisplay ? `<strong>Time:</strong> ${timeDisplay}<br>` : ''}
-                ${event.eventAddress ? `<strong>Location:</strong> ${event.eventAddress}${mapsLink ? ` &nbsp;<a href="${mapsLink}" style="color: #007E8C; font-weight:600;">View on Google Maps →</a>` : ''}` : ''}
+                ${event.eventAddress ? `<strong>Location:</strong> ${event.eventAddress}${mapsLink ? ` &nbsp;<a href="${mapsLink}" style="color: #236383; font-weight:600;">View on Google Maps →</a>` : ''}` : ''}
               </div>
 
               <div class="change-card">

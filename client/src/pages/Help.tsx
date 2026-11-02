@@ -588,7 +588,7 @@ export default function Help({ onLaunchTour }: HelpProps) {
             />
           </div>
           <div className="flex items-center gap-3 sm:gap-4 mb-4">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#236383] to-[#007e8c] flex items-center justify-center shadow-lg flex-shrink-0">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#236383] to-[#236383] flex items-center justify-center shadow-lg flex-shrink-0">
               <HelpCircle className="w-6 h-6 sm:w-9 sm:h-9 text-white" />
             </div>
             <div>
@@ -627,7 +627,7 @@ export default function Help({ onLaunchTour }: HelpProps) {
                   className={cn(
                     'transition-all text-xs sm:text-sm',
                     selectedCategory === null &&
-                      'bg-gradient-to-r from-[#236383] to-[#007e8c] hover:from-[#1a4d66] hover:to-[#006270]'
+                      'bg-gradient-to-r from-[#236383] to-[#236383] hover:from-[#1a4d66] hover:to-[#006270]'
                   )}
                   data-testid="filter-all"
                 >
@@ -644,7 +644,7 @@ export default function Help({ onLaunchTour }: HelpProps) {
                       className={cn(
                         'transition-all text-xs sm:text-sm',
                         selectedCategory === key &&
-                          'bg-gradient-to-r from-[#236383] to-[#007e8c] hover:from-[#1a4d66] hover:to-[#006270]'
+                          'bg-gradient-to-r from-[#236383] to-[#236383] hover:from-[#1a4d66] hover:to-[#006270]'
                       )}
                       data-testid={`filter-${key}`}
                     >
@@ -685,8 +685,8 @@ export default function Help({ onLaunchTour }: HelpProps) {
                 <div key={categoryKey} data-testid={`category-${categoryKey}`}>
                   <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                     {CategoryIcon && (
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-[#007e8c]/10 flex items-center justify-center flex-shrink-0">
-                        <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5 text-[#007e8c]" />
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-[#236383]/10 flex items-center justify-center flex-shrink-0">
+                        <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5 text-[#236383]" />
                       </div>
                     )}
                     <div className="min-w-0">
@@ -721,7 +721,7 @@ export default function Help({ onLaunchTour }: HelpProps) {
                               <CardHeader className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors p-3 sm:p-6">
                                 <div className="flex items-start justify-between gap-2 sm:gap-4">
                                   <div className="flex items-start gap-2 sm:gap-4 flex-1 min-w-0">
-                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-[#236383]/10 to-[#007e8c]/10 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-br from-[#236383]/10 to-[#236383]/10 flex items-center justify-center flex-shrink-0">
                                       <TopicIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#236383]" />
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -761,7 +761,7 @@ export default function Help({ onLaunchTour }: HelpProps) {
                               <CardContent className="pt-0 pb-4 sm:pb-6 px-3 sm:px-6">
                                 <div className="space-y-4 sm:space-y-6">
                                   {/* Summary */}
-                                  <div className="bg-[#007e8c]/5 border-l-4 border-[#007e8c] p-3 sm:p-4 rounded-r-lg">
+                                  <div className="bg-[#236383]/5 border-l-4 border-[#236383] p-3 sm:p-4 rounded-r-lg">
                                     <p className="text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed">
                                       {topic.content.summary}
                                     </p>
@@ -810,7 +810,7 @@ export default function Help({ onLaunchTour }: HelpProps) {
                                     <div className="pt-3 sm:pt-4 border-t border-slate-200 dark:border-slate-700">
                                       <Button
                                         onClick={() => handleLaunchTour(topic.tourId!)}
-                                        className="w-full bg-gradient-to-r from-[#236383] to-[#007e8c] hover:from-[#1a4d66] hover:to-[#006270] text-white shadow-md hover:shadow-lg transition-all h-11"
+                                        className="w-full bg-gradient-to-r from-[#236383] to-[#236383] hover:from-[#1a4d66] hover:to-[#006270] text-white shadow-md hover:shadow-lg transition-all h-11"
                                         size="lg"
                                         data-testid={`launch-tour-${topic.id}`}
                                       >
@@ -834,11 +834,11 @@ export default function Help({ onLaunchTour }: HelpProps) {
         )}
 
         {/* Footer Note */}
-        <Card className="mt-4 sm:mt-8 bg-gradient-to-r from-[#236383]/5 to-[#007e8c]/5 border-2 border-[#007e8c]/20">
+        <Card className="mt-4 sm:mt-8 bg-gradient-to-r from-[#236383]/5 to-[#236383]/5 border-2 border-[#236383]/20">
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#007e8c]/10 flex items-center justify-center flex-shrink-0">
-                <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6 text-[#007e8c]" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#236383]/10 flex items-center justify-center flex-shrink-0">
+                <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6 text-[#236383]" />
               </div>
               <div className="min-w-0">
                 <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-slate-100 mb-1 sm:mb-2">

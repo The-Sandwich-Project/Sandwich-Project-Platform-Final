@@ -27,7 +27,7 @@ const directoryOptions: DirectoryOption[] = [
     description: 'View and manage drivers for sandwich deliveries',
     icon: Car,
     href: '/drivers',
-    color: 'bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/30',
+    color: 'bg-[#236383]/20 text-[#236383] border-[#236383]/30',
   },
   {
     id: 'hosts',

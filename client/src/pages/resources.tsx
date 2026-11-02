@@ -86,9 +86,9 @@ const CATEGORIES = [
     id: 'operations_safety',
     label: 'Operations & Safety',
     icon: Shield,
-    color: 'text-[#007E8C]', // Brand teal
-    bgColor: 'bg-[#007E8C]/10',
-    borderColor: 'border-[#007E8C]/30',
+    color: 'text-[#236383]', // Brand teal
+    bgColor: 'bg-[#236383]/10',
+    borderColor: 'border-[#236383]/30',
   },
   {
     id: 'forms_templates',
@@ -359,9 +359,9 @@ function SandwichAssemblyGuides() {
 
   return (
     <div className="mb-8">
-      <div className="flex items-center gap-3 mb-4 pb-3 border-b-2 border-[#007E8C]/30">
-        <div className="bg-[#007E8C]/10 p-3 rounded-lg">
-          <Image className="w-7 h-7 text-[#007E8C]" />
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b-2 border-[#236383]/30">
+        <div className="bg-[#236383]/10 p-3 rounded-lg">
+          <Image className="w-7 h-7 text-[#236383]" />
         </div>
         <h2 className="text-2xl font-bold text-gray-900">Sandwich Assembly Guides</h2>
         <span className="text-sm font-semibold text-gray-500 ml-auto">
@@ -371,7 +371,7 @@ function SandwichAssemblyGuides() {
           <Button
             onClick={() => setUploadOpen(true)}
             size="sm"
-            className="bg-[#007E8C] hover:bg-[#236383] text-white gap-1.5"
+            className="bg-[#236383] hover:bg-[#236383] text-white gap-1.5"
           >
             <Plus className="w-4 h-4" />
             Add Guide
@@ -441,7 +441,7 @@ function SandwichAssemblyGuides() {
                     <>
                       <button
                         onClick={() => setEditing(guide)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 transition-colors text-[#007E8C]"
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-md hover:bg-gray-50 transition-colors text-[#236383]"
                         title="Edit title/description"
                       >
                         <Edit className="w-4 h-4" />
@@ -571,7 +571,7 @@ function SandwichGuideUploadDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="w-5 h-5 text-[#007E8C]" />
+            <Upload className="w-5 h-5 text-[#236383]" />
             Add Assembly Guide
           </DialogTitle>
         </DialogHeader>
@@ -625,7 +625,7 @@ function SandwichGuideUploadDialog({
             <Button
               type="submit"
               disabled={uploading || !file || !title || !description}
-              className="bg-[#007E8C] hover:bg-[#236383] text-white"
+              className="bg-[#236383] hover:bg-[#236383] text-white"
             >
               {uploading ? 'Uploading…' : 'Add Guide'}
             </Button>
@@ -691,7 +691,7 @@ function SandwichGuideEditDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Edit className="w-5 h-5 text-[#007E8C]" />
+            <Edit className="w-5 h-5 text-[#236383]" />
             Edit Assembly Guide
           </DialogTitle>
         </DialogHeader>
@@ -728,7 +728,7 @@ function SandwichGuideEditDialog({
             <Button
               type="submit"
               disabled={saving || !title || !description}
-              className="bg-[#007E8C] hover:bg-[#236383] text-white"
+              className="bg-[#236383] hover:bg-[#236383] text-white"
             >
               {saving ? 'Saving…' : 'Save'}
             </Button>
@@ -1120,7 +1120,7 @@ export function Resources() {
             <button
               type="button"
               onClick={() => openResource(item)}
-              className="flex-1 bg-[#236383] text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-[#007E8C] transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-[#236383] text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-[#236383] transition-colors flex items-center justify-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
               Open
@@ -1130,7 +1130,7 @@ export function Resources() {
               onClick={() => copyLink(item)}
               className={`px-3 py-2 rounded-lg text-sm transition-colors ${
                 isCopied
-                  ? 'bg-[#007E8C]/20 text-[#007E8C]'
+                  ? 'bg-[#236383]/20 text-[#236383]'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
               title="Copy link"
@@ -1205,7 +1205,7 @@ export function Resources() {
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             onClick={() => loadResources()}
-            className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#007E8C] transition-colors"
+            className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#236383] transition-colors"
           >
             Try Again
           </button>
@@ -1284,7 +1284,7 @@ export function Resources() {
             {isAdmin && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#007E8C] transition-colors flex items-center gap-2"
+                className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#236383] transition-colors flex items-center gap-2"
               >
                 <Plus className="w-5 h-5" />
                 Add Resource

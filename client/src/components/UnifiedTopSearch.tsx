@@ -539,7 +539,7 @@ export function UnifiedTopSearch() {
           <DialogContent className="left-0 top-0 z-[10010] flex h-[100dvh] max-h-[100dvh] md:max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none [&>button.absolute]:hidden">
             <DialogTitle className="sr-only">Search</DialogTitle>
             <div
-              className="relative bg-[#007E8C] px-3 pb-3"
+              className="relative bg-[#236383] px-3 pb-3"
               style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
             >
               <div className="flex items-center gap-2">
@@ -619,14 +619,14 @@ export function UnifiedTopSearch() {
                         onClick={() => navigateToResult(r)}
                         onMouseEnter={() => setSelectedIndex(pageResults.indexOf(r))}
                         className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors ${
-                          active ? 'bg-[#007E8C]/10' : 'hover:bg-slate-50'
+                          active ? 'bg-[#236383]/10' : 'hover:bg-slate-50'
                         }`}
                       >
-                        <div className="w-7 h-7 rounded-md bg-[#007E8C]/10 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-md bg-[#236383]/10 flex items-center justify-center shrink-0">
                           {r.matchType === 'semantic' ? (
-                            <Sparkles className="w-3.5 h-3.5 text-[#007E8C]" />
+                            <Sparkles className="w-3.5 h-3.5 text-[#236383]" />
                           ) : (
-                            <Search className="w-3.5 h-3.5 text-[#007E8C]" />
+                            <Search className="w-3.5 h-3.5 text-[#236383]" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -666,7 +666,7 @@ export function UnifiedTopSearch() {
                           setSelectedIndex(pageResults.length + personResults.indexOf(r))
                         }
                         className={`w-full px-3 py-2 flex items-start gap-3 text-left transition-colors ${
-                          active ? 'bg-[#007E8C]/10' : 'hover:bg-slate-50'
+                          active ? 'bg-[#236383]/10' : 'hover:bg-slate-50'
                         }`}
                       >
                         <div className="mt-0.5 w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
@@ -746,7 +746,7 @@ export function UnifiedTopSearch() {
                           )
                         }
                         className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors ${
-                          active ? 'bg-[#007E8C]/10' : 'hover:bg-slate-50'
+                          active ? 'bg-[#236383]/10' : 'hover:bg-slate-50'
                         }`}
                       >
                         <div className="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center shrink-0">

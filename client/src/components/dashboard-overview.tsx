@@ -121,7 +121,7 @@ const TSP_APPS: ReadonlyArray<{
       'Track grants and deadlines, with AI research tools to work on grant applications.',
     url: 'https://tsp-grant-manager.lovable.app',
     icon: Target,
-    accent: '#007E8C',
+    accent: '#236383',
   },
   {
     name: 'Host Onboarding Tracker',
@@ -795,9 +795,9 @@ export default function DashboardOverview({
             className="block group"
             aria-label="Open TSP Volunteer Handbook in a new tab"
           >
-            <div className="rounded-xl border-2 border-[#007E8C]/50 bg-gradient-to-r from-[#007e8c]/15 via-white to-[#236383]/10 p-5 sm:p-6 shadow-sm hover:shadow-md hover:border-[#007E8C] transition-all">
+            <div className="rounded-xl border-2 border-[#236383]/50 bg-gradient-to-r from-[#236383]/15 via-white to-[#236383]/10 p-5 sm:p-6 shadow-sm hover:shadow-md hover:border-[#236383] transition-all">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-[#007E8C] flex items-center justify-center shrink-0 shadow-sm">
+                <div className="w-14 h-14 rounded-xl bg-[#236383] flex items-center justify-center shrink-0 shadow-sm">
                   <BookOpen className="w-7 h-7 text-white" aria-hidden="true" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -808,11 +808,11 @@ export default function DashboardOverview({
                     The all-encompassing handbook for every volunteer role — policies, procedures, and reference material.
                   </p>
                 </div>
-                <div className="hidden sm:flex items-center gap-2 shrink-0 font-semibold text-[#007E8C] group-hover:underline underline-offset-4">
+                <div className="hidden sm:flex items-center gap-2 shrink-0 font-semibold text-[#236383] group-hover:underline underline-offset-4">
                   Open Handbook
                   <ExternalLink className="w-5 h-5" aria-hidden="true" />
                 </div>
-                <ExternalLink className="w-5 h-5 text-[#007E8C] shrink-0 sm:hidden" aria-hidden="true" />
+                <ExternalLink className="w-5 h-5 text-[#236383] shrink-0 sm:hidden" aria-hidden="true" />
               </div>
             </div>
           </a>
@@ -871,13 +871,13 @@ export default function DashboardOverview({
               href="https://the-sandwich-project.github.io/sandwichprojectcollectionsites/"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 bg-white hover:border-[#007E8C] hover:bg-[#e8f4f8]/40 transition-colors group"
+              className="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 bg-white hover:border-[#236383] hover:bg-[#e8f4f8]/40 transition-colors group"
             >
-              <div className="w-9 h-9 rounded-lg bg-[#007E8C] flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-[#236383] flex items-center justify-center shrink-0">
                 <Building2 className="w-4 h-4 text-white" />
               </div>
               <span className="font-semibold text-[#236383] text-sm flex-1">Host Finder Tool</span>
-              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-[#007E8C]" aria-hidden="true" />
+              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-[#236383]" aria-hidden="true" />
             </a>
           </div>
 
@@ -1020,7 +1020,7 @@ export default function DashboardOverview({
                   <span className="inline-flex items-center gap-1.5">
                     <span
                       className="inline-block w-3 h-3 rounded-sm"
-                      style={{ backgroundColor: '#007E8C' }}
+                      style={{ backgroundColor: '#236383' }}
                       aria-hidden="true"
                     />
                     <span>Sandwiches per week</span>
@@ -1042,8 +1042,8 @@ export default function DashboardOverview({
                 <AreaChart data={weeklyTrend} margin={{ top: 5, right: 8, left: 4, bottom: 4 }}>
                   <defs>
                     <linearGradient id="dashTrendFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#007E8C" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#007E8C" stopOpacity={0.02} />
+                      <stop offset="0%" stopColor="#236383" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#236383" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" vertical={false} />
@@ -1082,7 +1082,7 @@ export default function DashboardOverview({
                     type="monotone"
                     dataKey="sandwiches"
                     name="Sandwiches collected"
-                    stroke="#007E8C"
+                    stroke="#236383"
                     strokeWidth={2}
                     fill="url(#dashTrendFill)"
                   />

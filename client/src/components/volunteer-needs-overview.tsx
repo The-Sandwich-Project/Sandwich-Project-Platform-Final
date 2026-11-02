@@ -175,7 +175,7 @@ export default function VolunteerNeedsOverview({ onNavigate }: VolunteerNeedsOve
   if (isError) {
     return (
       <div className="mx-4 mb-8">
-        <div className="premium-card-elevated p-6" style={{ borderTop: '4px solid #007E8C' }}>
+        <div className="premium-card-elevated p-6" style={{ borderTop: '4px solid #236383' }}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="premium-text-h4 text-brand-primary">Upcoming Volunteer Needs</h3>
@@ -198,7 +198,7 @@ export default function VolunteerNeedsOverview({ onNavigate }: VolunteerNeedsOve
 
   return (
     <div className="mx-4 mb-8">
-      <div className="premium-card-elevated p-6" style={{ borderTop: '4px solid #007E8C' }}>
+      <div className="premium-card-elevated p-6" style={{ borderTop: '4px solid #236383' }}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-brand-teal rounded-lg flex items-center justify-center">

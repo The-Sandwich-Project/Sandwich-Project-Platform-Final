@@ -59,7 +59,7 @@ interface AIInsightsChatProps {
   };
 }
 
-const CHART_COLORS = ['#47B3CB', '#236383', '#FBAD3F', '#007E8C', '#A31C41', '#10B981', '#6366F1', '#F59E0B'];
+const CHART_COLORS = ['#47B3CB', '#236383', '#FBAD3F', '#236383', '#A31C41', '#10B981', '#6366F1', '#F59E0B'];
 
 const SUGGESTED_QUESTIONS = [
   "Show me the monthly growth trend",

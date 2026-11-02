@@ -169,7 +169,7 @@ export function QuickCalculator() {
 
   const btnBase = 'flex items-center justify-center rounded-lg font-semibold transition-all active:scale-95 select-none';
   const btnNum = `${btnBase} bg-white hover:bg-gray-50 text-gray-900 text-lg h-12 shadow-sm border border-gray-200`;
-  const btnOp = `${btnBase} bg-[#007E8C] hover:bg-[#006570] text-white text-lg h-12 shadow-sm`;
+  const btnOp = `${btnBase} bg-[#236383] hover:bg-[#006570] text-white text-lg h-12 shadow-sm`;
   const btnFunc = `${btnBase} bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm h-12 border border-gray-200`;
   const btnEquals = `${btnBase} bg-[#FBAD3F] hover:bg-[#e99d2f] text-white text-xl h-12 shadow-sm font-bold`;
 
@@ -199,7 +199,7 @@ export function QuickCalculator() {
         <TooltipContent side="bottom" sideOffset={8}>Quick Calculator</TooltipContent>
       </Tooltip>
       <DialogContent className="sm:max-w-[320px] p-0 gap-0 rounded-2xl overflow-hidden border-0 shadow-2xl">
-        <div className="bg-gradient-to-br from-[#236383] to-[#007E8C] p-4 pb-3">
+        <div className="bg-gradient-to-br from-[#236383] to-[#236383] p-4 pb-3">
           <DialogHeader className="mb-2">
             <DialogTitle className="flex items-center gap-2 text-white text-sm font-medium">
               <Calculator className="w-4 h-4" />
@@ -222,7 +222,7 @@ export function QuickCalculator() {
           {/* Memory row */}
           <div className="grid grid-cols-4 gap-1.5">
             <button onClick={memoryClear} className={`${btnFunc} text-xs`}>MC</button>
-            <button onClick={memoryRecall} className={`${btnFunc} text-xs ${hasMemory ? 'ring-1 ring-[#007E8C]' : ''}`}>MR</button>
+            <button onClick={memoryRecall} className={`${btnFunc} text-xs ${hasMemory ? 'ring-1 ring-[#236383]' : ''}`}>MR</button>
             <button onClick={memoryAdd} className={`${btnFunc} text-xs`}>M+</button>
             <button onClick={clear} className={`${btnBase} bg-red-50 hover:bg-red-100 text-red-600 text-sm h-12 border border-red-200 font-bold`}>AC</button>
           </div>

@@ -606,7 +606,7 @@ export function NotesTab({
       case 'discussion':
         return 'bg-brand-primary-light text-brand-primary-dark border-brand-primary-border-strong';
       case 'meeting':
-        return 'bg-[#47B3CB]/20 text-[#007E8C] border-[#007E8C]/40';
+        return 'bg-[#47B3CB]/20 text-[#236383] border-[#236383]/40';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-300';
     }
@@ -614,7 +614,7 @@ export function NotesTab({
 
   const getStatusColor = (status: string) => {
     return status === 'active' 
-      ? 'bg-[#47B3CB]/10 text-[#007E8C] border-[#007E8C]/30'
+      ? 'bg-[#47B3CB]/10 text-[#236383] border-[#236383]/30'
       : 'bg-gray-50 text-gray-600 border-gray-200';
   };
 
@@ -651,7 +651,7 @@ export function NotesTab({
                 <div className="flex items-start gap-2">
                   <MessageSquare className="w-4 h-4 text-[#47B3CB] mt-1 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-[#007E8C] mb-1">📝 Pre-Meeting Discussion Points</p>
+                    <p className="text-sm font-medium text-[#236383] mb-1">📝 Pre-Meeting Discussion Points</p>
                     <p className="text-gray-700 whitespace-pre-wrap leading-relaxed italic">{parsed.discussionPoints}</p>
                   </div>
                 </div>

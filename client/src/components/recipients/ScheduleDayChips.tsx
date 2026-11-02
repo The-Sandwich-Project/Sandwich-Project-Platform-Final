@@ -19,10 +19,10 @@ interface ScheduleDayChipsProps {
 // AND a calm background for the readable time line beneath.
 const VARIANT_STYLES = {
   collection: {
-    container: 'border border-[#007E8C]/40 bg-white',
-    header: 'bg-[#007E8C] text-white',
+    container: 'border border-[#236383]/40 bg-white',
+    header: 'bg-[#236383] text-white',
     timeText: 'text-[#0F4A52]',
-    noteDot: 'bg-[#007E8C]',
+    noteDot: 'bg-[#236383]',
   },
   feeding: {
     container: 'border border-[#FBAD3F]/50 bg-white',

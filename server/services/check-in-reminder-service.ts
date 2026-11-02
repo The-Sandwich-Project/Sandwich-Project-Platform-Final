@@ -196,7 +196,7 @@ async function sendReminderEmail(
       subject: `Reminder: ${ruleInfo.label} - ${orgName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
+          <div style="background: linear-gradient(135deg, #236383, #236383); padding: 20px; border-radius: 8px 8px 0 0;">
             <h2 style="color: white; margin: 0;">${ruleInfo.label}</h2>
           </div>
           <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
@@ -212,7 +212,7 @@ async function sendReminderEmail(
             <p style="font-size: 14px; color: #6b7280;">
               Take a moment to review the event and follow up if needed.
             </p>
-            <a href="${eventUrl}" style="display: inline-block; background: #007E8C; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 12px 0;">
+            <a href="${eventUrl}" style="display: inline-block; background: #236383; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 12px 0;">
               View Event Details
             </a>
             <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">

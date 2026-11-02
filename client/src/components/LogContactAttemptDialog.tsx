@@ -277,14 +277,14 @@ export default function LogContactAttemptDialog({
 
         <div className="space-y-6">
           {/* Attempt Counter */}
-          <div className="bg-gradient-to-r from-[#e6f2f5] to-[#f0f7f9] border border-[#007E8C]/20 rounded-lg p-4">
+          <div className="bg-gradient-to-r from-[#e6f2f5] to-[#f0f7f9] border border-[#236383]/20 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-[#007E8C] font-medium">Previous Attempts</p>
+                <p className="text-sm text-[#236383] font-medium">Previous Attempts</p>
                 <p className="text-2xl font-bold text-[#1A2332]">{currentAttempts}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-[#007E8C] font-medium">This Will Be</p>
+                <p className="text-sm text-[#236383] font-medium">This Will Be</p>
                 <p className="text-2xl font-bold text-[#FBAD3F]">Attempt #{nextAttemptNumber}</p>
               </div>
             </div>
@@ -437,7 +437,7 @@ export default function LogContactAttemptDialog({
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !contactMethod || !contactOutcome || !attributedToUserId}
-              className="flex-1 bg-[#007E8C] hover:bg-[#006B75] text-white"
+              className="flex-1 bg-[#236383] hover:bg-[#1e5a75] text-white"
               data-testid="button-submit-contact-log"
             >
               {isSubmitting ? (

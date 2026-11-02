@@ -140,7 +140,7 @@ const getInitials = (name: string | null | undefined) => {
 
 const getAvatarColor = (name: string | null | undefined) => {
   const colors = [
-    'bg-[#236383]', 'bg-[#007E8C]', 'bg-[#47B3CB]', 'bg-[#FBAD3F]',
+    'bg-[#236383]', 'bg-[#236383]', 'bg-[#47B3CB]', 'bg-[#FBAD3F]',
     'bg-[#A31C41]', 'bg-[#2E7D32]',
   ];
   if (!name || typeof name !== 'string') return colors[0];
@@ -290,7 +290,7 @@ function ItemComments({ itemId, initialCommentCount, canView, canSubmit }: { ite
     <div className="border-t border-gray-200 dark:border-gray-700 mt-4 pt-3">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between w-full text-sm text-[#007E8C] dark:text-[#47B3CB] hover:text-[#236383] dark:hover:text-[#FBAD3F] transition-colors font-medium"
+        className="flex items-center justify-between w-full text-sm text-[#236383] dark:text-[#47B3CB] hover:text-[#236383] dark:hover:text-[#FBAD3F] transition-colors font-medium"
         data-testid={`button-comments-toggle-${itemId}`}
       >
         <div className="flex items-center gap-2">
@@ -383,7 +383,7 @@ function ItemComments({ itemId, initialCommentCount, canView, canSubmit }: { ite
                             size="sm"
                             onClick={() => handleEditComment(comment.id)}
                             disabled={editCommentMutation.isPending || !editContent.trim()}
-                            className="bg-[#236383] hover:bg-[#007E8C] h-7"
+                            className="bg-[#236383] hover:bg-[#236383] h-7"
                             data-testid={`button-save-edit-${comment.id}`}
                           >
                             {editCommentMutation.isPending ? (
@@ -1366,7 +1366,7 @@ export default function HoldingZone() {
             <Button
               onClick={() => setIsSubmitDialogOpen(true)}
               size="lg"
-              className="bg-[#236383] hover:bg-[#007E8C] text-white"
+              className="bg-[#236383] hover:bg-[#236383] text-white"
               data-testid="button-submit-item"
             >
               <Plus className="h-5 w-5 mr-2" />
@@ -1889,7 +1889,7 @@ export default function HoldingZone() {
                             setUpgradeToProjectDialogOpen(true);
                           }}
                           disabled={upgradeToProjectMutation.isPending}
-                          className="text-xs bg-[#236383] hover:bg-[#007E8C]"
+                          className="text-xs bg-[#236383] hover:bg-[#236383]"
                           data-testid={`button-upgrade-to-project-${item.id}`}
                         >
                           <FolderKanban className="h-3 w-3 mr-1" />
@@ -2164,7 +2164,7 @@ export default function HoldingZone() {
                   <Button
                     onClick={handleCreateCategory}
                     disabled={createCategoryMutation.isPending || !newCategoryName.trim()}
-                    className="w-full bg-[#236383] hover:bg-[#007E8C] text-sm"
+                    className="w-full bg-[#236383] hover:bg-[#236383] text-sm"
                     size="sm"
                     data-testid="button-create-category"
                   >
@@ -2402,7 +2402,7 @@ export default function HoldingZone() {
             <Button
               onClick={handleSubmitItem}
               disabled={createItemMutation.isPending || !newItemContent.trim()}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
               data-testid="button-confirm-submit"
             >
               {createItemMutation.isPending ? (
@@ -2644,7 +2644,7 @@ export default function HoldingZone() {
                         }
                       }}
                       disabled={!editNewCategoryName.trim() || createCategoryMutation.isPending}
-                      className="bg-[#236383] hover:bg-[#007E8C]"
+                      className="bg-[#236383] hover:bg-[#236383]"
                       data-testid="button-edit-create-category"
                     >
                       {createCategoryMutation.isPending ? (
@@ -2743,7 +2743,7 @@ export default function HoldingZone() {
                 }
               }}
               disabled={editItemMutation.isPending || !editItemContent.trim()}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               {editItemMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
@@ -2930,7 +2930,7 @@ export default function HoldingZone() {
                 }
               }}
               disabled={promoteToTaskMutation.isPending || !itemToPromote}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
               data-testid="button-confirm-promote"
             >
               {promoteToTaskMutation.isPending ? (
@@ -3055,7 +3055,7 @@ export default function HoldingZone() {
                 }
               }}
               disabled={upgradeToProjectMutation.isPending || !itemToUpgrade || !upgradeProjectTitle.trim()}
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
               data-testid="button-confirm-upgrade"
             >
               {upgradeToProjectMutation.isPending ? (
@@ -3201,7 +3201,7 @@ export default function HoldingZone() {
                 linkItemMutation.isPending ||
                 (selectedParentId === itemToLink?.parentItemId) // No change
               }
-              className="bg-[#236383] hover:bg-[#007E8C]"
+              className="bg-[#236383] hover:bg-[#236383]"
             >
               {linkItemMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>

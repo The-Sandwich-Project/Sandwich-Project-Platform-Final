@@ -164,7 +164,7 @@ export default function ImpactDashboard() {
 
         {/* Key Impact Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8 min-w-0">
-          <Card className="min-w-0 overflow-hidden bg-gradient-to-r from-[#236383] to-[#007E8C] text-white">
+          <Card className="min-w-0 overflow-hidden bg-gradient-to-r from-[#236383] to-[#236383] text-white">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg font-medium flex items-center flex-wrap gap-2">
                 <Heart className="w-5 h-5 flex-shrink-0" />
@@ -181,7 +181,7 @@ export default function ImpactDashboard() {
             </CardContent>
           </Card>
 
-          <Card className="min-w-0 overflow-hidden bg-gradient-to-r from-[#236383] to-[#007E8C] text-white">
+          <Card className="min-w-0 overflow-hidden bg-gradient-to-r from-[#236383] to-[#236383] text-white">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg font-medium flex items-center flex-wrap gap-2">
                 <Users className="w-5 h-5 flex-shrink-0" />

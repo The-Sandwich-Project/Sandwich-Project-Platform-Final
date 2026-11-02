@@ -1032,7 +1032,7 @@ export default function GrantMetrics() {
         ]} />
 
         {/* Hero Section - Impact First with Sustainability Story */}
-        <div className="mb-8 bg-gradient-to-r from-[#236383] to-[#007e8c] rounded-2xl p-8 text-white shadow-xl">
+        <div className="mb-8 bg-gradient-to-r from-[#236383] to-[#236383] rounded-2xl p-8 text-white shadow-xl">
           {/* Lead with Impact + Consistency */}
           <div className="text-center mb-8">
             <div className="text-5xl md:text-7xl font-black text-[#fbad3f] mb-2">{liveHeroSandwiches}</div>
@@ -1279,9 +1279,9 @@ export default function GrantMetrics() {
                   {metrics.peakMonth.month || 'No monthly data yet'}
                 </p>
               </div>
-              <div className="p-4 rounded-lg border border-[#007E8C]/20 bg-white">
+              <div className="p-4 rounded-lg border border-[#236383]/20 bg-white">
                 <div className="text-sm font-semibold text-gray-600">Latest Completed YoY</div>
-                <div className="text-2xl font-black text-[#007E8C]">
+                <div className="text-2xl font-black text-[#236383]">
                   {latestGrowthPoint ? `${latestGrowthPoint.growth > 0 ? '+' : ''}${latestGrowthPoint.growth}%` : '—'}
                 </div>
                 <p className="text-xs text-gray-500">
@@ -1356,9 +1356,9 @@ export default function GrantMetrics() {
                 <div className="text-xs text-gray-500">sandwiches</div>
               </div>
 
-              <div className="bg-white p-4 rounded-lg border border-[#007E8C]/20">
+              <div className="bg-white p-4 rounded-lg border border-[#236383]/20">
                 <div className="text-sm text-gray-600 mb-1">Weekly Avg (Recent)</div>
-                <div className="text-3xl font-black text-[#007E8C]">
+                <div className="text-3xl font-black text-[#236383]">
                   {metrics.weeklyAverage > 0 ? metrics.weeklyAverage.toLocaleString() : '—'}
                 </div>
                 <div className="text-xs text-gray-500">sandwiches/week (last 4 non-holiday weeks)</div>
@@ -1387,7 +1387,7 @@ export default function GrantMetrics() {
             : 0;
           if (baseYearTotal === 0 || peakYearTotal === 0) return null;
           return (
-            <Card className="mb-8 bg-gradient-to-r from-[#236383] to-[#007e8c] text-white shadow-xl border-0">
+            <Card className="mb-8 bg-gradient-to-r from-[#236383] to-[#236383] text-white shadow-xl border-0">
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row md:items-center gap-6">
                   <div className="flex-shrink-0 text-center md:text-left">
@@ -1506,8 +1506,8 @@ export default function GrantMetrics() {
               </div>
 
               <div className="text-center p-4 bg-[#E0F2F1] rounded-lg">
-                <Clock className="w-8 h-8 mx-auto mb-2 text-[#007E8C]" />
-                <div className="text-3xl font-black text-[#007E8C] mb-1">
+                <Clock className="w-8 h-8 mx-auto mb-2 text-[#236383]" />
+                <div className="text-3xl font-black text-[#236383] mb-1">
                   {filteredVolunteerMetrics.activeVolunteerHours.toLocaleString()}
                 </div>
                 <p className="text-sm text-gray-700 font-medium">
@@ -1569,7 +1569,7 @@ export default function GrantMetrics() {
                     <span>÷ {GROUP_SANDWICHES_PER_ENGAGEMENT_CENTRAL} sandwiches per participant = {filteredVolunteerMetrics.groupEngagements.toLocaleString()} engagements</span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Badge className="bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/30 shrink-0">
+                    <Badge className="bg-[#236383]/20 text-[#236383] border-[#236383]/30 shrink-0">
                       Range
                     </Badge>
                     <span>÷ {GROUP_SANDWICHES_PER_ENGAGEMENT_LOW_BOUND} to ÷ {GROUP_SANDWICHES_PER_ENGAGEMENT_HIGH_BOUND} = {filteredVolunteerMetrics.groupEngagementsLow.toLocaleString()}–{filteredVolunteerMetrics.groupEngagementsHigh.toLocaleString()} engagements</span>
@@ -1599,7 +1599,7 @@ export default function GrantMetrics() {
                     <span>÷ {INDIVIDUAL_SANDWICHES_PER_ENGAGEMENT_CENTRAL} sandwiches per participant = {filteredVolunteerMetrics.individualEngagements.toLocaleString()} engagements</span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <Badge className="bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/30 shrink-0">
+                    <Badge className="bg-[#236383]/20 text-[#236383] border-[#236383]/30 shrink-0">
                       Range
                     </Badge>
                     <span>÷ {INDIVIDUAL_SANDWICHES_PER_ENGAGEMENT_LOW_BOUND} to ÷ {INDIVIDUAL_SANDWICHES_PER_ENGAGEMENT_HIGH_BOUND} = {filteredVolunteerMetrics.individualEngagementsLow.toLocaleString()}–{filteredVolunteerMetrics.individualEngagementsHigh.toLocaleString()} engagements</span>
@@ -1611,14 +1611,14 @@ export default function GrantMetrics() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-white to-[#E0F2F1] p-5 rounded-lg border border-[#007E8C]/30 mb-4">
+            <div className="bg-gradient-to-r from-white to-[#E0F2F1] p-5 rounded-lg border border-[#236383]/30 mb-4">
               <h3 className="font-bold text-gray-900 mb-3 flex items-center">
-                <Clock className="w-5 h-5 mr-2 text-[#007E8C]" />
+                <Clock className="w-5 h-5 mr-2 text-[#236383]" />
                 Estimated active sandwich-making volunteer hours
               </h3>
               <div className="space-y-2 text-sm text-gray-700">
                 <div className="flex items-start gap-2">
-                  <Badge className="bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/30 shrink-0">
+                  <Badge className="bg-[#236383]/20 text-[#236383] border-[#236383]/30 shrink-0">
                     Hours
                   </Badge>
                   <span>{filteredVolunteerMetrics.totalSandwiches.toLocaleString()} total sandwiches ÷ {SANDWICHES_PER_ACTIVE_VOLUNTEER_HOUR} per active hour = {filteredVolunteerMetrics.activeVolunteerHoursExact.toLocaleString()} hours</span>
@@ -1630,7 +1630,7 @@ export default function GrantMetrics() {
                   <span>× ${IRS_VOLUNTEER_RATE_USD_PER_HOUR.toFixed(2)}/hr (Independent Sector, {IRS_VOLUNTEER_RATE_YEAR}) = ${filteredVolunteerMetrics.economicValue.toLocaleString()}</span>
                 </div>
               </div>
-              <p className="text-xs text-[#007E8C] font-medium mt-3">
+              <p className="text-xs text-[#236383] font-medium mt-3">
                 {VOLUNTEER_HOURS_METHODOLOGY_NOTE}
               </p>
             </div>
@@ -1642,8 +1642,8 @@ export default function GrantMetrics() {
         </Card>
 
         {/* Cost Efficiency & Financial Metrics - INTERACTIVE */}
-        <Card className="mb-8 border-2 border-[#007E8C] shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-[#007E8C] to-[#236383] text-white">
+        <Card className="mb-8 border-2 border-[#236383] shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-[#236383] to-[#236383] text-white">
             <CardTitle className="flex items-center text-xl">
               <DollarSign className="w-6 h-6 mr-2" />
               Cost Efficiency & Financial Impact
@@ -1655,7 +1655,7 @@ export default function GrantMetrics() {
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
               <div className="text-center p-4 bg-[#E0F2F1] rounded-lg">
-                <div className="text-4xl font-black text-[#007E8C] mb-2">
+                <div className="text-4xl font-black text-[#236383] mb-2">
                   ${filteredCostMetrics.costPerSandwich.toFixed(2)}
                 </div>
                 <p className="text-sm text-gray-700 font-medium">
@@ -1707,9 +1707,9 @@ export default function GrantMetrics() {
               </div>
             </div>
 
-            <div className="mb-6 bg-white p-5 rounded-lg border border-[#007E8C]/20">
+            <div className="mb-6 bg-white p-5 rounded-lg border border-[#236383]/20">
               <h3 className="font-bold text-gray-900 mb-3 flex items-center">
-                <FileText className="w-5 h-5 mr-2 text-[#007E8C]" />
+                <FileText className="w-5 h-5 mr-2 text-[#236383]" />
                 Ingredient Cost Baselines
               </h3>
               <p className="text-sm text-gray-600 mb-4">
@@ -1744,11 +1744,11 @@ export default function GrantMetrics() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-[#E0F2F1] to-white p-5 rounded-lg border border-[#007E8C]/30">
+            <div className="bg-gradient-to-r from-[#E0F2F1] to-white p-5 rounded-lg border border-[#236383]/30">
               <h3 className="font-bold text-gray-900 mb-3">Why This Matters for Funders</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#007E8C] flex items-center justify-center text-white font-bold shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-[#236383] flex items-center justify-center text-white font-bold shrink-0">
                     1
                   </div>
                   <div>
@@ -1946,7 +1946,7 @@ export default function GrantMetrics() {
 
         {/* Partnership & Collaboration Strength - NOW WITH REAL DATA! */}
         <Card className="mb-8 border-2 border-[#47B3CB] shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-[#47B3CB] to-[#007E8C] text-white">
+          <CardHeader className="bg-gradient-to-r from-[#47B3CB] to-[#236383] text-white">
             <CardTitle className="flex items-center text-xl">
               <Building2 className="w-6 h-6 mr-2" />
               Partnership & Collaboration Network
@@ -1968,9 +1968,9 @@ export default function GrantMetrics() {
                 </p>
               </div>
 
-              <div className="text-center p-6 bg-gradient-to-br from-[#007E8C]/10 to-white rounded-lg border border-[#007E8C]/30">
-                <MapPin className="w-12 h-12 mx-auto mb-3 text-[#007E8C]" />
-                <div className="text-4xl font-black text-[#007E8C] mb-2">
+              <div className="text-center p-6 bg-gradient-to-br from-[#236383]/10 to-white rounded-lg border border-[#236383]/30">
+                <MapPin className="w-12 h-12 mx-auto mb-3 text-[#236383]" />
+                <div className="text-4xl font-black text-[#236383] mb-2">
                   {totalHosts}
                 </div>
                 <p className="font-medium text-gray-900">Host Locations</p>
@@ -2038,11 +2038,11 @@ export default function GrantMetrics() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-[#E0F2F1] to-white p-5 rounded-lg border border-[#007E8C]/30">
+            <div className="bg-gradient-to-r from-[#E0F2F1] to-white p-5 rounded-lg border border-[#236383]/30">
               <h3 className="font-bold text-gray-900 mb-3">Estimated Weekly Bare Minimum Need</h3>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-black text-[#007E8C]">
+                  <div className="text-3xl font-black text-[#236383]">
                     {recipientMetrics.totalWeeklyCapacity.toLocaleString()}
                   </div>
                   <p className="text-sm text-gray-600 mt-1">
@@ -2052,7 +2052,7 @@ export default function GrantMetrics() {
                     This is likely an undercount of true community need. Many recipient partners can take extra sandwiches, which is why TSP can place all sandwiches even during 10,000+ sandwich weeks. This number is best understood as the bare-minimum weekly baseline, not the ceiling of demand.
                   </p>
                 </div>
-                <BarChart3 className="w-16 h-16 text-[#007E8C]/30" />
+                <BarChart3 className="w-16 h-16 text-[#236383]/30" />
               </div>
             </div>
           </CardContent>
@@ -2061,7 +2061,7 @@ export default function GrantMetrics() {
         {/* Group Events Impact - REAL DATA */}
         {eventMetrics.totalEvents > 0 && (
           <Card className="mb-8 border-2 border-[#236383] shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-[#236383] to-[#007E8C] text-white">
+            <CardHeader className="bg-gradient-to-r from-[#236383] to-[#236383] text-white">
               <CardTitle className="flex items-center text-xl">
                 <Users className="w-6 h-6 mr-2" />
                 Group Events & Community Engagement
@@ -2204,9 +2204,9 @@ export default function GrantMetrics() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-white to-[#E0F2F1] p-5 rounded-lg border-l-4 border-[#007E8C]">
+              <div className="bg-gradient-to-r from-white to-[#E0F2F1] p-5 rounded-lg border-l-4 border-[#236383]">
                 <div className="flex items-start gap-4">
-                  <Activity className="w-8 h-8 text-[#007E8C] shrink-0 mt-1" />
+                  <Activity className="w-8 h-8 text-[#236383] shrink-0 mt-1" />
                   <div>
                     <h3 className="font-bold text-gray-900 mb-2">Logistics Infrastructure</h3>
                     <p className="text-sm text-gray-700 mb-2">
@@ -2215,7 +2215,7 @@ export default function GrantMetrics() {
                     <p className="text-sm text-gray-700 mb-2">
                       <strong>Impact:</strong> Enable simultaneous routes, reduce volunteer burden, improve crisis response time
                     </p>
-                    <Badge className="bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/30">
+                    <Badge className="bg-[#236383]/20 text-[#236383] border-[#236383]/30">
                       Est. Cost: $35K-50K (one-time)
                     </Badge>
                   </div>

@@ -589,7 +589,7 @@ export default function PredictiveForecasts() {
             </div>
             <div className={`text-center p-4 rounded-lg border-2 ${
               forecasts.weekly.vsAvg >= 10
-                ? 'bg-[#007E8C]/10 border-[#007E8C]'
+                ? 'bg-[#236383]/10 border-[#236383]'
                 : forecasts.weekly.isWithinRange || forecasts.weekly.vsAvg >= 0
                 ? 'bg-brand-primary/10 border-brand-primary'
                 : forecasts.weekly.vsAvg >= -10
@@ -598,7 +598,7 @@ export default function PredictiveForecasts() {
             }`}>
               <p className="text-sm text-gray-600 mb-1">Projected Week Total</p>
               <p className={`text-3xl font-bold ${
-                forecasts.weekly.vsAvg >= 10 ? 'text-[#007E8C]' :
+                forecasts.weekly.vsAvg >= 10 ? 'text-[#236383]' :
                 forecasts.weekly.isWithinRange || forecasts.weekly.vsAvg >= 0 ? 'text-brand-primary' :
                 forecasts.weekly.vsAvg >= -10 ? 'text-brand-orange' :
                 'text-[#A31C41]'
@@ -625,7 +625,7 @@ export default function PredictiveForecasts() {
               {/* Clear status indicator */}
               <div className={`mt-3 px-3 py-2 rounded-md font-semibold text-sm ${
                 forecasts.weekly.vsAvg >= 10
-                  ? 'bg-[#007E8C] text-white'
+                  ? 'bg-[#236383] text-white'
                   : forecasts.weekly.isWithinRange || forecasts.weekly.vsAvg >= 0
                   ? 'bg-brand-primary text-white'
                   : forecasts.weekly.vsAvg >= -10
@@ -703,10 +703,10 @@ export default function PredictiveForecasts() {
             </div>
           )}
           {!forecasts.weekly.isExcludedWeek && forecasts.weekly.vsAvg >= 10 && (
-            <div className="bg-[#007E8C]/10 border-2 border-[#007E8C] rounded-lg p-4 flex items-start gap-3">
-              <TrendingUp className="h-5 w-5 text-[#007E8C] mt-0.5" />
+            <div className="bg-[#236383]/10 border-2 border-[#236383] rounded-lg p-4 flex items-start gap-3">
+              <TrendingUp className="h-5 w-5 text-[#236383] mt-0.5" />
               <div>
-                <p className="font-semibold text-[#007E8C]">Excellent Week!</p>
+                <p className="font-semibold text-[#236383]">Excellent Week!</p>
                 <p className="text-sm text-gray-700 mt-1">
                   On track to exceed weekly average by {Math.round(forecasts.weekly.projected - forecasts.weekly.average).toLocaleString()} sandwiches.
                 </p>
@@ -869,7 +869,7 @@ export default function PredictiveForecasts() {
             </div>
             <div className={`text-center p-4 rounded-lg border-2 ${
               forecasts.monthly.vsAvg >= 10
-                ? 'bg-[#007E8C]/10 border-[#007E8C]'
+                ? 'bg-[#236383]/10 border-[#236383]'
                 : forecasts.monthly.isWithinRange || forecasts.monthly.vsAvg >= 0
                 ? 'bg-brand-teal/10 border-brand-teal'
                 : forecasts.monthly.vsAvg >= -10
@@ -878,7 +878,7 @@ export default function PredictiveForecasts() {
             }`}>
               <p className="text-sm text-gray-600 mb-1">Projected Month Total</p>
               <p className={`text-3xl font-bold ${
-                forecasts.monthly.vsAvg >= 10 ? 'text-[#007E8C]' :
+                forecasts.monthly.vsAvg >= 10 ? 'text-[#236383]' :
                 forecasts.monthly.isWithinRange || forecasts.monthly.vsAvg >= 0 ? 'text-brand-teal' :
                 forecasts.monthly.vsAvg >= -10 ? 'text-brand-orange' :
                 'text-[#A31C41]'
@@ -890,7 +890,7 @@ export default function PredictiveForecasts() {
               {/* Clear status indicator */}
               <div className={`mt-3 px-3 py-2 rounded-md font-semibold text-sm ${
                 forecasts.monthly.vsAvg >= 10
-                  ? 'bg-[#007E8C] text-white'
+                  ? 'bg-[#236383] text-white'
                   : forecasts.monthly.isWithinRange || forecasts.monthly.vsAvg >= 0
                   ? 'bg-brand-teal text-white'
                   : forecasts.monthly.vsAvg >= -10

@@ -330,8 +330,8 @@ const DashboardActionTracker = ({ onNavigate }: DashboardActionTrackerProps) => 
                     )}
                     {dashboardData.counts.tasks > 0 && (
                       <div className="flex items-center gap-1.5">
-                        <SquareCheck className="w-4 h-4 text-[#007E8C]" />
-                        <span className="text-sm font-semibold text-[#007E8C]">{dashboardData.counts.tasks}</span>
+                        <SquareCheck className="w-4 h-4 text-[#236383]" />
+                        <span className="text-sm font-semibold text-[#236383]">{dashboardData.counts.tasks}</span>
                         <span className="text-sm text-gray-600">{dashboardData.counts.tasks === 1 ? 'Task' : 'Tasks'}</span>
                       </div>
                     )}

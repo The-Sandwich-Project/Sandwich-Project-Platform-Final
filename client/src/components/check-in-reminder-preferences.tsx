@@ -260,7 +260,7 @@ export default function CheckInReminderPreferencesEditor() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-[#007E8C]" />
+        <Loader2 className="w-6 h-6 animate-spin text-[#236383]" />
       </div>
     );
   }
@@ -273,7 +273,7 @@ export default function CheckInReminderPreferencesEditor() {
     <Card data-tour="reminder-preferences">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <AlarmClock className="w-5 h-5 text-[#007E8C]" />
+          <AlarmClock className="w-5 h-5 text-[#236383]" />
           Event Check-In Reminders
         </CardTitle>
         <CardDescription>
@@ -404,7 +404,7 @@ export default function CheckInReminderPreferencesEditor() {
 
         {/* Save */}
         <Button
-          className="w-full bg-[#007E8C] hover:bg-[#006570] text-white"
+          className="w-full bg-[#236383] hover:bg-[#006570] text-white"
           onClick={handleSave}
           disabled={saveMutation.isPending}
         >
@@ -443,7 +443,7 @@ function RuleSection({
   onFrequency: (ruleType: string, freq: ReminderFrequency) => void;
   accentColor?: 'teal' | 'purple';
 }) {
-  const enabledBorder = accentColor === 'purple' ? 'border-purple-300/30 bg-purple-50/50' : 'border-[#007E8C]/30 bg-[#007E8C]/5';
+  const enabledBorder = accentColor === 'purple' ? 'border-purple-300/30 bg-purple-50/50' : 'border-[#236383]/30 bg-[#236383]/5';
 
   return (
     <div className="space-y-3">

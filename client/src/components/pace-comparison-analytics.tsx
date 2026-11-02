@@ -527,7 +527,7 @@ export default function PaceComparisonAnalytics() {
                 key={k}
                 size="sm"
                 variant={preset === k ? 'default' : 'outline'}
-                className={preset === k ? 'bg-[#236383] hover:bg-[#007e8c]' : ''}
+                className={preset === k ? 'bg-[#236383] hover:bg-[#236383]' : ''}
                 onClick={() => setPreset(k)}
               >
                 {label}
@@ -562,7 +562,7 @@ export default function PaceComparisonAnalytics() {
       </Card>
 
       {/* At-a-glance headline */}
-      <Card className="border-2 border-[#236383]/20 bg-gradient-to-br from-[#236383]/5 via-white to-[#007e8c]/5">
+      <Card className="border-2 border-[#236383]/20 bg-gradient-to-br from-[#236383]/5 via-white to-[#236383]/5">
         <CardContent className="pt-6 pb-5">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2 min-w-0">

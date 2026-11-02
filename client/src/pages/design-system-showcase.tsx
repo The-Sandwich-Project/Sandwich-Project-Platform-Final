@@ -31,7 +31,7 @@ export default function DesignSystemShowcase() {
           </h1>
           <p className="premium-text-body-lg text-gray-600 max-w-3xl mx-auto">
             A modern, cohesive design system using your brand colors: Navy (#236383),
-            Teal (#007E8C), Cyan (#47B3CB), Orange (#FBAD3F), and Burgundy (#A31C41).
+            Teal (#236383), Cyan (#47B3CB), Orange (#FBAD3F), and Burgundy (#A31C41).
             All classes use the "premium-" prefix and work alongside existing styles.
           </p>
         </div>
@@ -52,10 +52,10 @@ export default function DesignSystemShowcase() {
             <div className="premium-card p-6 text-center">
               <div
                 className="w-full h-24 rounded-lg mb-4"
-                style={{ background: '#007E8C' }}
+                style={{ background: '#236383' }}
               />
               <div className="font-semibold text-sm">Teal</div>
-              <div className="text-xs text-gray-500 mt-1">#007E8C</div>
+              <div className="text-xs text-gray-500 mt-1">#236383</div>
               <div className="text-xs text-gray-400">Success, Active</div>
             </div>
             <div className="premium-card p-6 text-center">

@@ -2112,9 +2112,9 @@ export default function DriversManagement() {
                       {/* Vehicle Icon */}
                       <div className={`flex-shrink-0 rounded-lg p-3 ${driver.isActive ? 'bg-[#47B3CB]/20' : 'bg-slate-200'}`}>
                         {driver.vehicleType?.toLowerCase().includes('van') ? (
-                          <Truck className={`w-8 h-8 ${driver.isActive ? 'text-[#007E8C]' : 'text-slate-500'}`} />
+                          <Truck className={`w-8 h-8 ${driver.isActive ? 'text-[#236383]' : 'text-slate-500'}`} />
                         ) : (
-                          <Car className={`w-8 h-8 ${driver.isActive ? 'text-[#007E8C]' : 'text-slate-500'}`} />
+                          <Car className={`w-8 h-8 ${driver.isActive ? 'text-[#236383]' : 'text-slate-500'}`} />
                         )}
                       </div>
 
@@ -2305,10 +2305,10 @@ export default function DriversManagement() {
                           {driver.phone && (
                             <div className={`rounded-lg px-3 py-2.5 border ${driver.isActive ? 'bg-[#47B3CB]/10 border-[#47B3CB]/30' : 'bg-slate-100 border-slate-300'}`}>
                               <div className="flex items-center gap-2">
-                                <Phone className={`w-4 h-4 flex-shrink-0 ${driver.isActive ? 'text-[#007E8C]' : 'text-slate-600'}`} />
+                                <Phone className={`w-4 h-4 flex-shrink-0 ${driver.isActive ? 'text-[#236383]' : 'text-slate-600'}`} />
                                 <div className="min-w-0">
                                   <div className={`text-xs font-medium ${driver.isActive ? 'text-[#236383]' : 'text-slate-600'}`}>Phone</div>
-                                  <a href={`tel:${driver.phone}`} className={`text-sm font-semibold ${driver.isActive ? 'text-gray-900 hover:text-[#007E8C]' : 'text-slate-700 hover:text-gray-900'}`}>
+                                  <a href={`tel:${driver.phone}`} className={`text-sm font-semibold ${driver.isActive ? 'text-gray-900 hover:text-[#236383]' : 'text-slate-700 hover:text-gray-900'}`}>
                                     {driver.phone}
                                   </a>
                                 </div>
@@ -2318,10 +2318,10 @@ export default function DriversManagement() {
                           {driver.email && (
                             <div className={`rounded-lg px-3 py-2.5 border ${driver.isActive ? 'bg-[#47B3CB]/10 border-[#47B3CB]/30' : 'bg-slate-100 border-slate-300'}`}>
                               <div className="flex items-center gap-2">
-                                <Mail className={`w-4 h-4 flex-shrink-0 ${driver.isActive ? 'text-[#007E8C]' : 'text-slate-600'}`} />
+                                <Mail className={`w-4 h-4 flex-shrink-0 ${driver.isActive ? 'text-[#236383]' : 'text-slate-600'}`} />
                                 <div className="min-w-0 overflow-hidden">
                                   <div className={`text-xs font-medium ${driver.isActive ? 'text-[#236383]' : 'text-slate-600'}`}>Email</div>
-                                  <a href={`mailto:${driver.email}`} className={`text-sm font-semibold truncate block ${driver.isActive ? 'text-gray-900 hover:text-[#007E8C]' : 'text-slate-700 hover:text-gray-900'}`}>
+                                  <a href={`mailto:${driver.email}`} className={`text-sm font-semibold truncate block ${driver.isActive ? 'text-gray-900 hover:text-[#236383]' : 'text-slate-700 hover:text-gray-900'}`}>
                                     {driver.email}
                                   </a>
                                 </div>

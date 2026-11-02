@@ -98,9 +98,9 @@ function SortIcon({
     return <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />;
   }
   return sortDirection === 'asc' ? (
-    <ArrowUp className="w-3.5 h-3.5 text-[#007E8C]" />
+    <ArrowUp className="w-3.5 h-3.5 text-[#236383]" />
   ) : (
-    <ArrowDown className="w-3.5 h-3.5 text-[#007E8C]" />
+    <ArrowDown className="w-3.5 h-3.5 text-[#236383]" />
   );
 }
 
@@ -436,7 +436,7 @@ export function RecipientTable({
     if (id === 'name') {
       return `font-medium sticky left-0 z-10 ${rowBgClass} group-hover:bg-[#E6F4F6] shadow-[2px_0_3px_-1px_rgb(0_0_0/0.08)]`;
     }
-    if (id === 'collectionDays') return 'bg-[#007E8C]/[0.03]';
+    if (id === 'collectionDays') return 'bg-[#236383]/[0.03]';
     if (id === 'feedingDays') return 'bg-[#FBAD3F]/[0.04]';
     return '';
   };
@@ -481,7 +481,7 @@ export function RecipientTable({
                       col.id === 'name'
                         ? 'sticky left-0 z-20 bg-slate-50 shadow-[2px_0_3px_-1px_rgb(0_0_0/0.08)]'
                         : col.id === 'collectionDays'
-                          ? 'bg-[#007E8C]/8'
+                          ? 'bg-[#236383]/8'
                           : col.id === 'feedingDays'
                             ? 'bg-[#FBAD3F]/10'
                             : ''
@@ -489,7 +489,7 @@ export function RecipientTable({
                       isBeingDragged ? 'opacity-40' : ''
                     } ${
                       isDragTarget
-                        ? 'outline outline-2 outline-[#007E8C] outline-offset-[-2px]'
+                        ? 'outline outline-2 outline-[#236383] outline-offset-[-2px]'
                         : ''
                     } ${!isLocked ? 'cursor-grab active:cursor-grabbing' : ''}`}
                   >
@@ -505,7 +505,7 @@ export function RecipientTable({
                       <button
                         type="button"
                         onClick={() => onSort(col.id)}
-                        className="inline-flex items-center gap-1 hover:text-[#007E8C] transition-colors"
+                        className="inline-flex items-center gap-1 hover:text-[#236383] transition-colors"
                       >
                         {col.label}
                         <SortIcon column={col.id} sortColumn={sortColumn} sortDirection={sortDirection} />
@@ -521,8 +521,8 @@ export function RecipientTable({
                       draggable={false}
                       onMouseDown={(e) => handleResizeStart(e, col)}
                       onClick={(e) => e.stopPropagation()}
-                      className={`absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-[#007E8C]/40 active:bg-[#007E8C]/60 transition-colors ${
-                        resizingColumn?.id === col.id ? 'bg-[#007E8C]/60' : ''
+                      className={`absolute top-0 right-0 bottom-0 w-1.5 cursor-col-resize hover:bg-[#236383]/40 active:bg-[#236383]/60 transition-colors ${
+                        resizingColumn?.id === col.id ? 'bg-[#236383]/60' : ''
                       }`}
                       title="Drag to resize column"
                     />
@@ -551,7 +551,7 @@ export function RecipientTable({
                   ref={isHighlighted ? highlightRowRef : undefined}
                   onClick={() => onRowClick(recipient)}
                   className={`group cursor-pointer transition-colors ${
-                    isInactive ? 'text-slate-500 hover:bg-slate-100/80' : 'hover:bg-[#007E8C]/5'
+                    isInactive ? 'text-slate-500 hover:bg-slate-100/80' : 'hover:bg-[#236383]/5'
                   } ${
                     isHighlighted
                       ? 'bg-[#FBAD3F]/10 ring-1 ring-inset ring-[#FBAD3F]/40'

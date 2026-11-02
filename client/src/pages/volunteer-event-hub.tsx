@@ -145,7 +145,7 @@ function getGoogleMapsUrl(location: {
 function AddressLink({
   location,
   className,
-  iconClassName = 'w-4 h-4 shrink-0 mt-0.5 text-[#007e8c]',
+  iconClassName = 'w-4 h-4 shrink-0 mt-0.5 text-[#236383]',
 }: {
   location: {
     eventAddress?: string | null;
@@ -165,7 +165,7 @@ function AddressLink({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'flex items-start gap-2 text-sm text-muted-foreground hover:text-[#007e8c] hover:underline underline-offset-2',
+        'flex items-start gap-2 text-sm text-muted-foreground hover:text-[#236383] hover:underline underline-offset-2',
         className,
       )}
       aria-label={`Open ${addressText} in Google Maps`}
@@ -361,7 +361,7 @@ interface CoverageSummaryEvent {
 const createEventIcon = (needsVolunteer: boolean, needsDriver: boolean, isCompleted = false, needsVanDriver = false) => {
   // Two-state: needs help (teal) vs filled/completed (gray). Specific role detail lives in the popup.
   const needsHelp = !isCompleted && (needsVolunteer || needsDriver || needsVanDriver);
-  const color = needsHelp ? '#007e8c' : '#9ca3af';
+  const color = needsHelp ? '#236383' : '#9ca3af';
 
   const html = `
     <div style="position: relative; width: 30px; height: 42px;">
@@ -417,14 +417,14 @@ const createUserLocationIcon = () => {
   });
 };
 
-// Brand colors: #236383 (dark teal), #47b3cb (light teal), #007e8c (primary teal), #a31c41 (burgundy), #fbad3f (gold)
+// Brand colors: #236383 (dark teal), #47b3cb (light teal), #236383 (primary teal), #a31c41 (burgundy), #fbad3f (gold)
 
 // Role badge component
 function RoleBadge({ role }: { role: string }) {
   const config = {
     speaker: { label: 'Speaker', icon: Mic, className: 'bg-[#a31c41]/10 text-[#a31c41] border-[#a31c41]/30' },
     driver: { label: 'Driver', icon: Car, className: 'bg-[#236383]/10 text-[#236383] border-[#236383]/30' },
-    general: { label: 'Volunteer', icon: UserCheck, className: 'bg-[#007e8c]/10 text-[#007e8c] border-[#007e8c]/30' },
+    general: { label: 'Volunteer', icon: UserCheck, className: 'bg-[#236383]/10 text-[#236383] border-[#236383]/30' },
   }[role] || { label: role, icon: Users, className: 'bg-gray-100 text-gray-800 border-gray-200' };
 
   const Icon = config.icon;
@@ -499,7 +499,7 @@ function EventCard({
 
         {/* Date & Time — single line when possible */}
         <div className="flex items-start gap-2 text-sm min-w-0">
-          <Calendar className="w-4 h-4 shrink-0 text-[#007e8c] mt-0.5" />
+          <Calendar className="w-4 h-4 shrink-0 text-[#236383] mt-0.5" />
           <span className="font-medium min-w-0 break-words">
             {formattedDate}
             <span className="font-normal text-muted-foreground">
@@ -511,7 +511,7 @@ function EventCard({
         {/* Driver pickup time */}
         {event.pickupTime && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Truck className="w-4 h-4 shrink-0 text-[#007e8c]" />
+            <Truck className="w-4 h-4 shrink-0 text-[#236383]" />
             <span>Pickup: {formatTimeForDisplay(event.pickupTime)}</span>
           </div>
         )}
@@ -526,7 +526,7 @@ function EventCard({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-gray-700">Needed:</span>
             {event.volunteersUnfilled > 0 && (
-              <Badge variant="outline" className="bg-[#007e8c]/10 text-[#007e8c] border-[#007e8c]/30 gap-1">
+              <Badge variant="outline" className="bg-[#236383]/10 text-[#236383] border-[#236383]/30 gap-1">
                 <UserCheck className="w-3 h-3" />
                 Volunteer{event.volunteersUnfilled > 1 ? ` (${event.volunteersUnfilled})` : ''}
               </Badge>
@@ -557,9 +557,9 @@ function EventCard({
         {/* Action button */}
         <div className="pt-2">
           {existingSignup ? (
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-gradient-to-r from-[#47b3cb]/15 to-[#007e8c]/10 border border-[#47b3cb]/30">
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-gradient-to-r from-[#47b3cb]/15 to-[#236383]/10 border border-[#47b3cb]/30">
               <div className="flex items-center gap-2">
-                <div className="bg-[#007e8c] rounded-full p-0.5">
+                <div className="bg-[#236383] rounded-full p-0.5">
                   <Check className="w-3 h-3 text-white" />
                 </div>
                 <span className="text-sm font-medium text-[#236383]">
@@ -593,7 +593,7 @@ function EventCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-10 border-[#007e8c]/30 text-[#236383] hover:bg-[#007e8c]/10"
+                  className="h-10 border-[#236383]/30 text-[#236383] hover:bg-[#236383]/10"
                   onClick={() => onClearUnavailable(event.id)}
                 >
                   Available Again
@@ -629,7 +629,7 @@ function EventCard({
                       role: 'general',
                       label: `Sign Up to Volunteer${event.volunteersUnfilled > 1 ? ` (${event.volunteersUnfilled} needed)` : ''}`,
                       icon: HandHeart,
-                      className: 'bg-gradient-to-r from-[#007e8c] to-[#47b3cb] hover:from-[#236383] hover:to-[#007e8c] text-white',
+                      className: 'bg-gradient-to-r from-[#236383] to-[#47b3cb] hover:from-[#236383] hover:to-[#236383] text-white',
                     });
                   }
                   if (!event.vanDriverNeeded && event.driversUnfilled > 0) {
@@ -647,7 +647,7 @@ function EventCard({
                       role: 'general',
                       label: 'Sign Up to Volunteer',
                       icon: HandHeart,
-                      className: 'bg-gradient-to-r from-[#007e8c] to-[#47b3cb] hover:from-[#236383] hover:to-[#007e8c] text-white',
+                      className: 'bg-gradient-to-r from-[#236383] to-[#47b3cb] hover:from-[#236383] hover:to-[#236383] text-white',
                     });
                   }
 
@@ -800,9 +800,9 @@ function SignupDialog({
           ? 'General Volunteer — filled, extra help welcome'
           : 'General Volunteer — extra help always welcome',
       icon: UserCheck,
-      colorClass: 'text-[#007e8c]',
-      borderClass: 'border-[#007e8c]/30',
-      bgClass: 'bg-[#007e8c]/5',
+      colorClass: 'text-[#236383]',
+      borderClass: 'border-[#236383]/30',
+      bgClass: 'bg-[#236383]/5',
       instructions: event.volunteerInstructions,
     });
 
@@ -932,9 +932,9 @@ function SignupDialog({
           </div>
 
           {/* Reassurance callout */}
-          <div className="bg-[#007e8c]/10 border-l-4 border-[#007e8c] rounded-md p-4 text-sm text-[#236383]">
+          <div className="bg-[#236383]/10 border-l-4 border-[#236383] rounded-md p-4 text-sm text-[#236383]">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0 text-[#007e8c]" />
+              <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0 text-[#236383]" />
               <div>
                 <p className="text-base font-semibold">What happens next?</p>
                 <p className="text-[#236383]/90 mt-1.5 leading-relaxed">
@@ -953,7 +953,7 @@ function SignupDialog({
           <Button
             onClick={() => onSubmit(selectedRoles, notes)}
             disabled={selectedRoles.length === 0 || isSubmitting}
-            className="bg-gradient-to-r from-[#007e8c] to-[#47b3cb] hover:from-[#236383] hover:to-[#007e8c] text-white shadow-sm"
+            className="bg-gradient-to-r from-[#236383] to-[#47b3cb] hover:from-[#236383] hover:to-[#236383] text-white shadow-sm"
           >
             {isSubmitting ? (
               <>
@@ -1044,7 +1044,7 @@ function SignupSuccessDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="items-center text-center">
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#007e8c] to-[#47b3cb] text-white shadow-sm">
+          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#236383] to-[#47b3cb] text-white shadow-sm">
             <PartyPopper className="h-7 w-7" />
           </div>
           <DialogTitle className="text-xl">You're in! 🎉</DialogTitle>
@@ -1057,22 +1057,22 @@ function SignupSuccessDialog({
 
         <div className="space-y-4 py-2">
           {/* Event recap */}
-          <div className="rounded-lg border border-[#007e8c]/20 bg-[#007e8c]/5 p-4 space-y-2.5 text-sm">
+          <div className="rounded-lg border border-[#236383]/20 bg-[#236383]/5 p-4 space-y-2.5 text-sm">
             <div className="flex items-center gap-2 text-gray-700">
-              <Building2 className="h-4 w-4 shrink-0 text-[#007e8c]" />
+              <Building2 className="h-4 w-4 shrink-0 text-[#236383]" />
               <span className="font-medium">{event.organizationName}</span>
             </div>
             <div className="flex items-center gap-2 text-gray-700">
-              <CalendarDays className="h-4 w-4 shrink-0 text-[#007e8c]" />
+              <CalendarDays className="h-4 w-4 shrink-0 text-[#236383]" />
               <span>{formattedDate}</span>
             </div>
             <div className="flex items-center gap-2 text-gray-700">
-              <Clock className="h-4 w-4 shrink-0 text-[#007e8c]" />
+              <Clock className="h-4 w-4 shrink-0 text-[#236383]" />
               <span>{timeText}</span>
             </div>
             {addressText && (
               <div className="flex items-start gap-2 text-gray-700">
-                <MapPin className="h-4 w-4 shrink-0 text-[#007e8c] mt-0.5" />
+                <MapPin className="h-4 w-4 shrink-0 text-[#236383] mt-0.5" />
                 <span>{addressText}</span>
               </div>
             )}
@@ -1082,7 +1082,7 @@ function SignupSuccessDialog({
                   <Badge
                     key={label}
                     variant="secondary"
-                    className="bg-[#007e8c]/10 text-[#236383] hover:bg-[#007e8c]/10"
+                    className="bg-[#236383]/10 text-[#236383] hover:bg-[#236383]/10"
                   >
                     {label}
                   </Badge>
@@ -1101,7 +1101,7 @@ function SignupSuccessDialog({
                 <Button
                   variant="outline"
                   onClick={handleGoogle}
-                  className="flex-1 border-[#007e8c]/30 text-[#236383] hover:bg-[#007e8c]/5"
+                  className="flex-1 border-[#236383]/30 text-[#236383] hover:bg-[#236383]/5"
                 >
                   <CalendarPlus className="h-4 w-4 mr-2" />
                   Google Calendar
@@ -1109,7 +1109,7 @@ function SignupSuccessDialog({
                 <Button
                   variant="outline"
                   onClick={handleIcs}
-                  className="flex-1 border-[#007e8c]/30 text-[#236383] hover:bg-[#007e8c]/5"
+                  className="flex-1 border-[#236383]/30 text-[#236383] hover:bg-[#236383]/5"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Apple / Outlook
@@ -1120,7 +1120,7 @@ function SignupSuccessDialog({
 
           {/* What happens next */}
           <div className="flex items-start gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-[#007e8c] mt-0.5" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-[#236383] mt-0.5" />
             <span>
               A coordinator will confirm your spot, and we've emailed you the details. See you on{' '}
               {shortDate}!
@@ -1131,7 +1131,7 @@ function SignupSuccessDialog({
         <DialogFooter>
           <Button
             onClick={() => onOpenChange(false)}
-            className="w-full bg-gradient-to-r from-[#007e8c] to-[#47b3cb] hover:from-[#236383] hover:to-[#007e8c] text-white"
+            className="w-full bg-gradient-to-r from-[#236383] to-[#47b3cb] hover:from-[#236383] hover:to-[#236383] text-white"
           >
             Done
           </Button>
@@ -1275,9 +1275,9 @@ function AssignOthersDialog({
         ? `General Volunteer (${event.volunteersUnfilled} needed)`
         : `General Volunteer`,
       icon: UserCheck,
-      colorClass: 'text-[#007e8c]',
-      borderClass: 'border-[#007e8c]/30',
-      bgClass: 'bg-[#007e8c]/5',
+      colorClass: 'text-[#236383]',
+      borderClass: 'border-[#236383]/30',
+      bgClass: 'bg-[#236383]/5',
     });
     if (!event.vanDriverNeeded && (event.driversNeeded > 0 || event.driversAssigned > 0)) {
       roles.push({
@@ -1349,7 +1349,7 @@ function AssignOthersDialog({
                         onClick={() => setTargetUserId(u.id)}
                         className={cn(
                           'w-full text-left px-2 py-1.5 rounded text-sm transition-colors',
-                          isSelected ? 'bg-[#007e8c] text-white' : 'hover:bg-slate-100'
+                          isSelected ? 'bg-[#236383] text-white' : 'hover:bg-slate-100'
                         )}
                       >
                         <div className="font-medium truncate">{label}</div>
@@ -1431,7 +1431,7 @@ function AssignOthersDialog({
           <Button
             onClick={() => onSubmit(targetUserId, selectedRoles, notes)}
             disabled={!targetUserId || selectedRoles.length === 0 || isSubmitting}
-            className="bg-gradient-to-r from-[#007e8c] to-[#47b3cb] hover:from-[#236383] hover:to-[#007e8c] text-white shadow-sm"
+            className="bg-gradient-to-r from-[#236383] to-[#47b3cb] hover:from-[#236383] hover:to-[#236383] text-white shadow-sm"
           >
             {isSubmitting ? (
               <>
@@ -2109,7 +2109,7 @@ export default function VolunteerEventHub({
     const roles: Array<{ singular: string; plural: string; count: number; color: string; bg: string; Icon: typeof Mic }> = [];
 
     if (event.volunteersUnfilled > 0) {
-      roles.push({ singular: 'volunteer', plural: 'volunteers', count: event.volunteersUnfilled, color: '#007E8C', bg: '#007E8C14', Icon: UserCheck });
+      roles.push({ singular: 'volunteer', plural: 'volunteers', count: event.volunteersUnfilled, color: '#236383', bg: '#23638314', Icon: UserCheck });
     }
     if (event.driversUnfilled > 0) {
       roles.push({ singular: 'driver', plural: 'drivers', count: event.driversUnfilled, color: '#236383', bg: '#23638314', Icon: Car });
@@ -2384,7 +2384,7 @@ export default function VolunteerEventHub({
   return (
     <div className="p-4 sm:p-6 space-y-6">
         {/* Header with gradient banner */}
-        <div className="bg-gradient-to-r from-[#007e8c] to-[#47b3cb] rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-r from-[#236383] to-[#47b3cb] rounded-xl p-6 text-white">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
@@ -2535,12 +2535,12 @@ export default function VolunteerEventHub({
               shadow lift so switching views feels intentional, not
               accidental. The label stays so the icon's meaning is
               never ambiguous. */}
-          <div className="flex w-full flex-wrap gap-1 rounded-lg border border-[#007e8c]/20 bg-[#007e8c]/5 p-1 sm:w-auto">
+          <div className="flex w-full flex-wrap gap-1 rounded-lg border border-[#236383]/20 bg-[#236383]/5 p-1 sm:w-auto">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setView('calendar')}
-              className={`flex-1 gap-1.5 font-semibold sm:flex-none ${view === 'calendar' ? 'bg-[#007e8c] text-white shadow-sm hover:bg-[#007e8c]/90 hover:text-white' : 'text-[#236383] hover:text-[#007e8c] hover:bg-[#007e8c]/10'}`}
+              className={`flex-1 gap-1.5 font-semibold sm:flex-none ${view === 'calendar' ? 'bg-[#236383] text-white shadow-sm hover:bg-[#236383]/90 hover:text-white' : 'text-[#236383] hover:text-[#236383] hover:bg-[#236383]/10'}`}
             >
               <CalendarDays className="w-[18px] h-[18px]" />
               Calendar
@@ -2549,7 +2549,7 @@ export default function VolunteerEventHub({
               variant="ghost"
               size="sm"
               onClick={() => setView('list')}
-              className={`flex-1 gap-1.5 font-semibold sm:flex-none ${view === 'list' ? 'bg-[#007e8c] text-white shadow-sm hover:bg-[#007e8c]/90 hover:text-white' : 'text-[#236383] hover:text-[#007e8c] hover:bg-[#007e8c]/10'}`}
+              className={`flex-1 gap-1.5 font-semibold sm:flex-none ${view === 'list' ? 'bg-[#236383] text-white shadow-sm hover:bg-[#236383]/90 hover:text-white' : 'text-[#236383] hover:text-[#236383] hover:bg-[#236383]/10'}`}
             >
               <List className="w-[18px] h-[18px]" />
               List
@@ -2558,7 +2558,7 @@ export default function VolunteerEventHub({
               variant="ghost"
               size="sm"
               onClick={() => setView('map')}
-              className={`flex-1 gap-1.5 font-semibold sm:flex-none ${view === 'map' ? 'bg-[#007e8c] text-white shadow-sm hover:bg-[#007e8c]/90 hover:text-white' : 'text-[#236383] hover:text-[#007e8c] hover:bg-[#007e8c]/10'}`}
+              className={`flex-1 gap-1.5 font-semibold sm:flex-none ${view === 'map' ? 'bg-[#236383] text-white shadow-sm hover:bg-[#236383]/90 hover:text-white' : 'text-[#236383] hover:text-[#236383] hover:bg-[#236383]/10'}`}
             >
               <MapIcon className="w-[18px] h-[18px]" />
               Map
@@ -2567,13 +2567,13 @@ export default function VolunteerEventHub({
               variant="ghost"
               size="sm"
               onClick={() => setView('my_signups')}
-              className={`flex-1 gap-1.5 sm:flex-none ${view === 'my_signups' ? 'bg-[#007e8c] text-white hover:bg-[#007e8c]/90 hover:text-white' : 'text-[#236383] hover:text-[#007e8c] hover:bg-[#007e8c]/10'}`}
+              className={`flex-1 gap-1.5 sm:flex-none ${view === 'my_signups' ? 'bg-[#236383] text-white hover:bg-[#236383]/90 hover:text-white' : 'text-[#236383] hover:text-[#236383] hover:bg-[#236383]/10'}`}
             >
               <UserCheck className="w-4 h-4" />
               My Signups
               {mySignups.length > 0 && (
                 <span className={`ml-1 text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center ${
-                  view === 'my_signups' ? 'bg-white text-[#007e8c]' : 'bg-[#007e8c] text-white'
+                  view === 'my_signups' ? 'bg-white text-[#236383]' : 'bg-[#236383] text-white'
                 }`}>
                   {mySignups.length}
                 </span>
@@ -2585,13 +2585,13 @@ export default function VolunteerEventHub({
                   variant="ghost"
                   size="sm"
                   onClick={() => setView('pending_approvals')}
-                  className={`flex-1 gap-1.5 sm:flex-none ${view === 'pending_approvals' ? 'bg-[#007e8c] text-white hover:bg-[#007e8c]/90 hover:text-white' : 'text-amber-700 hover:text-[#007e8c] hover:bg-[#007e8c]/10'}`}
+                  className={`flex-1 gap-1.5 sm:flex-none ${view === 'pending_approvals' ? 'bg-[#236383] text-white hover:bg-[#236383]/90 hover:text-white' : 'text-amber-700 hover:text-[#236383] hover:bg-[#236383]/10'}`}
                 >
                   <Clock className="w-4 h-4" />
                   Pending
                   {pendingSignups.length > 0 && (
                     <span className={`ml-1 text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center ${
-                      view === 'pending_approvals' ? 'bg-white text-[#007e8c]' : 'bg-amber-500 text-white'
+                      view === 'pending_approvals' ? 'bg-white text-[#236383]' : 'bg-amber-500 text-white'
                     }`}>
                       {pendingSignups.length}
                     </span>
@@ -2601,7 +2601,7 @@ export default function VolunteerEventHub({
                   variant="ghost"
                   size="sm"
                   onClick={() => setView('coverage')}
-                  className={`flex-1 gap-1.5 sm:flex-none ${view === 'coverage' ? 'bg-[#007e8c] text-white hover:bg-[#007e8c]/90 hover:text-white' : 'text-[#236383] hover:text-[#007e8c] hover:bg-[#007e8c]/10'}`}
+                  className={`flex-1 gap-1.5 sm:flex-none ${view === 'coverage' ? 'bg-[#236383] text-white hover:bg-[#236383]/90 hover:text-white' : 'text-[#236383] hover:text-[#236383] hover:bg-[#236383]/10'}`}
                 >
                   <Eye className="w-4 h-4" />
                   Coverage
@@ -2638,13 +2638,13 @@ export default function VolunteerEventHub({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8 border-[#007E8C]/30 text-[#236383] hover:bg-[#007E8C]/10" aria-label="Previous month">
+                        <Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8 border-[#236383]/30 text-[#236383] hover:bg-[#236383]/10" aria-label="Previous month">
                           <ChevronLeft className="w-4 h-4" />
                         </Button>
                         <CardTitle className="min-w-[180px] text-center text-xl sm:text-2xl text-[#236383]">
                           {format(currentMonth, 'MMMM yyyy')}
                         </CardTitle>
-                        <Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8 border-[#007E8C]/30 text-[#236383] hover:bg-[#007E8C]/10" aria-label="Next month">
+                        <Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8 border-[#236383]/30 text-[#236383] hover:bg-[#236383]/10" aria-label="Next month">
                           <ChevronRight className="w-4 h-4" />
                         </Button>
                       </div>
@@ -2655,8 +2655,8 @@ export default function VolunteerEventHub({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="hidden sm:flex items-center gap-2 rounded-lg bg-white border border-[#007E8C]/20 px-3 py-2 text-sm text-[#236383]">
-                      <HandHeart className="w-4 h-4 text-[#007E8C]" />
+                    <div className="hidden sm:flex items-center gap-2 rounded-lg bg-white border border-[#236383]/20 px-3 py-2 text-sm text-[#236383]">
+                      <HandHeart className="w-4 h-4 text-[#236383]" />
                       <span className="font-semibold">{monthCalendarSummary.openings}</span>
                       <span>open spots</span>
                     </div>
@@ -2667,7 +2667,7 @@ export default function VolunteerEventHub({
                     <Button
                       variant="outline"
                       onClick={goToToday}
-                      className="h-10 px-5 border-2 border-[#007E8C] text-[#007E8C] font-bold hover:bg-[#007E8C] hover:text-white hover:border-[#007E8C] transition-colors shadow-sm"
+                      className="h-10 px-5 border-2 border-[#236383] text-[#236383] font-bold hover:bg-[#236383] hover:text-white hover:border-[#236383] transition-colors shadow-sm"
                     >
                       <CalendarDays className="w-4 h-4 mr-1.5" aria-hidden="true" />
                       Today
@@ -2676,12 +2676,12 @@ export default function VolunteerEventHub({
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 mt-4">
-                  <div className="rounded-lg bg-white border border-[#007E8C]/15 p-3">
+                  <div className="rounded-lg bg-white border border-[#236383]/15 p-3">
                     <div className="text-2xl font-bold text-[#236383]">{monthCalendarSummary.events}</div>
                     <div className="text-xs font-medium text-gray-600">events shown</div>
                   </div>
-                  <div className="rounded-lg bg-white border border-[#007E8C]/15 p-3">
-                    <div className="text-2xl font-bold text-[#007E8C]">{monthCalendarSummary.days}</div>
+                  <div className="rounded-lg bg-white border border-[#236383]/15 p-3">
+                    <div className="text-2xl font-bold text-[#236383]">{monthCalendarSummary.days}</div>
                     <div className="text-xs font-medium text-gray-600">days with events</div>
                   </div>
                   <div className="rounded-lg bg-white border border-[#FBAD3F]/30 p-3">
@@ -2699,7 +2699,7 @@ export default function VolunteerEventHub({
                         at a glance, but only upcoming events read as
                         actionable. The legend names each visual state up
                         front so there's nothing to decode. */}
-                    <div className="rounded-lg border border-[#007E8C]/15 bg-white px-3 py-3 space-y-2">
+                    <div className="rounded-lg border border-[#236383]/15 bg-white px-3 py-3 space-y-2">
                       <p className="text-xs sm:text-sm text-gray-700 leading-snug">
                         This calendar shows both completed and upcoming events so you can see the full month at a glance. Teal-tinted days have open volunteer spots.
                       </p>
@@ -2726,7 +2726,7 @@ export default function VolunteerEventHub({
                         </span>
                         <span className="text-gray-300" aria-hidden="true">·</span>
                         <span className="inline-flex items-center gap-1.5">
-                          <span className="inline-block w-3.5 h-3.5 rounded-sm bg-white border-2 border-[#007E8C]" aria-hidden="true" />
+                          <span className="inline-block w-3.5 h-3.5 rounded-sm bg-white border-2 border-[#236383]" aria-hidden="true" />
                           <span className="text-gray-700"><span className="font-semibold">Today</span></span>
                         </span>
                       </div>
@@ -2801,20 +2801,20 @@ export default function VolunteerEventHub({
                                 // Upcoming + fully-staffed: white cell,
                                 // neutral border. There's an event, but no
                                 // volunteer action required.
-                                'bg-white border-[#47B3CB]/35 hover:border-[#007E8C] hover:shadow-md cursor-pointer',
+                                'bg-white border-[#47B3CB]/35 hover:border-[#236383] hover:shadow-md cursor-pointer',
                               hasOpenSpots &&
                                 // Upcoming + has open spots: tint the
                                 // entire cell soft teal so available days
                                 // visually pop out of the white grid.
-                                'bg-[#e6f4f5] border-[#47B3CB] hover:border-[#007E8C] hover:shadow-md cursor-pointer',
+                                'bg-[#e6f4f5] border-[#47B3CB] hover:border-[#236383] hover:shadow-md cursor-pointer',
                               isPastWithEvents &&
                                 'bg-gray-50 border-gray-200 hover:border-gray-300 hover:shadow-sm cursor-pointer',
-                              isSelected && 'ring-2 ring-[#FBAD3F] border-[#007E8C] shadow-md bg-[#FAF8F4]',
+                              isSelected && 'ring-2 ring-[#FBAD3F] border-[#236383] shadow-md bg-[#FAF8F4]',
                               // Today gets a stronger emphasis: bold colored
                               // ring, brand-accent background tint, so the
                               // "what's happening right now" anchor is
                               // immediately findable in the grid.
-                              isToday && !isSelected && 'ring-2 ring-[#007E8C] bg-gradient-to-b from-[#47B3CB]/10 to-white shadow-sm',
+                              isToday && !isSelected && 'ring-2 ring-[#236383] bg-gradient-to-b from-[#47B3CB]/10 to-white shadow-sm',
                             )}
                           >
                             <div className="flex items-center justify-between gap-1">
@@ -2822,7 +2822,7 @@ export default function VolunteerEventHub({
                                 className={cn(
                                   'inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold',
                                   isToday
-                                    ? 'bg-[#007E8C] text-white'
+                                    ? 'bg-[#236383] text-white'
                                     : isPastWithEvents
                                       ? 'text-gray-500'
                                       : hasEvents
@@ -2907,7 +2907,7 @@ export default function VolunteerEventHub({
                       !isAfter(selectedDateObj, startOfDay(new Date())) &&
                       !isSameDay(selectedDateObj, new Date());
                     return (
-                  <div className="rounded-2xl border border-[#007E8C]/20 bg-[#FAF8F4] p-4 sm:p-5 lg:min-h-[360px]">
+                  <div className="rounded-2xl border border-[#236383]/20 bg-[#FAF8F4] p-4 sm:p-5 lg:min-h-[360px]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h3 className="text-lg font-bold text-[#236383]">{selectedDateLabel}</h3>
@@ -2928,7 +2928,7 @@ export default function VolunteerEventHub({
                             Completed
                           </Badge>
                         ) : (
-                          <Badge className="bg-[#007E8C] text-white border-transparent">
+                          <Badge className="bg-[#236383] text-white border-transparent">
                             {getTotalOpeningsForEvents(selectedDateEvents)} open
                           </Badge>
                         )
@@ -2954,7 +2954,7 @@ export default function VolunteerEventHub({
                                 { n: 4, title: 'Submit your signup', body: 'Confirm and you\'re done. We\'ll send a reminder before the event.' },
                               ].map((step) => (
                                 <li key={step.n} className="flex items-start gap-3">
-                                  <span className="flex-shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#007E8C] text-white text-xs font-bold">
+                                  <span className="flex-shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#236383] text-white text-xs font-bold">
                                     {step.n}
                                   </span>
                                   <div className="min-w-0">
@@ -2986,7 +2986,7 @@ export default function VolunteerEventHub({
 
                           return (
                             <div key={event.id} className="rounded-xl bg-white border border-[#47B3CB]/25 shadow-sm overflow-hidden">
-                              <div className="h-1 bg-gradient-to-r from-[#FBAD3F] via-[#47B3CB] to-[#007E8C]" />
+                              <div className="h-1 bg-gradient-to-r from-[#FBAD3F] via-[#47B3CB] to-[#236383]" />
                               <div className="p-4 space-y-3">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
@@ -2999,14 +2999,14 @@ export default function VolunteerEventHub({
 
                                 <div className="grid gap-2 text-sm text-gray-700">
                                   <div className="flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-[#007E8C] shrink-0" />
+                                    <Clock className="w-4 h-4 text-[#236383] shrink-0" />
                                     <span>{formatEventTime(event.eventStartTime, event.eventEndTime)}</span>
                                   </div>
                                   {event.eventAddress && (
                                     <AddressLink
                                       location={event}
                                       className="text-gray-700"
-                                      iconClassName="w-4 h-4 text-[#007E8C] shrink-0 mt-0.5"
+                                      iconClassName="w-4 h-4 text-[#236383] shrink-0 mt-0.5"
                                     />
                                   )}
                                   {event.estimatedSandwichCount && (
@@ -3080,7 +3080,7 @@ export default function VolunteerEventHub({
                                       </Button>
                                       <Button
                                         variant="outline"
-                                        className="border-[#007e8c]/30 text-[#236383] hover:bg-[#007e8c]/10"
+                                        className="border-[#236383]/30 text-[#236383] hover:bg-[#236383]/10"
                                         onClick={() => handleClearUnavailable(event.id)}
                                       >
                                         Available Again
@@ -3101,7 +3101,7 @@ export default function VolunteerEventHub({
                                   <div className="grid gap-2 sm:grid-cols-2">
                                     {canSelfSignup ? (
                                       <Button
-                                        className="bg-[#007E8C] hover:bg-[#236383] text-white"
+                                        className="bg-[#236383] hover:bg-[#236383] text-white"
                                         onClick={() => handleSignupClick(event.id)}
                                       >
                                         <HandHeart className="w-4 h-4 mr-2" />
@@ -3169,7 +3169,7 @@ export default function VolunteerEventHub({
                         size="sm"
                         onClick={handleGeocodeAddress}
                         disabled={geocodingLoading || !userAddress.trim()}
-                        className="shrink-0 bg-[#007e8c] hover:bg-[#236383]"
+                        className="shrink-0 bg-[#236383] hover:bg-[#236383]"
                       >
                         {geocodingLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -3182,7 +3182,7 @@ export default function VolunteerEventHub({
                         variant="outline"
                         onClick={handleUseBrowserLocation}
                         disabled={browserLocationLoading}
-                        className="shrink-0 gap-1.5 border-[#007e8c]/30 text-xs text-[#236383] hover:bg-[#007e8c]/10"
+                        className="shrink-0 gap-1.5 border-[#236383]/30 text-xs text-[#236383] hover:bg-[#236383]/10"
                       >
                         {browserLocationLoading ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -3216,8 +3216,8 @@ export default function VolunteerEventHub({
 
                 {/* Date range info */}
                 <div className="px-4 py-2 border-b bg-gray-50 text-sm text-gray-600">
-                  <Calendar className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5 text-[#007e8c]" />
-                  Showing <span className="font-semibold text-[#007e8c]">{filteredEvents.length}</span> scheduled events from today onward that need volunteers or drivers
+                  <Calendar className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5 text-[#236383]" />
+                  Showing <span className="font-semibold text-[#236383]">{filteredEvents.length}</span> scheduled events from today onward that need volunteers or drivers
                 </div>
 
                 <div className="h-[520px] overflow-hidden rounded-lg sm:h-[600px]">
@@ -3291,7 +3291,7 @@ export default function VolunteerEventHub({
                 {/* Map Legend */}
                 <div className="p-4 border-t flex flex-wrap gap-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-4 h-4 rounded-full bg-[#007e8c]" />
+                    <div className="w-4 h-4 rounded-full bg-[#236383]" />
                     <span>Needs help</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -3348,13 +3348,13 @@ export default function VolunteerEventHub({
             {mySignups.length === 0 && myUnavailable.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
-                  <HandHeart className="w-12 h-12 mx-auto text-[#007e8c] mb-4" />
+                  <HandHeart className="w-12 h-12 mx-auto text-[#236383] mb-4" />
                   <h3 className="text-lg font-medium">You haven't signed up yet — that's okay!</h3>
                   <p className="text-muted-foreground mt-2 max-w-md mx-auto">
                     Every sandwich helps. Browse upcoming events to find one that fits your schedule.
                   </p>
                   <Button
-                    className="mt-4 bg-[#007e8c] hover:bg-[#236383]"
+                    className="mt-4 bg-[#236383] hover:bg-[#236383]"
                     onClick={() => setView('list')}
                   >
                     Browse Events
@@ -3412,7 +3412,7 @@ export default function VolunteerEventHub({
                             <div>
                               <h3 className="font-semibold text-base">{signup.event.organizationName}</h3>
                               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                <Calendar className="w-4 h-4 shrink-0 text-[#007e8c]" />
+                                <Calendar className="w-4 h-4 shrink-0 text-[#236383]" />
                                 <span>
                                   {formattedSignupDate}
                                   {' · '}{formatEventTime(signup.event.eventStartTime)}
@@ -3422,7 +3422,7 @@ export default function VolunteerEventHub({
                                 <AddressLink
                                   location={signup.event}
                                   className="mt-1"
-                                  iconClassName="w-4 h-4 shrink-0 mt-0.5 text-[#007e8c]"
+                                  iconClassName="w-4 h-4 shrink-0 mt-0.5 text-[#236383]"
                                 />
                               )}
                             </div>
@@ -3527,7 +3527,7 @@ export default function VolunteerEventHub({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="text-[#236383] border-[#007e8c]/30 hover:bg-[#007e8c]/10"
+                                  className="text-[#236383] border-[#236383]/30 hover:bg-[#236383]/10"
                                   onClick={() => handleClearUnavailable(unavailable.eventRequestId)}
                                   disabled={clearUnavailableMutation.isPending}
                                 >
@@ -3772,7 +3772,7 @@ export default function VolunteerEventHub({
             ) : (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="rounded-lg border border-[#007e8c]/20 bg-[#007e8c]/5 p-3">
+                  <div className="rounded-lg border border-[#236383]/20 bg-[#236383]/5 p-3">
                     <p className="text-2xl font-bold text-[#236383]">{coverageMetrics.events}</p>
                     <p className="text-sm font-medium text-[#236383]">Upcoming Events</p>
                   </div>
@@ -3816,11 +3816,11 @@ export default function VolunteerEventHub({
                               {event.department && <p className="text-sm text-gray-500">{event.department}</p>}
                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                                 <span className="inline-flex items-center gap-1.5">
-                                  <Calendar className="w-4 h-4 text-[#007e8c]" />
+                                  <Calendar className="w-4 h-4 text-[#236383]" />
                                   {formattedEventDate}
                                 </span>
                                 <span className="inline-flex items-center gap-1.5">
-                                  <Clock className="w-4 h-4 text-[#007e8c]" />
+                                  <Clock className="w-4 h-4 text-[#236383]" />
                                   {formatEventTime(event.eventStartTime, event.eventEndTime)}
                                 </span>
                               </div>
@@ -3828,7 +3828,7 @@ export default function VolunteerEventHub({
                                 <AddressLink
                                   location={event}
                                   className="mt-1"
-                                  iconClassName="w-4 h-4 shrink-0 mt-0.5 text-[#007e8c]"
+                                  iconClassName="w-4 h-4 shrink-0 mt-0.5 text-[#236383]"
                                 />
                               )}
                             </div>

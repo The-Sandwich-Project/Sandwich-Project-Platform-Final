@@ -96,7 +96,7 @@ async function addHostHandbookResource() {
       documentId: document.id,
       url: null,
       icon: 'BookOpen',
-      iconColor: '#007E8C',
+      iconColor: '#236383',
       isPinnedGlobal: true,
       pinnedOrder: null,
       createdBy: 'admin_1756853839752',
@@ -121,7 +121,7 @@ async function addHostHandbookResource() {
         .insert(resourceTags)
         .values({
           name: 'host',
-          color: '#007E8C',
+          color: '#236383',
           description: 'Resources for host collection sites',
           createdBy: 'admin_1756853839752',
         })

@@ -759,10 +759,10 @@ export default function WeeklyCollectionsReport() {
                       <Line
                         type="monotone"
                         dataKey="individual"
-                        stroke="#007E8C"
+                        stroke="#236383"
                         strokeWidth={2}
-                        dot={{ fill: '#007E8C', strokeWidth: 2, r: 4 }}
-                        activeDot={{ r: 6, fill: '#007E8C' }}
+                        dot={{ fill: '#236383', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, fill: '#236383' }}
                         name="individual"
                       />
                       <Line
