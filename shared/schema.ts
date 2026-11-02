@@ -5302,3 +5302,36 @@ export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
 
 export const ANNUAL_SANDWICH_GOAL_KEY = 'annual_sandwich_goal';
 export const DEFAULT_ANNUAL_SANDWICH_GOAL = 500000;
+
+// Recurring auto-logged collections (e.g. Collective Learning's standing
+// 250 PBJ/week). Config lives in app_settings under this key as JSON; a
+// per-week override says "they didn't collect" or "they collected N".
+export const COLLECTIVE_LEARNING_AUTO_LOG_KEY = 'collective_learning_auto_log';
+export const AUTO_RECURRING_SUBMISSION_METHOD = 'auto_recurring';
+
+export const recurringCollectionOverrides = pgTable(
+  'recurring_collection_overrides',
+  {
+    id: serial('id').primaryKey(),
+    ruleKey: varchar('rule_key', { length: 100 }).notNull(),
+    // Wednesday (YYYY-MM-DD) that starts the Wed–Tue collection week
+    weekOf: text('week_of').notNull(),
+    // true = no collection that week; otherwise `count` replaces the default
+    skipped: boolean('skipped').notNull().default(false),
+    count: integer('count'),
+    note: text('note'),
+    createdBy: varchar('created_by'),
+    createdByName: text('created_by_name'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    ruleWeekIdx: uniqueIndex('recurring_collection_overrides_rule_week_unique').on(
+      table.ruleKey,
+      table.weekOf
+    ),
+  })
+);
+
+export type RecurringCollectionOverride =
+  typeof recurringCollectionOverrides.$inferSelect;
