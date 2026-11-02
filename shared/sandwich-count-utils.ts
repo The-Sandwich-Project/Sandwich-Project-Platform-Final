@@ -58,6 +58,104 @@ export function parseSandwichCountInput(value: number | string | null | undefine
   return { count, min: null, max: null, isRange: false };
 }
 
+export interface SandwichTypeEntry {
+  type?: string;
+  quantity?: number | string | null;
+}
+
+/**
+ * Parse a sandwichTypes value into an array of entries. Never throws —
+ * unrecognizable input yields [].
+ *
+ * Accepts every shape the column has held over time, matching the client's
+ * parseSandwichTypes() so the two can't disagree about whether a row has a
+ * breakdown:
+ *   * a real array                    -> [{type, quantity}, ...]
+ *   * a double-encoded JSON string    -> "[{\"type\": ...}]"
+ *   * an object keyed by index        -> {"0": {type, quantity}, ...}
+ *   * the legacy type->quantity map   -> {deli: 0, turkey: 250, pbj: 248}
+ */
+export function parseSandwichTypeEntries(sandwichTypes: unknown): SandwichTypeEntry[] {
+  if (!sandwichTypes) return [];
+  try {
+    const parsed = typeof sandwichTypes === 'string' ? JSON.parse(sandwichTypes) : sandwichTypes;
+    if (Array.isArray(parsed)) return parsed as SandwichTypeEntry[];
+    if (!parsed || typeof parsed !== 'object') return [];
+
+    const values = Object.values(parsed as Record<string, unknown>);
+    if (values.length === 0) return [];
+
+    // Object keyed by index, holding real entries.
+    if (values.every((item) => !!item && typeof item === 'object' && 'type' in (item as object) && 'quantity' in (item as object))) {
+      return values as SandwichTypeEntry[];
+    }
+
+    // Legacy {deli: 0, turkey: 250} map. Zero quantities carry no information
+    // in this shape, so they are dropped (same rule as the client parser).
+    if (values.every((value) => typeof value === 'number')) {
+      return Object.entries(parsed as Record<string, number>)
+        .map(([type, quantity]) => ({ type, quantity }))
+        .filter((entry) => entry.quantity > 0);
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/** Sum quantities from a sandwichTypes value (array or JSON string). */
+export function sumSandwichTypeQuantities(sandwichTypes: unknown): number {
+  return parseSandwichTypeEntries(sandwichTypes).reduce(
+    (sum, item) => sum + (Number(item?.quantity) || 0),
+    0,
+  );
+}
+
+/**
+ * Normalize a sandwichTypes value into what the JSONB column should hold: a
+ * real array, or NULL when there is no breakdown.
+ *
+ * The client serializes breakdowns with JSON.stringify() before sending them,
+ * so the save routes receive a STRING. Writing that string into a jsonb column
+ * stores a JSON scalar string ("[{\"type\":...}]") rather than a JSON array —
+ * double-encoded. The client hides this because its parsers accept both, but
+ * SQL cannot: jsonb_array_length()/jsonb_array_elements() error with "cannot
+ * get array length of a scalar" on those rows, so reporting and heal queries
+ * skip or break on them. Normalizing on write keeps the column one shape.
+ */
+export function normalizeSandwichTypesForStorage(value: unknown): SandwichTypeEntry[] | null {
+  if (value === null || value === undefined) return null;
+  const entries = parseSandwichTypeEntries(value);
+  return entries.length > 0 ? entries : null;
+}
+
+/**
+ * True when a sandwichTypes breakdown should drive UI/display as the live
+ * representation of the count.
+ *
+ * The types-mode twin of hasActiveSandwichRange, and it exists for the same
+ * reason: a breakdown that DISAGREES with an explicit exact count is stale
+ * leftover data, not the user's intent. Whoever wrote the exact count wrote it
+ * last, so a disagreeing breakdown must not be shown, must not seed an editor
+ * in "Specify Types" mode, and must not be summed back over the exact count
+ * (the "500 saves as 498" bug — 250 turkey + 248 PBJ left behind by an earlier
+ * types entry). A breakdown with no exact count, or one that sums to exactly
+ * the stored count, is legitimate and stays active.
+ */
+export function hasActiveSandwichTypes(
+  sandwichTypes: unknown,
+  exactCount?: number | string | null,
+): boolean {
+  const entries = parseSandwichTypeEntries(sandwichTypes);
+  if (entries.length === 0) return false;
+
+  const exact = toFiniteCount(exactCount);
+  if (exact === null) return true;
+
+  return sumSandwichTypeQuantities(entries) === exact;
+}
+
 export function getRangeMidpoint(minValue: number | string | null | undefined, maxValue: number | string | null | undefined): number | null {
   const min = toFiniteCount(minValue);
   const max = toFiniteCount(maxValue);

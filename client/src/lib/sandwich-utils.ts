@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { hasActiveSandwichTypes } from '@shared/sandwich-count-utils';
 
 /**
  * Utility functions for handling sandwich types data
@@ -142,12 +143,19 @@ function formatSandwichTypeName(type: string): string {
 /**
  * Format sandwich types for display
  * Returns a human-readable string
+ *
+ * When an authoritative count is passed as fallbackCount and the breakdown
+ * disagrees with it, the breakdown is stale leftover data (see
+ * hasActiveSandwichTypes) and the count wins — otherwise a card shows
+ * "250 Turkey, 248 PBJ" for an event whose entered count is 500.
  */
 export function formatSandwichTypesDisplay(
   sandwichTypes: any,
   fallbackCount?: number
 ): string {
-  const parsed = parseSandwichTypes(sandwichTypes);
+  const parsed = hasActiveSandwichTypes(sandwichTypes, fallbackCount)
+    ? parseSandwichTypes(sandwichTypes)
+    : null;
 
   if (parsed && parsed.length > 0) {
     // Filter out "unknown" types completely
