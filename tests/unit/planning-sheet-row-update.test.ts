@@ -659,6 +659,36 @@ describe('numbered role codes and unreadable cells (live sheet format)', () => {
     expect(plan.updates.assignedVolunteerIds).toEqual(['Karen', 'Bev Lowe', 'Alicia Jn Baptiste']);
   });
 
+  it('reads the other live formats', () => {
+    const a = parsePlanningStaffing('VD: Luz  V1: Sibet/Bruce V2:  James');
+    expect(a.driver).toMatchObject({ names: ['Luz'], van: true });
+    expect(a.volunteer).toMatchObject({ names: ['Sibet', 'Bruce', 'James'], slots: 2 });
+    const b = parsePlanningStaffing('D: Luz, V1: Jeff Gross V2: Laurel Gross');
+    expect(b.driver.names).toEqual(['Luz']);
+    expect(b.volunteer).toMatchObject({ names: ['Jeff Gross', 'Laurel Gross'], slots: 2 });
+    // A slash in a date doesn't split the name; the parenthetical note is dropped.
+    expect(parsePlanningStaffing('D: Brigith (pick up 11/5)').driver.names).toEqual(['Brigith']);
+    expect(parsePlanningStaffing('D: Ann 11/5').driver.names).toEqual(['Ann 11/5']);
+  });
+
+  it('reads codes in parentheses, notes after names, and role references', () => {
+    const a = parsePlanningStaffing('D: (VD: Luz for event), V1: Christine V2:  Laura B');
+    expect(a.driver).toMatchObject({ names: ['Luz'], van: true, vanNames: ['Luz'], slots: 1 });
+    expect(a.volunteer).toMatchObject({ names: ['Christine', 'Laura B'], slots: 2 });
+    expect(a.unread).toEqual([]);
+
+    const b = parsePlanningStaffing('V1: Dawn M. V2: VD');
+    expect(b.volunteer).toMatchObject({ names: ['Dawn M.'], slots: 2 });
+    expect(b.unread).toEqual(['V2: VD']);
+
+    const c = parsePlanningStaffing('V/D: Dawn M. D: Jeff Gross');
+    expect(c.driver).toMatchObject({ names: ['Dawn M.', 'Jeff Gross'], van: true, vanNames: ['Dawn M.'], slots: 2 });
+    expect(c.volunteer.listed).toBe(false);
+
+    const d = parsePlanningStaffing('D: Luz S: Brigith (9:15 pickup or go for event)');
+    expect(d.volunteer.names).toEqual(['Brigith']);
+  });
+
   it('empty numbered slots count as needed', () => {
     const p = parsePlanningStaffing('D1: Karen, D2:');
     expect(p.driver).toMatchObject({ names: ['Karen'], slots: 2 });

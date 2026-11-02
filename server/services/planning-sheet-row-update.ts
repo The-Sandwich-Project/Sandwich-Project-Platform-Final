@@ -244,14 +244,6 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const s = clean(raw);
   if (!s) return out;
 
-  let current: 'driver' | 'speaker' | 'volunteer' | null = null;
-  let inVan = false;
-  const addName = (role: 'driver' | 'speaker' | 'volunteer', name: string) => {
-    const n = name.trim();
-    if (!n) return;
-    out[role].names.push(n);
-    if (role === 'driver' && inVan) out.driver.vanNames.push(n);
-  };
   // Role codes, optionally numbered per slot ("D1:", "V2:"), or spelled out
   // ("Driver:", "Volunteers:", "Van driver:"). Speakers were folded into
   // volunteers, so S counts as a volunteer.
@@ -263,37 +255,91 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     if (c === 'S' || c === 'SPEAKER' || c === 'SPEAKERS') return { role: 'volunteer', van: false };
     return null;
   };
+  const ROLE_CODE = String.raw`(?:van\s+drivers?|drivers?|volunteers?|speakers?|VD|D|S|V)\d*\s*:`;
 
-  // Names can be separated by commas, semicolons, new lines, "&" or "and"
-  // ("D: Katie & Kim", "V: Ann and Bo"). "and" only counts as a whole word, so
-  // names like "Anderson" or "Sandy" stay intact.
-  // A role code can also start mid-cell with no comma ("D: Katie V: Kim"),
-  // which the old parser accepted, so break before each one too.
-  // "+" also joins names ("V2: Bev Lowe + Alicia Jn Baptiste").
-  const cell = s.replace(
-    /\s+(?=(?:van\s+drivers?|drivers?|volunteers?|speakers?|VD|D|S|V)\d*\s*:)/gi,
-    ','
-  );
+  // Formats seen on the live sheet, all handled here:
+  //   "D: Katie, Kim"  "D: Katie & Kim"  "V: Ann and Bo"   (name separators)
+  //   "D1: Karen V1: Karen  V2: Bev Lowe + Alicia"         (numbered slots, "+")
+  //   "V1: Sibet/Bruce"                                    (slash between names)
+  //   "D: (VD: Luz for event)"                             (a code in parentheses)
+  //   "V/D: Dawn M."                                       (V/D = van driver)
+  //   "D: Brigith (9:15 pickup or go for event)"           (a note in parentheses)
+  //   "D: Katie V: Kim"                                    (no comma before a code)
+  let cell = s
+    // "V/D:" is a van-driver code, not two names.
+    .replace(/\bV\s*\/\s*D(?=\d*\s*:)/gi, 'VD')
+    // A code inside parentheses is just a code: "(VD: Luz)" -> " VD: Luz ".
+    .replace(new RegExp(String.raw`\(\s*(${ROLE_CODE}[^)]*)\)`, 'gi'), ' $1 ')
+    // Any other parenthetical is a note about the person, not a name.
+    .replace(/\([^)]*\)/g, ' ')
+    // A slash between two names separates them; inside numbers (11/5) it doesn't.
+    .replace(/(?<=[A-Za-z])\s*\/\s*(?=[A-Za-z])/g, ' + ')
+    // Break before every role code, even without a comma.
+    .replace(new RegExp(String.raw`\s+(?=${ROLE_CODE})`, 'gi'), ',');
+
+  // A person's name is its leading words; trailing lowercase words are a note
+  // ("Luz for event" -> "Luz"). A name that is only a role code ("V2: VD")
+  // refers to another role, not a person.
+  const cleanName = (raw: string): string => {
+    const words = raw.replace(/^[:\s]+/, '').trim().split(/\s+/).filter(Boolean);
+    const kept: string[] = [];
+    for (const w of words) {
+      if (kept.length && /^[a-z]/.test(w)) break;
+      kept.push(w);
+    }
+    return kept.join(' ');
+  };
+
+  type Segment = { role: 'driver' | 'volunteer'; van: boolean; names: string[]; head: string };
+  const segments: Segment[] = [];
+  let current: Segment | null = null;
+  const addTo = (seg: Segment, raw: string) => {
+    const name = cleanName(raw);
+    if (!name) return;
+    if (roleFor(name)) {
+      out.unread.push(`${seg.head}: ${name}`);
+      return;
+    }
+    seg.names.push(name);
+  };
   for (const token of cell.split(/[,;\n&+]|\s+and\s+/i).map((t) => t.trim())) {
     if (!token) continue;
     const colon = token.indexOf(':');
     const head = colon >= 0 ? token.slice(0, colon) : token;
     const hit = roleFor(head);
     if (hit) {
-      const role = hit.role;
-      current = role;
-      out[role].listed = true;
-      out[role].slots += 1;
-      inVan = hit.van;
-      if (inVan) out.driver.van = true;
-      else if (role === 'driver') out.driver.plainListed = true;
-      addName(role, colon >= 0 ? token.slice(colon + 1) : '');
+      current = { role: hit.role, van: hit.van, names: [], head: head.trim() };
+      segments.push(current);
+      addTo(current, colon >= 0 ? token.slice(colon + 1) : '');
     } else if (current) {
-      addName(current, token.replace(/^[:\s]+/, ''));
+      addTo(current, token);
     } else {
       out.unread.push(token);
     }
   }
+
+  // "D: (VD: Luz)" = one driver slot, filled by the van driver: a nameless
+  // driver code straight before a van-driver code is its label, not a slot.
+  const merged = segments.filter(
+    (seg, i) =>
+      !(seg.role === 'driver' && !seg.van && seg.names.length === 0 && segments[i + 1]?.role === 'driver' && segments[i + 1]?.van)
+  );
+  for (const seg of merged) {
+    const r = out[seg.role];
+    r.listed = true;
+    r.slots += 1;
+    r.names.push(...seg.names);
+    if (seg.role === 'driver') {
+      if (seg.van) {
+        out.driver.van = true;
+        out.driver.vanNames.push(...seg.names);
+      } else {
+        out.driver.plainListed = true;
+      }
+    }
+  }
+  // A code with nothing at all (a label merged away) still means the role is listed.
+  for (const seg of segments) out[seg.role].listed = true;
   return out;
 }
 
