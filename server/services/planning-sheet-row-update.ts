@@ -8,14 +8,15 @@ import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
  *
  * The app pushes an event to the planning sheet, then the team keeps editing
  * that row on the sheet (times get added, the date moves, sandwich numbers and
- * types change, drivers/speakers/volunteers get assigned). This module works
+ * types change, drivers/volunteers get assigned, notes get added). This module works
  * out what the app should change to match the sheet row.
  *
  * It is deliberately MANUAL and field-scoped:
  * - Nothing here runs on a timer. A person clicks "send row to app" on the
  *   sheet, sees the changes, and confirms.
- * - Only the fields below can change. Status, TSP contact, notes and anything
- *   else on the event are never touched.
+ * - Only the fields below can change. Status can only move TO cancelled (when
+ *   the sheet's Cancelled column says so); notes are only appended to. TSP
+ *   contact, group name and everything else are never touched.
  * - A blank sheet cell never clears an app value. People leave cells empty
  *   because they haven't filled them in yet, not to delete data.
  * - Contact details and address/recipient are FILL-ONLY: they're added when
@@ -56,6 +57,12 @@ export interface RowUpdateEvent {
   driverDetails: unknown;
   speakerDetails: unknown;
   volunteerDetails: unknown;
+  planningNotes?: string | null;
+  cancelledReason?: string | null;
+  /** The original request message. The push writes it into ALL DETAILS. */
+  message?: string | null;
+  /** The push writes this into the sheet's Waiting On column. */
+  nextAction?: string | null;
 }
 
 /** A sheet row as the Apps Script sends it (same keys as /import-from-sheets). */
@@ -66,6 +73,11 @@ export interface SheetRowData {
   'Event end time (MUST when volunteer needed)'?: string;
   'Pick up time'?: string;
   Staffing?: string;
+  Cancelled?: string;
+  'ALL DETAILS'?: string;
+  Notes?: string;
+  "Add'l Notes"?: string;
+  'Waiting On'?: string;
   /** What the sheet's Apps Script actually sends for the staffing column. */
   'Volunteer/Driver Needed'?: string;
   'Estimate # sandwiches'?: string | number;
@@ -175,6 +187,7 @@ export interface ParsedStaffing {
    * `vanNames` is just the VD ones; `plainListed` is whether a plain "D" appeared.
    */
   driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean };
+  /** Always empty: "S" is read as a volunteer. Kept so callers' shapes don't change. */
   speaker: { listed: boolean; names: string[] };
   volunteer: { listed: boolean; names: string[] };
 }
@@ -183,9 +196,13 @@ export interface ParsedStaffing {
  * Parse the planning-sheet Staffing cell.
  *
  * Handles every format the push writes and people type:
- *   "D, S"                  → driver + speaker needed, nobody assigned
+ *   "D, V"                  → driver + volunteer needed, nobody assigned
  *   "D: , S: "              → same (this is what the push writes for "needed")
- *   "D: Katie, Kim, S: Ann" → drivers Katie AND Kim, speaker Ann
+ *   "D: Katie, Kim, V: Ann" → drivers Katie AND Kim, volunteer Ann
+ *   "S: Ann"                → volunteer Ann. The speaker role was retired and
+ *                             folded into volunteers (migration
+ *                             20260709_convert_event_speakers_to_volunteers),
+ *                             so an old "S" on the sheet counts as a volunteer.
  *   "VD: Luz"               → van driver Luz
  *
  * A token that isn't a role code continues the previous role's name list,
@@ -211,7 +228,7 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const roleFor = (code: string) => {
     const c = code.trim().toUpperCase();
     if (c === 'D' || c === 'VD') return 'driver' as const;
-    if (c === 'S') return 'speaker' as const;
+    if (c === 'S') return 'volunteer' as const; // speakers were folded into volunteers
     if (c === 'V') return 'volunteer' as const;
     return null;
   };
@@ -351,12 +368,6 @@ const ROLE_CONFIG = {
     ids: 'assignedDriverIds',
     needed: 'driversNeeded',
     details: 'driverDetails',
-  },
-  speaker: {
-    label: 'Speakers',
-    ids: 'assignedSpeakerIds',
-    needed: 'speakersNeeded',
-    details: 'speakerDetails',
   },
   volunteer: {
     label: 'Volunteers',
@@ -526,7 +537,9 @@ export function buildRowUpdatePlan(
     const staffing = parsePlanningStaffing(staffingCell);
     const usersById = new Map(users.map((u) => [u.id, u]));
 
-    for (const role of ['driver', 'speaker', 'volunteer'] as const) {
+    // Speakers were retired (folded into volunteers), so the speaker columns
+    // are never touched here.
+    for (const role of ['driver', 'volunteer'] as const) {
       const cfg = ROLE_CONFIG[role];
       const sheet = staffing[role];
       const appIds = ((event[cfg.ids] as string[] | null) ?? []).filter(Boolean);
@@ -554,7 +567,7 @@ export function buildRowUpdatePlan(
         newNeeded = Math.max(appNeeded, newIds.length, 1);
       }
 
-      const changeField = role === 'driver' ? 'drivers' : role === 'speaker' ? 'speakers' : 'volunteers';
+      const changeField = role === 'driver' ? 'drivers' : 'volunteers';
       const sameIds =
         newIds.length === appIds.length && newIds.every((id) => appIds.includes(id));
       if (sameIds && newNeeded === appNeeded) continue;
@@ -596,7 +609,93 @@ export function buildRowUpdatePlan(
     }
   }
 
+  // --- Cancelled (one-way) --------------------------------------------------
+  // Events sometimes get marked cancelled only on the sheet. A "yes" in the
+  // Cancelled column cancels the app event. It never un-cancels (a blank or
+  // "no" cell changes nothing), and a completed event is left for a person.
+  const cancelCell = lower(clean(row.Cancelled));
+  const sheetCancelled = ['yes', 'y', 'cancelled', 'canceled', 'true', 'x'].includes(cancelCell);
+  if (sheetCancelled && event.status !== 'cancelled') {
+    if (event.status === 'completed') {
+      notes.push('The sheet says cancelled, but the app has this event as completed. Change it in the app if the sheet is right.');
+    } else {
+      const from = STATUS_LABELS[event.status] ?? event.status;
+      changes.push({ field: 'status', label: 'Status', from, to: 'Cancelled', kind: 'update' });
+      set('status', 'status', 'cancelled');
+      set('status', 'statusChangedAt', new Date());
+      set('status', 'cancelledAt', new Date());
+      // Cancelling needs a recorded reason (shared/event-status-workflow.ts).
+      if (!clean(event.cancelledReason)) {
+        set('status', 'cancelledReason', 'Marked cancelled on the planning sheet');
+      }
+    }
+  } else if (event.status === 'cancelled' && ['no', 'n', 'false'].includes(cancelCell)) {
+    notes.push('The sheet says not cancelled, but the app has this event as cancelled. Change it in the app if the event is back on.');
+  }
+
+  // --- Planning notes (APPEND-ONLY) -----------------------------------------
+  // Sheet notes are added to the end of planning notes, never replacing them.
+  // Only text the event doesn't already have is added, and text the app itself
+  // pushed to the sheet (the request message in ALL DETAILS, the next action in
+  // Waiting On) is skipped so it doesn't echo back.
+  const already = squash(
+    [event.planningNotes, event.message, event.nextAction].filter(Boolean).join('\n')
+  );
+  const newParts = sheetNoteParts(row).filter((part) => {
+    const body = squash(part.replace(/^(Notes|Additional Notes|Waiting On): /, ''));
+    return body && !already.includes(body);
+  });
+  if (newParts.length) {
+    const appNotes = clean(event.planningNotes);
+    const added = newParts.join('\n\n');
+    changes.push({
+      field: 'planningNotes',
+      label: appNotes ? 'Planning notes (added to the end)' : 'Planning notes',
+      from: '',
+      to: added,
+      kind: appNotes ? 'update' : 'fill',
+    });
+    set('planningNotes', 'planningNotes', appNotes ? `${appNotes}\n\n${added}` : added);
+  }
+
   return { changes, updates, updatesByField, notes };
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  new: 'New',
+  in_process: 'In process',
+  scheduled: 'Scheduled',
+  rescheduled: 'Rescheduled',
+  completed: 'Completed',
+  declined: 'Declined',
+  cancelled: 'Cancelled',
+  non_event: 'Non-event',
+  standby: 'Standby',
+  stalled: 'Stalled',
+};
+
+const squash = (v: string) => v.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/**
+ * The sheet's note columns as planning-notes paragraphs. Same format the
+ * "send row to app" create path has always used, so both paths agree.
+ */
+export function sheetNoteParts(row: {
+  'ALL DETAILS'?: string;
+  Notes?: string;
+  "Add'l Notes"?: string;
+  'Waiting On'?: string;
+}): string[] {
+  const parts: string[] = [];
+  const details = clean(row['ALL DETAILS']);
+  const notesCell = clean(row.Notes);
+  const addl = clean(row["Add'l Notes"]);
+  const waiting = clean(row['Waiting On']);
+  if (details) parts.push(details);
+  if (notesCell) parts.push(`Notes: ${notesCell}`);
+  if (addl) parts.push(`Additional Notes: ${addl}`);
+  if (waiting) parts.push(`Waiting On: ${waiting}`);
+  return parts;
 }
 
 /**
@@ -665,11 +764,11 @@ export function staffingForNewEvent(raw: unknown) {
   const need = (listed: boolean, n: number) => (listed ? Math.max(1, n) : 0);
   return {
     driversNeeded: need(s.driver.listed, s.driver.names.length),
-    speakersNeeded: need(s.speaker.listed, s.speaker.names.length),
+    speakersNeeded: 0, // retired role; "S" is counted under volunteers
     volunteersNeeded: need(s.volunteer.listed, s.volunteer.names.length),
     vanDriverNeeded: s.driver.van,
     assignedDriverNames: s.driver.names,
-    assignedSpeakerNames: s.speaker.names,
+    assignedSpeakerNames: [] as string[],
     assignedVolunteerNames: s.volunteer.names,
     customVanDriverName: s.driver.vanNames.length ? s.driver.vanNames.join(', ') : null,
   };

@@ -33,10 +33,12 @@ Both endpoints use the same `x-api-key` header (`GOOGLE_SHEETS_API_KEY` on the s
 | Sandwich estimate | Updated (ranges like `200-300` are kept) |
 | Sandwich types | Updated when the *set* of types differs. If there are several types, the count is split evenly between them. |
 | Final # sandwiches | Updated. This is the reference-only `actualSandwichCount`. Official totals still come from the collections log. |
-| Drivers, speakers, volunteers, van driver | Updated from the Staffing cell. Several names per role are fine, separated by commas, `;`, `&` or `and` (`D: Katie & Kim`). People already assigned are kept, matched by name (first name is enough). New names become a user only if exactly one active user matches; otherwise they're saved as typed. A role removed from the cell is cleared. `VD` sets "van driver needed". |
+| Drivers, volunteers, van driver | Updated from the Volunteer/Driver Needed cell. Several names per role are fine, separated by commas, `;`, `&` or `and` (`D: Katie & Kim`). People already assigned are kept, matched by name (first name is enough). New names become a user only if exactly one active user matches; otherwise they're saved as typed. A role removed from the cell is cleared. `VD` sets "van driver needed". The speaker role was retired, so an old `S` counts as a volunteer and the speaker columns are never touched. |
+| Notes (ALL DETAILS, Notes, Add'l Notes, Waiting On) | **Appended** to planning notes, never replacing them. Only text the event doesn't already have is added; text the app itself pushed (the request message in ALL DETAILS, the next action in Waiting On) is skipped. |
+| Cancelled | A "yes" cancels the app event, recording "Marked cancelled on the planning sheet" as the reason if none is set. One-way: a blank or "no" never un-cancels, and a completed event is left alone (shown as a note). |
 | Contact name, email, phone, address, recipient | **Fill-only.** Added if the app has nothing. Never overwritten. A difference shows up as a note. |
 
-Never touched: status, TSP contact, notes, group name, toolkit, anything else.
+Never touched: any other status change, TSP contact, group name, toolkit, anything else.
 **A blank sheet cell never clears an app value.** A blank Staffing cell leaves staffing alone.
 
 Every applied update writes an audit-log entry (`actionType: PLANNING_SHEET_UPDATE`)

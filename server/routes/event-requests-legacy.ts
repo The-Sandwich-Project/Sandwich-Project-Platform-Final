@@ -82,6 +82,7 @@ import {
   resolveSheetName,
   sandwichTypesForNewEvent,
   selectUpdates,
+  sheetNoteParts,
   staffingCellOf,
   staffingForNewEvent,
   type RowUpdateEvent,
@@ -371,21 +372,13 @@ const combineNotesFields = (
   addlNotes?: string,
   waitingOn?: string
 ): string | null => {
-  const parts: string[] = [];
-
-  if (allDetails && allDetails.trim()) {
-    parts.push(allDetails.trim());
-  }
-  if (notes && notes.trim()) {
-    parts.push(`Notes: ${notes.trim()}`);
-  }
-  if (addlNotes && addlNotes.trim()) {
-    parts.push(`Additional Notes: ${addlNotes.trim()}`);
-  }
-  if (waitingOn && waitingOn.trim()) {
-    parts.push(`Waiting On: ${waitingOn.trim()}`);
-  }
-
+  // Shared with the update-from-sheet flow so both format notes the same way.
+  const parts = sheetNoteParts({
+    'ALL DETAILS': allDetails,
+    Notes: notes,
+    "Add'l Notes": addlNotes,
+    'Waiting On': waitingOn,
+  });
   return parts.length > 0 ? parts.join('\n\n') : null;
 };
 
