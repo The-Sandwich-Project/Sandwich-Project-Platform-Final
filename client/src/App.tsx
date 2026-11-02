@@ -18,6 +18,7 @@ import { ChatWindowsProvider } from '@/context/chat-windows-context';
 import { FloatingChatWindowsContainer } from '@/components/chat/floating-chat-windows-container';
 import { InstantMessagingProvider } from '@/contexts/instant-messaging-context';
 import { InstantMessageContainer } from '@/components/instant-message-container';
+import { StreamConnectionManager } from '@/components/chat/stream-connection-manager';
 import { ReviewerProvider } from '@/contexts/reviewer-context';
 import { ReviewerBlockedModal } from '@/components/reviewer-blocked-modal';
 import { FloatingViewsProvider } from '@/contexts/floating-views-context';
@@ -523,6 +524,7 @@ function App() {
                 <Router />
                 <FloatingChatWindowsContainer />
                 <InstantMessageContainer />
+                <StreamConnectionManager />
                 <ReviewerBlockedModal />
                 <BackToTopButton />
               </TooltipProvider>
