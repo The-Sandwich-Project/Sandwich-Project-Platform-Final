@@ -5,7 +5,6 @@ import { apiRequest, invalidateEventRequestQueries, applyPatchResponseToCache, a
 import { useEventRequestContext } from '../context/EventRequestContext';
 import { useEventDialogState } from '../context/EventDialogContext';
 import { logger } from '@/lib/logger';
-import { sumSandwichTypeQuantities } from '../form-utils';
 
 export const useEventMutations = () => {
   const { toast } = useToast();
@@ -379,23 +378,14 @@ export const useEventMutations = () => {
       field: string;
       value: any;
     }) => {
+      // Send only the edited field. The server's shared estimate rule
+      // (shared/sandwich-estimate.ts) keeps the count, range and type
+      // breakdown consistent: a new count keeps a single type, and a types
+      // edit without amounts keeps the existing total. Clearing the other
+      // fields here used to wipe the estimate (e.g. a type picked with no
+      // quantity sent count: null).
       const payload: Record<string, unknown> = { [field]: value };
 
-      // Keep estimatedSandwichCount and sandwichTypes in sync on single-field edits.
-      // Otherwise a spreadsheet/card edit to "200" leaves stale types (e.g. 198)
-      // that hijack the next full-form save.
-      if (field === 'estimatedSandwichCount') {
-        payload.sandwichTypes = null;
-        payload.estimatedSandwichCountMin = null;
-        payload.estimatedSandwichCountMax = null;
-        payload.estimatedSandwichRangeType = null;
-      } else if (field === 'sandwichTypes') {
-        const total = sumSandwichTypeQuantities(value);
-        payload.estimatedSandwichCount = total > 0 ? total : null;
-        payload.estimatedSandwichCountMin = null;
-        payload.estimatedSandwichCountMax = null;
-        payload.estimatedSandwichRangeType = null;
-      }
 
       return apiRequest('PATCH', `/api/event-requests/${id}`, payload);
     },
@@ -422,23 +412,11 @@ export const useEventMutations = () => {
         previousLists.set(query.queryKey, queryClient.getQueryData(query.queryKey));
       });
 
+      // Optimistic: just the edited field; the saved row (with the server's
+      // reconciled estimate) replaces it in onSuccess.
       patchEventInListCaches(queryClient, id, (existing) => ({
         ...existing,
         [field]: value,
-        ...(field === 'estimatedSandwichCount'
-          ? {
-              sandwichTypes: null,
-              estimatedSandwichCountMin: null,
-              estimatedSandwichCountMax: null,
-            }
-          : {}),
-        ...(field === 'sandwichTypes'
-          ? {
-              estimatedSandwichCount: sumSandwichTypeQuantities(value) || null,
-              estimatedSandwichCountMin: null,
-              estimatedSandwichCountMax: null,
-            }
-          : {}),
       }));
 
       return { previousLists };

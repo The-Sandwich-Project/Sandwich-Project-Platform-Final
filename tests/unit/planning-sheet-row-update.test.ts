@@ -16,6 +16,12 @@ import {
   type RowUpdateEvent,
   type SheetRowData,
 } from '../../server/services/planning-sheet-row-update';
+import { resolveEstimatePatch } from '../../shared/sandwich-estimate';
+
+/** What the event's estimate fields end up as after the picked changes are saved. */
+function saved(event: RowUpdateEvent, plan: ReturnType<typeof buildRowUpdatePlan>, fields: string[]) {
+  return resolveEstimatePatch(event as any, selectUpdates(plan, fields, event).updates);
+}
 
 const USERS: MatchableUser[] = [
   { id: 'u-katie', firstName: 'Katie', lastName: 'Long', displayName: null },
@@ -162,17 +168,20 @@ describe('buildRowUpdatePlan', () => {
   });
 
   it('updates sandwich count and types', () => {
+    const event = makeEvent();
     const plan = buildRowUpdatePlan(
-      makeEvent(),
+      event,
       makeRow({ 'Estimate # sandwiches': '300', 'Deli or PBJ?': 'Deli & PBJ', 'Final # sandwiches made': '310' }),
       USERS
     );
     expect(plan.updates.estimatedSandwichCount).toBe(300);
-    expect(plan.updates.sandwichTypes).toEqual([
-      { type: 'deli', quantity: 150 },
-      { type: 'pbj', quantity: 150 },
-    ]);
+    // The sheet has no per-type amounts, so none are invented: split TBD.
+    expect(plan.updates.sandwichTypes).toEqual([{ type: 'deli' }, { type: 'pbj' }]);
     expect(plan.updates.actualSandwichCount).toBe(310);
+    expect(saved(event, plan, ['estimatedSandwichCount', 'sandwichTypes'])).toMatchObject({
+      estimatedSandwichCount: 300,
+      sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }],
+    });
   });
 
   it('leaves types alone when only the label spelling differs', () => {
@@ -273,19 +282,19 @@ describe('buildRowUpdatePlan', () => {
     expect(() => selectUpdates(plan, ['status'], event)).toThrow('Not part of this update: status');
   });
 
-  it('re-splits types with the app estimate when the new estimate is skipped', () => {
+  it('keeps the app estimate when only the types change is picked', () => {
     const event = makeEvent();
     const plan = buildRowUpdatePlan(
       event,
       makeRow({ 'Estimate # sandwiches': '300', 'Deli or PBJ?': 'Deli & PBJ' }),
       USERS
     );
-    const picked = selectUpdates(plan, ['sandwichTypes'], event);
-    expect(picked.updates).toEqual({
-      sandwichTypes: [
-        { type: 'deli', quantity: 100 },
-        { type: 'pbj', quantity: 100 },
-      ],
+    expect(selectUpdates(plan, ['sandwichTypes'], event).updates).toEqual({
+      sandwichTypes: [{ type: 'deli' }, { type: 'pbj' }],
+    });
+    expect(saved(event, plan, ['sandwichTypes'])).toMatchObject({
+      estimatedSandwichCount: 200,
+      sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }],
     });
   });
 });
@@ -339,12 +348,9 @@ describe('creating an event from a sheet row ("send row to app")', () => {
     });
   });
 
-  it('stores sandwich types with the app\'s keys, as an array', () => {
-    expect(sandwichTypesForNewEvent('Turkey & PBJ', 301)).toEqual([
-      { type: 'deli_turkey', quantity: 150 },
-      { type: 'pbj', quantity: 151 },
-    ]);
-    expect(sandwichTypesForNewEvent('', 100)).toBeNull();
+  it('stores sandwich types with the app\'s keys, as an array, without inventing amounts', () => {
+    expect(sandwichTypesForNewEvent('Turkey & PBJ')).toEqual([{ type: 'deli_turkey' }, { type: 'pbj' }]);
+    expect(sandwichTypesForNewEvent('')).toBeNull();
   });
 
   it('a row created from the sheet then updated from the same row shows no staffing changes', () => {
@@ -446,15 +452,11 @@ describe('Copilot review fixes', () => {
   });
 
   it('token covers the written values, not just the labels', () => {
-    // Blank sheet estimate, Deli -> Deli & PBJ: labels are the same, but the
-    // per-type quantities depend on the app estimate.
-    const row = makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'Deli & PBJ' });
-    const e200 = makeEvent({ estimatedSandwichCount: 200 });
-    const e400 = makeEvent({ estimatedSandwichCount: 400 });
-    const p200 = buildRowUpdatePlan(e200, row, USERS);
-    const p400 = buildRowUpdatePlan(e400, row, USERS);
-    expect(p200.changes).toEqual(p400.changes);
-    expect(planToken(e200, p200)).not.toBe(planToken(e400, p400));
+    // Same labels, different range bounds written.
+    const e = makeEvent();
+    const a = buildRowUpdatePlan(e, makeRow({ 'Estimate # sandwiches': '200-300' }), USERS);
+    const b = buildRowUpdatePlan(e, makeRow({ 'Estimate # sandwiches': '150-350' }), USERS);
+    expect(planToken(e, a)).not.toBe(planToken(e, b));
   });
 
   it('rejects impossible dates', () => {
@@ -468,7 +470,12 @@ describe('Copilot review fixes', () => {
     const narrower = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '225-275' }), USERS);
     expect(narrower.changes.find((c) => c.field === 'estimatedSandwichCount')).toMatchObject({ from: '200–300', to: '225–275' });
     const exact = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '250' }), USERS);
-    expect(exact.updatesByField.estimatedSandwichCount).toMatchObject({
+    expect(exact.updatesByField.estimatedSandwichCount).toEqual({
+      estimatedSandwichCount: 250,
+      estimatedSandwichCountMin: null,
+      estimatedSandwichCountMax: null,
+    });
+    expect(saved(ranged, exact, ['estimatedSandwichCount'])).toMatchObject({
       estimatedSandwichCount: 250,
       estimatedSandwichCountMin: null,
       estimatedSandwichCountMax: null,
@@ -479,18 +486,15 @@ describe('Copilot review fixes', () => {
     expect(buildRowUpdatePlan(rangeMode, makeRow({ 'Estimate # sandwiches': '200-300' }), USERS).changes).toEqual([]);
   });
 
-  it('splits types using the range midpoint for range-mode events', () => {
-    const rangeMode = makeEvent({ estimatedSandwichCount: null, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 });
+  it('a types change on a range-mode event keeps the range', () => {
+    const rangeMode = makeEvent({ estimatedSandwichCount: null, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, sandwichTypes: null });
     const plan = buildRowUpdatePlan(rangeMode, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
-    expect(plan.updates.sandwichTypes).toEqual([
-      { type: 'deli', quantity: 125 },
-      { type: 'pbj', quantity: 125 },
-    ]);
-    const picked = selectUpdates(plan, ['sandwichTypes'], rangeMode);
-    expect(picked.updates.sandwichTypes).toEqual([
-      { type: 'deli', quantity: 125 },
-      { type: 'pbj', quantity: 125 },
-    ]);
+    expect(saved(rangeMode, plan, ['sandwichTypes'])).toMatchObject({
+      estimatedSandwichCountMin: 200,
+      estimatedSandwichCountMax: 300,
+      estimatedSandwichRangeType: null,
+      sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }],
+    });
   });
 
   it('keeps the plan free of wall-clock timestamps so the token is stable', () => {
@@ -528,21 +532,22 @@ describe('Copilot review fixes, round 2', () => {
     expect(s.volunteer.names).toEqual(['Kim']);
   });
 
-  it('rescales the existing breakdown when only the estimate changes', () => {
+  it('a new estimate drops per-type amounts that no longer add up, keeping the types', () => {
     const event = makeEvent({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 50 }] });
     const plan = buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '400', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
-    expect(plan.updatesByField.estimatedSandwichCount?.sandwichTypes).toEqual([
-      { type: 'deli', quantity: 300 },
-      { type: 'pbj', quantity: 100 },
-    ]);
     expect(plan.updatesByField.sandwichTypes).toBeUndefined();
+    expect(saved(event, plan, ['estimatedSandwichCount'])).toMatchObject({
+      estimatedSandwichCount: 400,
+      sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }],
+    });
   });
 
-  it('a picked types change wins over the rescaled breakdown', () => {
+  it('one type takes the total, whichever changes are picked', () => {
     const event = makeEvent({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 200 }] });
     const plan = buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '300', 'Deli or PBJ?': 'PBJ' }), USERS);
-    expect(selectUpdates(plan, ['estimatedSandwichCount'], event).updates.sandwichTypes).toEqual([{ type: 'deli', quantity: 300 }]);
-    expect(selectUpdates(plan, ['sandwichTypes', 'estimatedSandwichCount'], event).updates.sandwichTypes).toEqual([{ type: 'pbj', quantity: 300 }]);
+    expect(saved(event, plan, ['estimatedSandwichCount']).sandwichTypes).toEqual([{ type: 'deli', quantity: 300 }]);
+    expect(saved(event, plan, ['sandwichTypes', 'estimatedSandwichCount']).sandwichTypes).toEqual([{ type: 'pbj', quantity: 300 }]);
+    expect(saved(event, plan, ['sandwichTypes'])).toMatchObject({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'pbj', quantity: 200 }] });
   });
 
   it('keeps the range type in step with a types change', () => {
@@ -554,19 +559,22 @@ describe('Copilot review fixes, round 2', () => {
       sandwichTypes: [{ type: 'deli_turkey', quantity: 250 }],
     });
     const one = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'PBJ' }), USERS);
-    expect(selectUpdates(one, ['sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBe('pbj');
+    expect(saved(ranged, one, ['sandwichTypes']).estimatedSandwichRangeType).toBe('pbj');
     const two = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
-    expect(selectUpdates(two, ['sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBeNull();
-    // Exact estimate + types both ticked: out of range mode, so no range type.
+    expect(saved(ranged, two, ['sandwichTypes']).estimatedSandwichRangeType).toBeNull();
     const exact = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '250', 'Deli or PBJ?': 'PBJ' }), USERS);
-    expect(selectUpdates(exact, ['estimatedSandwichCount', 'sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBeNull();
-    // Copilot's case: same preview, only the types change ticked. The range stays, so the type must follow.
-    expect(selectUpdates(exact, ['sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBe('pbj');
-    // Estimate only: exact clears the type.
-    expect(selectUpdates(exact, ['estimatedSandwichCount'], ranged).updates.estimatedSandwichRangeType).toBeNull();
+    // Exact estimate + types: out of range mode, so no range type.
+    expect(saved(ranged, exact, ['estimatedSandwichCount', 'sandwichTypes'])).toMatchObject({
+      estimatedSandwichRangeType: null,
+      sandwichTypes: [{ type: 'pbj', quantity: 250 }],
+    });
+    // Only types ticked: the range stays, and the type follows.
+    expect(saved(ranged, exact, ['sandwichTypes']).estimatedSandwichRangeType).toBe('pbj');
+    // Only the estimate: exact clears the range type.
+    expect(saved(ranged, exact, ['estimatedSandwichCount']).estimatedSandwichRangeType).toBeNull();
   });
 
-  it('rescaled amounts always add up to the new total', () => {
+  it('never leaves per-type amounts that add up to more than the new total', () => {
     const event = makeEvent({
       estimatedSandwichCount: 301,
       sandwichTypes: [
@@ -577,9 +585,10 @@ describe('Copilot review fixes, round 2', () => {
       ],
     });
     const plan = buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '101', 'Deli or PBJ?': 'Deli, PBJ, Turkey, Ham' }), USERS);
-    const q = (plan.updatesByField.estimatedSandwichCount?.sandwichTypes as { quantity: number }[]).map((t) => t.quantity);
-    expect(q.reduce((a, b) => a + b, 0)).toBe(101);
-    expect(q.every((n) => n >= 0)).toBe(true);
+    const out = saved(event, plan, ['estimatedSandwichCount']);
+    expect(out.estimatedSandwichCount).toBe(101);
+    const q = (out.sandwichTypes as { quantity: number }[]).map((t) => t.quantity);
+    expect(q.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(101);
   });
 });
 
@@ -599,7 +608,7 @@ describe('Copilot review fixes, round 4', () => {
       sandwichTypes: null,
     });
     const plan = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '350', 'Deli or PBJ?': '' }), USERS);
-    expect(plan.updatesByField.estimatedSandwichCount).toMatchObject({
+    expect(saved(ranged, plan, ['estimatedSandwichCount'])).toMatchObject({
       estimatedSandwichCount: 350,
       estimatedSandwichRangeType: null,
       sandwichTypes: [{ type: 'deli_turkey', quantity: 350 }],
@@ -609,9 +618,9 @@ describe('Copilot review fixes, round 4', () => {
   it('carries the one existing type into range mode; a ticked types change still decides', () => {
     const exact = makeEvent({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'pbj', quantity: 200 }] });
     const plan = buildRowUpdatePlan(exact, makeRow({ 'Estimate # sandwiches': '200-300', 'Deli or PBJ?': 'PBJ' }), USERS);
-    expect(selectUpdates(plan, ['estimatedSandwichCount'], exact).updates.estimatedSandwichRangeType).toBe('pbj');
+    expect(saved(exact, plan, ['estimatedSandwichCount']).estimatedSandwichRangeType).toBe('pbj');
     const swap = buildRowUpdatePlan(exact, makeRow({ 'Estimate # sandwiches': '200-300', 'Deli or PBJ?': 'Deli' }), USERS);
-    expect(selectUpdates(swap, ['estimatedSandwichCount', 'sandwichTypes'], exact).updates.estimatedSandwichRangeType).toBe('deli');
+    expect(saved(exact, swap, ['estimatedSandwichCount', 'sandwichTypes']).estimatedSandwichRangeType).toBe('deli');
   });
 
   it('keeps the final breakdown adding up to a new final count', () => {

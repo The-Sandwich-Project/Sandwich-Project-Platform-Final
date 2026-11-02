@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { totalFromFields } from '@shared/sandwich-estimate';
 import { parsePlanningStaffing } from './services/planning-sheet-row-update';
 import { JWT } from 'google-auth-library';
 import { db } from './db';
@@ -1086,7 +1087,16 @@ export class PlanningSheetSyncService {
     row[PLANNING_SHEET_COLUMNS.VAN_BOOKED] = e.vanDriverNeeded ? 'Yes' : '';
     row[PLANNING_SHEET_COLUMNS.VAN_NEEDED_FOR] = formatVanNeededForCell(e.vanNeededFor);
     row[PLANNING_SHEET_COLUMNS.STAFFING] = formatStaffingColumn(staffing);
-    row[PLANNING_SHEET_COLUMNS.ESTIMATE_SANDWICHES] = e.estimatedSandwichCount?.toString() || '';
+    // A live range goes to the sheet as "min-max" (it used to export blank,
+    // or only the midpoint); otherwise the exact count.
+    {
+      const total = totalFromFields(e as any);
+      row[PLANNING_SHEET_COLUMNS.ESTIMATE_SANDWICHES] = !total
+        ? ''
+        : total.min === total.max
+          ? String(total.min)
+          : `${total.min}-${total.max}`;
+    }
     row[PLANNING_SHEET_COLUMNS.DELI_OR_PBJ] = deliOrPbj;
     // Final sandwich count written to the sheet is intentionally the event's
     // own actualSandwichCount reference field — NOT a total derived from the

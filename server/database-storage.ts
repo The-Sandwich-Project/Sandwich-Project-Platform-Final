@@ -1,4 +1,5 @@
 import { normalizeEventContacts } from './services/event-contact-directory';
+import { resolveEstimatePatch, touchesEstimate } from '@shared/sandwich-estimate';
 import { hasEventContactPatch } from '@shared/event-contact-resolution';
 import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import {
@@ -4297,10 +4298,14 @@ export class DatabaseStorage implements IStorage {
   async createEventRequest(
     insertEventRequest: InsertEventRequest
   ): Promise<EventRequest> {
+    // One rule for the estimate fields, whatever created the event.
+    const withEstimate = touchesEstimate(insertEventRequest as Record<string, unknown>)
+      ? { ...insertEventRequest, ...resolveEstimatePatch(null, insertEventRequest as Record<string, unknown>) }
+      : insertEventRequest;
     const [result] = await db
       .insert(eventRequests)
       .values({
-        ...normalizeToolkitPatch(await normalizeEventContacts(insertEventRequest)),
+        ...normalizeToolkitPatch(await normalizeEventContacts(withEstimate as InsertEventRequest)),
         updatedAt: new Date(),
       })
       .returning();
@@ -4321,7 +4326,18 @@ export class DatabaseStorage implements IStorage {
     }
   ): Promise<EventRequest | undefined> {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const { expectedVersion, ifUnchangedSince, ...rawUpdateData } = updates as typeof updates;
+      const { expectedVersion, ifUnchangedSince, ...patchData } = updates as typeof updates;
+      // Estimate fields (count, range, range type, type breakdown) are always
+      // saved together and consistent, whichever screen sent which subset.
+      // See shared/sandwich-estimate.ts.
+      let rawUpdateData: Partial<EventRequest> = patchData;
+      if (touchesEstimate(patchData as Record<string, unknown>)) {
+        const before = await this.getEventRequest(id);
+        rawUpdateData = {
+          ...patchData,
+          ...(resolveEstimatePatch(before ?? null, patchData as Record<string, unknown>) as Partial<EventRequest>),
+        };
+      }
       const previousEvent = hasEventContactPatch(rawUpdateData) || (typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus)
         ? await this.getEventRequest(id)
         : undefined;

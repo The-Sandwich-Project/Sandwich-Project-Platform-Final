@@ -529,7 +529,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     const estimatedSandwichCount = parsedSandwichCount.count;
 
     // Parse sandwich types
-    const sandwichTypes = sandwichTypesForNewEvent(data['Deli or PBJ?'], estimatedSandwichCount);
+    const sandwichTypes = sandwichTypesForNewEvent(data['Deli or PBJ?']);
 
     // Parse contact name
     const contactNameParts = parseContactName(data['Contact Name']);
