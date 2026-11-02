@@ -90,6 +90,7 @@ import { aiChatRouter } from './ai-chat';
 import { aiAnalystRouter } from './ai-analyst';
 import { createAlertRequestsRouter, createAIAlertRouter } from './alert-requests';
 import { createAppSettingsRouter } from './app-settings';
+import { createCollectiveLearningAutoLogRouter } from './collective-learning-auto-log';
 import { createNavUserViewRouter } from './nav-user-view';
 import { createCollectionFavoritesRouter } from './collection-favorites';
 import { createGroupEngagementRoutes } from './group-engagement';
@@ -1088,6 +1089,18 @@ export function createMainRoutes(deps: RouterDependencies) {
     appSettingsRouter
   );
   router.use('/api/app-settings', createErrorHandler('app-settings'));
+
+  // Weekly auto-logged Collective Learning PBJ collection + per-week overrides
+  router.use(
+    '/api/collective-learning-auto-log',
+    deps.isAuthenticated,
+    ...createStandardMiddleware(),
+    createCollectiveLearningAutoLogRouter()
+  );
+  router.use(
+    '/api/collective-learning-auto-log',
+    createErrorHandler('collective-learning-auto-log')
+  );
 
   const navUserViewRouter = createNavUserViewRouter(deps);
   router.use(

@@ -282,6 +282,7 @@ Because Neon's HTTP driver has no transactions, a migration that fails partway c
 | Standby follow-ups | Daily 9:30 AM | Emails the TSP contact when a standby event's check-back date arrives | prod only |
 | Integration health check | Daily 6:00 AM | Live-checks OpenAI, SendGrid, Twilio, Sentry, Anthropic and the Projects sheet | none |
 | Daily error digest | Daily 7:05 AM | Emails a roll-up of the last 24h of errors (skipped if there are none) | prod only |
+| Collective Learning auto-log | Daily 6:20 PM | Logs the standing weekly PBJ count for Collective Learning (default 250, dated the week's Wednesday) unless that week has an override, a real log, or is a holiday week. Idempotent. Controls + overrides are a card on the Collections page (`services/collections/collective-learning-auto-log.ts`) | prod only |
 
 **"Disabled" jobs:** volunteer reminders, past-date notifications, TSP follow-ups, corporate follow-ups, corporate 24h escalation, event approaching, weekly contact reminder.
 - These pass `{ scheduled: false }`, but **node-cron 4.x ignores that option**: `schedule()` always starts the task, and `TaskOptions` has no `scheduled` field. So they **do fire**.
