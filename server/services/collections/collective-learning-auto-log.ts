@@ -337,7 +337,8 @@ export async function reconcileWeek(
 /**
  * Total sandwiches on a collection row, same formula as the rest of the app:
  * individual + sum(groupCollections[].count), falling back to the legacy
- * group1Count + group2Count columns.
+ * group1Count + group2Count columns. groupCollections may be an array or a
+ * JSON-encoded string.
  */
 function collectionTotal(row: {
   individualSandwiches: number | null;
@@ -345,9 +346,18 @@ function collectionTotal(row: {
   group1Count: number | null;
   group2Count: number | null;
 }): number {
+  // The CSV importer stores groupCollections as a JSON-encoded string.
+  let list: unknown = row.groupCollections;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = [];
+    }
+  }
   const groups =
-    Array.isArray(row.groupCollections) && row.groupCollections.length > 0
-      ? (row.groupCollections as Array<{ count?: number }>).reduce((sum, g) => sum + (g.count || 0), 0)
+    Array.isArray(list) && list.length > 0
+      ? (list as Array<{ count?: number }>).reduce((sum, g) => sum + (Number(g?.count) || 0), 0)
       : (row.group1Count || 0) + (row.group2Count || 0);
   return (row.individualSandwiches || 0) + groups;
 }
