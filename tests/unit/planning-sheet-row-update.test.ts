@@ -7,6 +7,8 @@ import {
   planToken,
   resolveSheetName,
   sandwichTypesForNewEvent,
+  sheetNoteParts,
+  isRowIdOnly,
   selectUpdates,
   shiftPickupDateTime,
   staffingForNewEvent,
@@ -618,5 +620,22 @@ describe('Copilot review fixes, round 4', () => {
       actualSandwichCount: 300,
       actualSandwichTypes: [{ type: 'deli', quantity: 300 }],
     });
+  });
+});
+
+describe('sync_id is never treated as a note', () => {
+  const ID = 'c5432e45-9a1c-4ecf-b849-36446f10b604';
+  it('recognizes an ID-only cell', () => {
+    expect(isRowIdOnly(ID)).toBe(true);
+    expect(isRowIdOnly(` ${ID.toUpperCase()} `)).toBe(true);
+    expect(isRowIdOnly(`see ${ID}`)).toBe(false);
+    expect(isRowIdOnly('bring coolers')).toBe(false);
+  });
+  it('drops an ID-only note from any notes column, keeps real notes', () => {
+    expect(sheetNoteParts({ Notes: 'call first', "Add'l Notes": ID, 'Waiting On': ID })).toEqual(['Notes: call first']);
+  });
+  it('the update flow adds no ID to planning notes', () => {
+    const plan = buildRowUpdatePlan(makeEvent({ planningNotes: null }), makeRow({ "Add'l Notes": ID } as any), USERS);
+    expect(plan.updatesByField.planningNotes).toBeUndefined();
   });
 });

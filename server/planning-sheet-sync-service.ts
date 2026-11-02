@@ -29,8 +29,8 @@ export const PLANNING_SHEET_COLUMNS = {
   ESTIMATE_SANDWICHES: 11,    // L - Estimate # sandwiches
   DELI_OR_PBJ: 12,            // M - Deli or PBJ?
   FINAL_SANDWICHES: 13,       // N - Final # sandwiches made
-  TOTAL_IN_APP: 14,           // O - Total in app? (manually maintained in the sheet; app leaves blank on new rows)
-  SOCIAL_POST: 15,            // P - Social Post
+  TOTAL_IN_APP: 14,           // O - #'s added to app (sheet-owned)
+  FOLLOW_UP_EMAIL_SENT: 15,   // P - Follow-up email sent (sheet-owned; was "Social Post")
   SENT_TOOLKIT: 16,           // Q - Sent toolkit?
   CONTACT_NAME: 17,           // R - Contact Name
   EMAIL: 18,                  // S - Email Address
@@ -41,9 +41,36 @@ export const PLANNING_SHEET_COLUMNS = {
   AFTER_EVENT_NOTES: 23,      // X - After Event Notes
   CANCELLED: 24,              // Y - Cancelled
   NOTES: 25,                  // Z - Notes
-  ADDL_NOTES: 26,             // AA - Add'l Notes
-  WAITING_ON: 27,             // AB - Waiting On
+  SYNC_ID: 26,                // AA - sync_id: a per-row ID kept on the sheet (sheet-owned; was "Add'l Notes")
+  UNLABELED_AB: 27,           // AB - no header (sheet-owned; was "Waiting On")
 } as const;
+
+/**
+ * Columns the sheet owns. The app never writes them: new rows get blanks and
+ * an existing row keeps whatever the sheet has, whatever merge decision was
+ * picked ("use app" included). Matches the live sheet as of Nov 2026:
+ * O "#'s added to app", P "Follow-up email sent", AA "sync_id", AB unlabeled.
+ */
+export const SHEET_OWNED_COLUMNS: readonly number[] = [
+  PLANNING_SHEET_COLUMNS.TOTAL_IN_APP,
+  PLANNING_SHEET_COLUMNS.FOLLOW_UP_EMAIL_SENT,
+  PLANNING_SHEET_COLUMNS.SYNC_ID,
+  PLANNING_SHEET_COLUMNS.UNLABELED_AB,
+];
+
+/** A copy of a new row with every sheet-owned cell blank (for rows the app creates). */
+export function blankSheetOwnedColumns(row: string[]): string[] {
+  const out = [...row];
+  for (const i of SHEET_OWNED_COLUMNS) if (i < out.length) out[i] = '';
+  return out;
+}
+
+/** Copy the sheet's own values into the sheet-owned columns of a row about to be written. */
+export function keepSheetOwnedColumns(row: string[], existingRaw: string[]): string[] {
+  const out = [...row];
+  for (const i of SHEET_OWNED_COLUMNS) out[i] = existingRaw[i] ?? '';
+  return out;
+}
 
 /** Convert a 0-based column index to a spreadsheet letter (0 → A, 26 → AA, 27 → AB). */
 export function planningSheetColumnLetter(index: number): string {
@@ -234,7 +261,7 @@ export interface PlanningSheetRow {
   deliOrPbj: string;
   finalSandwiches: string;
   totalInApp: string;
-  socialPost: string;
+  followUpEmailSent: string;
   sentToolkit: string;
   contactName: string;
   email: string;
@@ -245,8 +272,10 @@ export interface PlanningSheetRow {
   afterEventNotes: string;
   cancelled: string;
   notes: string;
-  addlNotes: string;
-  waitingOn: string;
+  /** AA: the sheet's per-row ID. Not notes. */
+  syncId: string;
+  /** AB: unlabeled column, read only so an update can write it back unchanged. */
+  unlabeledAB: string;
 }
 
 /**
@@ -897,7 +926,7 @@ export class PlanningSheetSyncService {
         deliOrPbj: row[PLANNING_SHEET_COLUMNS.DELI_OR_PBJ] || '',
         finalSandwiches: row[PLANNING_SHEET_COLUMNS.FINAL_SANDWICHES] || '',
         totalInApp: row[PLANNING_SHEET_COLUMNS.TOTAL_IN_APP] || '',
-        socialPost: row[PLANNING_SHEET_COLUMNS.SOCIAL_POST] || '',
+        followUpEmailSent: row[PLANNING_SHEET_COLUMNS.FOLLOW_UP_EMAIL_SENT] || '',
         sentToolkit: row[PLANNING_SHEET_COLUMNS.SENT_TOOLKIT] || '',
         contactName: row[PLANNING_SHEET_COLUMNS.CONTACT_NAME] || '',
         email: row[PLANNING_SHEET_COLUMNS.EMAIL] || '',
@@ -908,8 +937,8 @@ export class PlanningSheetSyncService {
         afterEventNotes: row[PLANNING_SHEET_COLUMNS.AFTER_EVENT_NOTES] || '',
         cancelled: row[PLANNING_SHEET_COLUMNS.CANCELLED] || '',
         notes: row[PLANNING_SHEET_COLUMNS.NOTES] || '',
-        addlNotes: row[PLANNING_SHEET_COLUMNS.ADDL_NOTES] || '',
-        waitingOn: row[PLANNING_SHEET_COLUMNS.WAITING_ON] || '',
+        syncId: row[PLANNING_SHEET_COLUMNS.SYNC_ID] || '',
+        unlabeledAB: row[PLANNING_SHEET_COLUMNS.UNLABELED_AB] || '',
       };
     });
   }
@@ -1068,7 +1097,7 @@ export class PlanningSheetSyncService {
     // to compute from sandwich_collections — that would risk corrupting the
     // official count records. Only show it if it's a positive number.
     row[PLANNING_SHEET_COLUMNS.FINAL_SANDWICHES] = (e.actualSandwichCount && e.actualSandwichCount > 0) ? e.actualSandwichCount.toString() : '';
-    row[PLANNING_SHEET_COLUMNS.SOCIAL_POST] = e.socialMediaPostCompleted ? 'Yes' : '';
+    // P is now "Follow-up email sent" (sheet-owned), so the app writes nothing there.
     row[PLANNING_SHEET_COLUMNS.SENT_TOOLKIT] = e.toolkitSent ? 'Yes' : '';
     row[PLANNING_SHEET_COLUMNS.CONTACT_NAME] = `${e.firstName || ''} ${e.lastName || ''}`.trim();
     row[PLANNING_SHEET_COLUMNS.EMAIL] = e.email || '';
@@ -1079,8 +1108,8 @@ export class PlanningSheetSyncService {
     row[PLANNING_SHEET_COLUMNS.AFTER_EVENT_NOTES] = e.followUpNotes || '';
     row[PLANNING_SHEET_COLUMNS.CANCELLED] = e.status === 'cancelled' ? 'Yes' : '';
     row[PLANNING_SHEET_COLUMNS.NOTES] = '';
-    row[PLANNING_SHEET_COLUMNS.ADDL_NOTES] = '';
-    row[PLANNING_SHEET_COLUMNS.WAITING_ON] = e.nextAction || '';
+    // AA (sync_id) and AB (unlabeled) are sheet-owned: left blank here, and
+    // an existing row keeps the sheet's values (pushEventDirectly).
 
     return row;
   }
@@ -1303,10 +1332,14 @@ export class PlanningSheetSyncService {
    */
   private async applyNewRow(proposal: any): Promise<{ success: boolean; message: string }> {
     const originalRow = proposal.proposedRowData as string[];
-    const rowData = migrateProposedPlanningRow(originalRow);
-    if (!rowData || !Array.isArray(rowData)) {
+    const migrated = migrateProposedPlanningRow(originalRow);
+    if (!migrated || !Array.isArray(migrated)) {
       return { success: false, message: 'Invalid row data in proposal' };
     }
+    // Proposals queued before the sheet-owned columns existed still carry the
+    // old Social Post (P) / Waiting On (AB) values. A new row never writes
+    // sheet-owned cells, whenever the proposal was made.
+    const rowData = blankSheetOwnedColumns(migrated);
     if (originalRow && rowData.length !== originalRow.length) {
       try {
         await db
@@ -1414,6 +1447,9 @@ export class PlanningSheetSyncService {
     const columnIndex = PLANNING_SHEET_COLUMNS[proposal.fieldName as keyof typeof PLANNING_SHEET_COLUMNS];
     if (columnIndex === undefined) {
       return { success: false, message: `Unknown field: ${proposal.fieldName}` };
+    }
+    if (SHEET_OWNED_COLUMNS.includes(columnIndex)) {
+      return { success: false, message: `${proposal.fieldName} is maintained on the sheet; the app doesn't write it` };
     }
 
     // Convert 0-based column index → spreadsheet letter (A, B, ..., Z, AA, AB, ...).
@@ -1766,7 +1802,7 @@ export class PlanningSheetSyncService {
     raw[C.DELI_OR_PBJ] = row.deliOrPbj;
     raw[C.FINAL_SANDWICHES] = row.finalSandwiches;
     raw[C.TOTAL_IN_APP] = row.totalInApp;
-    raw[C.SOCIAL_POST] = row.socialPost;
+    raw[C.FOLLOW_UP_EMAIL_SENT] = row.followUpEmailSent;
     raw[C.SENT_TOOLKIT] = row.sentToolkit;
     raw[C.CONTACT_NAME] = row.contactName;
     raw[C.EMAIL] = row.email;
@@ -1777,8 +1813,8 @@ export class PlanningSheetSyncService {
     raw[C.AFTER_EVENT_NOTES] = row.afterEventNotes;
     raw[C.CANCELLED] = row.cancelled;
     raw[C.NOTES] = row.notes;
-    raw[C.ADDL_NOTES] = row.addlNotes;
-    raw[C.WAITING_ON] = row.waitingOn;
+    raw[C.SYNC_ID] = row.syncId;
+    raw[C.UNLABELED_AB] = row.unlabeledAB;
     return raw;
   }
 
@@ -1824,10 +1860,8 @@ export class PlanningSheetSyncService {
           const existingRaw = this.planningSheetRowToRawArray(existingRow);
           finalRow = [...rowData];
 
-          // Iterate every mapped column (0..26 inclusive — the sheet has 27
-          // columns through AA/"Waiting On"). A hard-coded 26 here previously
-          // skipped the last column, so a keep_sheet/append decision on
-          // "Waiting On" was silently ignored and always overwritten.
+          // Iterate every mapped column (0..27, A..AB). A hard-coded count here
+          // previously skipped the last column and silently ignored its decision.
           for (let i = 0; i < finalRow.length; i++) {
             const decision = mergeDecisions[String(i)];
             if (decision === 'keep_sheet') {
@@ -1848,8 +1882,12 @@ export class PlanningSheetSyncService {
           logger.log(`[PlanningSheet] Applied merge decisions for ${Object.keys(mergeDecisions).length} columns`);
         } else {
           // No merge decisions = full overwrite (backward compatible)
-          finalRow = rowData;
+          finalRow = [...rowData];
         }
+
+        // Sheet-owned columns (sync_id, follow-up email, ...) always keep the
+        // sheet's value, whatever was decided, so a "use app" can't blank them.
+        finalRow = keepSheetOwnedColumns(finalRow, this.planningSheetRowToRawArray(existingRow));
 
         // Update existing row
         const range = this.getSheetRange(`A${existingRow.rowIndex}:${PLANNING_SHEET_LAST_COLUMN}${existingRow.rowIndex}`);

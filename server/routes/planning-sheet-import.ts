@@ -185,8 +185,7 @@ function buildPlanningNotes(row: PlanningSheetRow): string {
   add('Sent toolkit', row.sentToolkit);
   add('Details', row.allDetails);
   add('Notes', row.notes);
-  add('Additional notes', row.addlNotes);
-  add('Waiting on', row.waitingOn);
+  // AA is the sheet's sync_id (a row ID) and AB is unlabeled: not notes.
   add('After-event notes', row.afterEventNotes);
   return lines.join('\n');
 }

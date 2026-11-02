@@ -27,7 +27,7 @@ function makeRow(overrides: Partial<PlanningSheetRow> = {}): PlanningSheetRow {
     deliOrPbj: '',
     finalSandwiches: '',
     totalInApp: '',
-    socialPost: '',
+    followUpEmailSent: '',
     sentToolkit: '',
     contactName: 'Jane Doe',
     email: '',
@@ -38,8 +38,8 @@ function makeRow(overrides: Partial<PlanningSheetRow> = {}): PlanningSheetRow {
     afterEventNotes: '',
     cancelled: '',
     notes: '',
-    addlNotes: '',
-    waitingOn: '',
+    syncId: '',
+    unlabeledAB: '',
     ...overrides,
   };
 }

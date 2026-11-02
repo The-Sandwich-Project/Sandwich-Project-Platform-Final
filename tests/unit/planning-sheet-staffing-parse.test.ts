@@ -6,6 +6,11 @@ jest.mock('../../server/utils/production-safe-logger', () => ({
 }));
 
 import {
+  PLANNING_SHEET_COLUMNS,
+  PLANNING_SHEET_COLUMN_COUNT,
+  SHEET_OWNED_COLUMNS,
+  keepSheetOwnedColumns,
+  blankSheetOwnedColumns,
   assignmentLabelForUnknownId,
   formatStaffingColumn,
   parseStaffingColumn,
@@ -50,5 +55,40 @@ describe('assignmentLabelForUnknownId (app -> sheet push)', () => {
     expect(assignmentLabelForUnknownId('3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90')).toBe('Unknown');
     expect(assignmentLabelForUnknownId('42')).toBe('Unknown');
     expect(assignmentLabelForUnknownId('')).toBe('Unknown');
+  });
+});
+
+describe('sheet-owned columns (live layout, Nov 2026)', () => {
+  it('maps O/P/AA/AB to the live headers and marks them sheet-owned', () => {
+    expect(PLANNING_SHEET_COLUMNS.TOTAL_IN_APP).toBe(14);
+    expect(PLANNING_SHEET_COLUMNS.FOLLOW_UP_EMAIL_SENT).toBe(15);
+    expect(PLANNING_SHEET_COLUMNS.SYNC_ID).toBe(26);
+    expect(PLANNING_SHEET_COLUMNS.UNLABELED_AB).toBe(27);
+    expect([...SHEET_OWNED_COLUMNS].sort((a, b) => a - b)).toEqual([14, 15, 26, 27]);
+  });
+
+  it('a push never overwrites sync_id or the other sheet-owned cells', () => {
+    const appRow = new Array(PLANNING_SHEET_COLUMN_COUNT).fill('app');
+    const sheetRow = new Array(PLANNING_SHEET_COLUMN_COUNT).fill('sheet');
+    sheetRow[26] = 'c5432e45-9a1c-4ecf-b849-36446f10b604';
+    const out = keepSheetOwnedColumns(appRow, sheetRow);
+    expect(out[26]).toBe('c5432e45-9a1c-4ecf-b849-36446f10b604');
+    expect(out[14]).toBe('sheet');
+    expect(out[15]).toBe('sheet');
+    expect(out[27]).toBe('sheet');
+    expect(out[2]).toBe('app'); // everything else is the app's row
+    expect(appRow[26]).toBe('app'); // input not mutated
+  });
+});
+
+describe('queued proposals never write sheet-owned columns', () => {
+  it('blanks O/P/AA/AB on a row the app creates, leaving the rest', () => {
+    const queued = new Array(PLANNING_SHEET_COLUMN_COUNT).fill('x');
+    queued[15] = 'Yes'; // old Social Post value
+    queued[27] = 'Confirm time'; // old Waiting On value
+    const out = blankSheetOwnedColumns(queued);
+    expect([out[14], out[15], out[26], out[27]]).toEqual(['', '', '', '']);
+    expect(out[2]).toBe('x');
+    expect(queued[15]).toBe('Yes'); // input not mutated
   });
 });
