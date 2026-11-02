@@ -551,11 +551,31 @@ describe('Copilot review fixes, round 2', () => {
       sandwichTypes: [{ type: 'deli_turkey', quantity: 250 }],
     });
     const one = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'PBJ' }), USERS);
-    expect(one.updatesByField.sandwichTypes?.estimatedSandwichRangeType).toBe('pbj');
+    expect(selectUpdates(one, ['sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBe('pbj');
     const two = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
-    expect(two.updatesByField.sandwichTypes?.estimatedSandwichRangeType).toBeNull();
-    // An exact estimate leaves range mode, so the range type is cleared even if a types change is picked.
+    expect(selectUpdates(two, ['sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBeNull();
+    // Exact estimate + types both ticked: out of range mode, so no range type.
     const exact = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '250', 'Deli or PBJ?': 'PBJ' }), USERS);
     expect(selectUpdates(exact, ['estimatedSandwichCount', 'sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBeNull();
+    // Copilot's case: same preview, only the types change ticked. The range stays, so the type must follow.
+    expect(selectUpdates(exact, ['sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBe('pbj');
+    // Estimate only: exact clears the type.
+    expect(selectUpdates(exact, ['estimatedSandwichCount'], ranged).updates.estimatedSandwichRangeType).toBeNull();
+  });
+
+  it('rescaled amounts always add up to the new total', () => {
+    const event = makeEvent({
+      estimatedSandwichCount: 301,
+      sandwichTypes: [
+        { type: 'deli', quantity: 100 },
+        { type: 'pbj', quantity: 100 },
+        { type: 'deli_turkey', quantity: 100 },
+        { type: 'deli_ham', quantity: 1 },
+      ],
+    });
+    const plan = buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '101', 'Deli or PBJ?': 'Deli, PBJ, Turkey, Ham' }), USERS);
+    const q = (plan.updatesByField.estimatedSandwichCount?.sandwichTypes as { quantity: number }[]).map((t) => t.quantity);
+    expect(q.reduce((a, b) => a + b, 0)).toBe(101);
+    expect(q.every((n) => n >= 0)).toBe(true);
   });
 });

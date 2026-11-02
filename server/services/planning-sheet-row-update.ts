@@ -129,6 +129,12 @@ export interface RowUpdatePlan {
   updates: Record<string, unknown>;
   /** The same patch, split by RowChange.field, so a person can pick which to apply. */
   updatesByField: Record<string, Record<string, unknown>>;
+  /**
+   * With a types change: the single type a range-mode estimate should name
+   * (null when the sheet lists several). Applied by selectUpdates, which knows
+   * whether the event stays in range mode given what was ticked.
+   */
+  sheetRangeType?: string | null;
   /** Things the person should know that we did NOT change. */
   notes: string[];
 }
@@ -424,6 +430,7 @@ export function buildRowUpdatePlan(
 ): RowUpdatePlan {
   const changes: RowChange[] = [];
   const notes: string[] = [];
+  let sheetRangeType: string | null | undefined;
   const updates: Record<string, unknown> = {};
   // Every DB write is recorded under the change it belongs to, so a person
   // can apply some changes and skip others.
@@ -528,18 +535,11 @@ export function buildRowUpdatePlan(
         to: sheetTypes.map(typeLabel).join(', '),
         kind: appTypes.length ? 'update' : 'fill',
       });
-      // Range-mode estimates name ONE type. Keep it in step: the type when the
-      // sheet has one, cleared when it lists several (the breakdown carries them).
-      const willBeRange =
-        updates.estimatedSandwichCountMin !== undefined
-          ? updates.estimatedSandwichCountMin !== null || updates.estimatedSandwichCountMax !== null
-          : (event.estimatedSandwichCountMin ?? null) !== null || (event.estimatedSandwichCountMax ?? null) !== null;
-      if (willBeRange) {
-        const rangeType = sheetTypes.length === 1 ? sheetTypes[0] : null;
-        if (rangeType !== (event.estimatedSandwichRangeType ?? null)) {
-          set('sandwichTypes', 'estimatedSandwichRangeType', rangeType);
-        }
-      }
+      // Range-mode estimates name ONE type: the sheet's type when it lists one,
+      // none when it lists several (the breakdown carries them). Whether the
+      // event ends up in range mode depends on which changes are ticked, so
+      // selectUpdates applies this.
+      sheetRangeType = sheetTypes.length === 1 ? sheetTypes[0] : null;
       if (sheetTypes.length > 1 && total > 0) {
         notes.push('Sandwich types changed, so the count was split evenly between them. Adjust per-type numbers in the app if needed.');
       }
@@ -712,7 +712,7 @@ export function buildRowUpdatePlan(
     set('planningNotes', 'planningNotes', appNotes ? `${appNotes}\n\n${added}` : added);
   }
 
-  return { changes, updates, updatesByField, notes };
+  return { changes, updates, updatesByField, notes, sheetRangeType };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -759,7 +759,10 @@ export function sheetNoteParts(row: {
 export function selectUpdates(
   plan: RowUpdatePlan,
   fields: string[],
-  event: Pick<RowUpdateEvent, 'estimatedSandwichCount' | 'estimatedSandwichCountMin' | 'estimatedSandwichCountMax'>
+  event: Pick<
+    RowUpdateEvent,
+    'estimatedSandwichCount' | 'estimatedSandwichCountMin' | 'estimatedSandwichCountMax' | 'estimatedSandwichRangeType'
+  >
 ): { changes: RowChange[]; updates: Record<string, unknown> } {
   const known = new Set(plan.changes.map((c) => c.field));
   const unknown = fields.filter((f) => !known.has(f));
@@ -772,9 +775,21 @@ export function selectUpdates(
   // estimate's rescaled one.
   for (const f of chosen) if (f !== 'sandwichTypes') Object.assign(updates, plan.updatesByField[f]);
   if (chosen.has('sandwichTypes')) Object.assign(updates, plan.updatesByField.sandwichTypes);
-  // An exact estimate means no range mode, whatever the types change said.
-  if (chosen.has('estimatedSandwichCount') && updates.estimatedSandwichCountMin === null && updates.estimatedSandwichCountMax === null) {
-    updates.estimatedSandwichRangeType = null;
+  // Range type, decided from what was actually ticked:
+  // - the event's range state after this apply (the ticked estimate's, else the current one)
+  // - an exact estimate means no range mode, so no range type
+  // - in range mode with a ticked types change, the sheet's single type (or none)
+  const endsInRange = chosen.has('estimatedSandwichCount')
+    ? updates.estimatedSandwichCountMin != null || updates.estimatedSandwichCountMax != null
+    : (event.estimatedSandwichCountMin ?? null) !== null || (event.estimatedSandwichCountMax ?? null) !== null;
+  if (!endsInRange) {
+    if (chosen.has('estimatedSandwichCount') && event.estimatedSandwichRangeType) {
+      updates.estimatedSandwichRangeType = null;
+    }
+  } else if (chosen.has('sandwichTypes') && plan.sheetRangeType !== undefined) {
+    if (plan.sheetRangeType !== (event.estimatedSandwichRangeType ?? null)) {
+      updates.estimatedSandwichRangeType = plan.sheetRangeType;
+    }
   }
 
   // Types were split using the NEW estimate. If the estimate was left out,
@@ -833,11 +848,15 @@ function appSandwichTypeArray(raw: unknown): { type: string; quantity: number }[
 /** Scale a breakdown to a new total, keeping its proportions (even split if it had none). */
 function rescaleTypes(types: { type: string; quantity: number }[], total: number) {
   const sum = types.reduce((n, t) => n + (t.quantity > 0 ? t.quantity : 0), 0);
+  // Round the running total, not each share, so the parts always add up to
+  // exactly `total` and none goes negative (100/100/100/1 -> 101 = 34/33/34/0).
+  let cumShare = 0;
   let given = 0;
   return types.map((t, i) => {
-    const share = sum > 0 ? (t.quantity > 0 ? t.quantity : 0) / sum : 1 / types.length;
-    const quantity = Math.max(0, i === types.length - 1 ? total - given : Math.round(total * share));
-    given += quantity;
+    cumShare += sum > 0 ? (t.quantity > 0 ? t.quantity : 0) / sum : 1 / types.length;
+    const upTo = i === types.length - 1 ? total : Math.round(total * cumShare);
+    const quantity = upTo - given;
+    given = upTo;
     return { ...t, quantity };
   });
 }
