@@ -57,7 +57,7 @@ WHERE estimated_sandwich_count IS NULL
 -- 2b. Steps 3 and 4 clear the range type. On older events that's the ONLY
 --     place the type is stored (no breakdown), so first copy it into the
 --     breakdown, with the count those steps will leave. An existing
---     breakdown is never overwritten.
+--     breakdown, in any shape, is never overwritten.
 UPDATE event_requests
 SET sandwich_types = jsonb_build_array(jsonb_build_object(
       'type', estimated_sandwich_range_type,
@@ -70,9 +70,14 @@ SET sandwich_types = jsonb_build_array(jsonb_build_object(
         ELSE COALESCE(estimated_sandwich_count, 0)
       END))
 WHERE NULLIF(trim(estimated_sandwich_range_type), '') IS NOT NULL
+  -- Only a genuinely empty breakdown. Older object shapes ({"pbj": 200},
+  -- numeric-keyed lines) and any non-empty value are real data the app still
+  -- reads, so they're never replaced.
   AND (sandwich_types IS NULL
-       OR jsonb_typeof(sandwich_types) <> 'array'
-       OR jsonb_array_length(sandwich_types) = 0)
+       OR jsonb_typeof(sandwich_types) = 'null'
+       OR (jsonb_typeof(sandwich_types) = 'array' AND jsonb_array_length(sandwich_types) = 0)
+       OR (jsonb_typeof(sandwich_types) = 'object' AND sandwich_types = '{}'::jsonb)
+       OR (jsonb_typeof(sandwich_types) = 'string' AND trim(sandwich_types #>> '{}') IN ('', '[]', '{}', 'null')))
   AND (
     -- rows step 3 will touch
     (COALESCE(estimated_sandwich_count_min, 0) > 0) <> (COALESCE(estimated_sandwich_count_max, 0) > 0)

@@ -351,3 +351,15 @@ describe('Copilot review round 3 (previously missed)', () => {
     expect(sum.sandwichTypes).toEqual([{ type: 'deli', quantity: 150 }]);
   });
 });
+
+describe('Copilot review round 4', () => {
+  it('a range type picked with no lines sent replaces several types', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300,
+        sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }] },
+      { estimatedSandwichRangeType: 'deli_turkey' }
+    );
+    expect(out.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
+    expect(out.estimatedSandwichRangeType).toBe('deli_turkey');
+  });
+});

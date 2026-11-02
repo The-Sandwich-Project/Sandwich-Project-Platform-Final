@@ -337,6 +337,10 @@ export function resolveEstimatePatch(
     const rt = normalizeSandwichTypeKey(patch.estimatedSandwichRangeType);
     if (rt && lines.length <= 1) {
       lines = [{ type: rt, amount: lines[0]?.amount ?? null }];
+    } else if (rt && !touchedLines && isRange(total)) {
+      // A range type picked for a range (no new lines sent) names THE type,
+      // replacing several old ones (a form that only sends what changed).
+      lines = [{ type: rt, amount: null }];
     } else if (!rt && !touchedLines && isRange(total) && lines.length === 1) {
       // "No specific type" chosen for a range (and no new lines sent): the
       // one type the range named goes. For an exact total a null range type

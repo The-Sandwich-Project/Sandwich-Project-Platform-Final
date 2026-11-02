@@ -876,3 +876,12 @@ describe('Copilot review: a first-name-only record does not hide others', () => 
     expect(resolveSheetName('Karen', people, 'driver')).toBe('443');
   });
 });
+
+describe('Copilot review: sheet types compared without Unknown or duplicates', () => {
+  it('an unchanged row proposes no types change', () => {
+    const event = makeEvent({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 50 }] });
+    expect(buildRowUpdatePlan(event, makeRow({ 'Deli or PBJ?': 'Deli' }), USERS).updatesByField.sandwichTypes).toBeUndefined();
+    const dup = makeEvent({ estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'deli', quantity: 0 }] });
+    expect(buildRowUpdatePlan(dup, makeRow({ 'Estimate # sandwiches': '300', 'Deli or PBJ?': 'Deli' }), USERS).updatesByField.sandwichTypes).toBeUndefined();
+  });
+});

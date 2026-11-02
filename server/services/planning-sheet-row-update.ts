@@ -667,7 +667,9 @@ export function buildRowUpdatePlan(
   // Types: update when the SET of types differs.
   const sheetTypes = parseSheetSandwichTypes(row['Deli or PBJ?']);
   if (sheetTypes.length > 0) {
-    const appTypes = appEstimate.lines.map((l) => l.type);
+    // Compare named types the way the sheet lists them: once each, without
+    // "unknown" (the sheet export never writes it).
+    const appTypes = Array.from(new Set(appEstimate.lines.map((l) => l.type).filter((t) => t !== 'unknown')));
     const same =
       sheetTypes.length === appTypes.length && sheetTypes.every((t) => appTypes.includes(t));
     if (!same) {

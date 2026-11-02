@@ -23,3 +23,10 @@ describe('formatSandwichTypesDisplay with amounts TBD', () => {
       .toBe('200 Deli');
   });
 });
+
+describe('formatSandwichTypesDisplay with an Unknown amount', () => {
+  it('does not give the whole total to the one TBD type', () => {
+    expect(formatSandwichTypesDisplay([{ type: 'deli', quantity: 0 }, { type: 'unknown', quantity: 50 }], 300))
+      .toBe('300 total: 50 type TBD, Deli TBD');
+  });
+});

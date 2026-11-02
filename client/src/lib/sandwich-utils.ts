@@ -162,10 +162,18 @@ export function formatSandwichTypesDisplay(
     const named = parsed.filter(item => item.type.toLowerCase() !== 'unknown');
     const validTypes = named.filter(item => item.quantity > 0);
     const tbdTypes = showUnknown ? named.filter(item => !(item.quantity > 0)) : [];
+    // An amount whose type isn't known yet (estimates only) still has to show,
+    // or the remaining TBD type would look like it's the whole total.
+    const unknownAmount = showUnknown
+      ? parsed
+          .filter(item => item.type.toLowerCase() === 'unknown' && item.quantity > 0)
+          .reduce((sum, item) => sum + item.quantity, 0)
+      : 0;
 
     if (tbdTypes.length > 0) {
       const tbdNames = tbdTypes.map(item => formatSandwichTypeName(item.type));
       const known = validTypes.map(item => `${item.quantity} ${formatSandwichTypeName(item.type)}`);
+      if (unknownAmount > 0) known.push(`${unknownAmount} type TBD`);
       const prefix = fallbackCount ? `${fallbackCount} total: ` : '';
       if (known.length === 0) {
         // One type with no amount is simply all of the total.
