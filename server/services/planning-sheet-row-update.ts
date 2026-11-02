@@ -274,8 +274,15 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     // A code inside parentheses is just a code: "(VD: Luz)" -> " VD: Luz ".
     // PAREN marks it so the code just before it can be merged as its label.
     .replace(new RegExp(String.raw`\(\s*(${ROLE_CODE}[^)]*)\)`, 'gi'), ` ${PAREN}$1 `)
-    // Any other parenthetical is a note about the person, not a name.
-    .replace(/\([^)]*\)/g, ' ')
+    // Any other parenthetical is a note about the person, not a name. One
+    // with its own label ("(Helper: Kim)") might name someone in a role we
+    // don't know, so it's kept as unread: that keeps the partial-read safety
+    // on (nobody already assigned is removed). Times like "(9:15 pickup)"
+    // aren't labels.
+    .replace(/\([^)]*\)/g, (m) => {
+      if (/[A-Za-z][A-Za-z ]*:/.test(m)) out.unread.push(m.slice(1, -1).trim());
+      return ' ';
+    })
     // A slash between two names separates them; inside numbers (11/5) it doesn't.
     .replace(/(?<=[A-Za-z])\s*\/\s*(?=[A-Za-z])/g, ' + ')
     // Break before every role code, even without a comma, but never inside
@@ -774,7 +781,9 @@ export function buildRowUpdatePlan(
     // van driver (user) is linked in the app, which the sheet can't express.
     const vanName = staffing.driver.vanNames.join(', ');
     const appVanName = clean(event.customVanDriverName);
-    if (vanName && !event.assignedVanDriverId && lower(vanName) !== lower(appVanName)) {
+    // On a partial read, a van driver name already in the app is kept (the
+    // unread part may hold the rest of it).
+    if (vanName && !event.assignedVanDriverId && lower(vanName) !== lower(appVanName) && (!partlyUnread || !appVanName)) {
       changes.push({ field: 'vanDriver', label: 'Van driver', from: appVanName, to: vanName, kind: appVanName ? 'update' : 'fill' });
       set('vanDriver', 'customVanDriverName', vanName);
     }

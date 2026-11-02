@@ -751,3 +751,27 @@ describe('Copilot review on the staffing parser', () => {
     expect(b.updatesByField.volunteers?.assignedVolunteerIds).toEqual(['u-kim', 'u-ann1', 'u-katie']);
   });
 });
+
+describe('Copilot review fixes, round 6', () => {
+  it('keeps a labelled parenthetical as unread so assigned volunteers are not cleared', () => {
+    expect(parsePlanningStaffing('D: Katie, (Helper: Kim)').unread).toEqual(['Helper: Kim']);
+    // A time in a note is not a label.
+    expect(parsePlanningStaffing('D: Brigith (9:15 pickup)').unread).toEqual([]);
+    const plan = buildRowUpdatePlan(
+      makeEvent({ driversNeeded: 1, volunteersNeeded: 1, assignedVolunteerIds: ['u-kim'] }),
+      makeRow({ Staffing: 'D: Katie, (Helper: Kim)' }),
+      USERS
+    );
+    expect(plan.updates.assignedVolunteerIds).toBeUndefined();
+    expect(plan.updates.volunteersNeeded).toBeUndefined();
+  });
+
+  it('a partial read never overwrites a van driver name already in the app', () => {
+    const event = makeEvent({ vanDriverNeeded: true, customVanDriverName: 'Luz, Maria' });
+    const partial = buildRowUpdatePlan(event, makeRow({ Staffing: 'VD1: Luz VD2: V' }), USERS);
+    expect(partial.updatesByField.vanDriver).toBeUndefined();
+    // A full read still updates it.
+    const full = buildRowUpdatePlan(event, makeRow({ Staffing: 'VD: Luz' }), USERS);
+    expect(full.updatesByField.vanDriver).toEqual({ customVanDriverName: 'Luz' });
+  });
+});
