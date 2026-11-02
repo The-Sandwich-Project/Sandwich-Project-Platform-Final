@@ -80,7 +80,7 @@ import { MultiRecipientSelector } from '@/components/ui/multi-recipient-selector
 import { getMissingIntakeInfo } from '@/lib/event-request-validation';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
 import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
-import { MessageComposer } from '@/components/message-composer';
+import { useMessageAboutEvent } from '@/components/chat/chat-dock-context';
 import { InstructionsSection } from '../form-sections/InstructionsSection';
 import { MlkDayBadge } from '@/components/event-requests/MlkDayBadge';
 import { MissingDriverTimeBadge } from '@/components/event-requests/MissingDriverTimeBadge';
@@ -230,7 +230,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showSchedulingNotes, setShowSchedulingNotes] = useState(false);
   const [showNotesAndRequirements, setShowNotesAndRequirements] = useState(false);
-  const [showMessageDialog, setShowMessageDialog] = useState(false);
+  const messageAboutEvent = useMessageAboutEvent(request);
   const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
   const [instructionsDraft, setInstructionsDraft] = useState({ driverInstructions: '', volunteerInstructions: '' });
   const [showSendSmsDialog, setShowSendSmsDialog] = useState(false);
@@ -3898,7 +3898,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setShowMessageDialog(true)}
+                  onClick={messageAboutEvent}
                   className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
                   data-testid="button-message-event"
                 >
@@ -4006,6 +4006,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               variant="outline"
               size="sm"
               showLabel
+              isOnSheet={!!request.addedToOfficialSheet}
             />
 
             {/* For users who type the event into the Google Sheet by hand instead of
@@ -4326,21 +4327,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         )}
       </CardContent>
 
-      {/* Message Composer Dialog */}
-      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
-        <DialogContent className="w-[95vw] max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Message About Event: {request.organizationName}</DialogTitle>
-          </DialogHeader>
-          <MessageComposer
-            contextType="event"
-            contextId={request.id.toString()}
-            contextTitle={`${request.organizationName} event${displayDate ? ` on ${formatEventDate(displayDate.toString())}` : ''}`}
-            onSent={() => setShowMessageDialog(false)}
-            onCancel={() => setShowMessageDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
 
       {/* Driver / Volunteer Instructions Dialog */}
       <Dialog open={showInstructionsDialog} onOpenChange={setShowInstructionsDialog}>

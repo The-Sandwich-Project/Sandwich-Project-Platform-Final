@@ -282,6 +282,7 @@ Because Neon's HTTP driver has no transactions, a migration that fails partway c
 | Standby follow-ups | Daily 9:30 AM | Emails the TSP contact when a standby event's check-back date arrives | prod only |
 | Integration health check | Daily 6:00 AM | Live-checks OpenAI, SendGrid, Twilio, Sentry, Anthropic and the Projects sheet | none |
 | Daily error digest | Daily 7:05 AM | Emails a roll-up of the last 24h of errors (skipped if there are none) | prod only |
+| Collective Learning auto-log | Daily 6:20 PM | Logs the standing weekly PBJ count for Collective Learning (default 250, dated the week's Wednesday) unless that week has an override, a real log, or is a holiday week. Idempotent. Controls + overrides are a card on the Collections page (`services/collections/collective-learning-auto-log.ts`) | prod only |
 
 **"Disabled" jobs:** volunteer reminders, past-date notifications, TSP follow-ups, corporate follow-ups, corporate 24h escalation, event approaching, weekly contact reminder.
 - These pass `{ scheduled: false }`, but **node-cron 4.x ignores that option**: `schedule()` always starts the task, and `TaskOptions` has no `scheduled` field. So they **do fire**.
@@ -323,6 +324,7 @@ Because Neon's HTTP driver has no transactions, a migration that fails partway c
 | `POST /api/sms/webhook` (`routes/sms-users.ts`) | Twilio inbound SMS/MMS | Twilio signature (`X-Twilio-Signature`) validated | Handles STOP / START / HELP / IDEA keywords; parses texted collection counts (OpenAI); reads MMS sign-in sheet photos (Claude) |
 | `POST /api/sms-webhook/status` (`routes/sms-users.ts`) | Twilio delivery status callbacks | **No signature check** | Logs failed deliveries and updates the user's SMS status for certain error codes |
 | `POST /api/webhook/new-event-request` (`routes/index.ts`) | Google Apps Script on the event-requests sheet | `SHEETS_WEBHOOK_SECRET` in the `x-webhook-secret` header or the body | Triggers a full Sheet → DB event-request sync |
+| `POST /api/event-requests/import-from-sheets` and `.../preview-update`, `.../apply-update` (`routes/event-requests-legacy.ts`) | Google Apps Script on the planning sheet ("send row to app" / "update row in app") | `GOOGLE_SHEETS_API_KEY` in `x-api-key` | Creates an event from a planning-sheet row, or previews and applies a person-confirmed update to an existing one. See `docs/planning-sheet-update-from-sheet.md` |
 
 There is no SendGrid event or inbound-parse webhook. SendGrid is send-only.
 

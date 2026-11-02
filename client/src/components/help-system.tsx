@@ -248,7 +248,7 @@ export const QuickHelp: React.FC<{ section: string }> = ({ section }) => {
   const helpData = getSectionHelp();
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-[calc(1.5rem+var(--chat-dock-height,0px))] right-6 z-50">
       {isOpen && (
         <Card className="mb-4 p-4 w-80 bg-white shadow-lg border-2 border-yellow-200">
           <div className="flex items-center justify-between mb-3">

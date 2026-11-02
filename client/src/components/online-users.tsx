@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { useInstantMessaging } from '@/contexts/instant-messaging-context';
+import { useChatDockOptional } from '@/components/chat/chat-dock-context';
 import { useAuth } from '@/hooks/useAuth';
 
 interface OnlineUser {
@@ -104,7 +104,11 @@ function getTimeAgo(lastActiveAt: string | null): string {
 
 export function OnlineUsers() {
   const [isOpen, setIsOpen] = useState(false);
-  const { openChat } = useInstantMessaging();
+  const chatDock = useChatDockOptional();
+  // Opens the bottom-of-screen chat popup (Team Chat DM) with this person.
+  const openChat = (u: { id: string }) => {
+    chatDock?.openWithUser(String(u.id));
+  };
   const { user: currentUser } = useAuth();
 
   const { data: onlineUsers = [], isLoading, refetch } = useQuery<OnlineUser[]>({

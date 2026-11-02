@@ -13,7 +13,8 @@ export type OnboardingStep =
   | 'holding-zone-intro'        // Holding zone explanation
   | 'project-threads-intro'     // Project threads
   | 'toolkit-apps-intro'        // Toolkit & Apps menu item (formerly Quick Tools)
-  | 'status-definitions-review'; // One-time prompt to review updated status definitions
+  | 'status-definitions-review' // One-time prompt to review updated status definitions
+  | 'chat-event-reply';         // First time a chat reply is pinned to an event
 
 const STORAGE_KEY = 'sandwich-onboarding-completed';
 
@@ -112,6 +113,11 @@ export const onboardingContent: Record<OnboardingStep, { title: string; message:
     title: 'You have unread items!',
     message: 'Red badges show how many unread messages or items are waiting for you. Click to check them out!',
     action: 'Got it!'
+  },
+  'chat-event-reply': {
+    title: 'Replies stay linked to the event',
+    message: 'Replies stay linked to this event so you both know what they\'re about. Tap ✕ to send a regular message instead.',
+    action: 'Got it'
   },
   'team-chat-badge': {
     title: 'Team Chat',

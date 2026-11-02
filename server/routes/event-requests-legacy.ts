@@ -24,7 +24,7 @@ import { isAuthenticated } from '../auth';
 import { getEventRequestsGoogleSheetsService } from '../google-sheets-event-requests-sync';
 import { AuditLogger } from '../audit-logger';
 import { db } from '../db';
-import { eq, desc, and, sql, gte, lte, or, isNull, ne, isNotNull } from 'drizzle-orm';
+import { eq, desc, and, sql, gte, lte, or, isNull, ne, isNotNull, inArray } from 'drizzle-orm';
 import { EmailNotificationService } from '../services/email-notification-service';
 import { logger } from '../middleware/logger';
 import type { AuthenticatedRequest } from '../types/express';
@@ -74,6 +74,21 @@ import { geocodeEventInBackground } from '../utils/geocode-event';
 import { rateLimiter } from '../utils/rate-limiter';
 import { getEffectiveEventDate, getAssignmentUrgentGaps, daysSinceSubmitted, daysUntilEventDate } from '../../shared/event-validation-utils';
 import { filterEventsByWeekScope, parseWeekScopeOffset } from '../lib/event-week-filter';
+import {
+  buildRowUpdatePlan,
+  normalizeGroupName,
+  normalizeSheetDate,
+  planToken,
+  resolveSheetName,
+  sandwichTypesForNewEvent,
+  selectUpdates,
+  sheetNoteParts,
+  shiftPickupDateTime,
+  staffingCellOf,
+  staffingForNewEvent,
+  type RowUpdateEvent,
+  type SheetRowData,
+} from '../services/planning-sheet-row-update';
 
 const router = Router();
 
@@ -238,108 +253,9 @@ const processPickupTimeFields = (updates: Partial<EventRequest>, existingData?: 
 // Google Sheets Import Helper Functions
 // ============================================================================
 
-// Parse staffing column from Google Sheets
-// Format: "D, S, V" (needs) or "D: Katie, S: Kim, V: Christine, VD: Luz" (assigned)
-interface StaffingResult {
-  driversNeeded: number;
-  speakersNeeded: number;
-  volunteersNeeded: number;
-  vanDriverNeeded: boolean;
-  assignedDriverNames: string[];
-  assignedSpeakerNames: string[];
-  assignedVolunteerNames: string[];
-  customVanDriverName: string | null;
-}
-
-const parseStaffingColumn = (staffing: string | undefined): StaffingResult => {
-  const result: StaffingResult = {
-    driversNeeded: 0,
-    speakersNeeded: 0,
-    volunteersNeeded: 0,
-    vanDriverNeeded: false,
-    assignedDriverNames: [],
-    assignedSpeakerNames: [],
-    assignedVolunteerNames: [],
-    customVanDriverName: null,
-  };
-
-  if (!staffing || staffing.trim() === '') return result;
-
-  // Split by comma and process each part
-  const parts = staffing.split(',').map(p => p.trim());
-
-  for (const part of parts) {
-    if (!part) continue;
-
-    // Check if it has an assignment (contains ':')
-    if (part.includes(':')) {
-      const [role, name] = part.split(':').map(s => s.trim());
-      const roleUpper = role.toUpperCase();
-
-      if (roleUpper === 'VD') {
-        result.vanDriverNeeded = true;
-        result.customVanDriverName = name;
-      } else if (roleUpper === 'D') {
-        result.assignedDriverNames.push(name);
-      } else if (roleUpper === 'S') {
-        result.assignedSpeakerNames.push(name);
-      } else if (roleUpper === 'V') {
-        result.assignedVolunteerNames.push(name);
-      }
-    } else {
-      // Just a role letter means it's needed but not filled
-      const roleUpper = part.toUpperCase();
-      if (roleUpper === 'VD') {
-        result.vanDriverNeeded = true;
-      } else if (roleUpper === 'D') {
-        result.driversNeeded = 1;
-      } else if (roleUpper === 'S') {
-        result.speakersNeeded = 1;
-      } else if (roleUpper === 'V') {
-        result.volunteersNeeded = 1;
-      }
-    }
-  }
-
-  return result;
-};
-
-// Parse sandwich types from Google Sheets
-// Input: "Deli", "PBJ", "Deli & PBJ", "Turkey, Ham", etc.
-const parseSandwichTypes = (
-  typesStr: string | undefined,
-  estimatedCount?: number
-): Array<{ type: string; quantity: number }> | null => {
-  if (!typesStr || typesStr.trim() === '') return null;
-
-  const normalizedStr = typesStr.toLowerCase().trim();
-  const types: string[] = [];
-
-  // Handle common formats
-  if (normalizedStr.includes('&')) {
-    // "Deli & PBJ" format
-    types.push(...normalizedStr.split('&').map(t => t.trim()));
-  } else if (normalizedStr.includes(',')) {
-    // "Turkey, Ham" format
-    types.push(...normalizedStr.split(',').map(t => t.trim()));
-  } else if (normalizedStr.includes('/')) {
-    // "Deli/PBJ" format
-    types.push(...normalizedStr.split('/').map(t => t.trim()));
-  } else {
-    // Single type
-    types.push(normalizedStr);
-  }
-
-  // Calculate quantities - split evenly if we have an estimate
-  const count = estimatedCount || 0;
-  const perType = types.length > 0 ? Math.floor(count / types.length) : 0;
-
-  return types.map((type, index) => ({
-    type: type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
-    // Last type gets any remainder
-    quantity: index === types.length - 1 ? count - (perType * (types.length - 1)) : perType,
-  }));
-};
+// Staffing and sandwich types for rows created from the planning sheet are
+// parsed by server/services/planning-sheet-row-update.ts (staffingForNewEvent,
+// sandwichTypesForNewEvent), the same code the update-from-sheet flow uses.
 
 // Parse contact name into first/last name
 const parseContactName = (name: string | undefined): { firstName: string | null; lastName: string | null } => {
@@ -436,14 +352,11 @@ const batchMatchStaffNames = async (
     ? matchNameToUser(tspContactName, allUsers)
     : null;
 
-  // Match all staff names against cached user list
-  const matchNames = (names: string[]): string[] => {
-    return names.map(name => {
-      const userId = matchNameToUser(name, allUsers);
-      // If no match, store the name as-is (the field accepts text)
-      return userId || name;
-    });
-  };
+  // Match staff names against the cached user list. Only link a user when
+  // exactly one matches (so "Ann" with two Anns stays as typed text instead of
+  // picking one at random); same rule as the update-from-sheet flow.
+  const matchNames = (names: string[]): string[] =>
+    Array.from(new Set(names.map((name) => resolveSheetName(name, allUsers))));
 
   return {
     tspContactUserId,
@@ -460,21 +373,13 @@ const combineNotesFields = (
   addlNotes?: string,
   waitingOn?: string
 ): string | null => {
-  const parts: string[] = [];
-
-  if (allDetails && allDetails.trim()) {
-    parts.push(allDetails.trim());
-  }
-  if (notes && notes.trim()) {
-    parts.push(`Notes: ${notes.trim()}`);
-  }
-  if (addlNotes && addlNotes.trim()) {
-    parts.push(`Additional Notes: ${addlNotes.trim()}`);
-  }
-  if (waitingOn && waitingOn.trim()) {
-    parts.push(`Waiting On: ${waitingOn.trim()}`);
-  }
-
+  // Shared with the update-from-sheet flow so both format notes the same way.
+  const parts = sheetNoteParts({
+    'ALL DETAILS': allDetails,
+    Notes: notes,
+    "Add'l Notes": addlNotes,
+    'Waiting On': waitingOn,
+  });
   return parts.length > 0 ? parts.join('\n\n') : null;
 };
 
@@ -616,7 +521,7 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     });
 
     // Parse staffing column
-    const staffing = parseStaffingColumn(data['Staffing']);
+    const staffing = staffingForNewEvent(staffingCellOf(data));
 
     // Parse sandwich count
     const sandwichCountRaw = data['Estimate # sandwiches'];
@@ -624,14 +529,13 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     const estimatedSandwichCount = parsedSandwichCount.count;
 
     // Parse sandwich types
-    const sandwichTypes = parseSandwichTypes(data['Deli or PBJ?'], estimatedSandwichCount || undefined);
+    const sandwichTypes = sandwichTypesForNewEvent(data['Deli or PBJ?'], estimatedSandwichCount);
 
     // Parse contact name
     const contactNameParts = parseContactName(data['Contact Name']);
 
     // Batch match all staff names to user IDs (single DB query instead of N+1)
     const {
-      tspContactUserId,
       assignedDriverIds,
       assignedSpeakerIds,
       assignedVolunteerIds,
@@ -702,7 +606,8 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       estimatedSandwichCount,
       estimatedSandwichCountMin: parsedSandwichCount.min,
       estimatedSandwichCountMax: parsedSandwichCount.max,
-      sandwichTypes: sandwichTypes ? JSON.stringify(sandwichTypes) : null,
+      // A real array, not a JSON string: the column is jsonb and readers expect an array.
+      sandwichTypes,
 
       // Staffing needs
       driversNeeded: staffing.driversNeeded,
@@ -729,7 +634,8 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
         : null,
 
       // TSP Contact
-      tspContact: tspContactUserId || data['TSP Contact'] || null,
+      // Storage resolves only unique full names/emails/IDs; preserve ambiguous source text.
+      tspContact: data['TSP Contact'] || null,
 
       // Toolkit
       toolkitSent,
@@ -792,6 +698,283 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       error: 'Failed to import event',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+});
+
+// ============================================================================
+// Planning sheet → app UPDATE for rows that were already sent/pushed.
+//
+// "Send row to app" on a row that already exists used to just 409. These two
+// routes let the Apps Script show the person what would change and then apply
+// exactly that. Manual on purpose: no timer, a human confirms every update.
+// Field rules (what can change, fill-only vs update) live in
+// server/services/planning-sheet-row-update.ts.
+// ============================================================================
+
+const sheetRowUpdateExtrasSchema = z.object({
+  eventId: z.coerce.number().int().positive().optional(),
+  token: z.string().optional(),
+  // Which changes (RowChange.field) the person ticked. Omitted = all of them.
+  fields: z.array(z.string()).optional(),
+});
+
+/**
+ * Active users (new sheet names may match only these), plus any INACTIVE user
+ * already assigned to these events, so an existing assignee whose name the push
+ * wrote to the sheet keeps their ID and per-person details.
+ */
+const fetchUsersForRowUpdate = async (events: EventRequest[]) => {
+  const assigned = Array.from(
+    new Set(
+      events.flatMap((e) => [...(e.assignedDriverIds ?? []), ...(e.assignedVolunteerIds ?? [])]).filter(Boolean)
+    )
+  );
+  return db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      displayName: users.displayName,
+      isActive: users.isActive,
+    })
+    .from(users)
+    .where(assigned.length ? or(eq(users.isActive, true), inArray(users.id, assigned)) : eq(users.isActive, true));
+};
+
+
+/**
+ * Find app events this sheet row could be. The date can change on the sheet,
+ * so match by group name and rank by how close the date is, rather than
+ * requiring the exact date the old duplicate check used.
+ */
+const findSheetRowCandidates = async (groupName: string, sheetDateIso: string | null) => {
+  const rows = await db
+    .select()
+    .from(eventRequests)
+    .where(
+      and(
+        sql`LOWER(REGEXP_REPLACE(TRIM(${eventRequests.organizationName}), '\\s+', ' ', 'g')) = ${normalizeGroupName(groupName)}`,
+        isNull(eventRequests.deletedAt),
+        sql`${eventRequests.status} NOT IN ('declined', 'non_event')`
+      )
+    );
+  const target = sheetDateIso ? parseDateOnly(sheetDateIso)?.getTime() ?? null : null;
+  const distance = (e: EventRequest) => {
+    const d = getEffectiveEventDate(e);
+    if (!d || target === null) return Number.MAX_SAFE_INTEGER;
+    return Math.abs(new Date(d as any).getTime() - target);
+  };
+  // Same calendar day as the sheet first, then nearest. Raw timestamp distance
+  // alone can tie (e.g. two midnight-stored events either side of the date).
+  const sameDay = (e: EventRequest) =>
+    !!sheetDateIso && toDateOnlyString(getEffectiveEventDate(e) as any) === sheetDateIso;
+  return rows
+    // Drop events more than ~6 months from the sheet date: that's a repeat
+    // event from the same group, not this row.
+    .filter((e) => distance(e) <= 183 * 24 * 60 * 60 * 1000 || distance(e) === Number.MAX_SAFE_INTEGER)
+    .sort((a, b) => Number(sameDay(b)) - Number(sameDay(a)) || distance(a) - distance(b))
+    .slice(0, 5);
+};
+
+/**
+ * POST /api/event-requests/import-from-sheets/preview-update
+ * Body: the same row payload as /import-from-sheets, optionally with eventId.
+ * READ-ONLY. Returns candidate events and, for each, what would change.
+ */
+router.post('/import-from-sheets/preview-update', validateSheetsApiKey, async (req, res) => {
+  try {
+    const parsed = importFromSheetsSchema.safeParse(req.body);
+    const extras = sheetRowUpdateExtrasSchema.safeParse(req.body);
+    if (!parsed.success || !extras.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: parsed.success ? extras.error?.errors : parsed.error.errors,
+      });
+    }
+    const row = parsed.data as unknown as SheetRowData;
+    const sheetDateIso = normalizeSheetDate(row.date);
+
+    let candidates: EventRequest[];
+    if (extras.data.eventId) {
+      const [event] = await db
+        .select()
+        .from(eventRequests)
+        .where(and(eq(eventRequests.id, extras.data.eventId), isNull(eventRequests.deletedAt)));
+      candidates = event ? [event] : [];
+    } else {
+      candidates = await findSheetRowCandidates(row['Group Name'], sheetDateIso);
+    }
+
+    if (candidates.length === 0) {
+      return res.json({
+        success: true,
+        match: 'none',
+        message: `No event for "${row['Group Name']}" found in the app. Use "send row to app" to create it.`,
+        candidates: [],
+      });
+    }
+
+    const allUsers = await fetchUsersForRowUpdate(candidates);
+    const results = candidates.map((event) => {
+      const plan = buildRowUpdatePlan(event as unknown as RowUpdateEvent, row, allUsers);
+      const appDate = toDateOnlyString(getEffectiveEventDate(event) as any);
+      const notes = [...plan.notes];
+      if (normalizeGroupName(event.organizationName) !== normalizeGroupName(row['Group Name'])) {
+        notes.unshift(`Group name differs (app: "${event.organizationName}"). The name was not changed.`);
+      }
+      return {
+        eventId: event.id,
+        organizationName: event.organizationName,
+        status: event.status,
+        appDate,
+        dateMatches: !!sheetDateIso && appDate === sheetDateIso,
+        changes: plan.changes,
+        notes,
+        token: planToken(event as unknown as RowUpdateEvent, plan),
+        link: `/event-requests/${event.id}`,
+      };
+    });
+
+    const exact = results.filter((r) => r.dateMatches);
+    const match =
+      extras.data.eventId ? 'selected'
+      : exact.length === 1 ? 'exact'
+      : results.length === 1 ? 'date_differs'
+      : 'ambiguous';
+
+    return res.json({ success: true, match, candidates: results });
+  } catch (error) {
+    logger.error('Planning sheet row update preview failed:', error);
+    return res.status(500).json({ success: false, error: 'Failed to preview update' });
+  }
+});
+
+/**
+ * POST /api/event-requests/import-from-sheets/apply-update
+ * Body: the same row payload + eventId + token from the preview, and
+ * optionally `fields`: the changes the person ticked (default: all).
+ * Re-computes the plan and refuses if it no longer matches what was previewed.
+ */
+router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req, res) => {
+  try {
+    const parsed = importFromSheetsSchema.safeParse(req.body);
+    const extras = sheetRowUpdateExtrasSchema.safeParse(req.body);
+    if (!parsed.success || !extras.success || !extras.data.eventId || !extras.data.token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Send the row data plus eventId and token from the preview.',
+      });
+    }
+    const row = parsed.data as unknown as SheetRowData;
+    const eventId = extras.data.eventId;
+
+    const [event] = await db
+      .select()
+      .from(eventRequests)
+      .where(and(eq(eventRequests.id, eventId), isNull(eventRequests.deletedAt)));
+    if (!event) {
+      return res.status(404).json({ success: false, error: 'That event no longer exists in the app.' });
+    }
+
+    const allUsers = await fetchUsersForRowUpdate([event]);
+    const plan = buildRowUpdatePlan(event as unknown as RowUpdateEvent, row, allUsers);
+    if (planToken(event as unknown as RowUpdateEvent, plan) !== extras.data.token) {
+      return res.status(409).json({
+        success: false,
+        error: 'The event or the sheet row changed since you previewed it. Run it again to see the current changes.',
+      });
+    }
+    let selected: ReturnType<typeof selectUpdates>;
+    try {
+      selected = selectUpdates(
+        plan,
+        extras.data.fields ?? plan.changes.map((c) => c.field),
+        event as unknown as RowUpdateEvent
+      );
+    } catch (selectError) {
+      return res.status(400).json({ success: false, error: (selectError as Error).message });
+    }
+    if (selected.changes.length === 0) {
+      return res.json({
+        success: true,
+        updated: false,
+        message: plan.changes.length === 0 ? 'Already up to date.' : 'Nothing was selected, so nothing changed.',
+      });
+    }
+
+    let patch: Partial<EventRequest> = { ...(selected.updates as Partial<EventRequest>) };
+    // Keep pickupDateTime in step with pickupTime (cards prefer pickupDateTime),
+    // the same way the normal PATCH does, using the event's date after this update.
+    if (patch.pickupTime) {
+      patch = processPickupTimeFields(patch, { ...event, ...patch });
+    } else if (patch.scheduledEventDate && event.pickupDateTime) {
+      const shifted = shiftPickupDateTime(
+        String(event.pickupDateTime),
+        toDateOnlyString(getEffectiveEventDate(event) as any),
+        toDateOnlyString(patch.scheduledEventDate as any)
+      );
+      if (shifted) patch.pickupDateTime = shifted;
+    }
+    if (patch.status === 'cancelled') {
+      const now = new Date();
+      patch.statusChangedAt = now;
+      patch.cancelledAt = now;
+    }
+
+    let updated: EventRequest | undefined;
+    try {
+      updated = await storage.updateEventRequest(eventId, {
+        ...patch,
+        lastSyncedAt: new Date(),
+        // Atomic: only writes if nobody saved the event since we read it above.
+        ifUnchangedSince: event.updatedAt ?? null,
+      } as Partial<EventRequest>);
+    } catch (writeError) {
+      if ((writeError as Error)?.name === 'EventRequestChangedError') {
+        return res.status(409).json({
+          success: false,
+          error: 'The event was just changed in the app. Run it again to see the current changes.',
+        });
+      }
+      throw writeError;
+    }
+
+    try {
+      await AuditLogger.logEventRequestChange(
+        String(eventId),
+        event,
+        updated ?? { ...event, ...patch },
+        { userId: 'planning-sheet' },
+        {
+          actionType: 'PLANNING_SHEET_UPDATE',
+          section: 'planning-sheet',
+          notes: selected.changes.map((c) => `${c.label}: "${c.from}" → "${c.to}"`).join('; '),
+        }
+      );
+    } catch (auditError) {
+      logger.error('Failed to audit planning sheet row update', auditError);
+    }
+
+    if (patch.eventAddress) {
+      geocodeEventInBackground(eventId, patch.eventAddress as string);
+    }
+    if (updated) emitEventRequestUpdate('event_request_updated', updated);
+
+    logger.info(`✅ Planning sheet row update applied to event ${eventId}`, {
+      fields: selected.changes.map((c) => c.field),
+      skipped: plan.changes.filter((c) => !selected.changes.includes(c)).map((c) => c.field),
+    });
+    return res.json({
+      success: true,
+      updated: true,
+      eventId,
+      changes: selected.changes,
+      link: `/event-requests/${eventId}`,
+    });
+  } catch (error) {
+    logger.error('Planning sheet row update apply failed:', error);
+    return res.status(500).json({ success: false, error: 'Failed to apply update' });
   }
 });
 
@@ -4980,7 +5163,7 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     // Import SendGrid service and email footer
     const { sendEmail } = await import('../sendgrid');
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
-    const path = await import('path');
+    const { FROM_EMAIL } = await import('../config/organization');
 
     // Use the HTML content as-is (already styled from EventEmailComposer)
     // Only add footer to the existing content
@@ -4988,18 +5171,21 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     const emailBodyHtml = content + EMAIL_FOOTER_HTML;
 
     // Determine from and reply-to addresses
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'katielong2316@gmail.com';
+    // Must be a verified SendGrid sender; the old gmail fallback was rejected.
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL || FROM_EMAIL;
     const replyToEmail = req.user?.preferredEmail || req.user?.email || fromEmail;
 
-    // Convert attachment paths to absolute file system paths
-    const attachmentPaths = attachments.map((filePath: string) => {
-      // If path starts with /, it's already an absolute path from /uploads
-      // Convert to filesystem path
-      if (filePath.startsWith('/uploads/')) {
-        return path.join(process.cwd(), filePath);
-      }
-      return filePath;
-    });
+    // Resolve attachments (incl. /objects/ storage paths) up front; refuse to
+    // send if any selected file can't be loaded instead of dropping it.
+    const { resolveEmailAttachments, describeFailedAttachments } = await import('../utils/email-attachments');
+    const { resolved: resolvedAttachments, failed: failedAttachments } =
+      await resolveEmailAttachments(attachments, { user: req.user });
+    if (failedAttachments.length > 0) {
+      return res.status(422).json({
+        error: describeFailedAttachments(failedAttachments),
+        failedAttachments,
+      });
+    }
 
     // Send email via SendGrid with actual file attachments
     const emailSent = await sendEmail({
@@ -5009,7 +5195,7 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
       subject,
       text: emailBodyText,
       html: emailBodyHtml, // Use the styled HTML as-is, no wrapping
-      attachments: attachmentPaths, // Pass actual file paths for attachment
+      attachments: resolvedAttachments,
     });
 
     if (!emailSent) {

@@ -38,7 +38,7 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@google-cloud/local-auth": "^3.0.1",
-    "@google-cloud/storage": "^7.19.0",
+    "@google-cloud/storage": "^7.22.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
@@ -229,5 +229,21 @@
       "**/*.test.tsx",
       "tests/**"
     ]
-  }
+  },
+  "description": "A comprehensive web-based management system for **The Sandwich Project** nonprofit organization, handling sandwich collections, volunteer coordination, event management, and operational analytics.",
+  "main": "eslint.config.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/The-Sandwich-Project/Sandwich-Project-Platform-Final.git"
+  },
+  "keywords": [],
+  "author": "",
+  "bugs": {
+    "url": "https://github.com/The-Sandwich-Project/Sandwich-Project-Platform-Final/issues"
+  },
+  "homepage": "https://github.com/The-Sandwich-Project/Sandwich-Project-Platform-Final#readme"
 }

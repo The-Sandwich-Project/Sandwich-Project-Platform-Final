@@ -1,5 +1,6 @@
 import { storage } from '../../storage-wrapper';
-import { getDefaultPermissionsForRole } from '@shared/auth-utils';
+import { getDefaultPermissionsForRole, PERMISSIONS } from '@shared/auth-utils';
+import { hasPermission } from '@shared/unified-auth-utils';
 import { AuditLogger } from '../../audit-logger';
 import { logger } from '../../utils/production-safe-logger';
 import { authService } from '../auth.service';
@@ -96,6 +97,8 @@ export class UserService implements IUserService {
             user.firstName && user.lastName
               ? `${user.firstName} ${user.lastName}`
               : user.displayName || user.email,
+          // Whether this person can see Team Chat (and so receive chat popups/DMs)
+          canChat: hasPermission(user as any, PERMISSIONS.NAV_TEAM_CHAT),
         }));
       return assignableUsers;
     } catch (error) {

@@ -914,7 +914,7 @@ export function FloatingAIChat({
       <Button
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-20 right-4 h-11 w-11 rounded-full shadow-lg bg-gradient-to-r from-[#47B3CB] to-[#236383] hover:from-[#236383] hover:to-[#47B3CB] z-50",
+          "fixed bottom-[calc(5rem+var(--chat-dock-height,0px))] right-4 h-11 w-11 rounded-full shadow-lg bg-gradient-to-r from-[#47B3CB] to-[#236383] hover:from-[#236383] hover:to-[#47B3CB] z-50",
           "transition-all duration-300 ease-in-out",
           "hover:h-14 hover:w-14 hover:shadow-xl",
           isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
@@ -931,7 +931,7 @@ export function FloatingAIChat({
   // Minimized state
   if (isMinimized) {
     return (
-      <div className="fixed bottom-20 right-4 z-50">
+      <div className="fixed bottom-[calc(5rem+var(--chat-dock-height,0px))] right-4 z-50">
         <Card className="w-72 shadow-xl border-[#47B3CB]/30">
           <CardHeader className="py-2 px-3 flex flex-row items-center justify-between bg-gradient-to-r from-[#47B3CB] to-[#236383] text-white rounded-t-lg">
             <div className="flex items-center gap-2">
@@ -954,7 +954,7 @@ export function FloatingAIChat({
 
   // Full chat panel
   return (
-    <div className="fixed bottom-20 right-4 z-50">
+    <div className="fixed bottom-[calc(5rem+var(--chat-dock-height,0px))] right-4 z-50">
       <Card className="w-96 h-[500px] shadow-xl border-[#47B3CB]/30 flex flex-col">
         <CardHeader className="py-3 px-4 flex flex-row items-center justify-between bg-gradient-to-r from-[#47B3CB] to-[#236383] text-white rounded-t-lg flex-shrink-0">
           <div className="flex items-center gap-2">

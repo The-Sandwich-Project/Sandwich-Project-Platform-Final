@@ -65,10 +65,8 @@ import {
 // Import Stream Chat styles
 import 'stream-chat-react/dist/css/v2/index.css';
 import { logger } from '@/lib/logger';
-
-// Module-level flag to prevent multiple initializations across re-renders
-let streamChatInitialized = false;
-let streamChatInitPromise: Promise<void> | null = null;
+import { getStreamClient } from '@/lib/stream-client';
+import { MessageEventContext, getMessageEventContext } from '@/components/chat/event-context';
 
 // Custom Message component with read receipts and permission-based actions
 const CustomMessage = () => {
@@ -122,6 +120,14 @@ const CustomMessage = () => {
 
   return (
     <>
+      {/* Event this message is about (sent from an event card, or a reply tied to one) */}
+      {getMessageEventContext(message) && (
+        <div className={`flex px-4 pt-1 ${isOwnMessage ? 'justify-end' : 'justify-start pl-14'}`}>
+          <div className="max-w-xs">
+            <MessageEventContext message={message} />
+          </div>
+        </div>
+      )}
       <Message
         message={message}
         messageActions={getMessageActions()}
@@ -464,7 +470,6 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
       setActiveSection(defaultTab);
     }
   }, [defaultTab]);
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Members dialog (for group chats / channels where preview truncates member list)
   const [showMembersDialog, setShowMembersDialog] = useState(false);
@@ -765,76 +770,34 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
     );
   };
 
-  // Initialize Stream Chat client
+  // Connect to Stream Chat via the app-wide shared connection.
+  // This page never hangs up the connection when it unmounts: the unread
+  // badges (and chat popups) elsewhere in the app use the same one, and
+  // coming back to Team Chat must reconnect this page's state every time.
   useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    let unsubscribeFirstMessage: (() => void) | null = null;
+
     const initializeClient = async () => {
-      // Skip if no user or already initialized
-      if (!user || streamChatInitialized) return;
-
-      // If initialization is in progress, wait for it
-      if (streamChatInitPromise) {
-        await streamChatInitPromise;
-        return;
-      }
-
-      // Create the initialization promise
-      streamChatInitPromise = (async () => {
-        try {
-          // Get Stream credentials and user token from backend
-          const response = await fetch('/api/stream/credentials', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.message || 'Failed to get Stream credentials'
-          );
+      try {
+        const conn = await getStreamClient(user);
+        if (cancelled) return;
+        if (!conn) {
+          throw new Error('Failed to connect to Stream Chat');
         }
+        const { client: chatClient, streamUserId } = conn;
 
-        const { apiKey, userToken, streamUserId } = await response.json();
-
-        const chatClient = StreamChat.getInstance(apiKey);
-
-        // Only connect if not already connected (prevents duplicate connectUser warnings)
-        if (!chatClient.userID) {
-          await chatClient.connectUser(
-            {
-              id: streamUserId,
-              name: (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email) || user.email || 'User',
-            } as any,
-            userToken
-          );
-        }
-
-        streamChatInitialized = true;
-
-        // Listen for new messages from this user to track challenge completion
-        chatClient.on('message.new', (event) => {
-          // Only track if it's the current user sending the message
+        // Track challenge completion when this user sends their first message
+        const subscription = chatClient.on('message.new', (event) => {
           if (event.user?.id === streamUserId) {
             track('chat_first_message');
           }
         });
+        unsubscribeFirstMessage = () => subscription.unsubscribe();
 
         setClient(chatClient);
         setStreamUserId(streamUserId);
-
-        // Send heartbeat to mark user as online (for notification suppression)
-        const sendHeartbeat = () => {
-          fetch('/api/stream/heartbeat', {
-            method: 'POST',
-            credentials: 'include',
-          }).catch(() => {}); // Ignore errors
-        };
-
-        // Send initial heartbeat
-        sendHeartbeat();
-
-        // Send heartbeat every 2 minutes while chat is open
-        heartbeatIntervalRef.current = setInterval(sendHeartbeat, 2 * 60 * 1000);
 
         // Load DMs and group chats
         const { dmChannels, groupChannels } = await loadUserChannels(chatClient, streamUserId);
@@ -932,28 +895,21 @@ export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | 
           track('chat_read_messages');
         }
       } catch (error) {
+        if (cancelled) return;
         logger.error('Failed to initialize Stream Chat:', error);
-        streamChatInitPromise = null; // Reset so it can be retried
         toast({
           title: 'Chat Initialization Failed',
           description: 'Unable to connect to chat service. Please try refreshing.',
           variant: 'destructive',
         });
       }
-      })();
-
-      await streamChatInitPromise;
     };
 
     initializeClient();
 
     return () => {
-      if (client) {
-        client.disconnectUser();
-      }
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
-      }
+      cancelled = true;
+      unsubscribeFirstMessage?.();
     };
   }, [user]);
 

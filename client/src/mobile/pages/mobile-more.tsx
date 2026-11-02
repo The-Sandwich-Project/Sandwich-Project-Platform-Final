@@ -15,7 +15,7 @@ import {
   Wrench,
   Inbox,
   StickyNote,
-  MessageCircle,
+  Truck,
 } from 'lucide-react';
 import { MobileShell } from '../components/mobile-shell';
 import { cn } from '@/lib/utils';
@@ -55,10 +55,16 @@ export function MobileMore() {
 
   const menuSections: MenuSection[] = [
     {
+      title: 'Events',
+      items: [
+        // Moved here from the bottom nav to make room for Chat
+        { id: 'drivers', label: 'Driver Planning', icon: Truck, href: '/driver-planning' },
+      ],
+    },
+    {
       title: 'Communication',
       items: [
         { id: 'holding-zone', label: 'Holding Zone', icon: StickyNote, href: '/holding-zone' },
-        { id: 'chat', label: 'Team Chat', icon: MessageCircle, href: '/chat' },
         { id: 'inbox', label: 'Inbox', icon: Inbox, href: '/inbox' },
       ],
     },

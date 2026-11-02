@@ -375,7 +375,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
       <Button
         onClick={toggleMenu}
         className={cn(
-          "fixed bottom-4 right-4 w-11 h-11 rounded-full shadow-2xl z-50",
+          "fixed bottom-[calc(1rem+var(--chat-dock-height,0px))] right-4 w-11 h-11 rounded-full shadow-2xl z-50",
           "bg-gradient-to-br from-[#236383] to-[#007e8c] hover:from-[#1a4d66] hover:to-[#006270]",
           "text-white transition-all duration-300 hover:scale-110 hover:h-14 hover:w-14 active:scale-95",
           "border-2 border-white/20 hover:shadow-xl",
@@ -394,7 +394,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
           onClick={toggleMenu}
         >
           <Card
-            className="fixed bottom-20 right-4 w-[calc(100vw-3rem)] sm:w-96 md:w-[440px] max-w-[calc(100vw-3rem)] shadow-2xl z-50"
+            className="fixed bottom-[calc(5rem+var(--chat-dock-height,0px))] right-4 w-[calc(100vw-3rem)] sm:w-96 md:w-[440px] max-w-[calc(100vw-3rem)] shadow-2xl z-50"
             onClick={(e) => e.stopPropagation()}
           >
             <CardHeader className="pb-4 bg-gradient-to-r from-[#236383] to-[#007e8c] text-white rounded-t-lg">

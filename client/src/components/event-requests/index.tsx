@@ -1694,7 +1694,7 @@ const EventRequestsManagementContent: React.FC = () => {
 
         {/* Back to Top Floating Button - Desktop only to avoid mobile crowding */}
         {showBackToTop && (
-          <div className="hidden sm:block fixed bottom-6 left-6 z-50">
+          <div className="hidden sm:block fixed bottom-[calc(1.5rem+var(--chat-dock-height,0px))] left-6 z-50">
             <button
               onClick={scrollToTop}
               className="h-10 w-10 rounded-full shadow-lg bg-slate-600 hover:bg-slate-700 active:bg-slate-800 transition-all duration-200 flex items-center justify-center text-white hover:scale-105 active:scale-95"
@@ -1708,7 +1708,7 @@ const EventRequestsManagementContent: React.FC = () => {
 
         {/* Floating Action Button for Spreadsheet View - Desktop only, hidden on mobile to avoid crowding */}
         {activeTab !== 'scheduled' && (
-          <div className="hidden sm:block fixed bottom-6 right-6 z-50">
+          <div className="hidden sm:block fixed bottom-[calc(1.5rem+var(--chat-dock-height,0px))] right-6 z-50">
             <button
               onClick={handleSwitchToSpreadsheet}
               className="h-14 w-14 rounded-full shadow-xl bg-green-600 hover:bg-green-700 active:bg-green-800 transition-all duration-200 flex items-center justify-center text-white hover:scale-105 active:scale-95"

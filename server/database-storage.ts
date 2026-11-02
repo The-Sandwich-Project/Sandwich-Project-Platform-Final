@@ -1,3 +1,5 @@
+import { normalizeEventContacts } from './services/event-contact-directory';
+import { hasEventContactPatch } from '@shared/event-contact-resolution';
 import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import {
   users,
@@ -191,6 +193,48 @@ const UNASSIGNED_PROJECT_STATUSES: Array<Project['status']> = [
   // Support legacy data that may still use the deprecated 'available' status
   'available' as Project['status'],
 ];
+
+/** The event changed (or was deleted) since the caller read it. */
+export class EventRequestChangedError extends Error {
+  constructor(id: number) {
+    super(`Event request ${id} changed since it was read`);
+    this.name = 'EventRequestChangedError';
+  }
+}
+
+/**
+ * Keep the Collective Learning auto-log in step with hand edits to its auto
+ * entries (see prepareAutoEntryEdit / syncOverrideFromAutoEntryChange).
+ * Imported lazily to avoid a storage <-> service import cycle; failures never
+ * block the edit itself.
+ */
+async function autoLog() {
+  return import('./services/collections/collective-learning-auto-log');
+}
+
+async function prepareAutoLogEdit<T extends Record<string, unknown>>(
+  id: number,
+  updates: T
+): Promise<{ updates: T; afterSave?: () => Promise<void> }> {
+  try {
+    return await (await autoLog()).prepareAutoEntryEdit(id, updates);
+  } catch (error) {
+    logger.error('Failed to prepare auto-log entry edit', error);
+    return { updates };
+  }
+}
+
+async function syncAutoLogOverride(
+  id: number,
+  change: 'delete' | 'restore',
+  userId?: string
+): Promise<void> {
+  try {
+    await (await autoLog()).syncOverrideFromAutoEntryChange(id, change, userId);
+  } catch (error) {
+    logger.error('Failed to sync auto-log override after collection change', error);
+  }
+}
 
 export class DatabaseStorage implements IStorage {
   // Users (required for authentication)
@@ -1476,11 +1520,17 @@ export class DatabaseStorage implements IStorage {
     id: number,
     updates: Partial<SandwichCollection>
   ): Promise<SandwichCollection | undefined> {
+    const { updates: finalUpdates, afterSave } = await prepareAutoLogEdit(id, updates);
     const [collection] = await db
       .update(sandwichCollections)
-      .set(updates)
+      .set(finalUpdates)
       .where(eq(sandwichCollections.id, id))
       .returning();
+    if (collection && afterSave) {
+      await afterSave().catch((error) =>
+        logger.error('Failed to save auto-log override after collection edit', error)
+      );
+    }
     return collection || undefined;
   }
 
@@ -1493,7 +1543,9 @@ export class DatabaseStorage implements IStorage {
         deletedBy: userId || null,
       })
       .where(eq(sandwichCollections.id, id));
-    return (result.rowCount ?? 0) > 0;
+    const deleted = (result.rowCount ?? 0) > 0;
+    if (deleted) await syncAutoLogOverride(id, 'delete', userId);
+    return deleted;
   }
 
   async restoreSandwichCollection(id: number): Promise<boolean> {
@@ -1505,7 +1557,9 @@ export class DatabaseStorage implements IStorage {
         deletedBy: null,
       })
       .where(eq(sandwichCollections.id, id));
-    return (result.rowCount ?? 0) > 0;
+    const restored = (result.rowCount ?? 0) > 0;
+    if (restored) await syncAutoLogOverride(id, 'restore');
+    return restored;
   }
 
   // Meeting Minutes
@@ -4246,7 +4300,7 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .insert(eventRequests)
       .values({
-        ...normalizeToolkitPatch(insertEventRequest),
+        ...normalizeToolkitPatch(await normalizeEventContacts(insertEventRequest)),
         updatedAt: new Date(),
       })
       .returning();
@@ -4255,119 +4309,156 @@ export class DatabaseStorage implements IStorage {
 
   async updateEventRequest(
     id: number,
-    updates: Partial<EventRequest> & { expectedVersion?: Date }
+    updates: Partial<EventRequest> & {
+      expectedVersion?: Date;
+      /**
+       * Atomic optimistic lock: the UPDATE only applies if the row's updatedAt
+       * still equals this (to the millisecond) and it isn't deleted. Checked in
+       * the UPDATE's WHERE clause, not a separate read. On a mismatch this
+       * throws EventRequestChangedError instead of retrying or merging.
+       */
+      ifUnchangedSince?: Date | string | null;
+    }
   ): Promise<EventRequest | undefined> {
-    const { expectedVersion, ...rawUpdateData } = updates;
-    const previousToolkit = typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus
-      ? await this.getEventRequest(id)
-      : undefined;
-    const updateData = normalizeToolkitPatch(rawUpdateData, previousToolkit);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { expectedVersion, ifUnchangedSince, ...rawUpdateData } = updates as typeof updates;
+      const previousEvent = hasEventContactPatch(rawUpdateData) || (typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus)
+        ? await this.getEventRequest(id)
+        : undefined;
+      const updateData = normalizeToolkitPatch(await normalizeEventContacts(rawUpdateData, previousEvent), previousEvent);
 
-    // DEBUG: Log incoming updates for speaker assignment debugging
-    logger.info(`[DB updateEventRequest] Event ${id} - Received update keys: ${Object.keys(updateData).join(', ')}`);
-    if (updateData.speakerDetails !== undefined) {
-      logger.info(`[DB updateEventRequest] Event ${id} - speakerDetails value: ${JSON.stringify(updateData.speakerDetails)}`);
-    }
+      // Derived notes are based on the earlier snapshot. Guard only omitted note
+      // fields that normalization writes, so a concurrent note edit causes a fresh
+      // normalization attempt instead of silently losing the other writer's text.
+      const noteGuards = (['planningNotes', 'customTspContact'] as const)
+        .filter(field => previousEvent && rawUpdateData[field] === undefined && updateData[field] !== undefined)
+        .map(field => sql`${eventRequests[field]} IS NOT DISTINCT FROM ${previousEvent![field] ?? null}`);
 
-    if (expectedVersion) {
-      const current = await this.getEventRequest(id);
-      if (!current) {
-        throw new Error(`Event request ${id} not found`);
+      // DEBUG: Log incoming updates for speaker assignment debugging
+      logger.info(`[DB updateEventRequest] Event ${id} - Received update keys: ${Object.keys(updateData).join(', ')}`);
+      if (updateData.speakerDetails !== undefined) {
+        logger.info(`[DB updateEventRequest] Event ${id} - speakerDetails value: ${JSON.stringify(updateData.speakerDetails)}`);
       }
 
-      if (current.updatedAt && new Date(current.updatedAt).getTime() !== new Date(expectedVersion).getTime()) {
-        throw new Error('Conflict: Event request has been modified by another user. Please refresh and try again.');
+      if (expectedVersion) {
+        const current = await this.getEventRequest(id);
+        if (!current) {
+          throw new Error(`Event request ${id} not found`);
+        }
+
+        if (current.updatedAt && new Date(current.updatedAt).getTime() !== new Date(expectedVersion).getTime()) {
+          throw new Error('Conflict: Event request has been modified by another user. Please refresh and try again.');
+        }
       }
-    }
 
-    // Filter out undefined values to prevent Drizzle from writing NULL
-    // This preserves existing database values when a field is not explicitly updated
-    const filteredData = Object.fromEntries(
-      Object.entries(updateData).filter(([_, value]) => value !== undefined)
-    );
-
-    // DEBUG: Log filtered data
-    logger.info(`[DB updateEventRequest] Event ${id} - Filtered data keys: ${Object.keys(filteredData).join(', ')}`);
-    if (filteredData.speakerDetails !== undefined) {
-      logger.info(`[DB updateEventRequest] Event ${id} - Filtered speakerDetails: ${JSON.stringify(filteredData.speakerDetails)}`);
-    }
-
-    // PRIMARY PATH: UPDATE ... RETURNING. On the neon-http driver every statement
-    // is its own request to the PRIMARY, so the returned row is the authoritative
-    // post-write state: it reflects any DB-side triggers/defaults/coercions and is
-    // immune to the read-replica lag that a separate verify-SELECT can hit.
-    // (createEventRequest relies on .returning() the same way.)
-    //
-    // An empty result is NOT assumed to be success — it means the driver gave us no
-    // row back (either nothing matched, or a rare flake), so we fall through to the
-    // verify-and-heal path rather than fabricating a saved record.
-    const updatedRows = await db
-      .update(eventRequests)
-      .set({
-        ...filteredData,
-        updatedAt: new Date(),
-      })
-      .where(eq(eventRequests.id, id))
-      .returning();
-
-    if (updatedRows.length > 0) {
-      const updated = updatedRows[0] as EventRequest;
-      logger.info(`[DB updateEventRequest] Event ${id} - persisted via RETURNING (authoritative). speakerDetails: ${JSON.stringify(updated.speakerDetails)}`);
-      return updated;
-    }
-
-    // FALLBACK: RETURNING came back empty. Rare. Re-read to find out what actually
-    // happened — and never report success for a row we can't confirm.
-    logger.warn(`[DB updateEventRequest] Event ${id} - UPDATE returned no rows; falling back to a verify-read.`);
-    let result = await this.getEventRequest(id);
-
-    if (!result) {
-      // No RETURNING row AND no readable row: the record is gone (e.g. concurrently
-      // deleted) or the write never landed. Report failure honestly instead of
-      // synthesizing a "saved" object from the intended values.
-      logger.error(`[DB updateEventRequest] ⚠️ Event ${id} — no RETURNING row and not found on read; treating as a failed write.`);
-      return undefined;
-    }
-
-    // The row demonstrably exists. Verify the fields we intended to write actually
-    // landed; on a stale replica read, retry once, then — only because the row is
-    // confirmed to exist — trust the write and merge the intended values so the
-    // client doesn't see a ghost revert from replica lag. This residual merge now
-    // only runs in the rare empty-RETURNING case.
-    const findMismatches = (current: any) =>
-      Object.entries(filteredData).filter(([key, expected]) => {
-        // Drizzle stores Date objects as timestamptz; compare by .getTime() for those.
-        const actual = current?.[key];
-        if (expected instanceof Date && actual instanceof Date) {
-          return expected.getTime() !== actual.getTime();
-        }
-        // JSON columns: compare by stringification (cheap, handles arrays + objects).
-        if (typeof expected === 'object' && expected !== null) {
-          return JSON.stringify(expected) !== JSON.stringify(actual);
-        }
-        return expected !== actual;
-      });
-
-    let mismatches = findMismatches(result);
-    if (mismatches.length > 0) {
-      logger.warn(
-        `[DB updateEventRequest] Event ${id} — post-save read shows ${mismatches.length} field(s) stale, retrying after 150ms: ${mismatches.map(([k]) => k).join(', ')}`
+      // Filter out undefined values to prevent Drizzle from writing NULL
+      // This preserves existing database values when a field is not explicitly updated
+      const filteredData = Object.fromEntries(
+        Object.entries(updateData).filter(([_, value]) => value !== undefined)
       );
-      await new Promise((r) => setTimeout(r, 150));
-      result = await this.getEventRequest(id);
-      mismatches = result ? findMismatches(result) : [];
 
-      if (mismatches.length > 0 && result) {
-        logger.error(
-          `[DB updateEventRequest] ⚠️ Event ${id} — read still stale after retry. Trusting the write and merging filteredData. Stale fields: ${mismatches.map(([k]) => k).join(', ')}`
-        );
-        result = { ...result, ...(filteredData as Partial<EventRequest>) } as EventRequest;
-      } else if (result) {
-        logger.info(`[DB updateEventRequest] ✅ Event ${id} — retry succeeded, fields verified`);
+      // DEBUG: Log filtered data
+      logger.info(`[DB updateEventRequest] Event ${id} - Filtered data keys: ${Object.keys(filteredData).join(', ')}`);
+      if (filteredData.speakerDetails !== undefined) {
+        logger.info(`[DB updateEventRequest] Event ${id} - Filtered speakerDetails: ${JSON.stringify(filteredData.speakerDetails)}`);
       }
-    }
 
-    return result;
+      // PRIMARY PATH: UPDATE ... RETURNING. On the neon-http driver every statement
+      // is its own request to the PRIMARY, so the returned row is the authoritative
+      // post-write state: it reflects any DB-side triggers/defaults/coercions and is
+      // immune to the read-replica lag that a separate verify-SELECT can hit.
+      // (createEventRequest relies on .returning() the same way.)
+      //
+      // An empty result is NOT assumed to be success — it means the driver gave us no
+      // row back (either nothing matched, or a rare flake), so we fall through to the
+      // verify-and-heal path rather than fabricating a saved record.
+      const versionGuards =
+        ifUnchangedSince === undefined
+          ? []
+          : [
+              isNull(eventRequests.deletedAt),
+              ifUnchangedSince === null
+                ? isNull(eventRequests.updatedAt)
+                : sql`date_trunc('milliseconds', ${eventRequests.updatedAt}) = ${eventRequests.updatedAt.mapToDriverValue(new Date(ifUnchangedSince as any))}`,
+            ];
+
+      const updatedRows = await db
+        .update(eventRequests)
+        .set({
+          ...filteredData,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(eventRequests.id, id), ...noteGuards, ...versionGuards))
+        .returning();
+
+      if (updatedRows.length === 0 && versionGuards.length) {
+        throw new EventRequestChangedError(id);
+      }
+
+      if (updatedRows.length > 0) {
+        const updated = updatedRows[0] as EventRequest;
+        logger.info(`[DB updateEventRequest] Event ${id} - persisted via RETURNING (authoritative). speakerDetails: ${JSON.stringify(updated.speakerDetails)}`);
+        return updated;
+      }
+
+      // A conditional write that matched no row must never enter the fallback
+      // that merges intended values into a read. Re-read and normalize again.
+      if (noteGuards.length) continue;
+
+      // FALLBACK: RETURNING came back empty. Rare. Re-read to find out what actually
+      // happened — and never report success for a row we can't confirm.
+      logger.warn(`[DB updateEventRequest] Event ${id} - UPDATE returned no rows; falling back to a verify-read.`);
+      let result = await this.getEventRequest(id);
+
+      if (!result) {
+        // No RETURNING row AND no readable row: the record is gone (e.g. concurrently
+        // deleted) or the write never landed. Report failure honestly instead of
+        // synthesizing a "saved" object from the intended values.
+        logger.error(`[DB updateEventRequest] ⚠️ Event ${id} — no RETURNING row and not found on read; treating as a failed write.`);
+        return undefined;
+      }
+
+      // The row demonstrably exists. Verify the fields we intended to write actually
+      // landed; on a stale replica read, retry once, then — only because the row is
+      // confirmed to exist — trust the write and merge the intended values so the
+      // client doesn't see a ghost revert from replica lag. This residual merge now
+      // only runs in the rare empty-RETURNING case.
+      const findMismatches = (current: any) =>
+        Object.entries(filteredData).filter(([key, expected]) => {
+          // Drizzle stores Date objects as timestamptz; compare by .getTime() for those.
+          const actual = current?.[key];
+          if (expected instanceof Date && actual instanceof Date) {
+            return expected.getTime() !== actual.getTime();
+          }
+          // JSON columns: compare by stringification (cheap, handles arrays + objects).
+          if (typeof expected === 'object' && expected !== null) {
+            return JSON.stringify(expected) !== JSON.stringify(actual);
+          }
+          return expected !== actual;
+        });
+
+      let mismatches = findMismatches(result);
+      if (mismatches.length > 0) {
+        logger.warn(
+          `[DB updateEventRequest] Event ${id} — post-save read shows ${mismatches.length} field(s) stale, retrying after 150ms: ${mismatches.map(([k]) => k).join(', ')}`
+        );
+        await new Promise((r) => setTimeout(r, 150));
+        result = await this.getEventRequest(id);
+        mismatches = result ? findMismatches(result) : [];
+
+        if (mismatches.length > 0 && result) {
+          logger.error(
+            `[DB updateEventRequest] ⚠️ Event ${id} — read still stale after retry. Trusting the write and merging filteredData. Stale fields: ${mismatches.map(([k]) => k).join(', ')}`
+          );
+          result = { ...result, ...(filteredData as Partial<EventRequest>) } as EventRequest;
+        } else if (result) {
+          logger.info(`[DB updateEventRequest] ✅ Event ${id} — retry succeeded, fields verified`);
+        }
+      }
+
+      return result;
+    }
+    throw new Error('Conflict: Event notes changed while saving the contact. Please refresh and try again.');
   }
 
   async deleteEventRequest(id: number, userId?: string): Promise<boolean> {

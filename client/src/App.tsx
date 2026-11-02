@@ -14,10 +14,9 @@ import { LoadingState } from '@/components/ui/loading';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { ScrollToTop } from '@/components/ScrollToTop';
 import { BackToTopButton } from '@/components/back-to-top-button';
-import { ChatWindowsProvider } from '@/context/chat-windows-context';
-import { FloatingChatWindowsContainer } from '@/components/chat/floating-chat-windows-container';
-import { InstantMessagingProvider } from '@/contexts/instant-messaging-context';
-import { InstantMessageContainer } from '@/components/instant-message-container';
+import { ChatDockProvider } from '@/components/chat/chat-dock-context';
+import { ChatDock } from '@/components/chat/chat-dock';
+import { MobileChatBanner } from '@/components/chat/mobile-chat-banner';
 import { ReviewerProvider } from '@/contexts/reviewer-context';
 import { ReviewerBlockedModal } from '@/components/reviewer-blocked-modal';
 import { FloatingViewsProvider } from '@/contexts/floating-views-context';
@@ -42,6 +41,8 @@ const MobileHome = lazyWithRetry(() => import('@/mobile/pages/mobile-home'));
 const MobileCollections = lazyWithRetry(() => import('@/mobile/pages/mobile-collections'));
 const MobileCollectionEntry = lazyWithRetry(() => import('@/mobile/pages/mobile-collection-entry'));
 const MobileChat = lazyWithRetry(() => import('@/mobile/pages/mobile-chat'));
+const MobileChatConversation = lazyWithRetry(() => import('@/mobile/pages/mobile-chat-conversation'));
+const MobileChatNew = lazyWithRetry(() => import('@/mobile/pages/mobile-chat-new'));
 const MobileEvents = lazyWithRetry(() => import('@/mobile/pages/mobile-events'));
 const MobileMore = lazyWithRetry(() => import('@/mobile/pages/mobile-more'));
 const MobileHoldingZone = lazyWithRetry(() => import('@/mobile/pages/mobile-holding-zone'));
@@ -289,6 +290,16 @@ function Router() {
                 <MobileChat />
               </Suspense>
             </Route>
+            <Route path="/chat/new">
+              <Suspense fallback={<MobileLoader />}>
+                <MobileChatNew />
+              </Suspense>
+            </Route>
+            <Route path="/chat/dm/:channelId">
+              <Suspense fallback={<MobileLoader />}>
+                <MobileChatConversation />
+              </Suspense>
+            </Route>
             <Route path="/chat/:channel">
               <Suspense fallback={<MobileLoader />}>
                 <MobileChat />
@@ -515,20 +526,18 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <ReviewerProvider>
           <IssueReportProvider>
-          <ChatWindowsProvider>
+          <ChatDockProvider>
             <FloatingViewsProvider>
-              <InstantMessagingProvider>
                 <TooltipProvider>
                 <Toaster />
                 <Router />
-                <FloatingChatWindowsContainer />
-                <InstantMessageContainer />
+                <ChatDock />
+                <MobileChatBanner />
                 <ReviewerBlockedModal />
                 <BackToTopButton />
               </TooltipProvider>
-              </InstantMessagingProvider>
             </FloatingViewsProvider>
-          </ChatWindowsProvider>
+          </ChatDockProvider>
           </IssueReportProvider>
         </ReviewerProvider>
       </QueryClientProvider>
