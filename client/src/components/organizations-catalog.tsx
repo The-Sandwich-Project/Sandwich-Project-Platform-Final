@@ -2872,7 +2872,7 @@ export default function GroupCatalog({
       {showBackToTop && (
         <Button
           onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 rounded-full h-12 w-12 p-0 shadow-lg bg-[#236383] hover:bg-[#007E8C] text-white transition-all duration-300"
+          className="fixed bottom-[calc(1.5rem+var(--chat-dock-height,0px))] right-6 z-50 rounded-full h-12 w-12 p-0 shadow-lg bg-[#236383] hover:bg-[#007E8C] text-white transition-all duration-300"
           aria-label="Back to top"
           title="Back to top"
         >

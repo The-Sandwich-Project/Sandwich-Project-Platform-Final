@@ -3,3 +3,9 @@
 @import './styles/utilities.css';
 @import './styles/premium.css';
 @import './styles/mobile-responsive.css';
+
+/* Desktop chat bar: the page stops above the bar instead of running under it.
+   --chat-dock-height is set by the chat dock only while it is showing. */
+body {
+  padding-bottom: var(--chat-dock-height, 0px);
+}

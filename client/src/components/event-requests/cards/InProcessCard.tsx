@@ -67,7 +67,6 @@ import { EventRequestAuditLog } from '@/components/event-request-audit-log';
 import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
 import { getMissingIntakeInfo } from '@/lib/event-request-validation';
 import { getPrimaryContextualAction, getContextualTooltip } from '@/lib/contextual-actions';
-import { MessageComposer } from '@/components/message-composer';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
 import { CommentThread, CompactPresenceBadge } from '@/components/collaboration';
 import { useAuth } from '@/hooks/useAuth';
@@ -972,7 +971,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
 }) => {
   const { setViewMode } = useEventRequestContext();
   const [showAuditLog, setShowAuditLog] = useState(false);
-  const [showMessageDialog, setShowMessageDialog] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showContactAttempts, setShowContactAttempts] = useState(false);
   // Whether to expand the condensed contact-log list past the most-recent entry
@@ -2063,21 +2061,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
         <EventEmailLogDisplay eventId={request.id} compact />
       </CardContent>
 
-      {/* Message Composer Dialog */}
-      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
-        <DialogContent className="w-[95vw] max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Message About Event: {request.organizationName}</DialogTitle>
-          </DialogHeader>
-          <MessageComposer
-            contextType="event"
-            contextId={request.id.toString()}
-            contextTitle={`${request.organizationName} event`}
-            onSent={() => setShowMessageDialog(false)}
-            onCancel={() => setShowMessageDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 };

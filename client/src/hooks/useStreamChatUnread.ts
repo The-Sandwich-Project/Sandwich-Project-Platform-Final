@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { StreamChat } from 'stream-chat';
 import { useAuth } from './useAuth';
-import { apiRequest } from '@/lib/queryClient';
 import { logger } from '@/lib/logger';
+import {
+  getStreamClient,
+  getCurrentStreamConnection,
+  disconnectStreamClient,
+  startActivityHeartbeat,
+} from '@/lib/stream-client';
 
 interface RoomUnreadDetail {
   id: string;
@@ -18,7 +23,6 @@ interface StreamChatUnreadCounts {
   roomDetails: RoomUnreadDetail[];
 }
 
-let globalClient: StreamChat | null = null;
 let globalUnreadCounts: StreamChatUnreadCounts = {
   totalUnread: 0,
   roomsUnread: 0,
@@ -33,84 +37,42 @@ function notifyListeners() {
   listeners.forEach(listener => listener({ ...globalUnreadCounts }));
 }
 
-// Track if initialization is in progress to prevent race conditions
-let initializationPromise: Promise<StreamChat | null> | null = null;
+// The Stream user whose events we're already listening to, so the shared
+// connection only gets one set of unread listeners.
+let trackingFor: string | null = null;
 
-// Initialize Stream Chat client and track unread counts globally
+// Start tracking unread counts on the shared app-wide Stream connection.
 async function initializeStreamChat(user: any): Promise<StreamChat | null> {
-  // Return existing client if already initialized
-  if (globalClient) return globalClient;
+  // Pinging the server keeps people from being texted about chat messages
+  // while they're actively in the app (even if Stream itself is unreachable).
+  startActivityHeartbeat();
 
-  // If initialization is already in progress, wait for it
-  if (initializationPromise) return initializationPromise;
+  const conn = await getStreamClient(user);
+  if (!conn) return null;
+  const { client, streamUserId } = conn;
 
-  // Start initialization
-  initializationPromise = (async () => {
-    try {
-      const response = await fetch('/api/stream/credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      });
+  if (trackingFor === streamUserId) return client;
+  trackingFor = streamUserId;
 
-      if (!response.ok) {
-        logger.warn('Failed to get Stream credentials for unread tracking');
-        return null;
-      }
+  // Calculate initial unread counts
+  await updateUnreadCounts(client, streamUserId);
 
-      const { apiKey, userToken, streamUserId } = await response.json();
+  const refresh = () => {
+    // Ignore events once a different user has connected (StreamChat.getInstance
+    // reuses the same client object, so compare the user, not the object).
+    if (getCurrentStreamConnection()?.streamUserId !== streamUserId) return;
+    updateUnreadCounts(client, streamUserId);
+  };
 
-      const client = StreamChat.getInstance(apiKey);
+  client.on('message.new', (event) => {
+    // New message from someone else, update counts
+    if (event.user?.id !== streamUserId) refresh();
+  });
+  client.on('message.read', refresh);
+  client.on('notification.message_new', refresh);
+  client.on('notification.mark_read', refresh);
 
-      // Only connect if not already connected (prevents duplicate connectUser calls)
-      if (!client.userID) {
-        await client.connectUser(
-          {
-            id: streamUserId,
-            name: user.firstName && user.lastName
-              ? `${user.firstName} ${user.lastName}`
-              : user.email,
-          } as any,
-          userToken
-        );
-      }
-
-      globalClient = client;
-
-      // Calculate initial unread counts
-      await updateUnreadCounts(client, streamUserId);
-
-      // Listen for new messages to update unread counts
-      client.on('message.new', async (event) => {
-        if (event.user?.id !== streamUserId) {
-          // New message from someone else, update counts
-          await updateUnreadCounts(client, streamUserId);
-        }
-      });
-
-      // Listen for message read events
-      client.on('message.read', async () => {
-        await updateUnreadCounts(client, streamUserId);
-      });
-
-      // Listen for channel updates
-      client.on('notification.message_new', async () => {
-        await updateUnreadCounts(client, streamUserId);
-      });
-
-      client.on('notification.mark_read', async () => {
-        await updateUnreadCounts(client, streamUserId);
-      });
-
-      return client;
-    } catch (error) {
-      logger.error('Failed to initialize Stream Chat for unread tracking:', error);
-      initializationPromise = null; // Reset so it can be retried
-      return null;
-    }
-  })();
-
-  return initializationPromise;
+  return client;
 }
 
 // Update unread counts from Stream Chat
@@ -187,7 +149,18 @@ export function useStreamChatUnread() {
   const [unreadCounts, setUnreadCounts] = useState<StreamChatUnreadCounts>(globalUnreadCounts);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      // Logged out: close the shared connection and clear stale counts.
+      if (trackingFor) {
+        trackingFor = null;
+        globalUnreadCounts = {
+          totalUnread: 0, roomsUnread: 0, dmsUnread: 0, groupsUnread: 0, roomDetails: [],
+        };
+        notifyListeners();
+        disconnectStreamClient();
+      }
+      return;
+    }
 
     // Subscribe to updates
     const listener = (counts: StreamChatUnreadCounts) => {
@@ -205,9 +178,9 @@ export function useStreamChatUnread() {
 
   // Force refresh counts
   const refreshCounts = useCallback(async () => {
-    if (globalClient && user?.id) {
-      const streamUserId = `user_${user.id}`;
-      await updateUnreadCounts(globalClient, streamUserId);
+    const conn = getCurrentStreamConnection();
+    if (conn && user?.id) {
+      await updateUnreadCounts(conn.client, conn.streamUserId);
     }
   }, [user?.id]);
 
@@ -221,10 +194,11 @@ export function useStreamChatUnread() {
  * Mark a specific channel as read
  */
 export async function markStreamChannelAsRead(channelId: string, channelType: string = 'messaging') {
-  if (!globalClient) return;
+  const conn = getCurrentStreamConnection();
+  if (!conn) return;
 
   try {
-    const channel = globalClient.channel(channelType, channelId);
+    const channel = conn.client.channel(channelType, channelId);
     await channel.markRead();
   } catch (error) {
     logger.error('Failed to mark Stream channel as read:', error);

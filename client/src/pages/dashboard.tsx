@@ -1042,7 +1042,7 @@ export default function Dashboard({
 
       <DashboardNavigationProvider setActiveSection={enhancedSetActiveSection}>
         <MultiViewProvider initialSection={activeSection}>
-        <div className="bg-gray-50 h-screen flex flex-col overflow-hidden safe-area-inset">
+        <div className="bg-gray-50 h-[calc(100vh-var(--chat-dock-height,0px))] flex flex-col overflow-hidden safe-area-inset">
         {/* Reviewer Banner - shows for read-only reviewer accounts */}
         <ReviewerBanner />
         {/* Announcement Banner */}
@@ -1467,7 +1467,7 @@ export default function Dashboard({
                   // Normal layout for other content
                   return (
                     <div className="h-full overflow-y-auto overflow-x-hidden w-full max-w-full">
-                      <div className="w-full pb-20 min-h-full px-4 sm:px-6 pt-6">
+                      <div className="w-full pb-[calc(5rem+var(--chat-window-space,0px))] min-h-full px-4 sm:px-6 pt-6">
                         <DashboardBreadcrumbs activeSection={section} />
                         {renderContent(section)}
                       </div>

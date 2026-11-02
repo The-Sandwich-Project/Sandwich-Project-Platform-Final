@@ -57,7 +57,7 @@ import {
 } from '@/components/ui/select';
 import type { EventRequest } from '@shared/schema';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
-import { MessageComposer } from '@/components/message-composer';
+import { useMessageAboutEvent } from '@/components/chat/chat-dock-context';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
 import { CommentThread, CompactPresenceBadge } from '@/components/collaboration';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -1670,7 +1670,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [showAuditLog, setShowAuditLog] = useState(false);
-  const [showMessageDialog, setShowMessageDialog] = useState(false);
+  const messageAboutEvent = useMessageAboutEvent(request);
   const [showInstagramDialog, setShowInstagramDialog] = useState(false);
   const [instagramLink, setInstagramLink] = useState('');
   const [showComments, setShowComments] = useState(false);
@@ -3101,7 +3101,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
-                  onClick={() => setShowMessageDialog(true)}
+                  onClick={messageAboutEvent}
                   variant="ghost"
                   className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10"
                   aria-label="Message about this event"
@@ -3267,21 +3267,6 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Message Composer Dialog */}
-      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
-        <DialogContent className="w-[95vw] max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Message About Event: {request.organizationName}</DialogTitle>
-          </DialogHeader>
-          <MessageComposer
-            contextType="event"
-            contextId={request.id.toString()}
-            contextTitle={`${request.organizationName} event`}
-            onSent={() => setShowMessageDialog(false)}
-            onCancel={() => setShowMessageDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
 
       {/* Recipient Allocation Editor Dialog */}
       <RecipientAllocationEditor

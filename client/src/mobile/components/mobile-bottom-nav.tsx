@@ -5,7 +5,9 @@ import {
   Calendar,
   Menu,
   Truck,
+  MessageCircle,
 } from 'lucide-react';
+import { useStreamChatUnread } from '@/hooks/useStreamChatUnread';
 import { cn } from '@/lib/utils';
 import { MOBILE_NAV_ITEMS } from '../types';
 
@@ -16,6 +18,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Calendar,
   Menu,
   Truck,
+  MessageCircle,
 };
 
 /**
@@ -24,6 +27,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
  */
 export function MobileBottomNav() {
   const [location, navigate] = useLocation();
+  const { dmsUnread } = useStreamChatUnread();
 
   // wouter nest trims the base path (/m); normalize to work with either form
   const normalizedLocation = location.replace(/^\/m(\/|$)/, '/');
@@ -47,6 +51,7 @@ export function MobileBottomNav() {
       <div className="flex items-center justify-around h-16">
         {MOBILE_NAV_ITEMS.map((item) => {
           const Icon = iconMap[item.icon];
+          if (item.id === 'chat') item = { ...item, badge: dmsUnread };
           const active = isActive(item.href);
 
           return (
