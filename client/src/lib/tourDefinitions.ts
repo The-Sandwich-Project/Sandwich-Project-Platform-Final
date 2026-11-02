@@ -13,6 +13,16 @@ export interface TourStep {
   waitForElement?: boolean; // If true, wait longer for element to load (useful after filtering/navigation)
 }
 
+
+/** Switch the Resources page to its Logos & Branding tab (Radix tabs activate on mousedown, not click). */
+function openResourcesLogosTab() {
+  const tab = document.querySelector('[data-tour="resources-logos-tab"]');
+  if (tab instanceof HTMLElement) {
+    tab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    tab.focus();
+  }
+}
+
 export interface Tour {
   id: string;
   title: string;
@@ -131,59 +141,28 @@ export const TOURS: Tour[] = [
       },
       {
         id: 'logos-tab',
-        title: 'Open the Brand & Marketing category',
-        description: 'In Reference Materials, click the "Brand & Marketing" category to filter down to TSP logos and brand assets.',
-        targetSelector: '[data-tour="category-brand_marketing"]',
+        title: 'Open the Logos & Branding tab',
+        description: 'Logos have their own tab at the top of Reference Materials. I\'ll open it for you.',
+        targetSelector: '[data-tour="resources-logos-tab"]',
         position: 'bottom',
         highlightPadding: 8,
         waitForElement: true,
         beforeShow: () => {
-          // Category buttons live inside the Filters panel, which is collapsed by
-          // default on a fresh Resources page — open it first so the button mounts.
-          const clickCategory = () => {
-            const cat = document.querySelector('[data-tour="category-brand_marketing"]');
-            if (cat instanceof HTMLElement) {
-              cat.click();
-              return true;
-            }
-            return false;
-          };
-          if (!clickCategory()) {
-            const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
-            if (toggle instanceof HTMLElement) {
-              toggle.click();
-            }
-            setTimeout(clickCategory, 200);
-          }
+          setTimeout(openResourcesLogosTab, 200);
         }
       },
       {
         id: 'logos-available',
         title: 'All Logos Available Here!',
-        description: 'Here you\'ll find The Sandwich Project logos and brand assets - transparent backgrounds, print-ready versions, and more. Click any item to open or download it.',
-        targetSelector: '[data-testid="resources-list"]',
+        description: 'Here you\'ll find The Sandwich Project logos - transparent backgrounds, print-ready versions, and more. Click any logo to preview or download it.',
+        targetSelector: '[data-tour="resources-logos-panel"]',
         position: 'top',
         highlightPadding: 12,
         waitForElement: true
       }
     ],
     afterComplete: () => {
-      // Auto-filter to the Brand & Marketing category (opening Filters if needed)
-      setTimeout(() => {
-        let cat = document.querySelector('[data-tour="category-brand_marketing"]');
-        if (!(cat instanceof HTMLElement)) {
-          const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
-          if (toggle instanceof HTMLElement) {
-            toggle.click();
-          }
-        }
-        setTimeout(() => {
-          cat = document.querySelector('[data-tour="category-brand_marketing"]');
-          if (cat instanceof HTMLElement) {
-            cat.click();
-          }
-        }, 200);
-      }, 300);
+      setTimeout(openResourcesLogosTab, 300);
     }
   },
   {

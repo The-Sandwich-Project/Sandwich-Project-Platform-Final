@@ -13,9 +13,9 @@ const categoryMap: Record<string, string> = {
   'Forms': 'forms_templates',
   'Safety Guidelines': 'operations_safety',
   'Labels & Printing': 'operations_safety',
-  'Sandwich Making': 'training',
+  'Sandwich Making': 'toolkit',
   'Tools': 'forms_templates',
-  'Reference Lists': 'training',
+  'Reference Lists': 'master_documents',
 };
 
 // Initial resources data
@@ -137,7 +137,7 @@ const initialResources = [
     title: 'Deli Sandwich Making 101',
     description: 'Complete guide to preparing deli sandwiches according to TSP standards',
     type: 'link' as const,
-    category: 'training',
+    category: 'toolkit',
     url: '/documents/deli-sandwich-making-101.pdf',
     isPinnedGlobal: false,
   },
@@ -145,7 +145,7 @@ const initialResources = [
     title: 'PBJ Sandwich Making 101',
     description: 'Step-by-step instructions for making peanut butter and jelly sandwiches',
     type: 'link' as const,
-    category: 'training',
+    category: 'toolkit',
     url: '/documents/pbj-sandwich-making-101.pdf',
     isPinnedGlobal: false,
   },
@@ -154,7 +154,7 @@ const initialResources = [
     description:
       'Comprehensive final confirmed list of all congregations including churches, synagogues, and religious organizations',
     type: 'link' as const,
-    category: 'training',
+    category: 'master_documents',
     url: '/attached_assets/Master_Congregations_List_Final_1759034641771.pdf',
     isPinnedGlobal: false,
   },
@@ -163,7 +163,7 @@ const initialResources = [
     description:
       'Complete directory of corporate partners, businesses, and company organizations working with The Sandwich Project',
     type: 'link' as const,
-    category: 'training',
+    category: 'master_documents',
     url: '/attached_assets/TSP Company List _1759034641773.pdf',
     isPinnedGlobal: false,
   },
@@ -172,7 +172,7 @@ const initialResources = [
     description:
       'Comprehensive list of educational institutions including elementary, middle, high schools, and universities',
     type: 'link' as const,
-    category: 'training',
+    category: 'master_documents',
     url: '/attached_assets/Unified_Schools_List_1759034641773.pdf',
     isPinnedGlobal: false,
   },
@@ -275,7 +275,7 @@ async function seed() {
         if (resource.category === 'legal_governance') {
           tagsToAssign.push('Legal');
         }
-        if (resource.category === 'training') {
+        if (resource.category === 'toolkit') {
           tagsToAssign.push('Training');
         }
         if (resource.category === 'forms_templates') {

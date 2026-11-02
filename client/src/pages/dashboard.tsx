@@ -107,7 +107,6 @@ const DriversManagement = lazyWithRetry(() => import('@/components/drivers-manag
 const VolunteerManagement = lazyWithRetry(() => import('@/components/volunteer-management'));
 const HostsManagement = lazyWithRetry(() => import('@/components/hosts-management-consolidated'));
 const DocumentManagement = lazyWithRetry(() => import('@/components/document-management'));
-const ImportantDocuments = lazyWithRetry(() => import('@/pages/important-documents'));
 const BulkDataManager = lazyWithRetry(() => import('@/components/bulk-data-manager'));
 const HostAnalytics = lazyWithRetry(() => import('@/components/host-analytics'));
 const EnhancedMeetingDashboard = lazyWithRetry(() => import('@/components/enhanced-meeting-dashboard'));
@@ -634,8 +633,7 @@ export default function Dashboard({
         );
         setActiveSection('dashboard');
         return <DashboardOverview onSectionChange={setActiveSection} />;
-      case 'important-documents':
-        return <ImportantDocuments />;
+      case 'important-documents': // folded into Resources; keeps old links working
       case 'resources':
         return <Resources />;
       case 'auto-form-filler':
