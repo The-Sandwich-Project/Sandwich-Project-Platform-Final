@@ -318,7 +318,7 @@ export function SmartTooltipGuide({
         <Button
           variant="outline"
           size="default"
-          className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-[#FBAD3F] to-yellow-500 text-white hover:from-[#FBAD3F]/90 hover:to-yellow-500/90 border-0 shadow-xl rounded-full px-5 py-6 h-auto flex-col gap-1"
+          className="fixed bottom-[calc(1.5rem+var(--chat-dock-height,0px))] right-6 z-40 bg-gradient-to-r from-[#FBAD3F] to-yellow-500 text-white hover:from-[#FBAD3F]/90 hover:to-yellow-500/90 border-0 shadow-xl rounded-full px-5 py-6 h-auto flex-col gap-1"
           onClick={() => setIsVisible(true)}
           title="Interactive tutorials and guided walkthroughs"
         >

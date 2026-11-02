@@ -61,7 +61,6 @@ import { hasPermission } from '@shared/unified-auth-utils';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
 import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
-import { MessageComposer } from '@/components/message-composer';
 import { useToast } from '@/hooks/use-toast';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
 import { CommentThread, CompactPresenceBadge } from '@/components/collaboration';
@@ -909,7 +908,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
 }) => {
   const { setViewMode } = useEventRequestContext();
   const [showAuditLog, setShowAuditLog] = useState(false);
-  const [showMessageDialog, setShowMessageDialog] = useState(false);
   const [showConfirmToggle, setShowConfirmToggle] = useState(false);
   const [pendingConfirmValue, setPendingConfirmValue] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -1594,21 +1592,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
         />
       </CardContent>
 
-      {/* Message Composer Dialog */}
-      <Dialog open={showMessageDialog} onOpenChange={setShowMessageDialog}>
-        <DialogContent className="w-[95vw] max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Message About Event: {request.organizationName}</DialogTitle>
-          </DialogHeader>
-          <MessageComposer
-            contextType="event"
-            contextId={request.id.toString()}
-            contextTitle={`${request.organizationName} event`}
-            onSent={() => setShowMessageDialog(false)}
-            onCancel={() => setShowMessageDialog(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 };
