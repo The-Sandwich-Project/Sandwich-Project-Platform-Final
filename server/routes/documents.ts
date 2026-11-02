@@ -12,7 +12,7 @@ import { PERMISSIONS } from '@shared/auth-utils';
 import { ObjectStorageService, ObjectNotFoundError } from '../replit_integrations/object_storage';
 import { db } from '../db';
 import { resources } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 const objectStorageService = new ObjectStorageService();
 
@@ -137,7 +137,9 @@ async function ensureLibraryResource(
     const existing = await db
       .select({ id: resources.id })
       .from(resources)
-      .where(eq(resources.documentId, document.id))
+      // Only a file resource counts: a resource converted to a link can keep
+      // its old document_id but no longer opens the file.
+      .where(and(eq(resources.documentId, document.id), eq(resources.type, 'file')))
       .limit(1);
     if (existing.length > 0) return;
 
@@ -539,6 +541,36 @@ documentsRouter.patch(
       logger.info(
         `Document updated by ${user.email}: ID ${documentId} fields=${Object.keys(updates).join(',')}`
       );
+
+      // Keep linked file resources in step with title/description edits, but
+      // only where the resource still shows the document's previous value —
+      // a resource someone renamed on purpose keeps its own text.
+      try {
+        if (updates.title !== undefined && updates.title !== document.title) {
+          await db
+            .update(resources)
+            .set({ title: updates.title, updatedAt: new Date() })
+            .where(and(
+              eq(resources.documentId, documentId),
+              eq(resources.type, 'file'),
+              eq(resources.title, document.title)
+            ));
+        }
+        if (updates.description !== undefined && updates.description !== document.description) {
+          await db
+            .update(resources)
+            .set({ description: updates.description, updatedAt: new Date() })
+            .where(and(
+              eq(resources.documentId, documentId),
+              eq(resources.type, 'file'),
+              document.description === null
+                ? isNull(resources.description)
+                : eq(resources.description, document.description)
+            ));
+        }
+      } catch (syncError) {
+        logger.error(`Failed to sync resources for document ${documentId}:`, syncError);
+      }
 
       // A document uploaded as confidential never got a Resources entry; when
       // it's reclassified, add one so it doesn't vanish from both the library

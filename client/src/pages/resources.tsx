@@ -790,7 +790,7 @@ function ConfidentialUploadsList({ docs }: { docs: UploadedDocument[] }) {
   );
 }
 
-export function Resources() {
+export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
   const { user } = useAuth();
   const isAdmin =
     user?.role === 'admin' ||
@@ -806,12 +806,14 @@ export function Resources() {
     user?.email === 'katielong2316@gmail.com';
   const confidentialUploads = useConfidentialUploads();
   const showConfidentialTab = hasConfidentialAccess || confidentialUploads.length > 0;
-  const [activeTab, setActiveTab] = useState(() => {
-    const tab = new URLSearchParams(window.location.search).get('tab');
-    if (tab === 'logos') return 'logos';
-    if (tab === 'confidential') return 'confidential';
-    return 'library';
-  });
+  // The tab comes from Dashboard (which resolves split-view panel
+  // destinations too), so follow it when it changes.
+  const toResourcesTab = (tab?: string | null) =>
+    tab === 'logos' || tab === 'confidential' ? tab : 'library';
+  const [activeTab, setActiveTab] = useState(() => toResourcesTab(initialTab));
+  useEffect(() => {
+    setActiveTab(toResourcesTab(initialTab));
+  }, [initialTab]);
 
   const [resources, setResources] = useState<Resource[]>([]);
   const [favorites, setFavorites] = useState<Resource[]>([]);

@@ -63,7 +63,7 @@ SELECT d.title, d.description, 'file',
 FROM documents d
 WHERE d.is_active = true
   AND lower(d.category) <> 'confidential'
-  AND NOT EXISTS (SELECT 1 FROM resources r WHERE r.document_id = d.id);
+  AND NOT EXISTS (SELECT 1 FROM resources r WHERE r.document_id = d.id AND r.type = 'file');
 
 UPDATE resources
 SET category = 'master_documents', updated_at = NOW()

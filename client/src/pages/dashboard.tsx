@@ -635,7 +635,7 @@ export default function Dashboard({
         return <DashboardOverview onSectionChange={setActiveSection} />;
       case 'important-documents': // folded into Resources; keeps old links working
       case 'resources':
-        return <Resources />;
+        return <Resources initialTab={sectionTab} />;
       case 'auto-form-filler':
         return <AutoFormFiller />;
       case 'projects':
