@@ -204,7 +204,7 @@ describe('buildRowUpdatePlan', () => {
     );
     expect(plan.updates.assignedDriverIds).toEqual(['u-katie', 'u-kim']);
     expect(plan.updates.driversNeeded).toBe(2);
-    expect(plan.updates.driverDetails).toEqual({ 'u-katie': { pickup: 'host A' }, 'u-kim': {} });
+    expect(plan.updates.driverDetails).toEqual({ 'u-katie': { pickup: 'host A' }, 'u-kim': { name: 'Kim Lee' } });
     expect(plan.updates.assignedVolunteerIds).toEqual(['Stranger']);
     expect(plan.notes.some((n) => n.includes('"Stranger"'))).toBe(true);
   });
@@ -277,7 +277,7 @@ describe('buildRowUpdatePlan', () => {
       eventStartTime: '11:00',
       driversNeeded: 1,
       assignedDriverIds: ['u-katie'],
-      driverDetails: { 'u-katie': {} },
+      driverDetails: { 'u-katie': { name: 'Katie Long' } },
     });
     expect(() => selectUpdates(plan, ['status'], event)).toThrow('Not part of this update: status');
   });
@@ -782,5 +782,78 @@ describe('Copilot review fixes, round 6', () => {
     // A full read still updates it.
     const full = buildRowUpdatePlan(event, makeRow({ Staffing: 'VD: Luz' }), USERS);
     expect(full.updatesByField.vanDriver).toEqual({ customVanDriverName: 'Luz' });
+  });
+});
+
+describe('matching sheet names to every app directory', () => {
+  // Same shapes loadAssigneeDirectory returns.
+  const PEOPLE: MatchableUser[] = [
+    { id: 'user_1_karen', firstName: 'Karen', lastName: 'Smith', displayName: null, kind: 'user' },
+    { id: '443', firstName: 'Karen', lastName: 'Smith', displayName: 'Karen Smith', kind: 'driver', aliases: ['driver-443'] },
+    { id: 'volunteer-12', firstName: 'Karen', lastName: 'Smith', displayName: 'Karen Smith', kind: 'volunteer' },
+    { id: 'volunteer-30', firstName: 'Bev', lastName: 'Lowe', displayName: 'Bev Lowe', kind: 'volunteer' },
+    { id: '501', firstName: 'Luz', lastName: 'Garcia', displayName: 'Luz Garcia', kind: 'driver', aliases: ['driver-501'] },
+    { id: 'host-contact-7', firstName: 'Dawn', lastName: 'Martin', displayName: 'Dawn Martin', kind: 'host-contact' },
+    { id: 'volunteer-40', firstName: 'Ann', lastName: 'Lee', displayName: 'Ann Lee', kind: 'volunteer' },
+    { id: '600', firstName: 'Ann', lastName: 'Park', displayName: 'Ann Park', kind: 'driver' },
+    { id: '700', firstName: 'Old', lastName: 'Driver', displayName: 'Old Driver', kind: 'driver', isActive: false },
+  ];
+
+  it('finds people in the Drivers and Volunteers directories, not just team members', () => {
+    expect(resolveSheetName('Bev Lowe', PEOPLE, 'volunteer')).toBe('volunteer-30');
+    expect(resolveSheetName('Luz', PEOPLE, 'driver')).toBe('501');
+    expect(resolveSheetName('Dawn Martin', PEOPLE, 'volunteer')).toBe('host-contact-7');
+  });
+
+  it('searches every directory whatever the role (drivers volunteer, volunteers drive)', () => {
+    expect(resolveSheetName('Luz', PEOPLE, 'volunteer')).toBe('501');
+    expect(resolveSheetName('Bev Lowe', PEOPLE, 'driver')).toBe('volunteer-30');
+  });
+
+  it('one person in several directories: the role picks the record', () => {
+    expect(resolveSheetName('Karen', PEOPLE, 'driver')).toBe('443');
+    expect(resolveSheetName('Karen', PEOPLE, 'volunteer')).toBe('volunteer-12');
+  });
+
+  it('first name + initial ("Dawn M.") matches', () => {
+    expect(resolveSheetName('Dawn M.', PEOPLE, 'volunteer')).toBe('host-contact-7');
+  });
+
+  it('two different people keep the typed name; the full name links', () => {
+    expect(resolveSheetName('Ann', PEOPLE, 'volunteer')).toBe('Ann');
+    expect(resolveSheetName('Ann Park', PEOPLE, 'volunteer')).toBe('600');
+  });
+
+  it('never links a new name to an inactive record', () => {
+    expect(resolveSheetName('Old Driver', PEOPLE, 'driver')).toBe('Old Driver');
+  });
+
+  it('the live Karen row links everyone it can and keeps existing directory assignees', () => {
+    const fresh = buildRowUpdatePlan(
+      makeEvent({ driversNeeded: 1, volunteersNeeded: 1 }),
+      makeRow({ Staffing: 'D1: Karen V1: Karen  V2: Bev Lowe + Alicia Jn Baptiste' }),
+      PEOPLE
+    );
+    expect(fresh.updates.assignedDriverIds).toEqual(['443']);
+    expect(fresh.updates.assignedVolunteerIds).toEqual(['volunteer-12', 'volunteer-30', 'Alicia Jn Baptiste']);
+    expect(fresh.updates.volunteerDetails).toEqual({
+      'volunteer-12': { name: 'Karen Smith' },
+      'volunteer-30': { name: 'Bev Lowe' },
+      'Alicia Jn Baptiste': { name: 'Alicia Jn Baptiste' },
+    });
+    // Assigned in the app as "driver-443" (the edit dialog's format): no change.
+    const same = buildRowUpdatePlan(
+      makeEvent({ driversNeeded: 1, assignedDriverIds: ['driver-443'] }),
+      makeRow({ Staffing: 'D: Karen' }),
+      PEOPLE
+    );
+    expect(same.changes).toEqual([]);
+    // A custom entry made in the app keeps matching its typed name.
+    const custom = buildRowUpdatePlan(
+      makeEvent({ driversNeeded: 1, assignedDriverIds: ['custom-1763183106406-Chef-Hank'] }),
+      makeRow({ Staffing: 'D: Chef Hank' }),
+      PEOPLE
+    );
+    expect(custom.changes).toEqual([]);
   });
 });

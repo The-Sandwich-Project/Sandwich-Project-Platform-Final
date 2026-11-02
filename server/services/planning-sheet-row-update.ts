@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { extractNameFromAssignmentId } from '@shared/assignment-ids';
 import { parseDateOnly, toDateOnlyString } from '@shared/date-utils';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
@@ -100,16 +101,29 @@ export interface SheetRowData {
   'Planned Recipient/Host Home'?: string;
 }
 
+/** Which app directory a person comes from (the assignment picker's sections). */
+export type PersonKind = 'user' | 'driver' | 'volunteer' | 'host-contact';
+
+/**
+ * Someone a sheet name can be matched to: a team member (user), or a person in
+ * the Drivers, Volunteers or Host Contacts directory. `id` is the ID the app's
+ * assignment picker saves for them (user ID, "443" for a driver,
+ * "volunteer-12", "host-contact-5"), so a match is the same as picking them.
+ */
 export interface MatchableUser {
   id: string;
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
   /**
-   * false = an inactive user, passed in only so an EXISTING assignee keeps
-   * their identity (the push writes their name). New names never match one.
+   * false = inactive, passed in only so an EXISTING assignee keeps their
+   * identity (the push writes their name). New names never match one.
    */
   isActive?: boolean;
+  /** Directory; missing = user. */
+  kind?: PersonKind;
+  /** Other IDs the app may have saved for the same record ("driver-443"). */
+  aliases?: string[];
 }
 
 export type ChangeKind = 'fill' | 'update';
@@ -405,48 +419,124 @@ const typeLabel = (k: string) =>
 
 const lower = (s: string) => s.trim().toLowerCase();
 
+/** Lowercase, no periods, single spaces: "Dawn  M." -> "dawn m". */
+const normName = (s: unknown): string =>
+  clean(s).toLowerCase().replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+
 function userFullName(u: MatchableUser): string {
   return clean(u.displayName) || `${clean(u.firstName)} ${clean(u.lastName)}`.trim();
 }
 
+function personFirstName(u: MatchableUser): string {
+  return normName(u.firstName) || normName(userFullName(u)).split(' ')[0] || '';
+}
+
+function personLastName(u: MatchableUser): string {
+  const last = normName(u.lastName);
+  if (last) return last;
+  const words = normName(userFullName(u)).split(' ');
+  return words.length > 1 ? words.slice(1).join(' ') : '';
+}
+
+/** Every full spelling of a person's name. */
+function personFullNames(u: MatchableUser): Set<string> {
+  const out = new Set<string>();
+  const d = normName(u.displayName);
+  if (d) out.add(d);
+  const fl = normName(`${clean(u.firstName)} ${clean(u.lastName)}`);
+  if (fl) out.add(fl);
+  return out;
+}
+
+/**
+ * How a sheet name relates to one name: 'full' (same name), 'short' (just the
+ * first name, or first name + last initial like "Dawn M."), or none.
+ */
+function nameMatchKind(sheetName: string, first: string, last: string, fulls: Set<string>): 'full' | 'short' | null {
+  const n = normName(sheetName);
+  if (!n) return null;
+  if (fulls.has(n)) return 'full';
+  const words = n.split(' ');
+  if (words.length === 1 && first && words[0] === first) return 'short';
+  if (words.length === 2 && words[1].length === 1 && first && words[0] === first && last.startsWith(words[1])) {
+    return 'short';
+  }
+  return null;
+}
+
 /**
  * Does a name typed on the sheet refer to this app assignee?
- * The push writes full names, but people type first names ("Katie").
+ * The push writes full names, but people type first names ("Katie") or a
+ * first name and initial ("Dawn M.").
  */
 function nameMatchesAssignee(sheetName: string, assigneeName: string): boolean {
-  const a = lower(sheetName);
-  const b = lower(assigneeName);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  // Single-word sheet name matches the assignee's first word.
-  if (!a.includes(' ') && b.split(/\s+/)[0] === a) return true;
-  return false;
+  const b = normName(assigneeName);
+  if (!b) return false;
+  const words = b.split(' ');
+  return nameMatchKind(sheetName, words[0], words.slice(1).join(' '), new Set([b])) !== null;
 }
 
 /**
- * Resolve a new sheet name to a user ID. Only returns an ID when exactly one
- * active user matches; otherwise keeps the typed name as text (the assignment
- * columns accept free-text names, same as the existing sheet import).
+ * Resolve a new sheet name to the ID the app's assignment picker would save.
+ *
+ * Every directory is searched whatever the role (drivers volunteer and
+ * volunteers drive). The same person often has records in more than one
+ * directory; that's still one person, and the role decides which record:
+ * a driver slot prefers the Drivers directory, a volunteer slot the
+ * Volunteers directory, then the other one, then team members, then host
+ * contacts. Two DIFFERENT people matching (two Anns) keeps the typed name.
  */
-export function resolveSheetName(name: string, allUsers: MatchableUser[]): string {
-  const n = lower(name);
-  if (!n) return name;
-  const users = allUsers.filter((u) => u.isActive !== false);
-  const full = users.filter(
-    (u) =>
-      (u.displayName && lower(u.displayName) === n) ||
-      lower(`${clean(u.firstName)} ${clean(u.lastName)}`) === n
-  );
-  if (full.length === 1) return full[0].id;
-  if (full.length > 1) return name.trim();
-  const first = users.filter((u) => u.firstName && lower(u.firstName) === n);
-  return first.length === 1 ? first[0].id : name.trim();
+export function resolveSheetName(
+  name: string,
+  allPeople: MatchableUser[],
+  role: 'driver' | 'volunteer' = 'volunteer'
+): string {
+  const typed = name.trim();
+  if (!normName(name)) return name;
+  const people = allPeople.filter((u) => u.isActive !== false);
+  const scored = people
+    .map((u) => ({ u, kind: nameMatchKind(name, personFirstName(u), personLastName(u), personFullNames(u)) }))
+    .filter((x) => x.kind);
+  // A full-name match beats first-name-only matches.
+  const best = scored.some((x) => x.kind === 'full') ? scored.filter((x) => x.kind === 'full') : scored;
+  if (best.length === 0) return typed;
+
+  // Different people? Compare their full names (first + last).
+  const who = new Set(best.map((x) => `${personFirstName(x.u)} ${personLastName(x.u)}`.trim()));
+  if (who.size > 1) {
+    // "Karen" on a user with no last name and "Karen Smith" in Drivers are
+    // the same person only if every match shares the one last name given.
+    const lasts = new Set(best.map((x) => personLastName(x.u)).filter(Boolean));
+    if (lasts.size > 1) return typed;
+  }
+
+  const order: PersonKind[] =
+    role === 'driver'
+      ? ['driver', 'volunteer', 'user', 'host-contact']
+      : ['volunteer', 'driver', 'user', 'host-contact'];
+  for (const kind of order) {
+    const inKind = best.filter((x) => (x.u.kind ?? 'user') === kind);
+    // Duplicate records in one directory: try the next directory.
+    if (inKind.length === 1) return inKind[0].u.id;
+  }
+  return typed;
 }
 
-/** Name the app would show for an assignment entry (user ID or free text). */
-function assigneeName(idOrName: string, usersById: Map<string, MatchableUser>): string {
-  const u = usersById.get(idOrName);
-  return u ? userFullName(u) : idOrName;
+/** Look up people by every ID the app may have saved for them. */
+export function indexPeople(people: MatchableUser[]): Map<string, MatchableUser> {
+  const byId = new Map<string, MatchableUser>();
+  for (const p of people) {
+    byId.set(p.id, p);
+    for (const a of p.aliases ?? []) if (!byId.has(a)) byId.set(a, p);
+  }
+  return byId;
+}
+
+/** Name the app would show for an assignment entry (directory ID or free text). */
+export function assigneeName(idOrName: string, peopleById: Map<string, MatchableUser>): string {
+  const u = peopleById.get(idOrName);
+  if (u) return userFullName(u);
+  return extractNameFromAssignmentId(idOrName) ?? idOrName;
 }
 
 // ---------------------------------------------------------------------------
@@ -644,7 +734,7 @@ export function buildRowUpdatePlan(
     );
   } else if (staffingRead) {
     const staffing = staffingRead;
-    const usersById = new Map(users.map((u) => [u.id, u]));
+    const usersById = indexPeople(users);
     // Part of the cell couldn't be read: show it, and don't remove a role that
     // might be hiding in it.
     const partlyUnread = staffing.unread.length > 0;
@@ -677,7 +767,7 @@ export function buildRowUpdatePlan(
             kept.add(appIds[idx]);
             return appIds[idx];
           }
-          return resolveSheetName(name, users);
+          return resolveSheetName(name, users, role);
         });
         newIds = Array.from(new Set(newIds));
         // Part of the cell couldn't be read: only add people, never drop
@@ -704,12 +794,13 @@ export function buildRowUpdatePlan(
         set(changeField, cfg.ids, newIds.length ? newIds : null);
         // Keep per-person details for people who stay; new people start empty.
         const oldDetails = asDetailsObject(event[cfg.details]);
+        // New people get their name in the details, like the app's picker saves.
         set(changeField, cfg.details, newIds.length
-          ? Object.fromEntries(newIds.map((id) => [id, oldDetails[id] ?? {}]))
+          ? Object.fromEntries(newIds.map((id) => [id, oldDetails[id] ?? { name: assigneeName(id, usersById) }]))
           : null);
         const unmatched = newIds.filter((id) => !usersById.has(id) && !appIds.includes(id));
         if (unmatched.length) {
-          notes.push(`${cfg.label}: couldn't match ${unmatched.map((n) => `"${n}"`).join(', ')} to one app user, so they're saved as typed names.`);
+          notes.push(`${cfg.label}: couldn't match ${unmatched.map((n) => `"${n}"`).join(', ')} to exactly one person in the app (team members, drivers, volunteers or host contacts), so they're saved as typed names. Use the full name on the sheet if there are two people with that first name.`);
         }
       }
     }
