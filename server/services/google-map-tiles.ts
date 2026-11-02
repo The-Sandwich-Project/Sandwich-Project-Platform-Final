@@ -155,7 +155,15 @@ export function safeReasonFromGoogle(status: number, body: string): string {
   if (status === 429 || lower.includes('quota') || lower.includes('rate limit')) {
     return 'Google Maps tile quota was exceeded. Try again later.';
   }
-  return 'Google Maps tiles are temporarily unavailable.';
+  // Redact before truncating, so a key or token cut by the length limit
+  // can't slip through as an unmatched fragment.
+  const detail = redactMapSecrets(reason || message || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  return `Google Maps tiles are temporarily unavailable (Google returned HTTP ${status}${
+    detail ? `: ${detail}` : ''
+  }).`;
 }
 
 function parseExpiry(expiry: unknown): number {
@@ -260,6 +268,20 @@ function rememberFailure(reason: string) {
   session = null;
 }
 
+/** Plain-language reason for a failure that never got an HTTP response. */
+function reasonForThrown(error: unknown): string {
+  if (error instanceof MapTilesError) return error.safeReason;
+  const name = error instanceof Error ? error.name : '';
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    return `Google Maps tiles are temporarily unavailable (Google did not respond within ${
+      REQUEST_TIMEOUT_MS / 1000
+    }s).`;
+  }
+  const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
+  const code = cause?.code ? ` ${cause.code}` : '';
+  return `Google Maps tiles are temporarily unavailable (the server could not reach Google:${code || ' network error'}).`;
+}
+
 export async function getMapConfig(): Promise<MapTileConfig> {
   if (!apiKey()) {
     return {
@@ -276,10 +298,7 @@ export async function getMapConfig(): Promise<MapTileConfig> {
     const current = await getSession();
     return { provider: 'google', attribution: current.attribution };
   } catch (error) {
-    const reason =
-      error instanceof MapTilesError
-        ? error.safeReason
-        : 'Google Maps tiles are temporarily unavailable.';
+    const reason = reasonForThrown(error);
     rememberFailure(reason);
     logger.error(
       `Google map tiles unavailable: ${
