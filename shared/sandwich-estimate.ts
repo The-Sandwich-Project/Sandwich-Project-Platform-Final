@@ -141,7 +141,16 @@ export function parseEstimateLines(raw: unknown): EstimateLine[] {
     const lo = count((item as any).min);
     const hi = count((item as any).max);
     const q = count((item as any).quantity);
-    const amount = lo !== null && hi !== null ? amountOf(lo, hi) : q !== null ? { min: q, max: q } : null;
+    // A line's range only counts while its quantity is still the range's
+    // midpoint; a quantity edited to something else (an editor that kept the
+    // old min/max) is an exact amount, the same rule as totalFromFields.
+    const lineRange = lo !== null && hi !== null ? amountOf(lo, hi) : null;
+    const amount =
+      lineRange && (q === null || q === midpoint(lineRange))
+        ? lineRange
+        : q !== null
+          ? { min: q, max: q }
+          : lineRange;
     lines.push({ type, amount });
   }
   return lines;
@@ -304,6 +313,11 @@ export function resolveEstimatePatch(
     const rt = normalizeSandwichTypeKey(patch.estimatedSandwichRangeType);
     if (rt && lines.length <= 1) {
       lines = [{ type: rt, amount: lines[0]?.amount ?? null }];
+    } else if (!rt && !touchedLines && isRange(total) && lines.length === 1) {
+      // "No specific type" chosen for a range (and no new lines sent): the
+      // one type the range named goes. For an exact total a null range type
+      // means nothing and leaves the types alone.
+      lines = [];
     }
   }
 

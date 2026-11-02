@@ -65,8 +65,12 @@ export function buildInlineSandwichPatch(state: InlineSandwichState): Record<str
       estimatedSandwichCountMax: state.rangeMax > 0 ? state.rangeMax : null,
       estimatedSandwichCount: null,
     };
-    // A picked range type names the one type; no pick leaves the types alone.
-    if (state.rangeType) patch.estimatedSandwichRangeType = state.rangeType;
+    // A picked range type IS the type (replacing whatever types were there);
+    // no pick leaves the types alone.
+    if (state.rangeType) {
+      patch.estimatedSandwichRangeType = state.rangeType;
+      patch.sandwichTypes = [{ type: state.rangeType }];
+    }
     return patch;
   }
   // By type: send the lines only. Amounts left at 0 are "TBD"; the server keeps

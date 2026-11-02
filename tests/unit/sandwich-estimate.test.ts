@@ -252,3 +252,52 @@ describe('Copilot review: a new total is never undone by old amounts', () => {
     expect(out.estimatedSandwichCount).toBe(300);
   });
 });
+
+describe('Copilot review round 2', () => {
+  it('a line quantity edited away from its range midpoint is an exact amount', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300,
+        sandwichTypes: [{ type: 'deli', quantity: 250, min: 200, max: 300 }] },
+      { sandwichTypes: [{ type: 'deli', quantity: 400, min: 200, max: 300 }] }
+    );
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 400 }]);
+    expect(out.estimatedSandwichCount).toBe(400);
+  });
+
+  it('an untouched range line still reads as a range', () => {
+    const out = resolveEstimatePatch(
+      {},
+      { sandwichTypes: [{ type: 'deli', quantity: 250, min: 200, max: 300 }] }
+    );
+    expect(out).toMatchObject({ estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 });
+  });
+
+  it('"No specific type" on a range clears the one type', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300,
+        estimatedSandwichRangeType: 'pbj', sandwichTypes: [{ type: 'pbj', quantity: 250, min: 200, max: 300 }] },
+      { estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, estimatedSandwichRangeType: null }
+    );
+    expect(out.estimatedSandwichRangeType).toBeNull();
+    expect(out.sandwichTypes).toBeNull();
+    expect(out).toMatchObject({ estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 });
+  });
+
+  it('a null range type with an exact total leaves the types alone', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 200, sandwichTypes: [{ type: 'pbj', quantity: 200 }] },
+      { estimatedSandwichCount: 300, estimatedSandwichRangeType: null }
+    );
+    expect(out.sandwichTypes).toEqual([{ type: 'pbj', quantity: 300 }]);
+  });
+
+  it('a picked range type replaces several existing types (what the inline editor sends)', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }] },
+      { estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, estimatedSandwichCount: null,
+        estimatedSandwichRangeType: 'deli_turkey', sandwichTypes: [{ type: 'deli_turkey' }] }
+    );
+    expect(out.estimatedSandwichRangeType).toBe('deli_turkey');
+    expect(out.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
+  });
+});

@@ -1,3 +1,4 @@
+import { totalFromFields } from '@shared/sandwich-estimate';
 import React, { useState, useEffect, useCallback } from 'react';
 import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
 import { Button } from '@/components/ui/button';
@@ -551,8 +552,13 @@ const IntakeCallDialog: React.FC<IntakeCallDialogProps> = ({
         initialChecked.add('event_date');
       }
     }
-    if (req.estimatedSandwichCount != null) {
-      initialAnswers.sandwich_count = String(req.estimatedSandwichCount);
+    // Prefill the estimate the way the app shows it: an active range as
+    // "200-300" (so saving unrelated answers doesn't collapse it to its
+    // midpoint), otherwise the count.
+    const estTotal = totalFromFields(req);
+    if (estTotal) {
+      initialAnswers.sandwich_count =
+        estTotal.min === estTotal.max ? String(estTotal.min) : `${estTotal.min}-${estTotal.max}`;
       initialChecked.add('sandwich_count');
     }
     if (req.estimatedAttendance != null) {
