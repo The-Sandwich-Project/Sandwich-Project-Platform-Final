@@ -79,6 +79,13 @@ router.get('/', async (req, res) => {
         scheduledEventDate: eventRequests.scheduledEventDate,
         status: eventRequests.status,
         estimatedSandwichCount: eventRequests.estimatedSandwichCount,
+        // Sandwich type fields: Driver Planning shows the same summary as the
+        // Scheduled card, which needs these. Without them every event read
+        // "(type not set)" even when the type was filled in.
+        estimatedSandwichCountMin: eventRequests.estimatedSandwichCountMin,
+        estimatedSandwichCountMax: eventRequests.estimatedSandwichCountMax,
+        estimatedSandwichRangeType: eventRequests.estimatedSandwichRangeType,
+        sandwichTypes: eventRequests.sandwichTypes,
         tspContactAssigned: eventRequests.tspContactAssigned,
         tspContact: eventRequests.tspContact,
         customTspContact: eventRequests.customTspContact,

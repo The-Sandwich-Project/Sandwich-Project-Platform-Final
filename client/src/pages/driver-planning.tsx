@@ -31,6 +31,8 @@ import {
 } from '@/lib/assignment-utils';
 import { getRecipientDisplayRegion } from '@/lib/atlanta-regions';
 import { formatSandwichTypesDisplay } from '@/lib/sandwich-utils';
+import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
+import { SANDWICH_TYPES } from '@/components/event-requests/constants';
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -168,6 +170,9 @@ interface EventMapData {
   scheduledEventDate: string | null;
   status: string;
   estimatedSandwichCount: number | null;
+  estimatedSandwichCountMin?: number | null;
+  estimatedSandwichCountMax?: number | null;
+  estimatedSandwichRangeType?: string | null;
   tspContactAssigned: string | null;
   tspContact: string | null;
   customTspContact: string | null;
@@ -517,7 +522,38 @@ const formatTime12Hour = (time: string | null): string => {
 // formatter in @/lib/sandwich-utils (the same one ScheduledCard uses),
 // so the Driver Planning tool and the Scheduled card always agree on
 // what a given event is making.
-const formatSandwichSummary = (event: Pick<EventMapData, 'estimatedSandwichCount' | 'sandwichTypes'>): string => {
+const formatSandwichSummary = (
+  event: Pick<
+    EventMapData,
+    | 'estimatedSandwichCount'
+    | 'estimatedSandwichCountMin'
+    | 'estimatedSandwichCountMax'
+    | 'estimatedSandwichRangeType'
+    | 'sandwichTypes'
+  >
+): string => {
+  // A range ("400-500 Turkey") keeps its type in estimatedSandwichRangeType,
+  // not sandwichTypes. Mirror ScheduledCardEnhanced so both agree.
+  if (
+    hasActiveSandwichRange(
+      event.estimatedSandwichCountMin,
+      event.estimatedSandwichCountMax,
+      event.estimatedSandwichCount
+    )
+  ) {
+    const rangeText = `~${event.estimatedSandwichCountMin}-${event.estimatedSandwichCountMax} sandwiches`;
+    const rangeType = event.estimatedSandwichRangeType;
+    const typeLabel = rangeType
+      ? SANDWICH_TYPES.find((t) => t.value === rangeType)?.label
+      : undefined;
+    if (typeLabel && rangeType !== 'unknown') return `${rangeText} (${typeLabel})`;
+    // A range may still carry a per-type breakdown.
+    const rangeBreakdown = formatSandwichTypesDisplay(event.sandwichTypes, undefined);
+    return rangeBreakdown !== 'Not specified'
+      ? `${rangeText} (${rangeBreakdown})`
+      : `${rangeText} (type not set)`;
+  }
+
   const count = event.estimatedSandwichCount || 0;
   const countText = count > 0 ? `~${count} sandwiches` : 'Sandwich count not set';
   const breakdown = formatSandwichTypesDisplay(event.sandwichTypes, undefined);
