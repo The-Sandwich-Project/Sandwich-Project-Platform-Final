@@ -90,9 +90,9 @@ describe('parsing helpers', () => {
 
   it('parses staffing the way the push writes it', () => {
     const s = parsePlanningStaffing('D: Katie Long, Kim Lee, V: ');
-    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false, vanNames: [], plainListed: true });
-    expect(s.volunteer).toEqual({ listed: true, names: [] });
-    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true, vanNames: ['Luz'], plainListed: false });
+    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false, vanNames: [], plainListed: true, slots: 1 });
+    expect(s.volunteer).toEqual({ listed: true, names: [], slots: 1 });
+    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true, vanNames: ['Luz'], plainListed: false, slots: 1 });
     expect(parsePlanningStaffing('').driver.listed).toBe(false);
   });
 
@@ -211,8 +211,8 @@ describe('buildRowUpdatePlan', () => {
   });
 
   it('reads an old "S" (speaker) as a volunteer and never touches speaker columns', () => {
-    expect(parsePlanningStaffing('S: Ann').volunteer).toEqual({ listed: true, names: ['Ann'] });
-    expect(parsePlanningStaffing('S: Ann').speaker).toEqual({ listed: false, names: [] });
+    expect(parsePlanningStaffing('S: Ann').volunteer).toEqual({ listed: true, names: ['Ann'], slots: 1 });
+    expect(parsePlanningStaffing('S: Ann').speaker).toEqual({ listed: false, names: [], slots: 0 });
     const plan = buildRowUpdatePlan(
       makeEvent({ speakersNeeded: 1, assignedSpeakerIds: ['u-kim'] }),
       makeRow({ Staffing: 'D: , S: Ann Jones' }),
@@ -331,10 +331,11 @@ describe('creating an event from a sheet row ("send row to app")', () => {
   });
 
   it('still reads the bare-letter format', () => {
+    // An old speaker slot (S) is a volunteer slot now, so S + V = 2 volunteers.
     expect(staffingForNewEvent('D, S, V')).toMatchObject({
       driversNeeded: 1,
       speakersNeeded: 0,
-      volunteersNeeded: 1,
+      volunteersNeeded: 2,
     });
   });
 
@@ -637,5 +638,51 @@ describe('sync_id is never treated as a note', () => {
   it('the update flow adds no ID to planning notes', () => {
     const plan = buildRowUpdatePlan(makeEvent({ planningNotes: null }), makeRow({ "Add'l Notes": ID } as any), USERS);
     expect(plan.updatesByField.planningNotes).toBeUndefined();
+  });
+});
+
+describe('numbered role codes and unreadable cells (live sheet format)', () => {
+  const CELL = 'D1: Karen V1: Karen  V2: Bev Lowe + Alicia Jn Baptiste';
+
+  it('reads numbered codes and "+" between names', () => {
+    const p = parsePlanningStaffing(CELL);
+    expect(p.driver).toMatchObject({ listed: true, names: ['Karen'], slots: 1 });
+    expect(p.volunteer).toMatchObject({ listed: true, names: ['Karen', 'Bev Lowe', 'Alicia Jn Baptiste'], slots: 2 });
+    expect(p.unread).toEqual([]);
+  });
+
+  it('the update adds them instead of removing them', () => {
+    const plan = buildRowUpdatePlan(makeEvent({ driversNeeded: 0 }), makeRow({ Staffing: CELL }), USERS);
+    expect(plan.updates.driversNeeded).toBe(1);
+    expect(plan.updates.assignedDriverIds).toEqual(['Karen']);
+    expect(plan.updates.volunteersNeeded).toBe(3);
+    expect(plan.updates.assignedVolunteerIds).toEqual(['Karen', 'Bev Lowe', 'Alicia Jn Baptiste']);
+  });
+
+  it('empty numbered slots count as needed', () => {
+    const p = parsePlanningStaffing('D1: Karen, D2:');
+    expect(p.driver).toMatchObject({ names: ['Karen'], slots: 2 });
+    expect(staffingForNewEvent('D1: Karen, D2:').driversNeeded).toBe(2);
+  });
+
+  it('spelled-out roles work too', () => {
+    const p = parsePlanningStaffing('Driver: Katie, Volunteers: Ann');
+    expect(p.driver.names).toEqual(['Katie']);
+    expect(p.volunteer.names).toEqual(['Ann']);
+  });
+
+  it('never removes staffing when the cell can\'t be read', () => {
+    const event = makeEvent({ driversNeeded: 1, assignedDriverIds: ['u-katie'], volunteersNeeded: 2, assignedVolunteerIds: ['u-kim'] });
+    const plan = buildRowUpdatePlan(event, makeRow({ Staffing: 'Katie driving, Kim helping' }), USERS);
+    expect(plan.updatesByField.drivers).toBeUndefined();
+    expect(plan.updatesByField.volunteers).toBeUndefined();
+    expect(plan.notes.some((n) => n.includes("Couldn't read the staffing cell"))).toBe(true);
+  });
+
+  it('doesn\'t remove a role when part of the cell couldn\'t be read', () => {
+    const event = makeEvent({ driversNeeded: 1, assignedDriverIds: ['u-katie'], volunteersNeeded: 1, assignedVolunteerIds: ['u-kim'] });
+    const plan = buildRowUpdatePlan(event, makeRow({ Staffing: 'mystery text, D: Katie' }), USERS);
+    expect(plan.updatesByField.volunteers).toBeUndefined();
+    expect(plan.notes.some((n) => n.includes('wasn\'t understood'))).toBe(true);
   });
 });

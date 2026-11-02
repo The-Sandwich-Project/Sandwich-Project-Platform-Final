@@ -210,10 +210,12 @@ export interface ParsedStaffing {
    * drivers as "VD: ..." on van events, so VD names ARE drivers.
    * `vanNames` is just the VD ones; `plainListed` is whether a plain "D" appeared.
    */
-  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean };
+  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number };
   /** Always empty: "S" is read as a volunteer. Kept so callers' shapes don't change. */
-  speaker: { listed: boolean; names: string[] };
-  volunteer: { listed: boolean; names: string[] };
+  speaker: { listed: boolean; names: string[]; slots: number };
+  volunteer: { listed: boolean; names: string[]; slots: number };
+  /** Parts of the cell that weren't under any role code (shown to the person, never applied). */
+  unread: string[];
 }
 
 /**
@@ -234,9 +236,10 @@ export interface ParsedStaffing {
  */
 export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const out: ParsedStaffing = {
-    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false },
-    speaker: { listed: false, names: [] },
-    volunteer: { listed: false, names: [] },
+    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0 },
+    speaker: { listed: false, names: [], slots: 0 },
+    volunteer: { listed: false, names: [], slots: 0 },
+    unread: [],
   };
   const s = clean(raw);
   if (!s) return out;
@@ -249,11 +252,15 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     out[role].names.push(n);
     if (role === 'driver' && inVan) out.driver.vanNames.push(n);
   };
-  const roleFor = (code: string) => {
-    const c = code.trim().toUpperCase();
-    if (c === 'D' || c === 'VD') return 'driver' as const;
-    if (c === 'S') return 'volunteer' as const; // speakers were folded into volunteers
-    if (c === 'V') return 'volunteer' as const;
+  // Role codes, optionally numbered per slot ("D1:", "V2:"), or spelled out
+  // ("Driver:", "Volunteers:", "Van driver:"). Speakers were folded into
+  // volunteers, so S counts as a volunteer.
+  const roleFor = (code: string): { role: 'driver' | 'volunteer'; van: boolean } | null => {
+    const c = code.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\d+$/, '').trim();
+    if (c === 'VD' || c === 'VAN DRIVER' || c === 'VAN DRIVERS') return { role: 'driver', van: true };
+    if (c === 'D' || c === 'DRIVER' || c === 'DRIVERS') return { role: 'driver', van: false };
+    if (c === 'V' || c === 'VOLUNTEER' || c === 'VOLUNTEERS') return { role: 'volunteer', van: false };
+    if (c === 'S' || c === 'SPEAKER' || c === 'SPEAKERS') return { role: 'volunteer', van: false };
     return null;
   };
 
@@ -262,21 +269,29 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   // names like "Anderson" or "Sandy" stay intact.
   // A role code can also start mid-cell with no comma ("D: Katie V: Kim"),
   // which the old parser accepted, so break before each one too.
-  const cell = s.replace(/\s+(?=(?:VD|D|S|V)\s*:)/gi, ',');
-  for (const token of cell.split(/[,;\n&]|\s+and\s+/i).map((t) => t.trim())) {
+  // "+" also joins names ("V2: Bev Lowe + Alicia Jn Baptiste").
+  const cell = s.replace(
+    /\s+(?=(?:van\s+drivers?|drivers?|volunteers?|speakers?|VD|D|S|V)\d*\s*:)/gi,
+    ','
+  );
+  for (const token of cell.split(/[,;\n&+]|\s+and\s+/i).map((t) => t.trim())) {
     if (!token) continue;
     const colon = token.indexOf(':');
     const head = colon >= 0 ? token.slice(0, colon) : token;
-    const role = roleFor(head);
-    if (role) {
+    const hit = roleFor(head);
+    if (hit) {
+      const role = hit.role;
       current = role;
       out[role].listed = true;
-      inVan = role === 'driver' && head.trim().toUpperCase() === 'VD';
+      out[role].slots += 1;
+      inVan = hit.van;
       if (inVan) out.driver.van = true;
       else if (role === 'driver') out.driver.plainListed = true;
       addName(role, colon >= 0 ? token.slice(colon + 1) : '');
     } else if (current) {
       addName(current, token.replace(/^[:\s]+/, ''));
+    } else {
+      out.unread.push(token);
     }
   }
   return out;
@@ -609,9 +624,22 @@ export function buildRowUpdatePlan(
   // --- Staffing (update) -----------------------------------------------------
   // A blank Staffing cell means "not filled in", so leave staffing alone.
   const staffingCell = staffingCellOf(row);
-  if (clean(staffingCell)) {
-    const staffing = parsePlanningStaffing(staffingCell);
+  const staffingRead = clean(staffingCell) ? parsePlanningStaffing(staffingCell) : null;
+  if (staffingRead && !staffingRead.driver.listed && !staffingRead.volunteer.listed) {
+    // Something is in the cell but no role code could be read from it. Never
+    // treat that as "roles removed": leave staffing alone and say so.
+    notes.push(
+      `Couldn't read the staffing cell ("${clean(staffingCell)}"), so drivers and volunteers were left alone. Use codes like D: / V: (numbered D1: / V2: is fine).`
+    );
+  } else if (staffingRead) {
+    const staffing = staffingRead;
     const usersById = new Map(users.map((u) => [u.id, u]));
+    // Part of the cell couldn't be read: show it, and don't remove a role that
+    // might be hiding in it.
+    const partlyUnread = staffing.unread.length > 0;
+    if (partlyUnread) {
+      notes.push(`Part of the staffing cell wasn't understood and was ignored: "${staffing.unread.join('", "')}".`);
+    }
 
     // Speakers were retired (folded into volunteers), so the speaker columns
     // are never touched here.
@@ -625,7 +653,8 @@ export function buildRowUpdatePlan(
       let newIds: string[];
       let newNeeded: number;
       if (!sheet.listed) {
-        // Role was taken off the sheet.
+        // Role was taken off the sheet (only trusted when the whole cell was read).
+        if (partlyUnread) continue;
         newIds = [];
         newNeeded = 0;
       } else {
@@ -640,7 +669,8 @@ export function buildRowUpdatePlan(
           return resolveSheetName(name, users);
         });
         newIds = Array.from(new Set(newIds));
-        newNeeded = Math.max(appNeeded, newIds.length, 1);
+        // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned).
+        newNeeded = Math.max(appNeeded, sheet.slots, newIds.length, 1);
       }
 
       const changeField = role === 'driver' ? 'drivers' : 'volunteers';
@@ -925,11 +955,12 @@ export function staffingCellOf(row: {
  */
 export function staffingForNewEvent(raw: unknown) {
   const s = parsePlanningStaffing(raw);
-  const need = (listed: boolean, n: number) => (listed ? Math.max(1, n) : 0);
+  const need = (r: { listed: boolean; slots: number; names: string[] }) =>
+    r.listed ? Math.max(1, r.slots, r.names.length) : 0;
   return {
-    driversNeeded: need(s.driver.listed, s.driver.names.length),
+    driversNeeded: need(s.driver),
     speakersNeeded: 0, // retired role; "S" is counted under volunteers
-    volunteersNeeded: need(s.volunteer.listed, s.volunteer.names.length),
+    volunteersNeeded: need(s.volunteer),
     vanDriverNeeded: s.driver.van,
     assignedDriverNames: s.driver.names,
     assignedSpeakerNames: [] as string[],
