@@ -30,3 +30,21 @@ describe('formatSandwichTypesDisplay with an Unknown amount', () => {
       .toBe('300 total: 50 type TBD, Deli TBD');
   });
 });
+
+describe('formatSandwichTypesDisplay with Unknown rows (round 5)', () => {
+  it('shows an Unknown amount even when every type has an amount', () => {
+    expect(formatSandwichTypesDisplay([{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 50 }], 200))
+      .toBe('200 total: 150 Deli, 50 type TBD');
+  });
+  it('an Unknown row with no amount means the rest is untyped', () => {
+    expect(formatSandwichTypesDisplay([{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 0 }], 300))
+      .toBe('300 total: 150 Deli, rest type TBD');
+  });
+  it('Unknown alone is still just the total', () => {
+    expect(formatSandwichTypesDisplay([{ type: 'unknown', quantity: 200 }], 200)).toBe('200 total');
+  });
+  it('actual counts are unchanged', () => {
+    expect(formatSandwichTypesDisplay([{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 50 }], 200, { unknownAmounts: false }))
+      .toBe('150 Deli');
+  });
+});

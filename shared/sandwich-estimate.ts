@@ -165,9 +165,14 @@ export function parseEstimateLines(raw: unknown): EstimateLine[] {
         : q !== null
           ? { min: q, max: q }
           : lineRange;
-    // "Unknown"/TBD type: no line when it has no amount, but an amount still
-    // counts toward the total (150 Deli + 50 Unknown = 200), kept as "unknown".
-    const type = normalizeSandwichTypeKey((item as any).type) ?? (amount ? 'unknown' : null);
+    // "Unknown"/TBD type rows are kept as "unknown": an amount still counts
+    // toward the total (150 Deli + 50 Unknown = 200), and one without an
+    // amount marks the split incomplete (150 Deli + the rest unknown keeps a
+    // 300 total). Rows that are ONLY unknown mean "type TBD" and are dropped
+    // in normalizeEstimate.
+    const named = normalizeSandwichTypeKey((item as any).type);
+    const rawType = String((item as any).type ?? '').trim();
+    const type = named ?? (amount || rawType ? 'unknown' : null);
     if (!type) continue;
     lines.push({ type, amount });
   }

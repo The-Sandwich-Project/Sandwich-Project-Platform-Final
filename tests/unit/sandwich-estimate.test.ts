@@ -320,8 +320,8 @@ describe('Copilot review round 3 (previously missed)', () => {
     );
     expect(out.estimatedSandwichCount).toBe(200);
     expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 50 }]);
-    // An Unknown row with no amount is still no line.
-    expect(parseEstimateLines([{ type: 'unknown', quantity: 0 }])).toEqual([]);
+    // Only Unknown rows with no amount: still no type at all.
+    expect(resolveEstimatePatch({ estimatedSandwichCount: 200 }, { sandwichTypes: [{ type: 'unknown', quantity: 0 }] }).sandwichTypes).toBeNull();
   });
 
   it('clearing a ranged amount to 0 makes it TBD instead of restoring the range', () => {
@@ -361,5 +361,27 @@ describe('Copilot review round 4', () => {
     );
     expect(out.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
     expect(out.estimatedSandwichRangeType).toBe('deli_turkey');
+  });
+});
+
+describe('Copilot review round 5: an untyped remainder', () => {
+  it('150 Deli + Unknown (no amount) keeps a known 300 total', () => {
+    const out = resolveEstimatePatch(
+      { estimatedSandwichCount: 300 },
+      { sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'Unknown', quantity: 0 }] }
+    );
+    expect(out.estimatedSandwichCount).toBe(300);
+    expect(out.sandwichTypes).toEqual([{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 0 }]);
+  });
+
+  it('a total-only edit keeps the remainder untyped on the next read', () => {
+    const first = resolveEstimatePatch(
+      { estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 50 }] },
+      { estimatedSandwichCount: 100 }
+    );
+    expect(first.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'unknown', quantity: 0 }]);
+    // Read back and saved again unchanged: Deli is NOT given the whole total.
+    const again = resolveEstimatePatch(first, { estimatedSandwichCount: 100 });
+    expect(again.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'unknown', quantity: 0 }]);
   });
 });
