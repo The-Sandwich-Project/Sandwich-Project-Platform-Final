@@ -40,6 +40,8 @@ export interface RowUpdateEvent {
   /** Range-mode events keep their estimate here, with estimatedSandwichCount null. */
   estimatedSandwichCountMin?: number | null;
   estimatedSandwichCountMax?: number | null;
+  /** The single type a range-mode estimate is for (e.g. 'deli_turkey'). */
+  estimatedSandwichRangeType?: string | null;
   /** Folded into the plan token so any app save after the preview is caught. */
   updatedAt?: Date | string | null;
   actualSandwichCount: number | null;
@@ -100,6 +102,11 @@ export interface MatchableUser {
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
+  /**
+   * false = an inactive user, passed in only so an EXISTING assignee keeps
+   * their identity (the push writes their name). New names never match one.
+   */
+  isActive?: boolean;
 }
 
 export type ChangeKind = 'fill' | 'update';
@@ -245,7 +252,10 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   // Names can be separated by commas, semicolons, new lines, "&" or "and"
   // ("D: Katie & Kim", "V: Ann and Bo"). "and" only counts as a whole word, so
   // names like "Anderson" or "Sandy" stay intact.
-  for (const token of s.split(/[,;\n&]|\s+and\s+/i).map((t) => t.trim())) {
+  // A role code can also start mid-cell with no comma ("D: Katie V: Kim"),
+  // which the old parser accepted, so break before each one too.
+  const cell = s.replace(/\s+(?=(?:VD|D|S|V)\s*:)/gi, ',');
+  for (const token of cell.split(/[,;\n&]|\s+and\s+/i).map((t) => t.trim())) {
     if (!token) continue;
     const colon = token.indexOf(':');
     const head = colon >= 0 ? token.slice(0, colon) : token;
@@ -347,9 +357,10 @@ function nameMatchesAssignee(sheetName: string, assigneeName: string): boolean {
  * active user matches; otherwise keeps the typed name as text (the assignment
  * columns accept free-text names, same as the existing sheet import).
  */
-export function resolveSheetName(name: string, users: MatchableUser[]): string {
+export function resolveSheetName(name: string, allUsers: MatchableUser[]): string {
   const n = lower(name);
   if (!n) return name;
+  const users = allUsers.filter((u) => u.isActive !== false);
   const full = users.filter(
     (u) =>
       (u.displayName && lower(u.displayName) === n) ||
@@ -479,6 +490,17 @@ export function buildRowUpdatePlan(
         set('estimatedSandwichCount', 'estimatedSandwichCount', parsed.count);
         set('estimatedSandwichCount', 'estimatedSandwichCountMin', parsed.min);
         set('estimatedSandwichCount', 'estimatedSandwichCountMax', parsed.max);
+        // An exact number takes the event out of range mode (as the form does).
+        if (!parsed.isRange && event.estimatedSandwichRangeType) {
+          set('estimatedSandwichCount', 'estimatedSandwichRangeType', null);
+        }
+        // Keep the per-type breakdown adding up to the new total, so cards
+        // don't keep showing the old quantities. A types change, if picked
+        // too, replaces this (selectUpdates).
+        const existing = appSandwichTypeArray(event.sandwichTypes);
+        if (existing.length) {
+          set('estimatedSandwichCount', 'sandwichTypes', rescaleTypes(existing, parsed.count));
+        }
       }
     } else {
       notes.push(`Sandwich estimate "${clean(estRaw)}" isn't a number, so it was left alone.`);
@@ -506,6 +528,18 @@ export function buildRowUpdatePlan(
         to: sheetTypes.map(typeLabel).join(', '),
         kind: appTypes.length ? 'update' : 'fill',
       });
+      // Range-mode estimates name ONE type. Keep it in step: the type when the
+      // sheet has one, cleared when it lists several (the breakdown carries them).
+      const willBeRange =
+        updates.estimatedSandwichCountMin !== undefined
+          ? updates.estimatedSandwichCountMin !== null || updates.estimatedSandwichCountMax !== null
+          : (event.estimatedSandwichCountMin ?? null) !== null || (event.estimatedSandwichCountMax ?? null) !== null;
+      if (willBeRange) {
+        const rangeType = sheetTypes.length === 1 ? sheetTypes[0] : null;
+        if (rangeType !== (event.estimatedSandwichRangeType ?? null)) {
+          set('sandwichTypes', 'estimatedSandwichRangeType', rangeType);
+        }
+      }
       if (sheetTypes.length > 1 && total > 0) {
         notes.push('Sandwich types changed, so the count was split evenly between them. Adjust per-type numbers in the app if needed.');
       }
@@ -734,7 +768,14 @@ export function selectUpdates(
   }
   const chosen = new Set(fields);
   const updates: Record<string, unknown> = {};
-  for (const f of chosen) Object.assign(updates, plan.updatesByField[f]);
+  // A picked types change is applied last so its breakdown wins over the
+  // estimate's rescaled one.
+  for (const f of chosen) if (f !== 'sandwichTypes') Object.assign(updates, plan.updatesByField[f]);
+  if (chosen.has('sandwichTypes')) Object.assign(updates, plan.updatesByField.sandwichTypes);
+  // An exact estimate means no range mode, whatever the types change said.
+  if (chosen.has('estimatedSandwichCount') && updates.estimatedSandwichCountMin === null && updates.estimatedSandwichCountMax === null) {
+    updates.estimatedSandwichRangeType = null;
+  }
 
   // Types were split using the NEW estimate. If the estimate was left out,
   // re-split them using the count the app keeps.
@@ -771,6 +812,34 @@ export function planToken(
     plan.updatesByField,
   ]);
   return createHash('sha256').update(canonical).digest('hex').slice(0, 32);
+}
+
+/** The event's stored per-type breakdown (array or legacy JSON string). */
+function appSandwichTypeArray(raw: unknown): { type: string; quantity: number }[] {
+  let arr: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      arr = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((t: any) => t && typeof t === 'object' && clean(t.type))
+    .map((t: any) => ({ ...t, type: String(t.type), quantity: Number(t.quantity) || 0 }));
+}
+
+/** Scale a breakdown to a new total, keeping its proportions (even split if it had none). */
+function rescaleTypes(types: { type: string; quantity: number }[], total: number) {
+  const sum = types.reduce((n, t) => n + (t.quantity > 0 ? t.quantity : 0), 0);
+  let given = 0;
+  return types.map((t, i) => {
+    const share = sum > 0 ? (t.quantity > 0 ? t.quantity : 0) / sum : 1 / types.length;
+    const quantity = Math.max(0, i === types.length - 1 ? total - given : Math.round(total * share));
+    given += quantity;
+    return { ...t, quantity };
+  });
 }
 
 /** The app's current planned total: exact count, else the range midpoint. */
@@ -839,3 +908,17 @@ export function sandwichTypesForNewEvent(
 export function normalizeGroupName(name: string | null | undefined): string {
   return clean(name).toLowerCase().replace(/\s+/g, ' ');
 }
+
+/**
+ * pickupDateTime is a local "YYYY-MM-DDTHH:MM:SS" string. When the event date
+ * moves, move the pick-up date by the same number of days so a same-day (or
+ * next-day) pickup stays that way.
+ */
+export const shiftPickupDateTime = (pickup: string, fromDay: string, toDay: string): string | null => {
+  const m = /^(\d{4}-\d{2}-\d{2})(.*)$/.exec(pickup);
+  if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(fromDay) || !/^\d{4}-\d{2}-\d{2}$/.test(toDay)) return null;
+  const utc = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  const shifted = new Date(utc(m[1]) + (utc(toDay) - utc(fromDay)));
+  return shifted.toISOString().slice(0, 10) + m[2];
+};
+

@@ -8,6 +8,7 @@ import {
   resolveSheetName,
   sandwichTypesForNewEvent,
   selectUpdates,
+  shiftPickupDateTime,
   staffingForNewEvent,
   type MatchableUser,
   type RowUpdateEvent,
@@ -464,10 +465,11 @@ describe('Copilot review fixes', () => {
     const narrower = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '225-275' }), USERS);
     expect(narrower.changes.find((c) => c.field === 'estimatedSandwichCount')).toMatchObject({ from: '200–300', to: '225–275' });
     const exact = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '250' }), USERS);
-    expect(exact.updatesByField.estimatedSandwichCount).toEqual({
+    expect(exact.updatesByField.estimatedSandwichCount).toMatchObject({
       estimatedSandwichCount: 250,
       estimatedSandwichCountMin: null,
       estimatedSandwichCountMax: null,
+      sandwichTypes: [{ type: 'deli', quantity: 250 }],
     });
     // A range-mode event (count null) with the same range: no change.
     const rangeMode = makeEvent({ estimatedSandwichCount: null, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 });
@@ -494,5 +496,66 @@ describe('Copilot review fixes', () => {
       status: 'cancelled',
       cancelledReason: 'Marked cancelled on the planning sheet',
     });
+  });
+});
+
+describe('Copilot review fixes, round 2', () => {
+  it('keeps an inactive existing assignee, but never matches a new name to an inactive user', () => {
+    const users = [...USERS, { id: 'u-old', firstName: 'Olga', lastName: 'Old', displayName: null, isActive: false }];
+    const keep = buildRowUpdatePlan(
+      makeEvent({ driversNeeded: 1, assignedDriverIds: ['u-old'], driverDetails: { 'u-old': { car: 'van' } } }),
+      makeRow({ Staffing: 'D: Olga Old' }),
+      users
+    );
+    expect(keep.changes).toEqual([]);
+    const fresh = buildRowUpdatePlan(makeEvent({ driversNeeded: 1 }), makeRow({ Staffing: 'D: Olga Old' }), users);
+    expect(fresh.updates.assignedDriverIds).toEqual(['Olga Old']);
+  });
+
+  it('shifts pickupDateTime with a moved event date', () => {
+    expect(shiftPickupDateTime('2026-11-14T13:30:00', '2026-11-14', '2026-11-13')).toBe('2026-11-13T13:30:00');
+    // next-day pickup stays next-day
+    expect(shiftPickupDateTime('2026-11-15T09:00:00', '2026-11-14', '2026-11-20')).toBe('2026-11-21T09:00:00');
+    expect(shiftPickupDateTime('garbage', '2026-11-14', '2026-11-13')).toBeNull();
+  });
+
+  it('splits at a role code with no comma before it', () => {
+    const s = parsePlanningStaffing('D: Katie V: Kim');
+    expect(s.driver.names).toEqual(['Katie']);
+    expect(s.volunteer.names).toEqual(['Kim']);
+  });
+
+  it('rescales the existing breakdown when only the estimate changes', () => {
+    const event = makeEvent({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 50 }] });
+    const plan = buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '400', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
+    expect(plan.updatesByField.estimatedSandwichCount?.sandwichTypes).toEqual([
+      { type: 'deli', quantity: 300 },
+      { type: 'pbj', quantity: 100 },
+    ]);
+    expect(plan.updatesByField.sandwichTypes).toBeUndefined();
+  });
+
+  it('a picked types change wins over the rescaled breakdown', () => {
+    const event = makeEvent({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 200 }] });
+    const plan = buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '300', 'Deli or PBJ?': 'PBJ' }), USERS);
+    expect(selectUpdates(plan, ['estimatedSandwichCount'], event).updates.sandwichTypes).toEqual([{ type: 'deli', quantity: 300 }]);
+    expect(selectUpdates(plan, ['sandwichTypes', 'estimatedSandwichCount'], event).updates.sandwichTypes).toEqual([{ type: 'pbj', quantity: 300 }]);
+  });
+
+  it('keeps the range type in step with a types change', () => {
+    const ranged = makeEvent({
+      estimatedSandwichCount: null,
+      estimatedSandwichCountMin: 200,
+      estimatedSandwichCountMax: 300,
+      estimatedSandwichRangeType: 'deli_turkey',
+      sandwichTypes: [{ type: 'deli_turkey', quantity: 250 }],
+    });
+    const one = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'PBJ' }), USERS);
+    expect(one.updatesByField.sandwichTypes?.estimatedSandwichRangeType).toBe('pbj');
+    const two = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
+    expect(two.updatesByField.sandwichTypes?.estimatedSandwichRangeType).toBeNull();
+    // An exact estimate leaves range mode, so the range type is cleared even if a types change is picked.
+    const exact = buildRowUpdatePlan(ranged, makeRow({ 'Estimate # sandwiches': '250', 'Deli or PBJ?': 'PBJ' }), USERS);
+    expect(selectUpdates(exact, ['estimatedSandwichCount', 'sandwichTypes'], ranged).updates.estimatedSandwichRangeType).toBeNull();
   });
 });

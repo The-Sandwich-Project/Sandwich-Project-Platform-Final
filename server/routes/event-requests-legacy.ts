@@ -24,7 +24,7 @@ import { isAuthenticated } from '../auth';
 import { getEventRequestsGoogleSheetsService } from '../google-sheets-event-requests-sync';
 import { AuditLogger } from '../audit-logger';
 import { db } from '../db';
-import { eq, desc, and, sql, gte, lte, or, isNull, ne, isNotNull } from 'drizzle-orm';
+import { eq, desc, and, sql, gte, lte, or, isNull, ne, isNotNull, inArray } from 'drizzle-orm';
 import { EmailNotificationService } from '../services/email-notification-service';
 import { logger } from '../middleware/logger';
 import type { AuthenticatedRequest } from '../types/express';
@@ -83,6 +83,7 @@ import {
   sandwichTypesForNewEvent,
   selectUpdates,
   sheetNoteParts,
+  shiftPickupDateTime,
   staffingCellOf,
   staffingForNewEvent,
   type RowUpdateEvent,
@@ -717,16 +718,29 @@ const sheetRowUpdateExtrasSchema = z.object({
   fields: z.array(z.string()).optional(),
 });
 
-const fetchActiveUsersForRowUpdate = async () =>
-  db
+/**
+ * Active users (new sheet names may match only these), plus any INACTIVE user
+ * already assigned to these events, so an existing assignee whose name the push
+ * wrote to the sheet keeps their ID and per-person details.
+ */
+const fetchUsersForRowUpdate = async (events: EventRequest[]) => {
+  const assigned = Array.from(
+    new Set(
+      events.flatMap((e) => [...(e.assignedDriverIds ?? []), ...(e.assignedVolunteerIds ?? [])]).filter(Boolean)
+    )
+  );
+  return db
     .select({
       id: users.id,
       firstName: users.firstName,
       lastName: users.lastName,
       displayName: users.displayName,
+      isActive: users.isActive,
     })
     .from(users)
-    .where(eq(users.isActive, true));
+    .where(assigned.length ? or(eq(users.isActive, true), inArray(users.id, assigned)) : eq(users.isActive, true));
+};
+
 
 /**
  * Find app events this sheet row could be. The date can change on the sheet,
@@ -801,7 +815,7 @@ router.post('/import-from-sheets/preview-update', validateSheetsApiKey, async (r
       });
     }
 
-    const allUsers = await fetchActiveUsersForRowUpdate();
+    const allUsers = await fetchUsersForRowUpdate(candidates);
     const results = candidates.map((event) => {
       const plan = buildRowUpdatePlan(event as unknown as RowUpdateEvent, row, allUsers);
       const appDate = toDateOnlyString(getEffectiveEventDate(event) as any);
@@ -863,7 +877,7 @@ router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req
       return res.status(404).json({ success: false, error: 'That event no longer exists in the app.' });
     }
 
-    const allUsers = await fetchActiveUsersForRowUpdate();
+    const allUsers = await fetchUsersForRowUpdate([event]);
     const plan = buildRowUpdatePlan(event as unknown as RowUpdateEvent, row, allUsers);
     if (planToken(event as unknown as RowUpdateEvent, plan) !== extras.data.token) {
       return res.status(409).json({
@@ -894,6 +908,13 @@ router.post('/import-from-sheets/apply-update', validateSheetsApiKey, async (req
     // the same way the normal PATCH does, using the event's date after this update.
     if (patch.pickupTime) {
       patch = processPickupTimeFields(patch, { ...event, ...patch });
+    } else if (patch.scheduledEventDate && event.pickupDateTime) {
+      const shifted = shiftPickupDateTime(
+        String(event.pickupDateTime),
+        toDateOnlyString(getEffectiveEventDate(event) as any),
+        toDateOnlyString(patch.scheduledEventDate as any)
+      );
+      if (shifted) patch.pickupDateTime = shifted;
     }
     if (patch.status === 'cancelled') {
       const now = new Date();
