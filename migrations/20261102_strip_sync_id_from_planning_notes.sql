@@ -16,8 +16,10 @@
 -- What it touches
 -- ---------------
 -- Only a line that is exactly "Additional Notes: <uuid>" / "Additional notes:
--- <uuid>" (optionally followed by spaces). The newline(s) before it go too, so
--- no blank gap is left. Leading newlines left behind are trimmed, and notes
+-- <uuid>" (optionally followed by spaces): it must start at the beginning of
+-- the notes or of a line, and end at a line break or the end. The newline(s)
+-- before it go too, so no blank gap is left. Text that merely ends with
+-- "... Additional Notes: <uuid>" mid-line is NOT touched. Leading newlines left behind are trimmed, and notes
 -- that end up empty become NULL. Any other text, including "Additional
 -- Notes:" lines that hold real notes, is left exactly as it is.
 --
@@ -28,14 +30,14 @@
 --
 -- SELECT id, organization_name, planning_notes
 -- FROM event_requests
--- WHERE planning_notes ~* 'additional notes: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[ \t]*(\n|$)';
+-- WHERE planning_notes ~* E'(^|\n)additional notes: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[ \t]*(\n|$)';
 
 UPDATE event_requests
 SET planning_notes = NULLIF(
   regexp_replace(
     regexp_replace(
       planning_notes,
-      E'\\n*additional notes: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[ \\t]*(?=\\n|$)',
+      E'(^|\\n+)additional notes: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[ \\t]*(?=\\n|$)',
       '',
       'gi'
     ),
@@ -44,4 +46,4 @@ SET planning_notes = NULLIF(
   ),
   ''
 )
-WHERE planning_notes ~* E'additional notes: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[ \\t]*(\\n|$)';
+WHERE planning_notes ~* E'(^|\\n)additional notes: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[ \\t]*(\\n|$)';

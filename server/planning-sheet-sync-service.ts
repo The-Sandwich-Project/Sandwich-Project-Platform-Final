@@ -58,6 +58,13 @@ export const SHEET_OWNED_COLUMNS: readonly number[] = [
   PLANNING_SHEET_COLUMNS.UNLABELED_AB,
 ];
 
+/** A copy of a new row with every sheet-owned cell blank (for rows the app creates). */
+export function blankSheetOwnedColumns(row: string[]): string[] {
+  const out = [...row];
+  for (const i of SHEET_OWNED_COLUMNS) if (i < out.length) out[i] = '';
+  return out;
+}
+
 /** Copy the sheet's own values into the sheet-owned columns of a row about to be written. */
 export function keepSheetOwnedColumns(row: string[], existingRaw: string[]): string[] {
   const out = [...row];
@@ -1325,10 +1332,14 @@ export class PlanningSheetSyncService {
    */
   private async applyNewRow(proposal: any): Promise<{ success: boolean; message: string }> {
     const originalRow = proposal.proposedRowData as string[];
-    const rowData = migrateProposedPlanningRow(originalRow);
-    if (!rowData || !Array.isArray(rowData)) {
+    const migrated = migrateProposedPlanningRow(originalRow);
+    if (!migrated || !Array.isArray(migrated)) {
       return { success: false, message: 'Invalid row data in proposal' };
     }
+    // Proposals queued before the sheet-owned columns existed still carry the
+    // old Social Post (P) / Waiting On (AB) values. A new row never writes
+    // sheet-owned cells, whenever the proposal was made.
+    const rowData = blankSheetOwnedColumns(migrated);
     if (originalRow && rowData.length !== originalRow.length) {
       try {
         await db
@@ -1436,6 +1447,9 @@ export class PlanningSheetSyncService {
     const columnIndex = PLANNING_SHEET_COLUMNS[proposal.fieldName as keyof typeof PLANNING_SHEET_COLUMNS];
     if (columnIndex === undefined) {
       return { success: false, message: `Unknown field: ${proposal.fieldName}` };
+    }
+    if (SHEET_OWNED_COLUMNS.includes(columnIndex)) {
+      return { success: false, message: `${proposal.fieldName} is maintained on the sheet; the app doesn't write it` };
     }
 
     // Convert 0-based column index → spreadsheet letter (A, B, ..., Z, AA, AB, ...).

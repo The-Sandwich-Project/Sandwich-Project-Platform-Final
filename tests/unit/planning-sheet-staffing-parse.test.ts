@@ -10,6 +10,7 @@ import {
   PLANNING_SHEET_COLUMN_COUNT,
   SHEET_OWNED_COLUMNS,
   keepSheetOwnedColumns,
+  blankSheetOwnedColumns,
   assignmentLabelForUnknownId,
   formatStaffingColumn,
   parseStaffingColumn,
@@ -77,5 +78,17 @@ describe('sheet-owned columns (live layout, Nov 2026)', () => {
     expect(out[27]).toBe('sheet');
     expect(out[2]).toBe('app'); // everything else is the app's row
     expect(appRow[26]).toBe('app'); // input not mutated
+  });
+});
+
+describe('queued proposals never write sheet-owned columns', () => {
+  it('blanks O/P/AA/AB on a row the app creates, leaving the rest', () => {
+    const queued = new Array(PLANNING_SHEET_COLUMN_COUNT).fill('x');
+    queued[15] = 'Yes'; // old Social Post value
+    queued[27] = 'Confirm time'; // old Waiting On value
+    const out = blankSheetOwnedColumns(queued);
+    expect([out[14], out[15], out[26], out[27]]).toEqual(['', '', '', '']);
+    expect(out[2]).toBe('x');
+    expect(queued[15]).toBe('Yes'); // input not mutated
   });
 });
