@@ -10,11 +10,6 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { ScheduledCardEnhanced } from '../cards/ScheduledCardEnhanced';
 import { RescheduleDialog } from '../dialogs/RescheduleDialog';
 import { DuplicateEventDialog } from '../dialogs/DuplicateEventDialog';
-import {
-  buildInlineSandwichPatch,
-  DEFAULT_NEW_SANDWICH_TYPE,
-  inlineSandwichStateFromEvent,
-} from '../lib/inline-sandwich-edit';
 import { useConfirmation } from '@/components/ui/confirmation-dialog';
 import type { EventRequest } from '@shared/schema';
 import { ScheduledSpreadsheetView } from '../views/ScheduledSpreadsheetView';
@@ -114,18 +109,6 @@ export const ScheduledTab: React.FC = () => {
     setEditingField,
     editingValue,
     setEditingValue,
-    inlineSandwichMode,
-    setInlineSandwichMode,
-    inlineTotalCount,
-    setInlineTotalCount,
-    inlineSandwichTypes,
-    setInlineSandwichTypes,
-    inlineRangeMin,
-    setInlineRangeMin,
-    inlineRangeMax,
-    setInlineRangeMax,
-    inlineRangeType,
-    setInlineRangeType,
     openDialog,
   } = useEventDialogState();
 
@@ -155,22 +138,7 @@ export const ScheduledTab: React.FC = () => {
         setTempIsConfirmed(eventRequest.isConfirmed || false);
       }
     }
-
-    // Special handling for sandwich types
-    if (field === 'sandwichTypes') {
-      const eventRequest = eventRequests.find(req => req.id === id);
-      if (eventRequest) {
-        // Same mode choice as the full form, and every field reset (range
-        // values used to carry over from the previous event edited).
-        const st = inlineSandwichStateFromEvent(eventRequest);
-        setInlineSandwichMode(st.mode);
-        setInlineTotalCount(st.totalCount);
-        setInlineSandwichTypes(st.types);
-        setInlineRangeMin(st.rangeMin);
-        setInlineRangeMax(st.rangeMax);
-        setInlineRangeType(st.rangeType);
-      }
-    }
+    // The sandwich estimate's quick edit keeps its own state (CardSandwichEstimateEdit).
   };
 
   const saveEdit = () => {
@@ -178,22 +146,7 @@ export const ScheduledTab: React.FC = () => {
       // Define the actual save logic
       const performSave = () => {
 
-      // Special handling for sandwich types
-      if (editingField === 'sandwichTypes') {
-        const updateData = buildInlineSandwichPatch({
-          mode: inlineSandwichMode,
-          totalCount: inlineTotalCount,
-          types: inlineSandwichTypes,
-          rangeMin: inlineRangeMin,
-          rangeMax: inlineRangeMax,
-          rangeType: inlineRangeType,
-        });
-
-        updateEventRequestMutation.mutate({
-          id: editingScheduledId,
-          data: updateData,
-        });
-      } else if (editingField === 'hasRefrigeration') {
+      if (editingField === 'hasRefrigeration') {
         // Special handling for refrigeration
         let refrigerationValue: boolean | null;
         if (editingValue === 'true') {
@@ -367,12 +320,6 @@ export const ScheduledTab: React.FC = () => {
     setEditingScheduledId(null);
     setEditingField(null);
     setEditingValue('');
-    setInlineSandwichMode('total');
-    setInlineTotalCount(0);
-    setInlineSandwichTypes([]);
-    setInlineRangeMin(0);
-    setInlineRangeMax(0);
-    setInlineRangeType('');
   };
 
   // Batch save function for saving multiple time fields at once (used by TimeDialogContent)
@@ -382,20 +329,6 @@ export const ScheduledTab: React.FC = () => {
       data,
     });
     cancelEdit();
-  };
-
-  const addInlineSandwichType = () => {
-    setInlineSandwichTypes(prev => [...prev, { type: DEFAULT_NEW_SANDWICH_TYPE, quantity: 0 }]);
-  };
-
-  const updateInlineSandwichType = (index: number, field: 'type' | 'quantity', value: string | number) => {
-    setInlineSandwichTypes(prev => prev.map((item, i) =>
-      i === index ? { ...item, [field]: value } : item
-    ));
-  };
-
-  const removeInlineSandwichType = (index: number) => {
-    setInlineSandwichTypes(prev => prev.filter((_, i) => i !== index));
   };
 
   const quickToggleBoolean = (id: number, field: 'isConfirmed' | 'addedToOfficialSheet' | 'showOnVolunteerHub', currentValue: boolean) => {
@@ -504,12 +437,6 @@ export const ScheduledTab: React.FC = () => {
                 editingField={editingField}
                 editingValue={editingValue}
                 isEditingThisCard={editingScheduledId === request.id}
-                inlineSandwichMode={inlineSandwichMode}
-                inlineTotalCount={inlineTotalCount}
-                inlineSandwichTypes={inlineSandwichTypes}
-                inlineRangeMin={inlineRangeMin}
-                inlineRangeMax={inlineRangeMax}
-                inlineRangeType={inlineRangeType}
                 isSaving={updateEventRequestMutation.isPending || updateScheduledFieldMutation.isPending}
                 onEdit={() => {
                   setSelectedEventRequest(request);
@@ -560,14 +487,6 @@ export const ScheduledTab: React.FC = () => {
                 tempIsConfirmed={tempIsConfirmed}
                 setTempIsConfirmed={setTempIsConfirmed}
                 quickToggleBoolean={(field, value) => quickToggleBoolean(request.id, field, value)}
-                setInlineSandwichMode={setInlineSandwichMode}
-                setInlineTotalCount={setInlineTotalCount}
-                setInlineRangeMin={setInlineRangeMin}
-                setInlineRangeMax={setInlineRangeMax}
-                setInlineRangeType={setInlineRangeType}
-                addInlineSandwichType={addInlineSandwichType}
-                updateInlineSandwichType={updateInlineSandwichType}
-                removeInlineSandwichType={removeInlineSandwichType}
                 resolveUserName={resolveUserName}
                 resolveRecipientName={resolveRecipientName}
                 openAssignmentDialog={(type, isVanDriver) => openAssignmentDialog(request.id, type, isVanDriver)}

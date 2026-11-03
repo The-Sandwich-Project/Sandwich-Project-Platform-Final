@@ -9,6 +9,7 @@ import { normalizeToolkitPatch } from '@shared/toolkit-state';
  */
 
 import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
+import { estimateStateFromFields, normalizeEstimate } from '@shared/sandwich-estimate';
 import type { EventFormData } from './form-sections/types';
 export { findMismatchedSavedFields, getDroppedServerFields } from '@/lib/event-save-verification';
 
@@ -98,12 +99,13 @@ export function buildEventDataForServer(
     mode: 'schedule' | 'edit' | 'create';
     hasEventRequest: boolean;
     eventRequestStatus?: string;
-    sandwichMode: 'total' | 'range' | 'types';
+    /** No longer used: the estimate is always sent from the form's estimate fields. */
+    sandwichMode?: 'total' | 'range' | 'types';
     actualSandwichMode: 'total' | 'types';
     fieldOverrides?: Record<string, any>;
   }
 ): Record<string, any> {
-  const { mode, hasEventRequest, eventRequestStatus, sandwichMode, actualSandwichMode, fieldOverrides } = options;
+  const { mode, hasEventRequest, eventRequestStatus, actualSandwichMode, fieldOverrides } = options;
 
   // Resolve the effective status once so the status field and the scheduled-date
   // coupling stay consistent. (Schedule mode defaults to 'scheduled'.)
@@ -252,37 +254,29 @@ export function buildEventDataForServer(
     })(),
   };
 
-  // Sandwich estimate, by mode. Each mode sends only what it edits; the
-  // server's shared estimate rule (shared/sandwich-estimate.ts) keeps the rest
-  // consistent: an exact count clears the range (so a stale range can't
-  // survive next to it - the "500 shows as 498" bug), and existing types are
-  // kept (amounts that no longer fit are dropped) instead of being deleted.
-  // The diff-based save in EventSchedulingForm drops anything unchanged.
-  if (sandwichMode === 'total') {
-    eventData.estimatedSandwichCount = formData.totalSandwichCount;
-    eventData.estimatedSandwichCountMin = null;
-    eventData.estimatedSandwichCountMax = null;
-  } else if (sandwichMode === 'range') {
-    eventData.estimatedSandwichCountMin = formData.estimatedSandwichCountMin || null;
-    eventData.estimatedSandwichCountMax = formData.estimatedSandwichCountMax || null;
-    eventData.estimatedSandwichCount = null;
-    // A picked range type IS the type; "No specific type" (null) clears it.
-    // quantity 0 = amount TBD (the save schemas require a number).
-    eventData.estimatedSandwichRangeType = formData.rangeSandwichType || null;
-    if (formData.rangeSandwichType) {
-      eventData.sandwichTypes = [{ type: formData.rangeSandwichType, quantity: 0 }];
-    }
-  } else {
-    eventData.sandwichTypes = JSON.stringify(formData.sandwichTypes);
-    // Only a complete breakdown sets the total. With some amounts left blank
-    // (TBD) the existing total is kept.
-    const lines = (formData.sandwichTypes || []).filter((t: any) => t && t.type);
-    const complete = lines.length > 0 && lines.every((t: any) => Number(t.quantity) > 0);
-    if (complete) {
-      eventData.estimatedSandwichCount = sumSandwichTypeQuantities(formData.sandwichTypes);
-      eventData.estimatedSandwichCountMin = null;
-      eventData.estimatedSandwichCountMax = null;
-    }
+  // Sandwich estimate. The shared editor (SandwichEstimateEditor) keeps the
+  // form's estimate fields consistent; here they're normalized by the same
+  // shared rule the server uses and sent as one complete estimate. The
+  // diff-based save in EventSchedulingForm serializes the original form the
+  // same way, so an untouched estimate sends nothing, and a changed one sends
+  // only the fields that changed (the server rule reads partial estimates).
+  // sandwichTypes goes as JSON text so per-type ranges (min/max) survive the
+  // request schema, which strips unknown keys from array entries.
+  {
+    const est = normalizeEstimate(
+      estimateStateFromFields({
+        estimatedSandwichCount: formData.totalSandwichCount || null,
+        estimatedSandwichCountMin: formData.estimatedSandwichCountMin || null,
+        estimatedSandwichCountMax: formData.estimatedSandwichCountMax || null,
+        estimatedSandwichRangeType: formData.rangeSandwichType || null,
+        sandwichTypes: formData.sandwichTypes,
+      })
+    );
+    eventData.estimatedSandwichCount = est.estimatedSandwichCount;
+    eventData.estimatedSandwichCountMin = est.estimatedSandwichCountMin;
+    eventData.estimatedSandwichCountMax = est.estimatedSandwichCountMax;
+    eventData.estimatedSandwichRangeType = est.estimatedSandwichRangeType;
+    eventData.sandwichTypes = est.sandwichTypes ? JSON.stringify(est.sandwichTypes) : null;
   }
 
   // Attendee counts.

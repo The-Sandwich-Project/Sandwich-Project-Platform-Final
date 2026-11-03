@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { formatEstimate } from '@shared/sandwich-estimate';
 
 /**
  * Utility functions for handling sandwich types data
@@ -242,4 +243,22 @@ export function validateSandwichTypes(sandwichTypes: any): boolean {
     typeof item.quantity === 'number' &&
     item.quantity >= 0
   );
+}
+/**
+ * The planned (estimated) sandwiches for an event, worded the same everywhere:
+ * "300 PB&J", "200–300 Turkey", "300 (150 Deli, PB&J TBD)",
+ * "300–400, Deli & PB&J (split TBD)", "250, type TBD".
+ * Uses the shared estimate rule (shared/sandwich-estimate.ts), so it reads
+ * ranges, per-type ranges and amounts not decided yet the way they're saved.
+ * Not for delivered (actual) counts.
+ */
+export function formatEventEstimate(event: {
+  estimatedSandwichCount?: unknown;
+  estimatedSandwichCountMin?: unknown;
+  estimatedSandwichCountMax?: unknown;
+  estimatedSandwichRangeType?: unknown;
+  sandwichTypes?: unknown;
+} | null | undefined, empty = 'Not specified'): string {
+  if (!event) return empty;
+  return formatEstimate(event) || empty;
 }
