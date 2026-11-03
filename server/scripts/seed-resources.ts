@@ -13,9 +13,9 @@ const categoryMap: Record<string, string> = {
   'Forms': 'forms_templates',
   'Safety Guidelines': 'operations_safety',
   'Labels & Printing': 'operations_safety',
-  'Sandwich Making': 'training',
+  'Sandwich Making': 'toolkit',
   'Tools': 'forms_templates',
-  'Reference Lists': 'training',
+  'Reference Lists': 'master_documents',
 };
 
 // Initial resources data
@@ -56,7 +56,7 @@ const initialResources = [
     description: 'Required agreement form for volunteer drivers',
     type: 'link' as const,
     category: 'forms_templates',
-    url: '/attached_assets/TSP Volunteer Driver Agreement (1).pdf',
+    url: '/documents/volunteer-driver-agreement.pdf',
     isPinnedGlobal: false,
   },
   {
@@ -64,7 +64,7 @@ const initialResources = [
     description: 'Form for tracking and documenting community service hours',
     type: 'link' as const,
     category: 'forms_templates',
-    url: '/attached_assets/TSP COMMUNITY SERVICE HOURS (1) (1) (1).pdf',
+    url: '/documents/community-service-hours.pdf',
     isPinnedGlobal: false,
   },
   {
@@ -73,7 +73,7 @@ const initialResources = [
       'Simple sign-in form for tracking sandwich collection participants without requiring email addresses',
     type: 'link' as const,
     category: 'forms_templates',
-    url: '/attached_assets/Sandwich Project - Sign In Sheet correct qrs.pdf',
+    url: '/documents/volunteer-sign-in-sheet.pdf',
     isPinnedGlobal: false,
   },
 
@@ -94,7 +94,7 @@ const initialResources = [
       'Comprehensive safety protocols for volunteers preparing and delivering sandwiches',
     type: 'link' as const,
     category: 'operations_safety',
-    url: '/attached_assets/20260506-TSP-Food+Safety+Volunteers.pdf',
+    url: '/documents/food-safety-volunteers.pdf',
     isPinnedGlobal: false,
   },
   {
@@ -120,7 +120,7 @@ const initialResources = [
     description: 'Official TSP labels for deli sandwich identification and tracking',
     type: 'link' as const,
     category: 'operations_safety',
-    url: '/attached_assets/Deli Labels_1756865384146.pdf',
+    url: '/documents/deli-labels.pdf',
     isPinnedGlobal: false,
   },
   {
@@ -128,7 +128,7 @@ const initialResources = [
     description: 'Labels and guidelines for peanut butter and jelly sandwiches',
     type: 'link' as const,
     category: 'operations_safety',
-    url: '/attached_assets/PBJ Labels_1756865384146.pdf',
+    url: '/documents/pbj-labels.pdf',
     isPinnedGlobal: false,
   },
 
@@ -137,16 +137,16 @@ const initialResources = [
     title: 'Deli Sandwich Making 101',
     description: 'Complete guide to preparing deli sandwiches according to TSP standards',
     type: 'link' as const,
-    category: 'training',
-    url: '/attached_assets/Deli Sandwich Making 101 03172026.pdf',
+    category: 'toolkit',
+    url: '/documents/deli-sandwich-making-101.pdf',
     isPinnedGlobal: false,
   },
   {
     title: 'PBJ Sandwich Making 101',
     description: 'Step-by-step instructions for making peanut butter and jelly sandwiches',
     type: 'link' as const,
-    category: 'training',
-    url: '/attached_assets/PBJ Sandwich Making 2 101 03172026.pdf',
+    category: 'toolkit',
+    url: '/documents/pbj-sandwich-making-101.pdf',
     isPinnedGlobal: false,
   },
   {
@@ -154,7 +154,7 @@ const initialResources = [
     description:
       'Comprehensive final confirmed list of all congregations including churches, synagogues, and religious organizations',
     type: 'link' as const,
-    category: 'training',
+    category: 'master_documents',
     url: '/attached_assets/Master_Congregations_List_Final_1759034641771.pdf',
     isPinnedGlobal: false,
   },
@@ -163,7 +163,7 @@ const initialResources = [
     description:
       'Complete directory of corporate partners, businesses, and company organizations working with The Sandwich Project',
     type: 'link' as const,
-    category: 'training',
+    category: 'master_documents',
     url: '/attached_assets/TSP Company List _1759034641773.pdf',
     isPinnedGlobal: false,
   },
@@ -172,7 +172,7 @@ const initialResources = [
     description:
       'Comprehensive list of educational institutions including elementary, middle, high schools, and universities',
     type: 'link' as const,
-    category: 'training',
+    category: 'master_documents',
     url: '/attached_assets/Unified_Schools_List_1759034641773.pdf',
     isPinnedGlobal: false,
   },
@@ -275,7 +275,7 @@ async function seed() {
         if (resource.category === 'legal_governance') {
           tagsToAssign.push('Legal');
         }
-        if (resource.category === 'training') {
+        if (resource.category === 'toolkit') {
           tagsToAssign.push('Training');
         }
         if (resource.category === 'forms_templates') {

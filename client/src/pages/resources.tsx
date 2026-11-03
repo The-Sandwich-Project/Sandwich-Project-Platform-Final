@@ -63,6 +63,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ConfidentialDocuments } from '@/components/confidential-documents';
+import LogosPage from '@/pages/logos';
 
 // Category definitions with icons and colors (using brand color scheme)
 const CATEGORIES = [
@@ -160,7 +163,7 @@ interface Tag {
 /** Fallback paths when a seeded resource lost its URL in the DB (e.g. after a bad edit). */
 const STATIC_RESOURCE_URLS: Record<string, string> = {
   'Sandwich Sign-In Form':
-    '/attached_assets/Sandwich Project - Sign In Sheet correct qrs.pdf',
+    '/documents/volunteer-sign-in-sheet.pdf',
 };
 
 function getResourceOpenUrl(item: Resource): string | null {
@@ -739,7 +742,97 @@ function SandwichGuideEditDialog({
   );
 }
 
-export function Resources() {
+// Files uploaded through Document Management live in the documents table.
+// They're listed here live from /api/documents rather than copied into
+// resources, so there's no second copy to drift out of sync. The server only
+// returns active documents, and confidential ones only to users with
+// DOCUMENTS_CONFIDENTIAL; download/preview routes re-check both.
+interface UploadedDocument {
+  id: number;
+  title: string;
+  description: string | null;
+  category: string;
+  originalName: string;
+}
+
+// Both lists below load every resource (the API defaults to 100), so a file
+// whose card exists is never hidden from Uploaded files by a card that didn't
+// load.
+const RESOURCE_LIST_LIMIT = '1000';
+const FILE_RESOURCES_KEY = [`/api/resources?type=file&limit=${RESOURCE_LIST_LIMIT}`];
+
+interface FileResourceRow {
+  resource: { documentId: number | null };
+}
+
+function useUploadedDocuments() {
+  const { data: docs } = useQuery<UploadedDocument[]>({ queryKey: ['/api/documents'] });
+  // Files added through "Add Resource" already have a resource card; don't
+  // list them twice.
+  const { data: fileResources } = useQuery<FileResourceRow[]>({
+    queryKey: FILE_RESOURCES_KEY,
+  });
+  const linked = new Set(
+    (fileResources || []).map((r) => r.resource.documentId).filter((id): id is number => id != null)
+  );
+  const all = docs || [];
+  return {
+    confidential: all.filter((d) => d.category === 'confidential'),
+    library: all.filter((d) => d.category !== 'confidential' && !linked.has(d.id)),
+  };
+}
+
+function UploadedDocumentsList({
+  docs,
+  title,
+  subtitle,
+  testId,
+}: {
+  docs: UploadedDocument[];
+  title: string;
+  subtitle: string;
+  testId: string;
+}) {
+  if (docs.length === 0) return null;
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-4 mb-6" data-testid={testId}>
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">{title}</h2>
+      <p className="text-sm text-gray-500 mb-3">{subtitle}</p>
+      <ul className="divide-y divide-gray-100">
+        {docs.map((doc) => (
+          <li key={doc.id} className="py-2 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 truncate">{doc.title}</p>
+              {doc.description && (
+                <p className="text-sm text-gray-500 truncate">{doc.description}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              <a
+                href={`/api/documents/${doc.id}/preview`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-[#236383] hover:underline flex items-center gap-1"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open
+              </a>
+              <a
+                href={`/api/documents/${doc.id}/download`}
+                className="text-sm text-[#236383] hover:underline flex items-center gap-1"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </a>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
   const { user } = useAuth();
   const isAdmin =
     user?.role === 'admin' ||
@@ -747,6 +840,24 @@ export function Resources() {
     user?.permissions?.includes('manage_resources');
   const { track } = useOnboardingTracker();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Only these two accounts see confidential documents (same gate the old
+  // Important Documents page used; the server also enforces it).
+  const hasConfidentialAccess =
+    user?.email === 'admin@sandwich.project' ||
+    user?.email === 'katielong2316@gmail.com';
+  const uploads = useUploadedDocuments();
+  const confidentialUploads = uploads.confidential;
+  const showConfidentialTab = hasConfidentialAccess || confidentialUploads.length > 0;
+  // The tab comes from Dashboard (which resolves split-view panel
+  // destinations too), so follow it when it changes.
+  const toResourcesTab = (tab?: string | null) =>
+    tab === 'logos' || tab === 'confidential' ? tab : 'library';
+  const [activeTab, setActiveTab] = useState(() => toResourcesTab(initialTab));
+  useEffect(() => {
+    setActiveTab(toResourcesTab(initialTab));
+  }, [initialTab]);
 
   const [resources, setResources] = useState<Resource[]>([]);
   const [favorites, setFavorites] = useState<Resource[]>([]);
@@ -771,12 +882,23 @@ export function Resources() {
   }, []);
 
   // Load resources
+  // After add/edit/delete or an explicit refresh, also refetch the Uploaded
+  // files inputs so a converted or newly linked file shows up (or drops out)
+  // at once. Not done in loadResources itself, which also runs on every
+  // search/filter change, when neither dataset has changed.
+  const reloadAfterChange = async () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+    queryClient.invalidateQueries({ queryKey: FILE_RESOURCES_KEY });
+    await loadResources();
+  };
+
   const loadResources = async () => {
     try {
       setLoading(true);
       setError(null);
       const params = new URLSearchParams({
         sort: sortBy,
+        limit: RESOURCE_LIST_LIMIT,
         ...(selectedCategory && { category: selectedCategory }),
         ...(searchTerm && { search: searchTerm }),
         ...(selectedTags.length > 0 && { tags: selectedTags.join(',') }),
@@ -867,7 +989,7 @@ export function Resources() {
         description: `"${title}" has been removed.`,
       });
       setResourceToDelete(null);
-      await loadResources();
+      await reloadAfterChange();
     } catch (err) {
       toast({
         title: 'Delete failed',
@@ -1204,7 +1326,7 @@ export function Resources() {
           </h3>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={() => loadResources()}
+            onClick={() => reloadAfterChange()}
             className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#007E8C] transition-colors"
           >
             Try Again
@@ -1235,7 +1357,7 @@ export function Resources() {
           setShowAddModal(false);
           setEditingResource(null);
         }}
-        onSuccess={loadResources}
+        onSuccess={reloadAfterChange}
         availableTags={tags}
         existingResource={editingResource ?? undefined}
       />
@@ -1251,8 +1373,11 @@ export function Resources() {
             <AlertDialogTitle>Delete resource?</AlertDialogTitle>
             <AlertDialogDescription>
               {resourceToDelete
-                ? `"${resourceToDelete.resource.title}" will be hidden from this page for everyone. An admin can restore it later if needed.`
-                : 'This resource will be hidden from this page for everyone.'}
+                ? `"${resourceToDelete.resource.title}" will be removed from this page for everyone. An admin can restore it later if needed.`
+                : 'This resource will be removed from this page for everyone.'}
+              {resourceToDelete?.resource.type === 'file' && resourceToDelete.resource.documentId
+                ? ' The uploaded file itself stays in Document Management and will still be listed under Uploaded files. To hide the file too, deactivate it in Document Management.'
+                : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1291,292 +1416,350 @@ export function Resources() {
               </button>
             )}
           </div>
+        </div>
 
-          {/* Search and Filters */}
-          <div className="bg-white rounded-lg shadow-sm p-4" data-testid="resources-filters">
-            <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search resources..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  data-testid="resources-search"
-                />
-              </div>
+        <Tabs
+          value={activeTab === 'confidential' && !showConfidentialTab ? 'library' : activeTab}
+          onValueChange={setActiveTab}
+        >
+          <TabsList className="mb-6">
+            <TabsTrigger value="library" data-testid="tab-resources-library" data-tour="resources-library-tab">
+              Documents & Links
+            </TabsTrigger>
+            <TabsTrigger value="logos" data-testid="tab-resources-logos" data-tour="resources-logos-tab">
+              Logos & Branding
+            </TabsTrigger>
+            {showConfidentialTab && (
+              <TabsTrigger value="confidential" data-testid="tab-resources-confidential">
+                Confidential
+              </TabsTrigger>
+            )}
+          </TabsList>
 
-              {/* Sort */}
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="smart">Smart Sort</option>
-                <option value="alphabetical">Alphabetical</option>
-                <option value="recent">Recently Accessed</option>
-                <option value="popular">Most Popular</option>
-                <option value="newest">Newest First</option>
-              </select>
+          <TabsContent value="library">
+            <div className="mb-6">
+              {/* Search and Filters */}
+              <div className="bg-white rounded-lg shadow-sm p-4" data-testid="resources-filters">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Search */}
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search resources..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      data-testid="resources-search"
+                    />
+                  </div>
 
-              {/* Filters Toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                data-tour="resources-filters-toggle"
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-              >
-                <Filter className="w-5 h-5" />
-                Filters
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${
-                    showFilters ? 'rotate-180' : ''
-                  }`}
-                />
-              </button>
-            </div>
+                  {/* Sort */}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="smart">Smart Sort</option>
+                    <option value="alphabetical">Alphabetical</option>
+                    <option value="recent">Recently Accessed</option>
+                    <option value="popular">Most Popular</option>
+                    <option value="newest">Newest First</option>
+                  </select>
 
-            {/* Expanded Filters */}
-            {showFilters && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                {/* Category Filter */}
-                <div className="mb-4" data-testid="resources-categories">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category
-                  </label>
-                  <div className="flex flex-wrap gap-2" data-testid="category-filter">
-                    <button
-                      onClick={() => setSelectedCategory(null)}
-                      className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                        selectedCategory === null
-                          ? 'bg-[#236383] text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  {/* Filters Toggle */}
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    data-tour="resources-filters-toggle"
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  >
+                    <Filter className="w-5 h-5" />
+                    Filters
+                    <ChevronDown
+                      className={`w-4 h-4 transition-transform ${
+                        showFilters ? 'rotate-180' : ''
                       }`}
-                    >
-                      All
-                    </button>
-                    {CATEGORIES.map((cat) => {
-                      const Icon = cat.icon;
-                      return (
+                    />
+                  </button>
+                </div>
+
+                {/* Expanded Filters */}
+                {showFilters && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    {/* Category Filter */}
+                    <div className="mb-4" data-testid="resources-categories">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Category
+                      </label>
+                      <div className="flex flex-wrap gap-2" data-testid="category-filter">
                         <button
-                          key={cat.id}
-                          data-tour={`category-${cat.id}`}
-                          onClick={() => setSelectedCategory(cat.id)}
-                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-1.5 ${
-                            selectedCategory === cat.id
-                              ? `${cat.bgColor} ${cat.color} border ${cat.borderColor}`
+                          onClick={() => setSelectedCategory(null)}
+                          className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                            selectedCategory === null
+                              ? 'bg-[#236383] text-white'
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                         >
-                          <Icon className="w-4 h-4" />
-                          {cat.label}
+                          All
                         </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Tag Filter */}
-                {tags.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tags
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {tags.map((tag) => {
-                        const isSelected = selectedTags.includes(tag.tag.name);
-                        return (
-                          <button
-                            key={tag.tag.id}
-                            onClick={() => {
-                              if (isSelected) {
-                                setSelectedTags(
-                                  selectedTags.filter((t) => t !== tag.tag.name)
-                                );
-                              } else {
-                                setSelectedTags([...selectedTags, tag.tag.name]);
-                              }
-                            }}
-                            className={`px-3 py-1.5 rounded-full text-sm transition-colors flex items-center gap-1.5 ${
-                              isSelected
-                                ? 'bg-[#236383] text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                            style={
-                              tag.tag.color && !isSelected
-                                ? {
-                                    backgroundColor: `${tag.tag.color}20`,
-                                    color: tag.tag.color,
-                                  }
-                                : undefined
-                            }
-                          >
-                            <Tag className="w-3 h-3" />
-                            {tag.tag.name} ({tag.usageCount})
-                          </button>
-                        );
-                      })}
+                        {CATEGORIES.map((cat) => {
+                          const Icon = cat.icon;
+                          return (
+                            <button
+                              key={cat.id}
+                              data-tour={`category-${cat.id}`}
+                              onClick={() => setSelectedCategory(cat.id)}
+                              className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-1.5 ${
+                                selectedCategory === cat.id
+                                  ? `${cat.bgColor} ${cat.color} border ${cat.borderColor}`
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }`}
+                            >
+                              <Icon className="w-4 h-4" />
+                              {cat.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {/* Tag Filter */}
+                    {tags.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Tags
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {tags.map((tag) => {
+                            const isSelected = selectedTags.includes(tag.tag.name);
+                            return (
+                              <button
+                                key={tag.tag.id}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedTags(
+                                      selectedTags.filter((t) => t !== tag.tag.name)
+                                    );
+                                  } else {
+                                    setSelectedTags([...selectedTags, tag.tag.name]);
+                                  }
+                                }}
+                                className={`px-3 py-1.5 rounded-full text-sm transition-colors flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? 'bg-[#236383] text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                                style={
+                                  tag.tag.color && !isSelected
+                                    ? {
+                                        backgroundColor: `${tag.tag.color}20`,
+                                        color: tag.tag.color,
+                                      }
+                                    : undefined
+                                }
+                              >
+                                <Tag className="w-3 h-3" />
+                                {tag.tag.name} ({tag.usageCount})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Quick Access Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Pinned Resources */}
-          {pinnedResources.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm p-4" data-testid="pinned-resources">
-              <div className="flex items-center gap-2 mb-3">
-                <Pin className="w-5 h-5 text-[#FBAD3F]" />
-                <h2 className="font-semibold text-gray-900">Pinned</h2>
-              </div>
-              <div className="space-y-2">
-                {pinnedResources.slice(0, 3).map((resource) => (
-                  <button
-                    key={resource.resource.id}
-                    onClick={() => openResource(resource)}
-                    className="w-full text-left p-2 rounded hover:bg-gray-50 transition-colors"
-                  >
-                    <p className="font-medium text-sm text-gray-900 truncate">
-                      {resource.resource.title}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {resource.resource.accessCount} views
-                    </p>
-                  </button>
-                ))}
-              </div>
             </div>
-          )}
 
-          {/* Favorites */}
-          {favorites.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Star className="w-5 h-5 text-[#FBAD3F] fill-[#FBAD3F]" />
-                <h2 className="font-semibold text-gray-900">Your Favorites</h2>
-              </div>
-              <div className="space-y-2">
-                {favorites.slice(0, 3).map((fav) => (
-                  <button
-                    key={fav.resource.id}
-                    onClick={() => openResource(fav)}
-                    className="w-full text-left p-2 rounded hover:bg-gray-50 transition-colors"
-                  >
-                    <p className="font-medium text-sm text-gray-900 truncate">
-                      {fav.resource.title}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {fav.resource.accessCount} views
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Recently Accessed */}
-          {recentResources.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="w-5 h-5 text-[#47B3CB]" />
-                <h2 className="font-semibold text-gray-900">Recently Accessed</h2>
-              </div>
-              <div className="space-y-2">
-                {recentResources.slice(0, 3).map((recent) => (
-                  <button
-                    key={recent.resource.id}
-                    onClick={() => openResource(recent)}
-                    className="w-full text-left p-2 rounded hover:bg-gray-50 transition-colors"
-                  >
-                    <p className="font-medium text-sm text-gray-900 truncate">
-                      {recent.resource.title}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {recent.lastAccessed &&
-                        new Date(recent.lastAccessed).toLocaleDateString()}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Sandwich Assembly Guides */}
-        <SandwichAssemblyGuides />
-
-        {/* All Resources */}
-        {resources.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <Folder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No resources found
-            </h3>
-            <p className="text-gray-600">
-              {searchTerm || selectedCategory || selectedTags.length > 0
-                ? 'Try adjusting your filters'
-                : isAdmin
-                ? 'Get started by adding your first resource'
-                : 'Resources will appear here once they are added'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6" data-testid="resources-list">
-            {CATEGORIES.map((category) => {
-              const categoryResources = groupedResources[category.id] || [];
-              if (categoryResources.length === 0) return null;
-
-              const CategoryIcon = category.icon;
-
-              // Separate labels from other resources for special layout
-              const labelResources = categoryResources.filter(r => 
-                r.resource.title.includes('Labels')
-              );
-              const otherResources = categoryResources.filter(r => 
-                !r.resource.title.includes('Labels')
-              );
-
-              return (
-                <div key={category.id}>
-                  <div className={`flex items-center gap-3 mb-4 pb-3 border-b-2 ${category.borderColor}`}>
-                    <div className={`${category.bgColor} p-3 rounded-lg`}>
-                      <CategoryIcon className={`w-7 h-7 ${category.color}`} />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      {category.label}
-                    </h2>
-                    <span className="text-sm font-semibold text-gray-500 ml-auto">
-                      {categoryResources.length} {categoryResources.length === 1 ? 'item' : 'items'}
-                    </span>
+            {/* Quick Access Sections */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              {/* Pinned Resources */}
+              {pinnedResources.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm p-4" data-testid="pinned-resources">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Pin className="w-5 h-5 text-[#FBAD3F]" />
+                    <h2 className="font-semibold text-gray-900">Pinned</h2>
                   </div>
-
-                  {/* Labels displayed side-by-side */}
-                  {labelResources.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      {labelResources.map((resource) => (
-                        <ResourceCard key={resource.resource.id} item={resource} />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Other resources in standard grid */}
-                  {otherResources.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                      {otherResources.map((resource) => (
-                        <ResourceCard key={resource.resource.id} item={resource} />
-                      ))}
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    {pinnedResources.slice(0, 3).map((resource) => (
+                      <button
+                        key={resource.resource.id}
+                        onClick={() => openResource(resource)}
+                        className="w-full text-left p-2 rounded hover:bg-gray-50 transition-colors"
+                      >
+                        <p className="font-medium text-sm text-gray-900 truncate">
+                          {resource.resource.title}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {resource.resource.accessCount} views
+                        </p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+
+              {/* Favorites */}
+              {favorites.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="w-5 h-5 text-[#FBAD3F] fill-[#FBAD3F]" />
+                    <h2 className="font-semibold text-gray-900">Your Favorites</h2>
+                  </div>
+                  <div className="space-y-2">
+                    {favorites.slice(0, 3).map((fav) => (
+                      <button
+                        key={fav.resource.id}
+                        onClick={() => openResource(fav)}
+                        className="w-full text-left p-2 rounded hover:bg-gray-50 transition-colors"
+                      >
+                        <p className="font-medium text-sm text-gray-900 truncate">
+                          {fav.resource.title}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {fav.resource.accessCount} views
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recently Accessed */}
+              {recentResources.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock className="w-5 h-5 text-[#47B3CB]" />
+                    <h2 className="font-semibold text-gray-900">Recently Accessed</h2>
+                  </div>
+                  <div className="space-y-2">
+                    {recentResources.slice(0, 3).map((recent) => (
+                      <button
+                        key={recent.resource.id}
+                        onClick={() => openResource(recent)}
+                        className="w-full text-left p-2 rounded hover:bg-gray-50 transition-colors"
+                      >
+                        <p className="font-medium text-sm text-gray-900 truncate">
+                          {recent.resource.title}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {recent.lastAccessed &&
+                            new Date(recent.lastAccessed).toLocaleDateString()}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sandwich Assembly Guides */}
+            <SandwichAssemblyGuides />
+
+            {/* All Resources */}
+            {resources.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+                <Folder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No resources found
+                </h3>
+                <p className="text-gray-600">
+                  {searchTerm || selectedCategory || selectedTags.length > 0
+                    ? 'Try adjusting your filters'
+                    : isAdmin
+                    ? 'Get started by adding your first resource'
+                    : 'Resources will appear here once they are added'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6" data-testid="resources-list">
+                {CATEGORIES.map((category) => {
+                  const categoryResources = groupedResources[category.id] || [];
+                  if (categoryResources.length === 0) return null;
+
+                  const CategoryIcon = category.icon;
+
+                  // Separate labels from other resources for special layout
+                  const labelResources = categoryResources.filter(r => 
+                    r.resource.title.includes('Labels')
+                  );
+                  const otherResources = categoryResources.filter(r => 
+                    !r.resource.title.includes('Labels')
+                  );
+
+                  return (
+                    <div key={category.id}>
+                      <div className={`flex items-center gap-3 mb-4 pb-3 border-b-2 ${category.borderColor}`}>
+                        <div className={`${category.bgColor} p-3 rounded-lg`}>
+                          <CategoryIcon className={`w-7 h-7 ${category.color}`} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          {category.label}
+                        </h2>
+                        <span className="text-sm font-semibold text-gray-500 ml-auto">
+                          {categoryResources.length} {categoryResources.length === 1 ? 'item' : 'items'}
+                        </span>
+                      </div>
+
+                      {/* Labels displayed side-by-side */}
+                      {labelResources.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          {labelResources.map((resource) => (
+                            <ResourceCard key={resource.resource.id} item={resource} />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Other resources in standard grid */}
+                      {otherResources.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                          {otherResources.map((resource) => (
+                            <ResourceCard key={resource.resource.id} item={resource} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Uploaded files (Document Management), listed live */}
+            {!selectedCategory && selectedTags.length === 0 && (
+              <div className="mt-6">
+                <UploadedDocumentsList
+                  docs={uploads.library.filter((d) => {
+                    if (!searchTerm) return true;
+                    const q = searchTerm.toLowerCase();
+                    return (
+                      d.title.toLowerCase().includes(q) ||
+                      (d.description || '').toLowerCase().includes(q)
+                    );
+                  })}
+                  title="Uploaded files"
+                  subtitle="Files uploaded through Document Management."
+                  testId="uploaded-documents"
+                />
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="logos" data-tour="resources-logos-panel">
+            <LogosPage />
+          </TabsContent>
+
+          {showConfidentialTab && (
+            <TabsContent value="confidential">
+              <UploadedDocumentsList
+                docs={confidentialUploads}
+                title="Confidential uploads"
+                subtitle="Files uploaded as confidential through Document Management."
+                testId="confidential-uploads"
+              />
+              {hasConfidentialAccess && <ConfidentialDocuments />}
+            </TabsContent>
+          )}
+        </Tabs>
       </div>
 
       {/* AI Assistant */}

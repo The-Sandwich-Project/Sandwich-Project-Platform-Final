@@ -14,7 +14,7 @@ const docRows = [
   // Local files.
   { id: 11, filePath: `${TEST_DIR_REL}/labels.pdf`, originalName: 'Labels.pdf', mimeType: 'application/pdf', category: 'toolkit', isActive: true },
   { id: 12, filePath: `${TEST_DIR_REL}/secret-local.pdf`, originalName: 'Local Secret.pdf', mimeType: 'application/pdf', category: 'confidential', isActive: true },
-  // Legacy aliases (bundled files exist in attached_assets/).
+  // Legacy aliases (bundled files exist in client/public/documents/).
   { id: 13, filePath: 'uploads/documents/015b0f68ddb511633e7696caab59bfa7', originalName: 'Food Safety (old)', mimeType: 'application/pdf', category: 'toolkit', isActive: false },
   { id: 14, filePath: 'uploads/documents/3e375509b08b20265abdfa6afe632982', originalName: 'PBJ Sandwich Making 101.pdf', mimeType: 'application/pdf', category: 'toolkit', isActive: true },
   // Hash path that isn't a bundled alias: read from disk.
@@ -141,7 +141,7 @@ describe('resolveEmailAttachments', () => {
     it('maps an active legacy alias record to its bundled PDF', async () => {
       const { resolved, failed } = await resolveEmailAttachments([14], staff);
       expect(failed).toEqual([]);
-      const bundled = fs.readFileSync(abs('attached_assets/PBJ Sandwich Making 2 101 03172026.pdf'));
+      const bundled = fs.readFileSync(abs('client/public/documents/pbj-sandwich-making-101.pdf'));
       expect(resolved[0]).toMatchObject({ filename: 'PBJ Sandwich Making 101.pdf', content: bundled.toString('base64') });
     });
 
@@ -225,7 +225,7 @@ describe('resolveEmailAttachments', () => {
         await reasons([
           'uploads/documents/015b0f68ddb511633e7696caab59bfa7',
           'uploads/documents/./015b0f68ddb511633e7696caab59bfa7',
-          'attached_assets/20260506-TSP-Food+Safety+Volunteers.pdf',
+          'client/public/documents/food-safety-volunteers.pdf',
         ])
       ).toEqual(['document is not active', 'not a known document', 'not a known document']);
     });
