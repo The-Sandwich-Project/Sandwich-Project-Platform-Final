@@ -26,6 +26,8 @@ interface Notification {
   isArchived?: boolean;
   category?: string;
   actionUrl?: string;
+  mobileRoute?: string;
+  mobileParams?: Record<string, string | number | boolean | null>;
   createdAt: string;
 }
 
@@ -120,8 +122,25 @@ export function MobileNotifications() {
     if (!notification.isRead) {
       markRead.mutate(notification.id);
     }
+
+    if (notification.mobileRoute === 'eventDetail' && notification.mobileParams?.eventId) {
+      navigate(`/m/events/${notification.mobileParams.eventId}`);
+      return;
+    }
+    if (notification.mobileRoute === 'collectionDetail' && notification.mobileParams?.collectionId) {
+      navigate(`/m/collections/${notification.mobileParams.collectionId}`);
+      return;
+    }
+    if (notification.mobileRoute === 'messageThread' && notification.mobileParams?.threadId) {
+      navigate(`/m/chat/${notification.mobileParams.threadId}`);
+      return;
+    }
+    if (notification.mobileRoute === 'resourceDetail') {
+      navigate('/m/resources');
+      return;
+    }
     if (notification.actionUrl) {
-      navigate(notification.actionUrl);
+      navigate(notification.actionUrl.startsWith('/m/') ? notification.actionUrl : `/m${notification.actionUrl}`);
     }
   };
 

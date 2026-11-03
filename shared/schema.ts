@@ -1969,6 +1969,39 @@ export const insertNotificationSchema = createInsertSchema(notifications)
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
+// Registered native/mobile devices for future push notifications.
+export const mobileDevices = pgTable(
+  'mobile_devices',
+  {
+    id: serial('id').primaryKey(),
+    userId: varchar('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    platform: varchar('platform').notNull(), // 'ios' | 'android'
+    deviceToken: text('device_token').notNull(),
+    pushProvider: varchar('push_provider').notNull().default('expo'), // 'expo' | 'apns' | 'fcm'
+    appVersion: varchar('app_version'),
+    deviceName: text('device_name'),
+    isActive: boolean('is_active').notNull().default(true),
+    lastSeenAt: timestamp('last_seen_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_mobile_devices_user_id').on(table.userId),
+    uniqueIndex('idx_mobile_devices_user_token').on(table.userId, table.deviceToken),
+  ]
+);
+
+export const insertMobileDeviceSchema = createInsertSchema(mobileDevices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type MobileDevice = typeof mobileDevices.$inferSelect;
+export type InsertMobileDevice = z.infer<typeof insertMobileDeviceSchema>;
+
 // Committee schema types
 export const insertCommitteeSchema = createInsertSchema(committees).omit({
   createdAt: true,
