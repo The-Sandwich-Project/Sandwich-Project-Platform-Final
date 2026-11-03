@@ -882,11 +882,17 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
   }, []);
 
   // Load resources
-  const loadResources = async () => {
-    // Add/edit/delete all end in a reload; refresh the Uploaded files inputs
-    // too so a converted or newly linked file shows up (or drops out) at once.
+  // After add/edit/delete or an explicit refresh, also refetch the Uploaded
+  // files inputs so a converted or newly linked file shows up (or drops out)
+  // at once. Not done in loadResources itself, which also runs on every
+  // search/filter change, when neither dataset has changed.
+  const reloadAfterChange = async () => {
     queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
     queryClient.invalidateQueries({ queryKey: FILE_RESOURCES_KEY });
+    await loadResources();
+  };
+
+  const loadResources = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -983,7 +989,7 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
         description: `"${title}" has been removed.`,
       });
       setResourceToDelete(null);
-      await loadResources();
+      await reloadAfterChange();
     } catch (err) {
       toast({
         title: 'Delete failed',
@@ -1320,7 +1326,7 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
           </h3>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
-            onClick={() => loadResources()}
+            onClick={() => reloadAfterChange()}
             className="bg-[#236383] text-white px-4 py-2 rounded-lg hover:bg-[#007E8C] transition-colors"
           >
             Try Again
@@ -1351,7 +1357,7 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
           setShowAddModal(false);
           setEditingResource(null);
         }}
-        onSuccess={loadResources}
+        onSuccess={reloadAfterChange}
         availableTags={tags}
         existingResource={editingResource ?? undefined}
       />
