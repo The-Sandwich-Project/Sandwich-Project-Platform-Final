@@ -244,7 +244,7 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/data-management/integrity/check | 2 | client/src/components/data-management-dashboard.tsx |
 | /api/data-management/summary | 4 | client/src/components/data-management-dashboard.tsx |
 | /api/directions | 2 | client/src/components/event-requests/EventMapView.tsx<br>client/src/pages/driver-planning.tsx |
-| /api/documents | 8 | client/src/components/document-management.tsx<br>client/src/components/resource-admin-modal.tsx<br>client/src/pages/resources.tsx |
+| /api/documents | 9 | client/src/components/document-management.tsx<br>client/src/components/resource-admin-modal.tsx<br>client/src/pages/resources.tsx |
 | /api/documents/${doc.id}/download | 1 | client/src/pages/resources.tsx |
 | /api/documents/${doc.id}/preview | 1 | client/src/pages/resources.tsx |
 | /api/documents/${document.id}/download | 1 | client/src/components/document-management.tsx |
@@ -619,7 +619,7 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/resources/user/favorites | 3 | client/src/mobile/pages/mobile-resources.tsx<br>client/src/pages/resources.tsx |
 | /api/resources/user/recent?limit=5 | 2 | client/src/components/recently-accessed-resources.tsx<br>client/src/pages/resources.tsx |
 | /api/resources?${params} | 1 | client/src/pages/resources.tsx |
-| /api/resources?type=file&limit=1000 | 1 | client/src/pages/resources.tsx |
+| /api/resources?type=file&limit=${RESOURCE_LIST_LIMIT} | 1 | client/src/pages/resources.tsx |
 | /api/sandwich-collections | 36 | client/src/components/bulk-data-manager.tsx<br>client/src/components/collective-learning-auto-log-card.tsx<br>client/src/components/compact-collection-form.tsx<br>client/src/components/dashboard-overview.tsx |
 | /api/sandwich-collections/${collectionId} | 1 | client/src/mobile/pages/mobile-collection-detail.tsx |
 | /api/sandwich-collections/${data.id} | 1 | client/src/components/sandwich-collection-log.tsx |

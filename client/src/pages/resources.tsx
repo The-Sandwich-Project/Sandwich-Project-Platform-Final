@@ -755,6 +755,12 @@ interface UploadedDocument {
   originalName: string;
 }
 
+// Both lists below load every resource (the API defaults to 100), so a file
+// whose card exists is never hidden from Uploaded files by a card that didn't
+// load.
+const RESOURCE_LIST_LIMIT = '1000';
+const FILE_RESOURCES_KEY = [`/api/resources?type=file&limit=${RESOURCE_LIST_LIMIT}`];
+
 interface FileResourceRow {
   resource: { documentId: number | null };
 }
@@ -764,7 +770,7 @@ function useUploadedDocuments() {
   // Files added through "Add Resource" already have a resource card; don't
   // list them twice.
   const { data: fileResources } = useQuery<FileResourceRow[]>({
-    queryKey: ['/api/resources?type=file&limit=1000'],
+    queryKey: FILE_RESOURCES_KEY,
   });
   const linked = new Set(
     (fileResources || []).map((r) => r.resource.documentId).filter((id): id is number => id != null)
@@ -834,6 +840,7 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
     user?.permissions?.includes('manage_resources');
   const { track } = useOnboardingTracker();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Only these two accounts see confidential documents (same gate the old
   // Important Documents page used; the server also enforces it).
@@ -876,11 +883,16 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
 
   // Load resources
   const loadResources = async () => {
+    // Add/edit/delete all end in a reload; refresh the Uploaded files inputs
+    // too so a converted or newly linked file shows up (or drops out) at once.
+    queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+    queryClient.invalidateQueries({ queryKey: FILE_RESOURCES_KEY });
     try {
       setLoading(true);
       setError(null);
       const params = new URLSearchParams({
         sort: sortBy,
+        limit: RESOURCE_LIST_LIMIT,
         ...(selectedCategory && { category: selectedCategory }),
         ...(searchTerm && { search: searchTerm }),
         ...(selectedTags.length > 0 && { tags: selectedTags.join(',') }),
@@ -1355,8 +1367,11 @@ export function Resources({ initialTab }: { initialTab?: string | null } = {}) {
             <AlertDialogTitle>Delete resource?</AlertDialogTitle>
             <AlertDialogDescription>
               {resourceToDelete
-                ? `"${resourceToDelete.resource.title}" will be hidden from this page for everyone. An admin can restore it later if needed.`
-                : 'This resource will be hidden from this page for everyone.'}
+                ? `"${resourceToDelete.resource.title}" will be removed from this page for everyone. An admin can restore it later if needed.`
+                : 'This resource will be removed from this page for everyone.'}
+              {resourceToDelete?.resource.type === 'file' && resourceToDelete.resource.documentId
+                ? ' The uploaded file itself stays in Document Management and will still be listed under Uploaded files. To hide the file too, deactivate it in Document Management.'
+                : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
