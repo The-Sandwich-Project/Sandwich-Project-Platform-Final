@@ -52,7 +52,7 @@ import { TrafficConflictBadge } from '@/components/event-requests/TrafficConflic
 import { useDatePopulation, type DatePopulationInfo } from '@/components/event-requests/hooks/useDatePopulation';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
-import { formatSandwichTypesDisplay } from '@/lib/sandwich-utils';
+import { formatSandwichTypesDisplay, formatEventEstimate } from '@/lib/sandwich-utils';
 import { getPrimaryContextualAction, getContextualTooltip } from '@/lib/contextual-actions';
 import { useEventRequestContext } from '../context/EventRequestContext';
 import type { EventRequest } from '@shared/schema';
@@ -1145,17 +1145,12 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
             </div>
 
             {/* Sandwich Info */}
-            {(request.estimatedSandwichCount !== undefined && request.estimatedSandwichCount !== null) || request.sandwichTypes ? (
+            {formatEventEstimate(request, '') ? (
               <div className="bg-amber-50 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Package className="w-4 h-4 text-amber-600" />
                   <span className="font-medium">Sandwiches:</span>
-                  <span>
-                    {formatSandwichTypesDisplay(
-                      request.sandwichTypes,
-                      request.estimatedSandwichCount ?? undefined
-                    )}
-                  </span>
+                  <span>{formatEventEstimate(request)}</span>
                 </div>
               </div>
             ) : null}

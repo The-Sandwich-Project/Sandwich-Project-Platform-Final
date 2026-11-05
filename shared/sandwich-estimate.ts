@@ -384,11 +384,12 @@ export function resolveEstimatePatch(
 // ---------------------------------------------------------------------------
 
 const DISPLAY_LABELS: Record<string, string> = {
-  pbj: 'PBJ',
+  pbj: 'PB&J',
   deli: 'Deli',
   deli_turkey: 'Turkey',
   deli_ham: 'Ham',
   chicken: 'Chicken',
+  unknown: 'type TBD',
 };
 
 export function sandwichTypeLabel(key: string): string {
@@ -399,7 +400,8 @@ const fmtAmount = (a: Amount) => (a.min === a.max ? `${a.min}` : `${a.min}–${a
 
 /**
  * One line for cards and lists, e.g. "200 Turkey", "200–300 Turkey",
- * "200 (150 Deli, 50 PBJ)", "300–400, Deli & PBJ (split TBD)", "200, type TBD",
+ * "200 (150 Deli, 50 PB&J)", "300 (150 Deli, PB&J TBD)",
+ * "300–400, Deli & PB&J (split TBD)", "200, type TBD", "Deli, amount TBD",
  * or "" when there's no estimate at all.
  */
 export function formatEstimate(f: Partial<Record<EstimateFieldName, unknown>>): string {
@@ -407,14 +409,108 @@ export function formatEstimate(f: Partial<Record<EstimateFieldName, unknown>>): 
   const state = estimateStateFromFields(s);
   const total = state.total;
   const lines = state.lines;
+  const named = lines.filter((l) => l.type !== 'unknown');
   if (!total && lines.length === 0) return '';
-  if (!total) return `${lines.map((l) => sandwichTypeLabel(l.type)).join(' & ')}, amount TBD`;
-  if (lines.length === 0) return `${fmtAmount(total)}, type TBD`;
+  if (!total) return `${named.map((l) => sandwichTypeLabel(l.type)).join(' & ') || 'Type'}, amount TBD`;
+  if (named.length === 0) return `${fmtAmount(total)}, type TBD`;
   if (lines.length === 1) return `${fmtAmount(total)} ${sandwichTypeLabel(lines[0].type)}`;
-  if (lines.every((l) => l.amount)) {
+  const known = lines.filter((l) => l.amount);
+  if (known.length === lines.length) {
     return `${fmtAmount(total)} (${lines.map((l) => `${fmtAmount(l.amount!)} ${sandwichTypeLabel(l.type)}`).join(', ')})`;
   }
-  const names = lines.map((l) => sandwichTypeLabel(l.type));
-  const joined = names.length === 2 ? names.join(' & ') : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
-  return `${fmtAmount(total)}, ${joined} (split TBD)`;
+  if (known.length === 0) {
+    const names = named.map((l) => sandwichTypeLabel(l.type));
+    const joined = names.length === 1 ? names[0] : names.length === 2 ? names.join(' & ') : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
+    return lines.length > named.length
+      ? `${fmtAmount(total)} (${joined}, rest type TBD)`
+      : `${fmtAmount(total)}, ${joined} (split TBD)`;
+  }
+  // Some amounts known, some TBD.
+  const parts = lines.map((l) =>
+    l.amount
+      ? `${fmtAmount(l.amount)} ${sandwichTypeLabel(l.type)}`
+      : l.type === 'unknown'
+        ? 'rest type TBD'
+        : `${sandwichTypeLabel(l.type)} TBD`
+  );
+  return `${fmtAmount(total)} (${parts.join(', ')})`;
+}
+
+// ---------------------------------------------------------------------------
+// Editor draft (the shared estimate editor's text boxes <-> stored fields)
+// ---------------------------------------------------------------------------
+
+/**
+ * What the estimate editor shows: one total box and type rows, as typed.
+ * Amount text is "" (not known yet), a number ("300") or a range ("200-300").
+ */
+export interface EstimateDraft {
+  total: string;
+  lines: Array<{ type: string; amount: string }>;
+}
+
+/** Parse "300", "200-300", "200 to 300", "1,000"; "" is not known. */
+export function parseAmountText(text: string): { amount: Amount | null; error: string | null } {
+  const t = String(text ?? '').trim();
+  if (!t) return { amount: null, error: null };
+  const m = t.replace(/,/g, '').match(/^(\d+)\s*(?:-|–|—|to)\s*(\d+)$/i);
+  if (m) {
+    const lo = Number(m[1]);
+    const hi = Number(m[2]);
+    if (lo <= 0 || hi <= 0) return { amount: null, error: `"${t}" isn't a number of sandwiches` };
+    return { amount: amountOf(lo, hi), error: null };
+  }
+  if (/^\d+$/.test(t.replace(/,/g, ''))) {
+    const n = Number(t.replace(/,/g, ''));
+    if (n <= 0) return { amount: null, error: null }; // 0 = not known
+    return { amount: { min: n, max: n }, error: null };
+  }
+  return { amount: null, error: `"${t}" isn't a number or a range like 200-300` };
+}
+
+const amountText = (a: Amount | null) => (!a ? '' : a.min === a.max ? `${a.min}` : `${a.min}-${a.max}`);
+
+/** The editor's starting text for stored fields. */
+export function draftFromFields(f: Partial<Record<EstimateFieldName, unknown>>): EstimateDraft {
+  const state = estimateStateFromFields(normalizeEstimate(estimateStateFromFields(f)));
+  return {
+    total: amountText(state.total),
+    lines: state.lines.map((l) => ({ type: l.type, amount: amountText(l.amount) })),
+  };
+}
+
+export interface DraftResult {
+  /** The stored fields this draft saves as (consistent, normalized). */
+  fields: EstimateFields;
+  /** Problems that block saving (unreadable numbers). */
+  errors: string[];
+  /** Things the rule changed, worth showing before saving. */
+  notes: string[];
+  /** How it will read on cards. */
+  preview: string;
+}
+
+/** Read the editor's text into stored fields, with errors and notes. */
+export function resolveDraft(draft: EstimateDraft): DraftResult {
+  const errors: string[] = [];
+  const notes: string[] = [];
+  const t = parseAmountText(draft.total);
+  if (t.error) errors.push(`Total: ${t.error}`);
+  const lines: EstimateLine[] = [];
+  for (const row of draft.lines) {
+    const type = normalizeSandwichTypeKey(row.type) ?? (row.type ? 'unknown' : null);
+    if (!type) continue;
+    const a = parseAmountText(row.amount);
+    if (a.error) errors.push(`${sandwichTypeLabel(type)}: ${a.error}`);
+    lines.push({ type, amount: a.amount });
+  }
+  const fields = normalizeEstimate({ total: t.amount, lines });
+  const out = estimateStateFromFields(fields);
+  if (t.amount && out.total && (out.total.min !== t.amount.min || out.total.max !== t.amount.max)) {
+    notes.push(`The type amounts add up to ${fmtAmount(out.total)}, so that's the total that will be saved.`);
+  }
+  if (!t.amount && out.total && lines.length > 0) {
+    notes.push(`Total worked out from the types: ${fmtAmount(out.total)}.`);
+  }
+  return { fields, errors, notes, preview: formatEstimate(fields) };
 }

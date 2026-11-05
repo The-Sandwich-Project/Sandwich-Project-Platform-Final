@@ -43,6 +43,11 @@ export interface EventFormData {
   estimatedSandwichCountMax: number;
   rangeSandwichType: string;
   /**
+   * Set by the sandwich estimate editor while its text can't be read
+   * ("lots", "2oo"); the form won't save until it's fixed. Never sent.
+   */
+  sandwichEstimateError?: string;
+  /**
    * Authoritative estimated attendance. The server's legacy `volunteerCount`
    * column is derived from this in buildEventDataForServer — do not add it back
    * to form state.

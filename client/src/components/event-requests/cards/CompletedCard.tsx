@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { formatTime12Hour, formatEventDate } from '@/components/event-requests/utils';
 import { useEventQueries } from '../hooks/useEventQueries';
-import { formatSandwichTypesDisplay, parseSandwichTypes } from '@/lib/sandwich-utils';
+import { formatSandwichTypesDisplay, parseSandwichTypes, formatEventEstimate } from '@/lib/sandwich-utils';
 import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
 import { getDisplayName } from '@/lib/userHelpers';
 import { extractNameFromCustomId } from '@/lib/utils';
@@ -2515,27 +2515,9 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
               <>
                 <span className="text-gray-700">
                   Planned <strong className="font-semibold">
-                    {(() => {
-                      const hasRange = hasActiveSandwichRange(
-                        request.estimatedSandwichCountMin,
-                        request.estimatedSandwichCountMax,
-                        request.estimatedSandwichCount,
-                      );
-                      if (hasRange) {
-                        const rangeType = (request as any).estimatedSandwichRangeType;
-                        const typeLabel = rangeType ? SANDWICH_TYPES.find(t => t.value === rangeType)?.label : null;
-                        return `${request.estimatedSandwichCountMin}-${request.estimatedSandwichCountMax}${typeLabel ? ` ${typeLabel}` : ''}`;
-                      }
-                      if (request.estimatedSandwichCount) {
-                        return formatSandwichTypesDisplay(request.sandwichTypes, request.estimatedSandwichCount ?? undefined);
-                      }
-                      const parsedTypes = parseSandwichTypes(request.sandwichTypes);
-                      const totalFromTypes = parsedTypes?.reduce((sum, t) => sum + (typeof t.quantity === 'number' ? t.quantity : 0), 0) ?? 0;
-                      if (totalFromTypes > 0) {
-                        return formatSandwichTypesDisplay(request.sandwichTypes, undefined);
-                      }
-                      return <span className="text-gray-400 italic">not set</span>;
-                    })()}
+                    {formatEventEstimate(request, '') || (
+                      <span className="text-gray-400 italic">not set</span>
+                    )}
                   </strong>
                 </span>
                 <span className="text-gray-400">·</span>

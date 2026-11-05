@@ -3,11 +3,6 @@ import { useEventRequestContext } from '../context/EventRequestContext';
 import { useEventDialogState } from '../context/EventDialogContext';
 import { useEventFilters } from '../hooks/useEventFilters';
 import { useEventMutations } from '../hooks/useEventMutations';
-import {
-  buildInlineSandwichPatch,
-  DEFAULT_NEW_SANDWICH_TYPE,
-  inlineSandwichStateFromEvent,
-} from '../lib/inline-sandwich-edit';
 import { useEventAssignments } from '../hooks/useEventAssignments';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -78,18 +73,6 @@ export const MyAssignmentsTab: React.FC = () => {
     setEditingField,
     editingValue,
     setEditingValue,
-    inlineSandwichMode,
-    setInlineSandwichMode,
-    inlineTotalCount,
-    setInlineTotalCount,
-    inlineSandwichTypes,
-    setInlineSandwichTypes,
-    inlineRangeMin,
-    setInlineRangeMin,
-    inlineRangeMax,
-    setInlineRangeMax,
-    inlineRangeType,
-    setInlineRangeType,
     editingCompletedId,
     setEditingCompletedId,
     completedEdit,
@@ -106,20 +89,6 @@ export const MyAssignmentsTab: React.FC = () => {
       data.addedToOfficialSheetAt = !currentValue ? new Date().toISOString() : null;
     }
     updateEventRequestMutation.mutate({ id, data });
-  };
-
-  const addInlineSandwichType = () => {
-    setInlineSandwichTypes((prev: Array<{ type: string; quantity: number }>) => [...prev, { type: DEFAULT_NEW_SANDWICH_TYPE, quantity: 0 }]);
-  };
-
-  const updateInlineSandwichType = (index: number, field: 'type' | 'quantity', value: string | number) => {
-    setInlineSandwichTypes((prev: Array<{ type: string; quantity: number }>) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    );
-  };
-
-  const removeInlineSandwichType = (index: number) => {
-    setInlineSandwichTypes((prev: Array<{ type: string; quantity: number }>) => prev.filter((_, i) => i !== index));
   };
 
   const saveTimes = (id: number, data: any) => {
@@ -315,12 +284,6 @@ export const MyAssignmentsTab: React.FC = () => {
             editingField={editingField}
             editingValue={editingValue}
             isEditingThisCard={editingScheduledId === request.id}
-            inlineSandwichMode={inlineSandwichMode}
-            inlineTotalCount={inlineTotalCount}
-            inlineSandwichTypes={inlineSandwichTypes}
-            inlineRangeMin={inlineRangeMin}
-            inlineRangeMax={inlineRangeMax}
-            inlineRangeType={inlineRangeType}
             isSaving={updateEventRequestMutation.isPending || updateScheduledFieldMutation.isPending}
             onEdit={() => {
               setSelectedEventRequest(request);
@@ -362,38 +325,11 @@ export const MyAssignmentsTab: React.FC = () => {
               setEditingScheduledId(request.id);
               setEditingField(field);
               setEditingValue(value || '');
-              // The sandwich editor keeps its values in the inline state, not
-              // editingValue. Without this it opened with stale values and
-              // saved '' (which erased the estimate).
-              if (field === 'sandwichTypes') {
-                const st = inlineSandwichStateFromEvent(request);
-                setInlineSandwichMode(st.mode);
-                setInlineTotalCount(st.totalCount);
-                setInlineSandwichTypes(st.types);
-                setInlineRangeMin(st.rangeMin);
-                setInlineRangeMax(st.rangeMax);
-                setInlineRangeType(st.rangeType);
-              }
+              // The sandwich estimate's quick edit keeps its own state
+              // (CardSandwichEstimateEdit) and saves itself.
             }}
             saveEdit={() => {
               if (editingScheduledId && editingField) {
-                if (editingField === 'sandwichTypes') {
-                  updateEventRequestMutation.mutate({
-                    id: editingScheduledId,
-                    data: buildInlineSandwichPatch({
-                      mode: inlineSandwichMode,
-                      totalCount: inlineTotalCount,
-                      types: inlineSandwichTypes,
-                      rangeMin: inlineRangeMin,
-                      rangeMax: inlineRangeMax,
-                      rangeType: inlineRangeType,
-                    }),
-                  });
-                  setEditingScheduledId(null);
-                  setEditingField(null);
-                  setEditingValue('');
-                  return;
-                }
                 updateScheduledFieldMutation.mutate({
                   id: editingScheduledId,
                   field: editingField,
@@ -411,14 +347,6 @@ export const MyAssignmentsTab: React.FC = () => {
             tempIsConfirmed={tempIsConfirmed}
             setTempIsConfirmed={setTempIsConfirmed}
             quickToggleBoolean={(field, value) => quickToggleBoolean(request.id, field, value)}
-            setInlineSandwichMode={setInlineSandwichMode}
-            setInlineTotalCount={setInlineTotalCount}
-            setInlineRangeMin={setInlineRangeMin}
-            setInlineRangeMax={setInlineRangeMax}
-            setInlineRangeType={setInlineRangeType}
-            addInlineSandwichType={addInlineSandwichType}
-            updateInlineSandwichType={updateInlineSandwichType}
-            removeInlineSandwichType={removeInlineSandwichType}
             resolveUserName={resolveUserName}
             resolveRecipientName={resolveRecipientName}
             openAssignmentDialog={(type, isVanDriver) => openAssignmentDialog(request.id, type, isVanDriver)}

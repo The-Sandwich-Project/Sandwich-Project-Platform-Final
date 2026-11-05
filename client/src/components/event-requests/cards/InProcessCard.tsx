@@ -50,7 +50,7 @@ import { useDatePopulation, type DatePopulationInfo } from '@/components/event-r
 import { TrafficConflictBadge } from '@/components/event-requests/TrafficConflictBadge';
 import { LastContactAgeBadge } from '@/components/event-requests/LastContactAgeBadge';
 import { VanNeededBadgeAndButton } from '@/components/event-requests/VanNeededBadgeAndButton';
-import { formatSandwichTypesDisplay } from '@/lib/sandwich-utils';
+import { formatSandwichTypesDisplay, formatEventEstimate } from '@/lib/sandwich-utils';
 import {
   statusColors,
   statusIcons,
@@ -1568,10 +1568,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                           </div>
                         ) : (
                           <div className="font-medium text-amber-900">
-                            {formatSandwichTypesDisplay(
-                              request.sandwichTypes,
-                              request.estimatedSandwichCount ?? undefined
-                            )}
+                            {formatEventEstimate(request)}
                           </div>
                         )}
                       </div>

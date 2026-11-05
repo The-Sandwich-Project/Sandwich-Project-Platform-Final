@@ -1,3 +1,4 @@
+import { totalFromFields } from '@shared/sandwich-estimate';
 import * as React from 'react';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -941,9 +942,13 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
 
   const eventLikelyNeedsVan = (): boolean => {
     if ((formData.vanDriverNeeded || formData.isDhlVan) && !formData.selfTransport) return true;
-    const count = sandwichMode === 'total' ? formData.totalSandwichCount
-      : sandwichMode === 'range' ? (formData.estimatedSandwichCountMax || formData.estimatedSandwichCountMin || 0)
-      : formData.sandwichTypes.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    // Largest the estimate could be (a range's max).
+    const est = totalFromFields({
+      estimatedSandwichCount: formData.totalSandwichCount || null,
+      estimatedSandwichCountMin: formData.estimatedSandwichCountMin || null,
+      estimatedSandwichCountMax: formData.estimatedSandwichCountMax || null,
+    });
+    const count = est?.max ?? 0;
     if (count > 500) return true;
     const notes = `${formData.schedulingNotes || ''} ${formData.planningNotes || ''}`.toLowerCase();
     if (/\bvan\b/.test(notes) && !notes.includes('van-approved') && !notes.includes('van approved')) return true;
@@ -989,6 +994,18 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       setIsSubmitting(false);
       logger.log('⛔ Save blocked: form not initialized');
       toast({ title: 'Please wait', description: 'Form is still loading. Please try again in a moment.', variant: 'destructive' });
+      return;
+    }
+
+    // The sandwich estimate box has text it can't read ("lots", "2oo"). Don't
+    // save something other than what the person sees.
+    if (formData.sandwichEstimateError) {
+      setIsSubmitting(false);
+      toast({
+        title: 'Check the sandwich estimate',
+        description: formData.sandwichEstimateError,
+        variant: 'destructive',
+      });
       return;
     }
 
