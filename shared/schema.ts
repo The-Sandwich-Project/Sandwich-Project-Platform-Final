@@ -1119,6 +1119,10 @@ export const volunteers = pgTable('volunteers', {
   // finishing training can be recorded separately from being cleared to solo.
   experienceLevel: text('experience_level').notNull().default('new'), // 'new' | 'experienced'
   trainingCompleted: boolean('training_completed').notNull().default(false), // Whether the volunteer has completed the onboarding training
+  // Set when this volunteer record was created/linked from a host contact
+  // marked "Also a volunteer". Name/phone/email are kept in sync from that
+  // host contact on save.
+  hostContactId: integer('host_contact_id'),
   latitude: decimal('latitude'),
   longitude: decimal('longitude'),
   geocodedAt: timestamp('geocoded_at'),
@@ -1173,6 +1177,10 @@ export const hostContacts = pgTable('host_contacts', {
   // the collection-log dropdown) and weeklyActive (weekly host-finder
   // rotation) — those answer different questions.
   isFormerHost: boolean('is_former_host').notNull().default(false),
+  // Host who also volunteers at events. When true, the server keeps a linked
+  // row in `volunteers` (volunteers.host_contact_id = this id) so the person
+  // shows up in every volunteer picker. Unchecking deactivates that row.
+  isVolunteer: boolean('is_volunteer').notNull().default(false),
   alternateForContactId: integer('alternate_for_contact_id'), // ID of the host contact this person is an alternate for
   lastScraped: timestamp('last_scraped'), // Last time availability was scraped from external site
   latitude: decimal('latitude'), // Latitude coordinate for map display (nullable)

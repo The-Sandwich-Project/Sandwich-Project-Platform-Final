@@ -16,6 +16,10 @@ import { z } from 'zod';
 import { AuditLogger } from '../audit-logger';
 import { logger } from '../utils/production-safe-logger';
 import { geocodeAddress } from '../utils/geocoding';
+import {
+  syncHostContactVolunteer,
+  unlinkHostContactVolunteer,
+} from '../services/host-contact-volunteer-sync';
 
 // Normalize freeform contact role values to standardized ones
 // Must match the client-side normalizeContactRole function
@@ -595,6 +599,9 @@ export function createHostsRouter(deps: RouterDependencies) {
       }
     }
 
+    // "Also a volunteer" → create/link their volunteer record
+    await syncHostContactVolunteer(finalContact);
+
     res.status(201).json(finalContact);
   })
 );
@@ -684,6 +691,9 @@ export function createHostsRouter(deps: RouterDependencies) {
       }
     }
 
+    // Keep the linked volunteer record in step with "Also a volunteer"
+    await syncHostContactVolunteer(finalContact);
+
     res.json(finalContact);
   })
 );
@@ -705,6 +715,9 @@ export function createHostsRouter(deps: RouterDependencies) {
     if (!success) {
       throw createHostsError('Host contact not found', 404, 'HOST_CONTACT_NOT_FOUND', { contactId: id });
     }
+
+    // Their volunteer record (if any) stays — they may still volunteer
+    await unlinkHostContactVolunteer(id);
 
     // Audit log
     await AuditLogger.logDelete(

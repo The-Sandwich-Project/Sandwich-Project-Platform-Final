@@ -128,6 +128,12 @@ function ComprehensivePersonSelector({
     hostContactNameLookup.set(`host-contact-${contact.id}`, contact.displayName || contact.name || 'Unknown Contact');
   });
 
+  // Deactivated volunteers (including hosts unmarked as volunteers) can't be picked
+  const activeVolunteers = volunteers.filter((v: any) => v.isActive !== false);
+  const hostContactIdsListedAsVolunteers = new Set(
+    activeVolunteers.map((v: any) => v.hostContactId).filter((id: any) => id != null)
+  );
+
   // Filter all people based on search term
   const allPeople = [
     ...users.map((user: any) => ({
@@ -160,7 +166,7 @@ function ComprehensivePersonSelector({
         section: 'Drivers',
         vanApproved: driver.vanApproved
       })),
-    ...volunteers.map((volunteer: any) => ({
+    ...activeVolunteers.map((volunteer: any) => ({
       id: `volunteer-${volunteer.id}`,
       displayName: `${volunteer.firstName || ''} ${volunteer.lastName || ''}`.trim() || volunteer.name || 'Unknown Volunteer',
       email: volunteer.email,
@@ -168,7 +174,10 @@ function ComprehensivePersonSelector({
       type: 'volunteer',
       section: 'Volunteers'
     })),
-    ...hostContacts.map((contact: any) => ({
+    ...hostContacts
+      // Hosts marked "Also a volunteer" are already listed under Volunteers
+      .filter((contact: any) => !hostContactIdsListedAsVolunteers.has(contact.id))
+      .map((contact: any) => ({
       id: `host-contact-${contact.id}`,
       displayName: contact.displayName,
       email: contact.email,

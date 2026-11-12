@@ -532,6 +532,15 @@ export default function VolunteerManagement() {
                           Driver
                         </Badge>
                       )}
+                      {volunteer.hostContactId != null && (
+                        <Badge
+                          variant="outline"
+                          className="border-violet-500 text-violet-600"
+                          title="Linked to a host contact. Name, phone, email and host location update from the Hosts page."
+                        >
+                          Host{volunteer.hostLocation ? ` · ${volunteer.hostLocation}` : ''}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
