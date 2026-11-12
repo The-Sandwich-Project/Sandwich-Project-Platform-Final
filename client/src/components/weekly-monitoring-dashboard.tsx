@@ -111,6 +111,11 @@ export default function WeeklyMonitoringDashboard() {
   );
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
+  // Per-location missed-weeks export dialog
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportLocation, setExportLocation] = useState<string>('');
+  const [exportWeeks, setExportWeeks] = useState(27); // ~6 months of completed weeks + current
+  const [exportCopied, setExportCopied] = useState(false);
   const { trackReportGeneration, trackCommunication, trackButtonClick} = useAnalytics();
 
   // Calculate the week date based on selectedWeek
@@ -229,301 +234,190 @@ export default function WeeklyMonitoringDashboard() {
       apiRequest('POST', '/api/monitoring/test-sms', data),
   });
 
-  // Function to generate stylized export of non-reporting groups
-  const generateNonReportingExport = () => {
-    if (!submissionStatus || !Array.isArray(submissionStatus)) return;
+  // ---- Per-location missed-weeks export ----
+  // Fetch the grid data for the chosen lookback only while the export dialog
+  // is open. The grid endpoint already skips weeks before a host existed and
+  // applies the Dunwoody 2-log rule, so "missing" here matches the grid.
+  const { data: exportGrid, isLoading: exportGridLoading } = useQuery({
+    queryKey: ['/api/monitoring/grid-report', exportWeeks],
+    queryFn: () =>
+      apiRequest('GET', `/api/monitoring/grid-report/${exportWeeks}`),
+    enabled: showExportDialog,
+  });
 
-    const nonReportingGroups = submissionStatus.filter(
-      (status) => !status.hasSubmitted
+  // Week start dates come back as ISO strings for a Wednesday at local
+  // midnight on the server. Use the date portion so the browser's timezone
+  // can't shift it back to Tuesday.
+  const weekStartDate = (w: MultiWeekReport): Date => {
+    const iso = String(w.weekRange.startDate).slice(0, 10);
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const formatLongDate = (d: Date) =>
+    d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+  const exportLocations: string[] = React.useMemo(() => {
+    const weeks: MultiWeekReport[] = exportGrid?.weeks ?? [];
+    const set = new Set<string>();
+    weeks.forEach((w) =>
+      (w.submissionStatus ?? []).forEach((s) => set.add(s.location))
     );
-    const reportingGroups = submissionStatus.filter(
-      (status) => status.hasSubmitted
-    );
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [exportGrid]);
 
-    const currentDate = new Date();
-    const weekLabel = getWeekLabel(selectedWeek);
+  // Completed weeks only — the current week (index 0) is still in progress,
+  // so it would be unfair to list it as missed.
+  const exportSummary = React.useMemo(() => {
+    if (!exportLocation || !exportGrid?.weeks) return null;
+    const weeks: MultiWeekReport[] = exportGrid.weeks;
+    const missed: { start: Date; end: Date }[] = [];
+    let applicable = 0;
+    let lastSubmission: string | undefined;
+    weeks.forEach((w, i) => {
+      const status = (w.submissionStatus ?? []).find(
+        (s) => s.location === exportLocation
+      );
+      if (status?.lastSubmissionDate && !lastSubmission) {
+        lastSubmission = status.lastSubmissionDate; // weeks are newest-first
+      }
+      if (i === 0 || !status) return; // in-progress week, or host didn't exist yet
+      applicable++;
+      if (!status.hasSubmitted) {
+        const start = weekStartDate(w);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        missed.push({ start, end });
+      }
+    });
+    missed.reverse(); // oldest first reads better in a list
+    return { missed, applicable, lastSubmission };
+  }, [exportLocation, exportGrid]);
 
-    // Track report generation
-    trackReportGeneration('weekly_monitoring_report', 'html');
+  const exportPeriodLabel =
+    exportWeeks === 14 ? '3 months' : exportWeeks === 27 ? '6 months' : '12 months';
 
-    // Create HTML content for the export
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Weekly Monitoring Report - ${weekLabel}</title>
-        <style>
-          :root {
-            --report-header-background: linear-gradient(135deg, #236383 0%, #007E8C 100%);
-          }
-          body {
-            font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 40px 20px;
-            background-color: #f9fafb;
-            color: #1f2937;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 40px;
-            padding: 30px;
-            background: var(
-              --report-header-background,
-              linear-gradient(135deg, #236383 0%, #007E8C 100%)
-            );
-            color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-          }
-          .header h1 {
-            margin: 0 0 10px 0;
-            font-size: 2.2em;
-            font-weight: 700;
-          }
-          .header p {
-            margin: 0;
-            font-size: 1.1em;
-            opacity: 0.9;
-          }
-          .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-          }
-          .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            border-left: 4px solid;
-          }
-          .stat-card.missing {
-            border-left-color: #dc2626;
-          }
-          .stat-card.submitted {
-            border-left-color: #16a34a;
-          }
-          .stat-card.total {
-            border-left-color: #236383;
-          }
-          .stat-number {
-            font-size: 2.5em;
-            font-weight: 800;
-            margin: 0;
-            line-height: 1;
-          }
-          .stat-label {
-            color: #6b7280;
-            margin: 8px 0 0 0;
-            font-weight: 500;
-          }
-          .section {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-          }
-          .section-title {
-            font-size: 1.5em;
-            font-weight: 700;
-            margin: 0 0 25px 0;
-            color: #236383;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-          }
-          .status-item {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-            font-weight: 500;
-          }
-          .status-item.missing {
-            background-color: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #991b1b;
-          }
-          .status-item.submitted {
-            background-color: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            color: #166534;
-          }
-          .status-icon {
-            width: 24px;
-            height: 24px;
-            margin-right: 12px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 14px;
-          }
-          .status-icon.missing {
-            background-color: #dc2626;
-            color: white;
-          }
-          .status-icon.submitted {
-            background-color: #16a34a;
-            color: white;
-          }
-          .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding: 20px;
-            color: #6b7280;
-            border-top: 2px solid #e5e7eb;
-          }
-          .dunwoody-badge {
-            display: inline-block;
-            background-color: #fbbf24;
-            color: #92400e;
-            font-size: 0.75em;
-            padding: 4px 8px;
-            border-radius: 4px;
-            margin-left: 10px;
-            font-weight: 600;
-          }
-          .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #16a34a;
-            font-size: 1.2em;
-            background: #f0fdf4;
-            border-radius: 8px;
-            border: 1px solid #bbf7d0;
-          }
-          .empty-icon {
-            font-size: 3em;
-            margin-bottom: 15px;
-          }
-          @media print {
-            body {
-              background-color: white;
-              padding: 20px;
-            }
-            :root {
-              --report-header-background: #236383;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>📊 Weekly Monitoring Report</h1>
-          <p>${weekLabel} • Generated ${currentDate.toLocaleDateString()} at ${currentDate.toLocaleTimeString()}</p>
-        </div>
+  const buildMissedWeeksText = () => {
+    if (!exportSummary || !exportLocation) return '';
+    const { missed, applicable } = exportSummary;
+    if (missed.length === 0) {
+      return `Great news — we have a collection log from ${exportLocation} for every week in the last ${exportPeriodLabel} (${applicable} weeks). Thank you!`;
+    }
+    const lines = missed
+      .map((m) => `• Week of ${formatLongDate(m.start)}`)
+      .join('\n');
+    return `Hi ${exportLocation} team,\n\nWe're catching up on our records and are missing sandwich counts from your location for the following ${missed.length === 1 ? 'week' : `${missed.length} weeks`} in the last ${exportPeriodLabel}:\n\n${lines}\n\nEach "week" runs Wednesday through the following Tuesday. If you collected those weeks, could you send us the counts (or log them in the app)? If you didn't collect, just let us know so we can mark it.\n\nThank you!\nThe Sandwich Project`;
+  };
 
-        <div class="stats-grid">
-          <div class="stat-card total">
-            <div class="stat-number">${submissionStatus.length}</div>
-            <div class="stat-label">Total Locations</div>
-          </div>
-          <div class="stat-card submitted">
-            <div class="stat-number">${reportingGroups.length}</div>
-            <div class="stat-label">Submitted</div>
-          </div>
-          <div class="stat-card missing">
-            <div class="stat-number">${nonReportingGroups.length}</div>
-            <div class="stat-label">Missing Reports</div>
-          </div>
-        </div>
+  const escapeHtml = (str: string) =>
+    str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
 
-        <div class="section">
-          <div class="section-title">
-            ❌ Locations Missing Reports
-          </div>
-          ${
-            nonReportingGroups.length === 0
-              ? '<div class="empty-state"><div class="empty-icon">🎉</div><strong>Excellent!</strong><br>All locations have submitted their reports this week!</div>'
-              : nonReportingGroups
-                  .map(
-                    (status) => `
-              <div class="status-item missing">
-                <div class="status-icon missing">✗</div>
-                <div>
-                  ${status.location}
-                  ${
-                    status.location === 'Dunwoody/PTC' && status.dunwoodyStatus
-                      ? `<span class="dunwoody-badge">
-                      ${
-                        status.dunwoodyStatus.complete
-                          ? 'Both Required ✓'
-                          : 'Need 2+ collection logs with individual counts'
-                      }
-                    </span>`
-                      : ''
-                  }
-                  ${
-                    status.lastSubmissionDate
-                      ? `<br><small style="color: #6b7280;">Last submission: ${new Date(
-                          status.lastSubmissionDate
-                        ).toLocaleDateString()}</small>`
-                      : ''
-                  }
-                </div>
-              </div>
-            `
-                  )
-                  .join('')
-          }
-        </div>
+  const downloadMissedWeeksReport = () => {
+    if (!exportSummary || !exportLocation) return;
+    const { missed, applicable, lastSubmission } = exportSummary;
+    const loc = escapeHtml(exportLocation);
+    const generated = new Date();
+    const submitted = applicable - missed.length;
 
-        <div class="section">
-          <div class="section-title">
-            ✅ Locations With Reports
-          </div>
-          ${
-            reportingGroups.length === 0
-              ? '<div style="text-align: center; color: #6b7280; padding: 20px;">No locations have submitted reports yet.</div>'
-              : reportingGroups
-                  .map(
-                    (status) => `
-              <div class="status-item submitted">
-                <div class="status-icon submitted">✓</div>
-                <div>
-                  ${status.location}
-                  ${
-                    status.submittedBy && status.submittedBy.length > 0
-                      ? `<br><small style="color: #6b7280;">Submitted by: ${status.submittedBy.join(
-                          ', '
-                        )}</small>`
-                      : ''
-                  }
-                </div>
-              </div>
-            `
-                  )
-                  .join('')
-          }
-        </div>
+    trackReportGeneration('location_missed_weeks_report', 'html');
 
-        <div class="footer">
-          <p><strong>The Sandwich Project</strong> • Weekly Monitoring System</p>
-          <p>For questions about this report, contact the monitoring team.</p>
-        </div>
-      </body>
-      </html>
-    `;
+    const rows = missed
+      .map(
+        (m, idx) => `
+          <tr>
+            <td class="num">${idx + 1}</td>
+            <td>Week of <strong>${formatLongDate(m.start)}</strong></td>
+            <td class="muted">${m.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${m.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+          </tr>`
+      )
+      .join('');
 
-    // Create and download the report
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Missing Weeks – ${loc}</title>
+  <style>
+    body { font-family: 'Roboto','Segoe UI',Tahoma,sans-serif; max-width: 760px; margin: 0 auto; padding: 40px 20px; background: #f9fafb; color: #1f2937; }
+    .header { padding: 28px 30px; background: linear-gradient(135deg,#236383 0%,#007E8C 100%); color: #fff; border-radius: 12px; margin-bottom: 28px; }
+    .header h1 { margin: 0 0 6px; font-size: 1.9em; }
+    .header p { margin: 0; opacity: .9; }
+    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px; }
+    .stat { background: #fff; border-radius: 10px; padding: 18px; text-align: center; border-left: 4px solid #236383; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .stat.bad { border-left-color: #dc2626; } .stat.good { border-left-color: #16a34a; }
+    .stat .n { font-size: 2em; font-weight: 800; line-height: 1; }
+    .stat .l { color: #6b7280; margin-top: 6px; font-size: .9em; }
+    .section { background: #fff; border-radius: 12px; padding: 26px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 24px; }
+    .section h2 { margin: 0 0 14px; color: #236383; font-size: 1.3em; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 10px 8px; border-bottom: 1px solid #f3f4f6; }
+    td.num { width: 32px; color: #9ca3af; }
+    .muted { color: #6b7280; font-size: .9em; }
+    .good-box { text-align: center; padding: 30px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534; font-size: 1.1em; }
+    .note { color: #4b5563; font-size: .95em; line-height: 1.5; }
+    .footer { text-align: center; color: #6b7280; margin-top: 30px; font-size: .9em; }
+    @media print { body { background: #fff; padding: 0; } .header { background: #236383; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${loc}</h1>
+    <p>Missing collection logs • Last ${exportPeriodLabel} • Generated ${generated.toLocaleDateString()}</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n">${applicable}</div><div class="l">Weeks checked</div></div>
+    <div class="stat good"><div class="n">${submitted}</div><div class="l">Weeks logged</div></div>
+    <div class="stat bad"><div class="n">${missed.length}</div><div class="l">Weeks missing</div></div>
+  </div>
+  <div class="section">
+    <h2>Weeks we don't have counts for</h2>
+    ${
+      missed.length === 0
+        ? '<div class="good-box">🎉 Every week in this period has a collection log. Thank you!</div>'
+        : `<table>${rows}</table>`
+    }
+  </div>
+  <div class="section note">
+    <strong>How weeks are counted:</strong> each week runs Wednesday through the following Tuesday.
+    The current (in-progress) week isn't included.${
+      lastSubmission
+        ? ` Most recent log on file: <strong>${formatLongDate(new Date(lastSubmission + 'T12:00:00'))}</strong>.`
+        : ''
+    }
+    <br><br>If you collected during any of these weeks, please send us your counts or log them in the app. If you didn't collect, just let us know so we can mark it.
+  </div>
+  <div class="footer"><strong>The Sandwich Project</strong></div>
+</body>
+</html>`;
+
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Weekly-Monitoring-${weekLabel.replace(/\s+/g, '-')}-${
-      new Date().toISOString().split('T')[0]
-    }.html`;
+    const safeName = exportLocation.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
+    link.download = `Missing-Weeks-${safeName}-${generated.toISOString().split('T')[0]}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const copyMissedWeeksText = async () => {
+    try {
+      await navigator.clipboard.writeText(buildMissedWeeksText());
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    } catch {
+      // Clipboard can be blocked (e.g. insecure context); nothing else to do.
+    }
   };
 
   // SMS announcement mutation
@@ -634,17 +528,12 @@ export default function WeeklyMonitoringDashboard() {
         </div>
         <div className="flex flex-wrap gap-2 sm:gap-2">
           <Button
-            onClick={generateNonReportingExport}
+            onClick={() => setShowExportDialog(true)}
             variant="outline"
-            disabled={
-              !submissionStatus ||
-              !Array.isArray(submissionStatus) ||
-              submissionStatus.length === 0
-            }
             className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 h-8 sm:h-9 text-purple-700 border-purple-200 hover:bg-purple-50"
           >
             <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden lg:inline">Export Report</span>
+            <span className="hidden lg:inline">Location Export</span>
             <span className="lg:hidden">Export</span>
           </Button>
 
@@ -1769,6 +1658,109 @@ export default function WeeklyMonitoringDashboard() {
               className="bg-brand-primary hover:bg-brand-primary-dark"
             >
               {sendSingleEmailMutation.isPending ? 'Sending...' : 'Send'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Per-location missed-weeks export */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Export missing weeks for a location</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Select
+                  value={exportLocation}
+                  onValueChange={setExportLocation}
+                  disabled={exportGridLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        exportGridLoading ? 'Loading…' : 'Choose a location'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {exportLocations.map((loc) => (
+                      <SelectItem key={loc} value={loc}>
+                        {loc}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Look back</Label>
+                <Select
+                  value={String(exportWeeks)}
+                  onValueChange={(v) => setExportWeeks(Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="14">Last 3 months</SelectItem>
+                    <SelectItem value="27">Last 6 months</SelectItem>
+                    <SelectItem value="52">Last 12 months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {exportGridLoading && exportLocation ? (
+              <div className="flex items-center text-sm text-gray-600">
+                <RefreshCw className="h-4 w-4 animate-spin mr-2" /> Loading…
+              </div>
+            ) : exportSummary ? (
+              <div className="rounded-lg border bg-gray-50 p-3 text-sm">
+                {exportSummary.missed.length === 0 ? (
+                  <p className="text-green-700 font-medium">
+                    No missing weeks — logged all {exportSummary.applicable}{' '}
+                    completed weeks.
+                  </p>
+                ) : (
+                  <>
+                    <p className="font-medium text-red-700 mb-2">
+                      Missing {exportSummary.missed.length} of{' '}
+                      {exportSummary.applicable} completed weeks
+                    </p>
+                    <ul className="max-h-48 overflow-y-auto space-y-1 text-gray-700">
+                      {exportSummary.missed.map((m) => (
+                        <li key={m.start.toISOString()}>
+                          Week of {formatLongDate(m.start)}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Weeks run Wed–Tue. The current week isn&apos;t counted yet.
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={copyMissedWeeksText}
+              disabled={!exportSummary}
+            >
+              {exportCopied ? 'Copied!' : 'Copy as email text'}
+            </Button>
+            <Button
+              onClick={downloadMissedWeeksReport}
+              disabled={!exportSummary}
+              className="bg-brand-primary hover:bg-brand-primary-dark"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download report
             </Button>
           </DialogFooter>
         </DialogContent>
