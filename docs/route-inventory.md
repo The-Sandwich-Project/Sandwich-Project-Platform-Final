@@ -766,7 +766,7 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/volunteer-hub/signup/${signupId}/remove | 1 | client/src/pages/volunteer-event-hub.tsx |
 | /api/volunteer-hub/signup/${signupId}/role | 1 | client/src/pages/volunteer-event-hub.tsx |
 | /api/volunteer-hub/signup/${signupId}/status | 2 | client/src/components/volunteer-signup-admin.tsx<br>client/src/pages/volunteer-event-hub.tsx |
-| /api/volunteers | 12 | client/src/components/event-requests/dialogs/AssignmentDialog.tsx<br>client/src/components/event-requests/dialogs/EventEditDialog.tsx<br>client/src/components/event-requests/hooks/useEventQueries.ts<br>client/src/components/volunteer-management.tsx |
+| /api/volunteers | 14 | client/src/components/event-requests/dialogs/AssignmentDialog.tsx<br>client/src/components/event-requests/dialogs/EventEditDialog.tsx<br>client/src/components/event-requests/hooks/useEventQueries.ts<br>client/src/components/hosts-management-consolidated.tsx |
 | /api/volunteers/${editingVolunteer.id} | 1 | client/src/components/volunteer-management.tsx |
 | /api/volunteers/${id} | 1 | client/src/components/volunteer-management.tsx |
 | /api/volunteers/export | 1 | client/src/components/volunteer-management.tsx |
