@@ -115,7 +115,7 @@ export default function WeeklyMonitoringDashboard() {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportLocation, setExportLocation] = useState<string>('');
   const [exportWeeks, setExportWeeks] = useState(27); // ~6 months of completed weeks + current
-  const [exportCopied, setExportCopied] = useState(false);
+  const [exportCopied, setExportCopied] = useState<'text' | 'image' | null>(null);
   const { trackReportGeneration, trackCommunication, trackButtonClick} = useAnalytics();
 
   // Calculate the week date based on selectedWeek
@@ -253,14 +253,6 @@ export default function WeeklyMonitoringDashboard() {
     const [y, m, d] = iso.split('-').map(Number);
     return new Date(y, m - 1, d);
   };
-  const formatLongDate = (d: Date) =>
-    d.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-
   const exportLocations: string[] = React.useMemo(() => {
     const weeks: MultiWeekReport[] = exportGrid?.weeks ?? [];
     const set = new Set<string>();
@@ -301,122 +293,158 @@ export default function WeeklyMonitoringDashboard() {
   const exportPeriodLabel =
     exportWeeks === 14 ? '3 months' : exportWeeks === 27 ? '6 months' : '12 months';
 
-  const buildMissedWeeksText = () => {
-    if (!exportSummary || !exportLocation) return '';
-    const { missed, applicable } = exportSummary;
-    if (missed.length === 0) {
-      return `Great news — we have a collection log from ${exportLocation} for every week in the last ${exportPeriodLabel} (${applicable} weeks). Thank you!`;
-    }
-    const lines = missed
-      .map((m) => `• Week of ${formatLongDate(m.start)}`)
-      .join('\n');
-    return `Hi ${exportLocation} team,\n\nWe're catching up on our records and are missing sandwich counts from your location for the following ${missed.length === 1 ? 'week' : `${missed.length} weeks`} in the last ${exportPeriodLabel}:\n\n${lines}\n\nEach "week" runs Wednesday through the following Tuesday. If you collected those weeks, could you send us the counts (or log them in the app)? If you didn't collect, just let us know so we can mark it.\n\nThank you!\nThe Sandwich Project`;
+  // "Nov 5 – Nov 11, 2025" (year on the start too if the week spans New Year)
+  const formatWeekRange = (start: Date, end: Date) => {
+    const sameYear = start.getFullYear() === end.getFullYear();
+    const startStr = start.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      ...(sameYear ? {} : { year: 'numeric' }),
+    });
+    const endStr = end.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    return `${startStr} – ${endStr}`;
   };
 
-  const escapeHtml = (str: string) =>
-    str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+  // Plain list, one week per line — easy to paste into a text, email, or doc.
+  const buildMissedWeeksText = () => {
+    if (!exportSummary) return '';
+    return exportSummary.missed
+      .map((m) => formatWeekRange(m.start, m.end))
+      .join('\n');
+  };
 
-  const downloadMissedWeeksReport = () => {
-    if (!exportSummary || !exportLocation) return;
-    const { missed, applicable, lastSubmission } = exportSummary;
-    const loc = escapeHtml(exportLocation);
-    const generated = new Date();
-    const submitted = applicable - missed.length;
+  // Draw the same list as a PNG so it can be attached or pasted as an image.
+  const renderMissedWeeksImage = (): Promise<Blob | null> => {
+    if (!exportSummary || !exportLocation) return Promise.resolve(null);
+    const { missed } = exportSummary;
+    const scale = 2; // crisp on phones / retina
+    const width = 560;
+    const pad = 32;
+    const headerH = 96;
+    const rowH = 40;
+    const bodyH = Math.max(missed.length, 1) * rowH;
+    const footerH = 44;
+    const height = headerH + pad / 2 + bodyH + footerH;
 
-    trackReportGeneration('location_missed_weeks_report', 'html');
+    const canvas = document.createElement('canvas');
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return Promise.resolve(null);
+    ctx.scale(scale, scale);
+    const font = (weight: number, size: number) =>
+      `${weight} ${size}px 'Roboto', 'Segoe UI', Helvetica, Arial, sans-serif`;
+    const fitText = (text: string, maxW: number) => {
+      if (ctx.measureText(text).width <= maxW) return text;
+      let t = text;
+      while (t.length > 1 && ctx.measureText(t + '…').width > maxW)
+        t = t.slice(0, -1);
+      return t + '…';
+    };
 
-    const rows = missed
-      .map(
-        (m, idx) => `
-          <tr>
-            <td class="num">${idx + 1}</td>
-            <td>Week of <strong>${formatLongDate(m.start)}</strong></td>
-            <td class="muted">${m.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${m.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-          </tr>`
-      )
-      .join('');
+    // Background + header band
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#236383';
+    ctx.fillRect(0, 0, width, headerH);
 
-    const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Missing Weeks – ${loc}</title>
-  <style>
-    body { font-family: 'Roboto','Segoe UI',Tahoma,sans-serif; max-width: 760px; margin: 0 auto; padding: 40px 20px; background: #f9fafb; color: #1f2937; }
-    .header { padding: 28px 30px; background: linear-gradient(135deg,#236383 0%,#007E8C 100%); color: #fff; border-radius: 12px; margin-bottom: 28px; }
-    .header h1 { margin: 0 0 6px; font-size: 1.9em; }
-    .header p { margin: 0; opacity: .9; }
-    .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px; }
-    .stat { background: #fff; border-radius: 10px; padding: 18px; text-align: center; border-left: 4px solid #236383; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
-    .stat.bad { border-left-color: #dc2626; } .stat.good { border-left-color: #16a34a; }
-    .stat .n { font-size: 2em; font-weight: 800; line-height: 1; }
-    .stat .l { color: #6b7280; margin-top: 6px; font-size: .9em; }
-    .section { background: #fff; border-radius: 12px; padding: 26px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 24px; }
-    .section h2 { margin: 0 0 14px; color: #236383; font-size: 1.3em; }
-    table { width: 100%; border-collapse: collapse; }
-    td { padding: 10px 8px; border-bottom: 1px solid #f3f4f6; }
-    td.num { width: 32px; color: #9ca3af; }
-    .muted { color: #6b7280; font-size: .9em; }
-    .good-box { text-align: center; padding: 30px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534; font-size: 1.1em; }
-    .note { color: #4b5563; font-size: .95em; line-height: 1.5; }
-    .footer { text-align: center; color: #6b7280; margin-top: 30px; font-size: .9em; }
-    @media print { body { background: #fff; padding: 0; } .header { background: #236383; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>${loc}</h1>
-    <p>Missing collection logs • Last ${exportPeriodLabel} • Generated ${generated.toLocaleDateString()}</p>
-  </div>
-  <div class="stats">
-    <div class="stat"><div class="n">${applicable}</div><div class="l">Weeks checked</div></div>
-    <div class="stat good"><div class="n">${submitted}</div><div class="l">Weeks logged</div></div>
-    <div class="stat bad"><div class="n">${missed.length}</div><div class="l">Weeks missing</div></div>
-  </div>
-  <div class="section">
-    <h2>Weeks we don't have counts for</h2>
-    ${
+    ctx.fillStyle = '#ffffff';
+    ctx.font = font(700, 24);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(fitText(exportLocation, width - pad * 2), pad, 44);
+    ctx.font = font(400, 15);
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.fillText(
       missed.length === 0
-        ? '<div class="good-box">🎉 Every week in this period has a collection log. Thank you!</div>'
-        : `<table>${rows}</table>`
-    }
-  </div>
-  <div class="section note">
-    <strong>How weeks are counted:</strong> each week runs Wednesday through the following Tuesday.
-    The current (in-progress) week isn't included.${
-      lastSubmission
-        ? ` Most recent log on file: <strong>${formatLongDate(new Date(lastSubmission + 'T12:00:00'))}</strong>.`
-        : ''
-    }
-    <br><br>If you collected during any of these weeks, please send us your counts or log them in the app. If you didn't collect, just let us know so we can mark it.
-  </div>
-  <div class="footer"><strong>The Sandwich Project</strong></div>
-</body>
-</html>`;
+        ? `No missing weeks · last ${exportPeriodLabel}`
+        : `Missing sandwich counts · ${missed.length} ${missed.length === 1 ? 'week' : 'weeks'} · last ${exportPeriodLabel}`,
+      pad,
+      72
+    );
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
+    // Rows
+    let y = headerH + pad / 2;
+    if (missed.length === 0) {
+      ctx.fillStyle = '#166534';
+      ctx.font = font(500, 17);
+      ctx.fillText('All weeks logged — nothing missing.', pad, y + 26);
+    } else {
+      missed.forEach((m, idx) => {
+        if (idx % 2 === 1) {
+          ctx.fillStyle = '#f3f6f8';
+          ctx.fillRect(pad / 2, y, width - pad, rowH);
+        }
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = font(500, 14);
+        ctx.fillText(String(idx + 1), pad, y + 26);
+        ctx.fillStyle = '#1f2937';
+        ctx.font = font(500, 17);
+        ctx.fillText(formatWeekRange(m.start, m.end), pad + 34, y + 26);
+        y += rowH;
+      });
+    }
+
+    // Footer
+    ctx.fillStyle = '#6b7280';
+    ctx.font = font(400, 12);
+    ctx.fillText(
+      'Weeks run Wednesday – Tuesday · The Sandwich Project',
+      pad,
+      height - 18
+    );
+
+    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  };
+
+  const downloadMissedWeeksImage = async () => {
+    const blob = await renderMissedWeeksImage();
+    if (!blob || !exportLocation) return;
+    trackReportGeneration('location_missed_weeks', 'png');
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const safeName = exportLocation.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
-    link.download = `Missing-Weeks-${safeName}-${generated.toISOString().split('T')[0]}.html`;
+    const safeName = exportLocation
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '');
+    link.download = `Missing-Weeks-${safeName}-${new Date().toISOString().split('T')[0]}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
+  const flashCopied = (what: 'text' | 'image') => {
+    setExportCopied(what);
+    setTimeout(() => setExportCopied(null), 2000);
+  };
+
   const copyMissedWeeksText = async () => {
     try {
       await navigator.clipboard.writeText(buildMissedWeeksText());
-      setExportCopied(true);
-      setTimeout(() => setExportCopied(false), 2000);
+      flashCopied('text');
     } catch {
       // Clipboard can be blocked (e.g. insecure context); nothing else to do.
+    }
+  };
+
+  // Image clipboard isn't supported everywhere (e.g. Firefox); the button is
+  // hidden when ClipboardItem is missing, and Download still works.
+  const canCopyImage =
+    typeof window !== 'undefined' && 'ClipboardItem' in window;
+  const copyMissedWeeksImage = async () => {
+    try {
+      const blob = await renderMissedWeeksImage();
+      if (!blob) return;
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob }),
+      ]);
+      flashCopied('image');
+    } catch {
+      // Fall back silently; Download image still works.
     }
   };
 
@@ -1733,7 +1761,7 @@ export default function WeeklyMonitoringDashboard() {
                     <ul className="max-h-48 overflow-y-auto space-y-1 text-gray-700">
                       {exportSummary.missed.map((m) => (
                         <li key={m.start.toISOString()}>
-                          Week of {formatLongDate(m.start)}
+                          {formatWeekRange(m.start, m.end)}
                         </li>
                       ))}
                     </ul>
@@ -1746,21 +1774,30 @@ export default function WeeklyMonitoringDashboard() {
             ) : null}
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-wrap">
             <Button
               variant="outline"
               onClick={copyMissedWeeksText}
-              disabled={!exportSummary}
+              disabled={!exportSummary || exportSummary.missed.length === 0}
             >
-              {exportCopied ? 'Copied!' : 'Copy as email text'}
+              {exportCopied === 'text' ? 'Copied!' : 'Copy list'}
             </Button>
+            {canCopyImage && (
+              <Button
+                variant="outline"
+                onClick={copyMissedWeeksImage}
+                disabled={!exportSummary}
+              >
+                {exportCopied === 'image' ? 'Copied!' : 'Copy image'}
+              </Button>
+            )}
             <Button
-              onClick={downloadMissedWeeksReport}
+              onClick={downloadMissedWeeksImage}
               disabled={!exportSummary}
               className="bg-brand-primary hover:bg-brand-primary-dark"
             >
               <Download className="h-4 w-4 mr-2" />
-              Download report
+              Download image
             </Button>
           </DialogFooter>
         </DialogContent>
