@@ -437,10 +437,15 @@ export default function WeeklyMonitoringDashboard() {
     typeof window !== 'undefined' && 'ClipboardItem' in window;
   const copyMissedWeeksImage = async () => {
     try {
-      const blob = await renderMissedWeeksImage();
-      if (!blob) return;
+      // Call clipboard.write synchronously in the click handler and hand it
+      // the rendering promise: Safari/WebKit drop the user-gesture context
+      // if we await toBlob() first and then reject with NotAllowedError.
+      const pngPromise = renderMissedWeeksImage().then((blob) => {
+        if (!blob) throw new Error('Could not render image');
+        return blob;
+      });
       await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob }),
+        new ClipboardItem({ 'image/png': pngPromise }),
       ]);
       flashCopied('image');
     } catch {
@@ -1701,13 +1706,13 @@ export default function WeeklyMonitoringDashboard() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Location</Label>
+                <Label htmlFor="export-location">Location</Label>
                 <Select
                   value={exportLocation}
                   onValueChange={setExportLocation}
                   disabled={exportGridLoading}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="export-location">
                     <SelectValue
                       placeholder={
                         exportGridLoading ? 'Loading…' : 'Choose a location'
@@ -1724,18 +1729,18 @@ export default function WeeklyMonitoringDashboard() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Look back</Label>
+                <Label htmlFor="export-lookback">Look back</Label>
                 <Select
                   value={String(exportWeeks)}
                   onValueChange={(v) => setExportWeeks(Number(v))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="export-lookback">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="14">Last 3 months</SelectItem>
                     <SelectItem value="27">Last 6 months</SelectItem>
-                    <SelectItem value="52">Last 12 months</SelectItem>
+                    <SelectItem value="53">Last 12 months</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

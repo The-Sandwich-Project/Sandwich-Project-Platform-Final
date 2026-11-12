@@ -320,7 +320,9 @@ router.get('/grid-report/:weeks', async (req, res) => {
   try {
     const numWeeks = Math.min(
       Math.max(parseInt(req.params.weeks, 10) || 12, 1),
-      52
+      // 53 = 52 completed weeks + the in-progress one (location export's
+      // 12-month lookback drops the current week)
+      53
     );
 
     // All host locations from the hosts table (active only by default)
