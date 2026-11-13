@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { format, isValid, formatDistanceToNowStrict } from 'date-fns';
 import { parseDateOnly } from '@shared/date-utils';
-import { formatSandwichTypesDisplay } from '@/lib/sandwich-utils';
+import { formatSandwichTypesDisplay, formatEventEstimate } from '@/lib/sandwich-utils';
 import { useAuth } from '@/hooks/useAuth';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
@@ -220,10 +220,7 @@ function UrgentGapBadge({ gap }: { gap: string }) {
 }
 
 function getSandwichSummary(event: MyAssignmentItem): string {
-  return formatSandwichTypesDisplay(
-    event.sandwichTypes,
-    event.estimatedSandwichCount ?? undefined,
-  );
+  return formatEventEstimate(event as any);
 }
 
 function AssignmentEventRow({

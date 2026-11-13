@@ -23,7 +23,7 @@ import {
   History,
 } from 'lucide-react';
 import { formatTime12Hour, formatEventDate } from '@/components/event-requests/utils';
-import { formatSandwichTypesDisplay } from '@/lib/sandwich-utils';
+import { formatSandwichTypesDisplay, formatEventEstimate } from '@/lib/sandwich-utils';
 import type { EventRequest } from '@shared/schema';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
@@ -104,10 +104,7 @@ const driverAssigned = parsePostgresArray(request.assignedDriverIds).length + (r
   const staffingNeededColor = isWithin7Days ? 'text-[#A31C41] font-semibold' : 'text-orange-700';
 
   // Get sandwich info
-  const sandwichInfo = formatSandwichTypesDisplay(
-    request.sandwichTypes,
-    request.estimatedSandwichCount ?? undefined
-  );
+  const sandwichInfo = formatEventEstimate(request);
 
   const missingInfo = getMissingIntakeInfo(request);
 

@@ -166,19 +166,8 @@ export interface EventDialogContextType {
   editingValue: string;
   setEditingValue: (value: string) => void;
 
-  // Inline + modal sandwich count editing scratch state
-  inlineSandwichMode: 'total' | 'types' | 'range';
-  setInlineSandwichMode: (mode: 'total' | 'types' | 'range') => void;
-  inlineTotalCount: number;
-  setInlineTotalCount: (count: number) => void;
-  inlineSandwichTypes: Array<{ type: string; quantity: number }>;
-  setInlineSandwichTypes: (types: Array<{ type: string; quantity: number }>) => void;
-  inlineRangeMin: number;
-  setInlineRangeMin: (value: number) => void;
-  inlineRangeMax: number;
-  setInlineRangeMax: (value: number) => void;
-  inlineRangeType: string;
-  setInlineRangeType: (value: string) => void;
+  // Modal sandwich count editing scratch state (the inline quick edit keeps
+  // its own state: CardSandwichEstimateEdit)
   modalSandwichMode: 'total' | 'types';
   setModalSandwichMode: (mode: 'total' | 'types') => void;
   modalTotalCount: number;
@@ -271,12 +260,6 @@ export const EventDialogProvider: React.FC<{ children: ReactNode }> = ({
   const [editingValue, setEditingValue] = useState<string>('');
 
   // Sandwich-count editing
-  const [inlineSandwichMode, setInlineSandwichMode] = useState<'total' | 'types' | 'range'>('total');
-  const [inlineTotalCount, setInlineTotalCount] = useState(0);
-  const [inlineSandwichTypes, setInlineSandwichTypes] = useState<Array<{ type: string; quantity: number }>>([]);
-  const [inlineRangeMin, setInlineRangeMin] = useState(0);
-  const [inlineRangeMax, setInlineRangeMax] = useState(0);
-  const [inlineRangeType, setInlineRangeType] = useState('');
   const [modalSandwichMode, setModalSandwichMode] = useState<'total' | 'types'>('total');
   const [modalTotalCount, setModalTotalCount] = useState(0);
   const [modalSandwichTypes, setModalSandwichTypes] = useState<Array<{ type: string; quantity: number }>>([]);
@@ -377,18 +360,6 @@ export const EventDialogProvider: React.FC<{ children: ReactNode }> = ({
       setEditingValue,
 
       // Sandwich editing
-      inlineSandwichMode,
-      setInlineSandwichMode,
-      inlineTotalCount,
-      setInlineTotalCount,
-      inlineSandwichTypes,
-      setInlineSandwichTypes,
-      inlineRangeMin,
-      setInlineRangeMin,
-      inlineRangeMax,
-      setInlineRangeMax,
-      inlineRangeType,
-      setInlineRangeType,
       modalSandwichMode,
       setModalSandwichMode,
       modalTotalCount,
@@ -418,8 +389,6 @@ export const EventDialogProvider: React.FC<{ children: ReactNode }> = ({
       editingAssignmentPersonId, isVanDriverAssignment, customPersonData,
       scheduleCallDate, scheduleCallTime, followUpNotes,
       editingScheduledId, editingField, editingValue,
-      inlineSandwichMode, inlineTotalCount, inlineSandwichTypes,
-      inlineRangeMin, inlineRangeMax, inlineRangeType,
       modalSandwichMode, modalTotalCount, modalSandwichTypes,
       editingCompletedId, completedEdit,
       openEventDetails,
