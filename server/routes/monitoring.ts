@@ -18,6 +18,25 @@ import { and, gte, lte, isNull, asc } from 'drizzle-orm';
 
 const router = Router();
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The login link in reminder emails/texts comes from the dashboard
+ * (window.location.origin). Only accept a plain http(s) origin so the link
+ * can't be pointed anywhere odd; otherwise the sender uses its default.
+ */
+function safeAppUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Placeholder/categorization host names that are NOT real weekly locations and
  * should never appear in the submission grid. These are data-collection
@@ -580,13 +599,9 @@ router.post('/send-sms-reminders', async (req, res) => {
   }
 });
 
-// Send SMS reminder to single location
-router.post('/send-sms-reminder/:location', async (req, res) => {
+async function respondWithSmsReminder(location: string, rawAppUrl: unknown, res: any) {
   try {
-    const location = decodeURIComponent(req.params.location);
-    const { appUrl } = req.body;
-
-    const result = await sendSMSReminder(location, appUrl);
+    const result = await sendSMSReminder(location, safeAppUrl(rawAppUrl));
 
     if (result.success) {
       res.json({
@@ -606,6 +621,23 @@ router.post('/send-sms-reminder/:location', async (req, res) => {
     logger.error('Error sending SMS reminder:', error);
     res.status(500).json({ error: 'Failed to send SMS reminder' });
   }
+}
+
+// Send SMS reminder to single location (query parameter version, used by the
+// dashboard). Before this existed the dashboard's per-location SMS button hit
+// a route that didn't exist and always failed. Query string rather than path
+// because location names can contain "/" (e.g. "Dunwoody/PTC").
+router.post('/send-sms-reminder', async (req, res) => {
+  const location = req.query.location as string;
+  if (!location) {
+    return res.status(400).json({ error: 'Location parameter is required' });
+  }
+  await respondWithSmsReminder(location, req.body?.appUrl, res);
+});
+
+// Send SMS reminder to single location (path parameter version - legacy)
+router.post('/send-sms-reminder/:location', async (req, res) => {
+  await respondWithSmsReminder(decodeURIComponent(req.params.location), req.body?.appUrl, res);
 });
 
 // Test SMS
@@ -731,58 +763,50 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
     });
   } catch (error) {
     logger.error('Error sending test email:', error);
-    res.status(500).json({ error: 'Failed to send test email', details: error.message });
+    res.status(500).json({ error: 'Failed to send test email', details: errorMessage(error) });
   }
 });
 
-// Send email reminder to single location (query parameter version for frontend compatibility)
-router.post('/send-email-reminder', async (req, res) => {
+/**
+ * Send one location's weekly email reminder and report what actually happened.
+ * sendEmailReminder never throws; it returns success: false with a reason
+ * (no contact on file, no email address, SendGrid not configured, send
+ * failed). Those used to come back as HTTP 200, so the dashboard treated a
+ * reminder that never went out as sent. Now they're a 422 with the reason.
+ */
+async function respondWithEmailReminder(location: string, rawAppUrl: unknown, res: any) {
   try {
-    const location = req.query.location as string;
+    const { sendEmailReminder } = await import('../weekly-monitoring');
+    const result = await sendEmailReminder(location, safeAppUrl(rawAppUrl));
 
-    if (!location) {
-      return res.status(400).json({ error: 'Location parameter is required' });
+    if (!result.success) {
+      return res.status(422).json({
+        success: false,
+        location,
+        error: result.message,
+        message: result.message,
+      });
     }
 
-    // Import email service
-    const { sendWeeklyMonitoringReminder } = await import('../sendgrid');
-
-    // Send the email reminder
-    const result = await sendWeeklyMonitoringReminder(location);
-
-    res.json({
-      success: true,
-      location,
-      message: 'Email reminder sent successfully',
-      ...result
-    });
+    res.json({ success: true, location, message: result.message });
   } catch (error) {
     logger.error('Error sending email reminder:', error);
-    res.status(500).json({ error: 'Failed to send email reminder', details: error.message });
+    res.status(500).json({ error: 'Failed to send email reminder', details: errorMessage(error) });
   }
+}
+
+// Send email reminder to single location (query parameter version, used by the dashboard)
+router.post('/send-email-reminder', async (req, res) => {
+  const location = req.query.location as string;
+  if (!location) {
+    return res.status(400).json({ error: 'Location parameter is required' });
+  }
+  await respondWithEmailReminder(location, req.body?.appUrl, res);
 });
 
 // Send email reminder to single location (path parameter version - legacy)
 router.post('/send-email-reminder/:location', async (req, res) => {
-  try {
-    const location = decodeURIComponent(req.params.location);
-
-    // Import email service
-    const { sendWeeklyMonitoringReminder } = await import('../sendgrid');
-
-    // Send the email reminder
-    const result = await sendWeeklyMonitoringReminder(location);
-
-    res.json({
-      success: true,
-      location,
-      message: 'Email reminder sent successfully',
-      ...result
-    });
-  } catch (error) {
-    logger.error('Error sending email reminder:', error);
-    res.status(500).json({ error: 'Failed to send email reminder', details: error.message });
-  }
+  await respondWithEmailReminder(decodeURIComponent(req.params.location), req.body?.appUrl, res);
 });
 
 export default router;
