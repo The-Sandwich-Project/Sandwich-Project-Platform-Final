@@ -16,6 +16,10 @@ import { z } from 'zod';
 import { AuditLogger } from '../audit-logger';
 import { logger } from '../utils/production-safe-logger';
 import { geocodeAddress } from '../utils/geocoding';
+import {
+  syncHostContactVolunteer,
+  unlinkHostContactVolunteer,
+} from '../services/host-contact-volunteer-sync';
 
 // Normalize freeform contact role values to standardized ones
 // Must match the client-side normalizeContactRole function
@@ -543,6 +547,28 @@ export function createHostsRouter(deps: RouterDependencies) {
   asyncHandler(async (req: any, res) => {
     validateRequired(req.body, ['name', 'role', 'phone', 'hostId'], 'host contact creation');
 
+    // "Designate as Host" on the Volunteers page: link the new contact to this
+    // exact volunteer instead of matching by name/phone/email.
+    let linkVolunteerId: number | undefined;
+    if (req.body.linkVolunteerId != null) {
+      linkVolunteerId = validateId(String(req.body.linkVolunteerId), 'volunteer');
+      const volunteer = await storage.getVolunteer(linkVolunteerId);
+      if (!volunteer) {
+        throw createHostsError('Volunteer not found', 404, 'VOLUNTEER_NOT_FOUND', { volunteerId: linkVolunteerId });
+      }
+      if (volunteer.hostContactId != null) {
+        throw createHostsError(
+          `${volunteer.name} is already linked to a host contact. Edit them on the Hosts page instead.`,
+          409,
+          'VOLUNTEER_ALREADY_HOST',
+          { volunteerId: linkVolunteerId, hostContactId: volunteer.hostContactId }
+        );
+      }
+      // They stay a volunteer: that's the point of designating them.
+      req.body.isVolunteer = true;
+    }
+    delete req.body.linkVolunteerId;
+
     // Normalize role before validation
     if (req.body.role) {
       req.body.role = normalizeContactRole(req.body.role);
@@ -594,6 +620,9 @@ export function createHostsRouter(deps: RouterDependencies) {
         logger.error(`Failed to geocode host contact ${contact.id}:`, err);
       }
     }
+
+    // "Also a volunteer" → create/link their volunteer record
+    await syncHostContactVolunteer(finalContact, { preferVolunteerId: linkVolunteerId });
 
     res.status(201).json(finalContact);
   })
@@ -684,6 +713,9 @@ export function createHostsRouter(deps: RouterDependencies) {
       }
     }
 
+    // Keep the linked volunteer record in step with "Also a volunteer"
+    await syncHostContactVolunteer(finalContact);
+
     res.json(finalContact);
   })
 );
@@ -705,6 +737,9 @@ export function createHostsRouter(deps: RouterDependencies) {
     if (!success) {
       throw createHostsError('Host contact not found', 404, 'HOST_CONTACT_NOT_FOUND', { contactId: id });
     }
+
+    // Their volunteer record (if any) stays — they may still volunteer
+    await unlinkHostContactVolunteer(id);
 
     // Audit log
     await AuditLogger.logDelete(

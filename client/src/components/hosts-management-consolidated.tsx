@@ -263,6 +263,7 @@ export default function HostsManagementConsolidated() {
     isPrimary: false,
     driverAgreementSigned: false,
     vanApproved: false,
+    isVolunteer: false,
     notes: '',
     alternateForContactId: null as number | null,
   });
@@ -583,6 +584,8 @@ export default function HostsManagementConsolidated() {
         queryKey: ['/api/hosts-with-contacts'],
       });
       queryClient.invalidateQueries({ queryKey: ['/api/hosts/map'] });
+      // "Also a volunteer" creates a linked volunteer record server-side
+      queryClient.invalidateQueries({ queryKey: ['/api/volunteers'] });
       await queryClient.refetchQueries({
         queryKey: ['/api/hosts-with-contacts'],
       });
@@ -608,6 +611,7 @@ export default function HostsManagementConsolidated() {
         isPrimary: false,
         driverAgreementSigned: false,
         vanApproved: false,
+        isVolunteer: false,
         notes: '',
         alternateForContactId: null,
       });
@@ -675,6 +679,7 @@ export default function HostsManagementConsolidated() {
 
       queryClient.invalidateQueries({ queryKey: ['/api/hosts-with-contacts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/hosts/map'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/volunteers'] });
       setEditingContact(null);
       toast({
         title: 'Contact updated',
@@ -931,6 +936,7 @@ export default function HostsManagementConsolidated() {
       driverAgreementSigned: editingContact.driverAgreementSigned || false,
       vanApproved: editingContact.vanApproved || false,
       isFormerHost: editingContact.isFormerHost || false,
+      isVolunteer: editingContact.isVolunteer || false,
       alternateForContactId: editingContact.role === 'alternate' ? (editingContact.alternateForContactId || null) : null,
       notes: editingContact.notes?.trim() || '',
     };
@@ -1471,6 +1477,21 @@ export default function HostsManagementConsolidated() {
                   </span>
                 </Label>
               </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="main-contact-volunteer"
+                  checked={newContact.isVolunteer || false}
+                  onCheckedChange={(checked) =>
+                    setNewContact({ ...newContact, isVolunteer: checked })
+                  }
+                />
+                <Label htmlFor="main-contact-volunteer" className="text-sm">
+                  Also a Volunteer
+                  <span className="block text-xs text-slate-500">
+                    Lists this host in volunteer dropdowns so they can be assigned to events
+                  </span>
+                </Label>
+              </div>
               <div>
                 <Label htmlFor="main-contact-notes">Notes</Label>
                 <Textarea
@@ -1769,6 +1790,11 @@ export default function HostsManagementConsolidated() {
                             {(contact as any).isFormerHost && (
                               <Badge className="bg-gray-200 text-gray-700 border-gray-300 text-xs">
                                 Former Host
+                              </Badge>
+                            )}
+                            {(contact as any).isVolunteer && (
+                              <Badge className="bg-violet-100 text-violet-800 border-violet-200 text-xs">
+                                Volunteer
                               </Badge>
                             )}
                             {contact.weeklyActive && (
@@ -2147,6 +2173,21 @@ export default function HostsManagementConsolidated() {
                             </span>
                           </Label>
                         </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="edit-contact-volunteer"
+                            checked={editingContact.isVolunteer || false}
+                            onCheckedChange={(checked) =>
+                              setEditingContact({ ...editingContact, isVolunteer: checked })
+                            }
+                          />
+                          <Label htmlFor="edit-contact-volunteer" className="text-sm">
+                            Also a Volunteer
+                            <span className="block text-xs text-slate-500">
+                              Lists this host in volunteer dropdowns so they can be assigned to events
+                            </span>
+                          </Label>
+                        </div>
                       </div>
                     </div>
 
@@ -2493,6 +2534,21 @@ export default function HostsManagementConsolidated() {
                             Approved Van Driver
                             <span className="block text-xs text-slate-500">
                               Can be assigned to drive the van for events
+                            </span>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="contact-volunteer"
+                            checked={newContact.isVolunteer || false}
+                            onCheckedChange={(checked) =>
+                              setNewContact({ ...newContact, isVolunteer: checked })
+                            }
+                          />
+                          <Label htmlFor="contact-volunteer" className="text-sm">
+                            Also a Volunteer
+                            <span className="block text-xs text-slate-500">
+                              Lists this host in volunteer dropdowns so they can be assigned to events
                             </span>
                           </Label>
                         </div>
@@ -2859,6 +2915,21 @@ export default function HostsManagementConsolidated() {
                                                 Approved Van Driver
                                                 <span className="block text-xs text-slate-500">
                                                   Can be assigned to drive the van for events
+                                                </span>
+                                              </Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                              <Switch
+                                                id="edit-contact-volunteer-hosts"
+                                                checked={editingContact.isVolunteer || false}
+                                                onCheckedChange={(checked) =>
+                                                  setEditingContact({ ...editingContact, isVolunteer: checked })
+                                                }
+                                              />
+                                              <Label htmlFor="edit-contact-volunteer-hosts" className="text-sm">
+                                                Also a Volunteer
+                                                <span className="block text-xs text-slate-500">
+                                                  Lists this host in volunteer dropdowns so they can be assigned to events
                                                 </span>
                                               </Label>
                                             </div>

@@ -277,6 +277,8 @@ function PersonSelector({
     // Add volunteers (for volunteer assignments)
     if (assignmentType === 'volunteer') {
       volunteers.forEach((vol: any) => {
+        // Deactivated volunteers (including hosts unmarked as volunteers) can't be picked
+        if (vol.isActive === false) return;
         people.push({
           id: `volunteer-${vol.id}`,
           name: vol.name || `${vol.firstName || ''} ${vol.lastName || ''}`.trim() || `Volunteer #${vol.id}`,

@@ -1134,7 +1134,10 @@ class StorageWrapper implements IStorage {
   async createHostContact(contact: any) {
     return this.executeWithFallback(
       () => this.primaryStorage.createHostContact(contact),
-      () => this.fallbackStorage.createHostContact(contact)
+      () => this.fallbackStorage.createHostContact(contact),
+      // Writes must not land in MemStorage: a rejected duplicate would look
+      // saved but vanish, and could leave a volunteer linked to a fake id.
+      { isWriteOperation: true }
     );
   }
 
@@ -1155,14 +1158,20 @@ class StorageWrapper implements IStorage {
   async updateHostContact(id: number, updates: any) {
     return this.executeWithFallback(
       () => this.primaryStorage.updateHostContact(id, updates),
-      () => this.fallbackStorage.updateHostContact(id, updates)
+      () => this.fallbackStorage.updateHostContact(id, updates),
+      // Writes must not land in MemStorage: a rejected duplicate would look
+      // saved but vanish, and could leave a volunteer linked to a fake id.
+      { isWriteOperation: true }
     );
   }
 
   async deleteHostContact(id: number) {
     return this.executeWithFallback(
       () => this.primaryStorage.deleteHostContact(id),
-      () => this.fallbackStorage.deleteHostContact(id)
+      () => this.fallbackStorage.deleteHostContact(id),
+      // Writes must not land in MemStorage: a rejected duplicate would look
+      // saved but vanish, and could leave a volunteer linked to a fake id.
+      { isWriteOperation: true }
     );
   }
 
