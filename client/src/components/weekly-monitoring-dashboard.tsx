@@ -42,8 +42,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { FloatingAIChat } from '@/components/floating-ai-chat';
 
 interface WeeklySubmissionStatus {
@@ -104,13 +102,6 @@ export default function WeeklyMonitoringDashboard() {
     string | null
   >(null);
   const [smsingLocation, setSmsingLocation] = useState<string | null>(null);
-  // Email preview modal state
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailTargetLocation, setEmailTargetLocation] = useState<string | null>(
-    null
-  );
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
   // Per-location missed-weeks export dialog
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportLocation, setExportLocation] = useState<string>('');
@@ -466,13 +457,16 @@ export default function WeeklyMonitoringDashboard() {
 
   // Email reminder mutations
   const sendSingleEmailMutation = useMutation({
-    mutationFn: (data: { location: string; appUrl?: string; subject?: string; body?: string }) =>
+    // The server now answers a reminder that didn't go out (no contact on
+    // file, no email, send failed) with an error status, so a failure lands
+    // in onError / isError instead of looking sent.
+    mutationFn: (data: { location: string; appUrl?: string }) =>
       apiRequest(
         'POST',
         `/api/monitoring/send-email-reminder?location=${encodeURIComponent(
           data.location
         )}`,
-        { appUrl: data.appUrl, subject: data.subject, body: data.body }
+        { appUrl: data.appUrl }
       ),
     onMutate: (data) => {
       setEmailingSingleLocation(data.location);
@@ -1601,8 +1595,7 @@ export default function WeeklyMonitoringDashboard() {
       {(manualCheckMutation.isError ||
         testEmailMutation.isError ||
         checkWeekMutation.isError ||
-        sendSMSRemindersMutation.isError ||
-        sendSingleSMSMutation.isError) && (
+        sendSMSRemindersMutation.isError) && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -1630,66 +1623,42 @@ export default function WeeklyMonitoringDashboard() {
         </Alert>
       )}
 
+      {sendSingleEmailMutation.isSuccess && (
+        <Alert>
+          <CheckCircle className="h-4 w-4" />
+          <AlertDescription>
+            {sendSingleEmailMutation.data?.message ||
+              `Email reminder sent to ${sendSingleEmailMutation.variables?.location}`}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {sendSingleEmailMutation.isError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Email reminder to {sendSingleEmailMutation.variables?.location} was
+            not sent: {(sendSingleEmailMutation.error as Error)?.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {sendSingleSMSMutation.isError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            SMS reminder to {sendSingleSMSMutation.variables?.location} was not
+            sent: {(sendSingleSMSMutation.error as Error)?.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {sendSingleSMSMutation.isSuccess && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
           <AlertDescription>SMS reminder sent successfully!</AlertDescription>
         </Alert>
       )}
-      <Dialog open={showEmailModal} onOpenChange={setShowEmailModal}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              Send email reminder
-              {emailTargetLocation ? ` — ${emailTargetLocation}` : ''}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email-subject">Subject</Label>
-              <Input
-                id="email-subject"
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email-body">Body</Label>
-              <Textarea
-                id="email-body"
-                rows={10}
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowEmailModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!emailTargetLocation) return;
-                sendSingleEmailMutation.mutate({
-                  location: emailTargetLocation,
-                  appUrl: window.location.origin,
-                  subject: emailSubject,
-                  body: emailBody,
-                });
-                setShowEmailModal(false);
-              }}
-              disabled={sendSingleEmailMutation.isPending}
-              className="bg-brand-primary hover:bg-brand-primary-dark"
-            >
-              {sendSingleEmailMutation.isPending ? 'Sending...' : 'Send'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Per-location missed-weeks export */}
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <DialogContent className="max-w-lg">
