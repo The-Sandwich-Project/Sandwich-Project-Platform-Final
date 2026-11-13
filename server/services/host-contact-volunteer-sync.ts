@@ -98,7 +98,10 @@ async function contactFields(contact: HostContact) {
  * `isVolunteer` flag. Safe to call after every create/update. Never throws —
  * a sync failure is logged and must not fail the host contact save.
  */
-export async function syncHostContactVolunteer(contact: HostContact): Promise<void> {
+export async function syncHostContactVolunteer(
+  contact: HostContact,
+  options: { preferVolunteerId?: number } = {}
+): Promise<void> {
   try {
     const linked = await findLinkedVolunteer(contact.id);
 
@@ -123,6 +126,28 @@ export async function syncHostContactVolunteer(contact: HostContact): Promise<vo
         .set({ ...fields, ...reactivate, updatedAt: new Date() })
         .where(eq(volunteers.id, linked.id));
       return;
+    }
+
+    // "Designate as Host" on the Volunteers page names the exact volunteer to
+    // link. Claim that one (only while it is still unlinked) before matching.
+    if (options.preferVolunteerId != null) {
+      const claimed = await db
+        .update(volunteers)
+        .set({
+          ...fields,
+          hostContactId: contact.id,
+          isActive: true,
+          inactiveReason: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(eq(volunteers.id, options.preferVolunteerId), isNull(volunteers.hostContactId))
+        )
+        .returning({ id: volunteers.id });
+      if (claimed.length > 0) {
+        logger.info(`Linked host contact ${contact.id} to designated volunteer ${options.preferVolunteerId}`);
+        return;
+      }
     }
 
     const existing = await findMatchingUnlinkedVolunteer(contact);

@@ -100,7 +100,7 @@ export default function VolunteerManagement() {
   // Host designation state
   const [showHostDesignation, setShowHostDesignation] = useState(false);
   const [selectedHostId, setSelectedHostId] = useState<number | null>(null);
-  const [hostRole, setHostRole] = useState('volunteer');
+  const [hostRole, setHostRole] = useState('host');
   const [hostNotes, setHostNotes] = useState('');
 
   // Check permissions
@@ -173,30 +173,21 @@ export default function VolunteerManagement() {
     },
   });
 
-  // Designate as host mutation
+  // Designate as host mutation: creates a host contact linked to this exact
+  // volunteer record. They stay a volunteer (the contact is marked "Also a
+  // Volunteer"), so they keep showing up in volunteer dropdowns.
   const { mutate: designateAsHost, isPending: isDesignating } = useMutation({
-    mutationFn: async ({
-      volunteerData,
-      hostContactData,
-    }: {
-      volunteerData: any;
-      hostContactData: any;
-    }) => {
-      // First update the volunteer's hostId
-      await apiRequest('PATCH', `/api/drivers/${editingVolunteer.id}`, {
-        hostId: hostContactData.hostId,
-        notes: volunteerData.notes,
-      });
-
-      // Then create a host contact entry
+    mutationFn: async (hostContactData: any) => {
       return await apiRequest('POST', '/api/host-contacts', hostContactData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/volunteers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/hosts-with-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/host-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/hosts/map'] });
       toast({
         title: 'Success',
-        description: `${editingVolunteer.firstName} ${editingVolunteer.lastName} has been designated as a host contact`,
+        description: `${editingVolunteer?.name || 'This volunteer'} is now a host contact and is still listed as a volunteer`,
       });
       resetForm();
       setShowAddDialog(false);
@@ -248,7 +239,7 @@ export default function VolunteerManagement() {
     setEditingVolunteer(null);
     setShowHostDesignation(false);
     setSelectedHostId(null);
-    setHostRole('volunteer');
+    setHostRole('host');
     setHostNotes('');
   };
 
@@ -337,24 +328,27 @@ export default function VolunteerManagement() {
       });
       return;
     }
+    if (!formData.phone?.trim()) {
+      toast({
+        title: 'Phone number needed',
+        description: 'Host contacts need a phone number. Add one above first.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    const volunteerData = {
-      notes:
-        formData.notes +
-        (hostNotes ? `\n\nDesignated as host: ${hostNotes}` : ''),
-    };
-
-    const hostContactData = {
+    designateAsHost({
+      linkVolunteerId: editingVolunteer.id,
       hostId: selectedHostId,
-      name: formData.name,
+      name: formData.name.trim(),
       role: hostRole,
-      phone: formData.phone || '',
-      email: formData.email || '',
+      phone: formData.phone.trim(),
+      email: formData.email?.trim() || '',
+      address: formData.address?.trim() || '',
       notes: hostNotes,
       isPrimary: hostRole === 'primary',
-    };
-
-    designateAsHost({ volunteerData, hostContactData });
+      isVolunteer: true,
+    });
   };
 
   // Filter volunteers
@@ -830,14 +824,25 @@ export default function VolunteerManagement() {
                       </h3>
                     </div>
 
-                    {!showHostDesignation ? (
+                    {editingVolunteer.hostContactId != null ? (
+                      <div className="bg-violet-50 rounded-lg p-4">
+                        <p className="text-sm text-violet-800">
+                          Already a host contact
+                          {editingVolunteer.hostLocation
+                            ? ` at ${editingVolunteer.hostLocation}`
+                            : ''}
+                          . Their name, phone, email and location are managed
+                          on the Hosts page.
+                        </p>
+                      </div>
+                    ) : !showHostDesignation ? (
                       <div className="bg-brand-primary-lighter rounded-lg p-4">
                         <p className="text-sm text-brand-primary-dark mb-3">
-                          Promote this volunteer to be a host contact at a
-                          specific location. They will appear in the host
-                          management section.
+                          Add this volunteer as a host contact at a specific
+                          location. They'll appear on the Hosts page and stay
+                          in the volunteer list.
                         </p>
-                        <ButtonTooltip explanation="Convert this volunteer into a host location. This will let them collect sandwiches from their location and adds them to the hosts directory.">
+                        <ButtonTooltip explanation="Adds them to the hosts directory at the location you pick so they can collect sandwiches there. They remain a volunteer and keep appearing in volunteer dropdowns.">
                           <Button
                             type="button"
                             variant="outline"
@@ -864,7 +869,9 @@ export default function VolunteerManagement() {
                                 <SelectValue placeholder="Select a location" />
                               </SelectTrigger>
                               <SelectContent>
-                                {hosts.map((host: any) => (
+                                {hosts
+                                  .filter((host: any) => host.status !== 'hidden')
+                                  .map((host: any) => (
                                   <SelectItem
                                     key={host.id}
                                     value={host.id.toString()}
@@ -885,18 +892,14 @@ export default function VolunteerManagement() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="volunteer">
-                                  Volunteer
-                                </SelectItem>
-                                <SelectItem value="coordinator">
-                                  Coordinator
-                                </SelectItem>
-                                <SelectItem value="manager">Manager</SelectItem>
+                                {/* Same roles as the Hosts page */}
+                                <SelectItem value="host">Host</SelectItem>
+                                <SelectItem value="lead">Lead</SelectItem>
                                 <SelectItem value="primary">
                                   Primary Contact
                                 </SelectItem>
-                                <SelectItem value="backup">
-                                  Backup Contact
+                                <SelectItem value="alternate">
+                                  Alternate Contact
                                 </SelectItem>
                               </SelectContent>
                             </Select>
@@ -916,6 +919,13 @@ export default function VolunteerManagement() {
                           />
                         </div>
 
+                        {!formData.phone?.trim() && (
+                          <p className="text-sm text-amber-800">
+                            Host contacts need a phone number. Add one above
+                            first.
+                          </p>
+                        )}
+
                         <div className="flex gap-2">
                           <Button
                             type="button"
@@ -928,7 +938,7 @@ export default function VolunteerManagement() {
                           <Button
                             type="button"
                             onClick={handleHostDesignation}
-                            disabled={isDesignating || !selectedHostId}
+                            disabled={isDesignating || !selectedHostId || !formData.phone?.trim()}
                             size="sm"
                             className="bg-amber-600 hover:bg-amber-700"
                           >
