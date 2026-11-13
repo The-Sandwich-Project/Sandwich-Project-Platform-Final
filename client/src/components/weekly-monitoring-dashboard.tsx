@@ -293,27 +293,21 @@ export default function WeeklyMonitoringDashboard() {
   const exportPeriodLabel =
     exportWeeks === 14 ? '3 months' : exportWeeks === 27 ? '6 months' : '12 months';
 
-  // "Nov 5 – Nov 11, 2025" (year on the start too if the week spans New Year)
-  const formatWeekRange = (start: Date, end: Date) => {
-    const sameYear = start.getFullYear() === end.getFullYear();
-    const startStr = start.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      ...(sameYear ? {} : { year: 'numeric' }),
-    });
-    const endStr = end.toLocaleDateString('en-US', {
+  // Each missed week is identified by its Wednesday (the week's start date),
+  // e.g. "Wed, Nov 5, 2025" — that's the collection date hosts know.
+  const formatWednesday = (start: Date) =>
+    start.toLocaleDateString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     });
-    return `${startStr} – ${endStr}`;
-  };
 
-  // Plain list, one week per line — easy to paste into a text, email, or doc.
+  // Plain list, one Wednesday date per line — easy to paste into a text, email, or doc.
   const buildMissedWeeksText = () => {
     if (!exportSummary) return '';
     return exportSummary.missed
-      .map((m) => formatWeekRange(m.start, m.end))
+      .map((m) => formatWednesday(m.start))
       .join('\n');
   };
 
@@ -383,7 +377,7 @@ export default function WeeklyMonitoringDashboard() {
         ctx.fillText(String(idx + 1), pad, y + 26);
         ctx.fillStyle = '#1f2937';
         ctx.font = font(500, 17);
-        ctx.fillText(formatWeekRange(m.start, m.end), pad + 34, y + 26);
+        ctx.fillText(formatWednesday(m.start), pad + 34, y + 26);
         y += rowH;
       });
     }
@@ -392,7 +386,7 @@ export default function WeeklyMonitoringDashboard() {
     ctx.fillStyle = '#6b7280';
     ctx.font = font(400, 12);
     ctx.fillText(
-      'Weeks run Wednesday – Tuesday · The Sandwich Project',
+      'Wednesday collection dates · The Sandwich Project',
       pad,
       height - 18
     );
@@ -1766,14 +1760,14 @@ export default function WeeklyMonitoringDashboard() {
                     <ul className="max-h-48 overflow-y-auto space-y-1 text-gray-700">
                       {exportSummary.missed.map((m) => (
                         <li key={m.start.toISOString()}>
-                          {formatWeekRange(m.start, m.end)}
+                          {formatWednesday(m.start)}
                         </li>
                       ))}
                     </ul>
                   </>
                 )}
                 <p className="text-xs text-gray-500 mt-2">
-                  Weeks run Wed–Tue. The current week isn&apos;t counted yet.
+                  Each date is the Wednesday of a missed week (Wed–Tue). The current week isn&apos;t counted yet.
                 </p>
               </div>
             ) : null}
