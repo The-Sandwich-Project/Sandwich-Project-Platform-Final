@@ -22,8 +22,8 @@ export class ServiceHoursPDFGenerator {
     // Load the existing PDF template
     const templatePath = path.join(
       process.cwd(),
-      'attached_assets',
-      'TSP COMMUNITY SERVICE HOURS (1) (1) (1).pdf'
+      'client/public/documents',
+      'community-service-hours.pdf'
     );
 
     if (!fs.existsSync(templatePath)) {

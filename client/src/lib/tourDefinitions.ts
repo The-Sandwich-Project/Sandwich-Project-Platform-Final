@@ -13,6 +13,20 @@ export interface TourStep {
   waitForElement?: boolean; // If true, wait longer for element to load (useful after filtering/navigation)
 }
 
+
+/**
+ * Switch the Resources page to one of its tabs. Radix tabs activate on
+ * mousedown/focus, not click(), and unmount inactive panels — so tours that
+ * target the library (filters, resource list) must switch back to it first.
+ */
+function openResourcesTab(tab: 'library' | 'logos') {
+  const trigger = document.querySelector(`[data-tour="resources-${tab}-tab"]`);
+  if (trigger instanceof HTMLElement && trigger.getAttribute('data-state') !== 'active') {
+    trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    trigger.focus();
+  }
+}
+
 export interface Tour {
   id: string;
   title: string;
@@ -131,59 +145,28 @@ export const TOURS: Tour[] = [
       },
       {
         id: 'logos-tab',
-        title: 'Open the Brand & Marketing category',
-        description: 'In Reference Materials, click the "Brand & Marketing" category to filter down to TSP logos and brand assets.',
-        targetSelector: '[data-tour="category-brand_marketing"]',
+        title: 'Open the Logos & Branding tab',
+        description: 'Logos have their own tab at the top of Reference Materials. I\'ll open it for you.',
+        targetSelector: '[data-tour="resources-logos-tab"]',
         position: 'bottom',
         highlightPadding: 8,
         waitForElement: true,
         beforeShow: () => {
-          // Category buttons live inside the Filters panel, which is collapsed by
-          // default on a fresh Resources page — open it first so the button mounts.
-          const clickCategory = () => {
-            const cat = document.querySelector('[data-tour="category-brand_marketing"]');
-            if (cat instanceof HTMLElement) {
-              cat.click();
-              return true;
-            }
-            return false;
-          };
-          if (!clickCategory()) {
-            const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
-            if (toggle instanceof HTMLElement) {
-              toggle.click();
-            }
-            setTimeout(clickCategory, 200);
-          }
+          setTimeout(() => openResourcesTab('logos'), 200);
         }
       },
       {
         id: 'logos-available',
         title: 'All Logos Available Here!',
-        description: 'Here you\'ll find The Sandwich Project logos and brand assets - transparent backgrounds, print-ready versions, and more. Click any item to open or download it.',
-        targetSelector: '[data-testid="resources-list"]',
+        description: 'Here you\'ll find The Sandwich Project logos - transparent backgrounds, print-ready versions, and more. Click any logo to preview or download it.',
+        targetSelector: '[data-tour="resources-logos-panel"]',
         position: 'top',
         highlightPadding: 12,
         waitForElement: true
       }
     ],
     afterComplete: () => {
-      // Auto-filter to the Brand & Marketing category (opening Filters if needed)
-      setTimeout(() => {
-        let cat = document.querySelector('[data-tour="category-brand_marketing"]');
-        if (!(cat instanceof HTMLElement)) {
-          const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
-          if (toggle instanceof HTMLElement) {
-            toggle.click();
-          }
-        }
-        setTimeout(() => {
-          cat = document.querySelector('[data-tour="category-brand_marketing"]');
-          if (cat instanceof HTMLElement) {
-            cat.click();
-          }
-        }, 200);
-      }, 300);
+      setTimeout(() => openResourcesTab('logos'), 300);
     }
   },
   {
@@ -227,6 +210,8 @@ export const TOURS: Tour[] = [
         highlightPadding: 8,
         waitForElement: true,
         beforeShow: () => {
+          // The filters only exist on the Documents & Links tab.
+          openResourcesTab('library');
           // Category buttons live inside the Filters panel, which is collapsed by
           // default on a fresh Resources page — open it first so the button mounts.
           const clickCategory = () => {
@@ -237,13 +222,16 @@ export const TOURS: Tour[] = [
             }
             return false;
           };
-          if (!clickCategory()) {
-            const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
-            if (toggle instanceof HTMLElement) {
-              toggle.click();
+          // Give the tab switch a render before looking for its controls.
+          setTimeout(() => {
+            if (!clickCategory()) {
+              const toggle = document.querySelector('[data-tour="resources-filters-toggle"]');
+              if (toggle instanceof HTMLElement) {
+                toggle.click();
+              }
+              setTimeout(clickCategory, 200);
             }
-            setTimeout(clickCategory, 200);
-          }
+          }, 100);
         }
       },
       {
@@ -1195,7 +1183,11 @@ export const TOURS: Tour[] = [
         targetSelector: '[data-testid="resources-categories"], [data-testid="category-filter"]',
         position: 'bottom',
         highlightPadding: 12,
-        waitForElement: true
+        waitForElement: true,
+        beforeShow: () => {
+          // Categories, search and the list only exist on the Documents & Links tab.
+          openResourcesTab('library');
+        }
       },
       {
         id: 'resources-search',
