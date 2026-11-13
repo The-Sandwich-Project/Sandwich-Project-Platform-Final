@@ -122,6 +122,16 @@ function ComprehensivePersonSelector({
     driverNameLookup.set(driver.id.toString(), driver.name || 'Unknown Driver');
   });
 
+  // Create lookup map for ALL volunteers, active or not (for name resolution of
+  // already-assigned volunteers who are no longer selectable)
+  const volunteerNameLookup = new Map<string, string>();
+  volunteers.forEach((volunteer: any) => {
+    volunteerNameLookup.set(
+      `volunteer-${volunteer.id}`,
+      `${volunteer.firstName || ''} ${volunteer.lastName || ''}`.trim() || volunteer.name || 'Unknown Volunteer'
+    );
+  });
+
   // Create lookup map for ALL host contacts (for name resolution of already-assigned host contacts)
   const hostContactNameLookup = new Map<string, string>();
   hostContacts.forEach((contact: any) => {
@@ -249,6 +259,9 @@ function ComprehensivePersonSelector({
     // Fall back to driver lookup (for already-assigned unavailable drivers)
     const driverName = driverNameLookup.get(personId);
     if (driverName) return driverName;
+    // Fall back to volunteer lookup (for already-assigned inactive volunteers)
+    const volunteerName = volunteerNameLookup.get(personId);
+    if (volunteerName) return volunteerName;
     // Fall back to host contact lookup (for already-assigned host contacts)
     const hostContactName = hostContactNameLookup.get(personId);
     if (hostContactName) return hostContactName;

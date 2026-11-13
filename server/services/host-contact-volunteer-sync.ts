@@ -1,6 +1,6 @@
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { hosts, volunteers, type HostContact, type Volunteer } from '@shared/schema';
+import { hostContacts, hosts, volunteers, type HostContact, type Volunteer } from '@shared/schema';
 import { logger } from '../utils/production-safe-logger';
 
 /**
@@ -73,18 +73,22 @@ async function contactFields(contact: HostContact) {
     name: contact.name,
     phone: contact.phone || null,
     hostId: contact.hostId,
-    hostLocation: (await getHostName(contact.hostId)) ?? contact.hostLocation ?? null,
+    // The Hosts page edits a contact's area via hostLocation (hostId stays put),
+    // so prefer it and use the parent host's name only as a fallback.
+    hostLocation: contact.hostLocation?.trim() || (await getHostName(contact.hostId)) || null,
   };
   // Only overwrite email/address when the contact actually has one, so a
   // volunteer record with richer info isn't blanked by a sparse contact.
   if (contact.email) fields.email = contact.email;
   if (contact.address) {
     fields.address = contact.address;
-    if (contact.latitude && contact.longitude) {
-      fields.latitude = contact.latitude;
-      fields.longitude = contact.longitude;
-      fields.geocodedAt = contact.geocodedAt ?? new Date();
-    }
+    // Coordinates must describe the address we just copied: take the
+    // contact's pair, or clear any old pair so the map doesn't pin the
+    // volunteer at a previous address.
+    const hasCoords = !!(contact.latitude && contact.longitude);
+    fields.latitude = hasCoords ? contact.latitude : null;
+    fields.longitude = hasCoords ? contact.longitude : null;
+    fields.geocodedAt = hasCoords ? contact.geocodedAt ?? new Date() : null;
   }
   return fields;
 }
@@ -123,7 +127,9 @@ export async function syncHostContactVolunteer(contact: HostContact): Promise<vo
 
     const existing = await findMatchingUnlinkedVolunteer(contact);
     if (existing) {
-      await db
+      // Claim only if still unlinked: two concurrent saves can both match the
+      // same volunteer, and the loser must not steal the winner's link.
+      const claimed = await db
         .update(volunteers)
         .set({
           ...fields,
@@ -132,9 +138,13 @@ export async function syncHostContactVolunteer(contact: HostContact): Promise<vo
           inactiveReason: null,
           updatedAt: new Date(),
         })
-        .where(eq(volunteers.id, existing.id));
-      logger.info(`Linked host contact ${contact.id} to existing volunteer ${existing.id}`);
-      return;
+        .where(and(eq(volunteers.id, existing.id), isNull(volunteers.hostContactId)))
+        .returning({ id: volunteers.id });
+      if (claimed.length > 0) {
+        logger.info(`Linked host contact ${contact.id} to existing volunteer ${existing.id}`);
+        return;
+      }
+      // Lost the race: fall through and give this contact its own record.
     }
 
     const [created] = await db
@@ -151,6 +161,19 @@ export async function syncHostContactVolunteer(contact: HostContact): Promise<vo
   } catch (error) {
     logger.error(`Failed to sync volunteer record for host contact ${contact.id}`, error);
   }
+}
+
+/**
+ * Called before a whole host location (and with it, all of its contacts) is
+ * deleted: detach every volunteer linked to one of those contacts.
+ */
+export async function unlinkVolunteersForHost(hostId: number): Promise<void> {
+  await db
+    .update(volunteers)
+    .set({ hostContactId: null, updatedAt: new Date() })
+    .where(
+      sql`${volunteers.hostContactId} IN (SELECT ${hostContacts.id} FROM ${hostContacts} WHERE ${hostContacts.hostId} = ${hostId})`
+    );
 }
 
 /**
