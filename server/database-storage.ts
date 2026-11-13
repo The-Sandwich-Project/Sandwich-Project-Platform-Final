@@ -188,6 +188,7 @@ import {
 import type { IStorage } from './storage';
 import { logger } from './utils/production-safe-logger';
 import { normalizeEmail } from '@shared/email-utils';
+import { unlinkVolunteersForHost } from './services/host-contact-volunteer-sync';
 
 const UNASSIGNED_PROJECT_STATUSES: Array<Project['status']> = [
   'waiting',
@@ -1972,6 +1973,9 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    // Volunteers linked to these contacts ("Also a volunteer") stay, unlinked
+    await unlinkVolunteersForHost(id);
+
     // Also delete any host contacts first
     await db.delete(hostContacts).where(eq(hostContacts.hostId, id));
 
@@ -2262,7 +2266,26 @@ export class DatabaseStorage implements IStorage {
       insertContact.phone
     );
 
-    if (crossTableCheck.exists) {
+    // A host contact marked "Also a volunteer" for someone already in the
+    // volunteer list is the intended way to link the two, not a duplicate —
+    // as long as that volunteer isn't already linked to another host contact.
+    // The route's volunteer sync then adopts that record.
+    let linkableVolunteer = false;
+    if (
+      crossTableCheck.exists &&
+      crossTableCheck.source === 'volunteers' &&
+      insertContact.isVolunteer &&
+      crossTableCheck.contactId != null
+    ) {
+      const [match] = await db
+        .select({ hostContactId: volunteers.hostContactId })
+        .from(volunteers)
+        .where(eq(volunteers.id, crossTableCheck.contactId))
+        .limit(1);
+      linkableVolunteer = !!match && match.hostContactId == null;
+    }
+
+    if (crossTableCheck.exists && !linkableVolunteer) {
       logger.log(
         `❌ CROSS-TABLE DUPLICATE DETECTED: ${insertContact.name} already exists in ${crossTableCheck.source} table (ID: ${crossTableCheck.contactId})`
       );
