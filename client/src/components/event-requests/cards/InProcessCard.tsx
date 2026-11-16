@@ -64,7 +64,6 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { Input } from '@/components/ui/input';
 import type { EventRequest } from '@shared/schema';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
-import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
 import { getMissingIntakeInfo } from '@/lib/event-request-validation';
 import { getPrimaryContextualAction, getContextualTooltip } from '@/lib/contextual-actions';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
@@ -1783,11 +1782,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
               Log Contact
             </Button>
 
-            <ReminderRulesManager
-              eventRequestId={request.id}
-              tspContactUserId={request.tspContact || request.tspContactAssigned}
-              eventStatus={request.status}
-            />
 
             {onResendToolkit && (
               <Tooltip>

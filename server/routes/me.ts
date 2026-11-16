@@ -5,6 +5,9 @@ import { logger } from '../utils/production-safe-logger';
 import type { AuthenticatedRequest } from '../types/express';
 import { getUserMetadata, getEventNotificationPreferences, getCheckInReminderPreferences } from '@shared/types';
 import type { EventNotificationPreferences, CheckInReminderPreferences } from '@shared/types';
+import { db } from '../db';
+import { eventCheckInReminders } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 interface DashboardItem {
   id: number;
@@ -557,6 +560,14 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     await storage.updateUser(normalizedUserId, {
       metadata: { ...metadata, checkInReminderPreferences: updatedPreferences },
     });
+
+    // Defaults are the ONLY reminder settings (per-event customization was
+    // retired). The hourly job copies defaults onto each assigned event, so
+    // clear this user's existing copies — the next run (:15 past the hour)
+    // re-creates them from the new defaults for all their active events.
+    await db
+      .delete(eventCheckInReminders)
+      .where(eq(eventCheckInReminders.userId, fullUser.id));
 
     logger.info(`Updated check-in reminder preferences for user ${normalizedUserId}`);
     res.json({ success: true, preferences: updatedPreferences });

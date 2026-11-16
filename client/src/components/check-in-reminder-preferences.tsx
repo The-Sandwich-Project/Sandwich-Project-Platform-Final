@@ -3,11 +3,9 @@
  *
  * Global "default reminder rules" configuration.  Users set this up once in
  * their profile → Alerts tab.  These defaults automatically apply to every
- * event they're the TSP contact for, unless they override per-event.
- *
- * Pattern: toggle on the rules you care about, set thresholds, pick a
- * channel → Save.  Per-event cards then just show a bell icon (on/off) with
- * an optional "Customize" escape hatch.
+ * event they're the TSP contact for. Per-event customization was retired —
+ * these defaults are the only reminder settings. Saving clears the user's
+ * per-event copies so the hourly job re-applies the new defaults.
  */
 
 import { useState, useMemo, useEffect } from 'react';
@@ -278,8 +276,8 @@ export default function CheckInReminderPreferencesEditor() {
         </CardTitle>
         <CardDescription>
           Set your default reminder rules here. They'll automatically apply to
-          every event you're assigned to as TSP contact. You can still customize
-          or snooze reminders on individual events.
+          every event you're assigned to as TSP contact. Changes apply to all
+          your events within the hour.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

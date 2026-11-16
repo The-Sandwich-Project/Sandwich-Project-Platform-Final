@@ -34,7 +34,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { EventRequest } from '@shared/schema';
-import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
 import {
   Tooltip,
   TooltipContent,
@@ -429,11 +428,6 @@ export const StalledCard: React.FC<StalledCardProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            <ReminderRulesManager
-              eventRequestId={request.id}
-              tspContactUserId={request.tspContact || request.tspContactAssigned}
-              eventStatus={request.status}
-            />
 
             <ActionRowSpacer />
 
