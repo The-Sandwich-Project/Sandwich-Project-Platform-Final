@@ -7,7 +7,8 @@ export type ErrorLogSheetType =
   | 'user_report'
   | 'client_crash'
   | 'dynamic_error'
-  | 'app_error';
+  | 'app_error'
+  | 'db_backup';
 
 export interface ErrorLogSheetEntry {
   type: ErrorLogSheetType;

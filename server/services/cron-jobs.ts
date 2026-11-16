@@ -26,6 +26,7 @@ import { ALERT_TYPES } from '@shared/alert-catalog';
 import { getEffectivePrefs } from './notifications/preferences';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
 import { runCollectiveLearningAutoLog } from './collections/collective-learning-auto-log';
+import { runDatabaseBackup } from './db-backup-service';
 
 const cronLogger = createServiceLogger('cron');
 
@@ -1661,6 +1662,36 @@ export function initializeCronJobs() {
     timezone: 'America/New_York',
   });
 
+  // Weekly database backup to Google Drive - Sundays at 2:00 AM ET
+  // Exports every public table as gzipped CSV, uploads one .tar.gz to the
+  // Shared Drive folder in BACKUP_DRIVE_FOLDER_ID, prunes backups > 10 weeks.
+  // Success/failure is written to the error-log Google Sheet.
+  // PRODUCTION ONLY: use POST /api/admin/db-backup/run to test manually.
+  const dbBackupJob = cron.schedule('0 2 * * 0', async () => {
+    if (!isProduction) {
+      cronLogger.info('Skipping weekly database backup - not production environment');
+      return;
+    }
+    try {
+      const result = await runDatabaseBackup('cron');
+      cronLogger.info('Weekly database backup finished', result);
+    } catch (error) {
+      logError(
+        error as Error,
+        'Error running weekly database backup cron job',
+        undefined,
+        { jobType: 'db-backup' }
+      );
+    }
+  }, {
+    timezone: 'America/New_York',
+  });
+
+  cronLogger.info('Weekly database backup job scheduled successfully', {
+    schedule: 'Sundays at 2:00 AM',
+    timezone: 'America/New_York',
+  });
+
   // Return job references in case we need to manage them later
   return {
     hostScraperJob,
@@ -1683,6 +1714,7 @@ export function initializeCronJobs() {
     integrationHealthJob,
     errorDigestJob,
     collectiveLearningAutoLogJob,
+    dbBackupJob,
   };
 }
 
@@ -1711,5 +1743,6 @@ export function stopAllCronJobs(jobs: ReturnType<typeof initializeCronJobs>) {
   jobs.integrationHealthJob.stop();
   jobs.errorDigestJob.stop();
   jobs.collectiveLearningAutoLogJob.stop();
+  jobs.dbBackupJob.stop();
   cronLogger.info('All cron jobs stopped successfully');
 }
