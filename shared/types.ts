@@ -106,6 +106,12 @@ export interface UserMetadata {
 
   // Global check-in reminder defaults (applied to all events unless overridden)
   checkInReminderPreferences?: CheckInReminderPreferences;
+  /**
+   * When this user's existing backlog was rolled into one summary reminder.
+   * Unset = next reminder run sends a summary instead of one reminder per
+   * already-overdue event. Cleared when they save new reminder settings.
+   */
+  checkInRemindersBaselinedAt?: string;
 
   // Additional contact information
   phoneNumber?: string;

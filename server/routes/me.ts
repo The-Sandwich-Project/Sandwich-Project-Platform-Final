@@ -558,7 +558,9 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     };
 
     await storage.updateUser(normalizedUserId, {
-      metadata: { ...metadata, checkInReminderPreferences: updatedPreferences },
+      // Clearing the baseline makes the next run send one summary for anything
+      // already overdue under the new rules, instead of a burst of reminders.
+      metadata: { ...metadata, checkInReminderPreferences: updatedPreferences, checkInRemindersBaselinedAt: undefined },
     });
 
     // Defaults are the ONLY reminder settings (per-event customization was

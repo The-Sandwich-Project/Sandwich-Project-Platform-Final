@@ -19,7 +19,7 @@ import { logger } from '../utils/production-safe-logger';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getAppBaseUrl } from '../config/constants';
 import { getUserMetadata, getCheckInReminderPreferences } from '@shared/types';
-import { isScheduledOrRescheduled } from '../../shared/event-status-workflow';
+import { isScheduledOrRescheduled, STATUS_DEFINITIONS, type EventStatus } from '../../shared/event-status-workflow';
 import { sendTSPFollowupReminderSMS } from '../sms-service';
 import {
   calculateNextDue,
@@ -33,36 +33,93 @@ if (process.env.SENDGRID_API_KEY) {
 }
 
 // Rule type display labels and descriptions for emails
-const RULE_TYPE_LABELS: Record<string, { label: string; getDescription: (thresholdDays: number) => string }> = {
+/**
+ * Reminder copy. Tone: a light, helpful heads-up — never "overdue" or
+ * demanding. `label` is the internal rule name; everything else is what
+ * people actually read.
+ */
+type RuleCopy = {
+  label: string;
+  /** Email/notification heading */
+  title: (orgName: string) => string;
+  /** Short phrase used in lists and texts */
+  short: (days: number) => string;
+  /** Main sentence */
+  getDescription: (days: number) => string;
+  /** Gentle "how this clears" note (optional) */
+  tip?: string;
+};
+
+const RULE_TYPE_LABELS: Record<string, RuleCopy> = {
   [REMINDER_RULE_TYPES.NO_CONTACT]: {
     label: 'No Contact Attempt',
-    getDescription: (days) => `No contact attempt has been logged in the last ${days} days.`,
+    title: (org) => `Checking in on ${org}`,
+    short: (days) => `no contact logged in ${days} days`,
+    getDescription: (days) =>
+      `It's been about ${days} days since the last logged contact. Whenever you get a chance, a quick call or email can help keep things moving.`,
+    tip: `Already been in touch? Logging it in the app will clear this one.`,
   },
   [REMINDER_RULE_TYPES.STALE_EVENT]: {
     label: 'Stale Event',
-    getDescription: (days) => `This event has had no updates in the last ${days} days.`,
+    title: (org) => `A quick look at ${org}`,
+    short: (days) => `no updates in ${days} days`,
+    getDescription: (days) =>
+      `There haven't been any updates on this event in about ${days} days. If you have a moment, it might be worth a quick look.`,
+    tip: `Any update to the event will reset this reminder.`,
   },
   [REMINDER_RULE_TYPES.DATE_APPROACHING_INPROCESS]: {
     label: 'Date Approaching (In Process)',
-    getDescription: (days) => `The desired event date is within ${days} days and the event is still in process.`,
+    title: (org) => `${org}'s requested date is coming up`,
+    short: (days) => `requested date within ${days} days`,
+    getDescription: (days) =>
+      `Their requested date is within ${days} days and the event is still being planned. This could be a good time to confirm the details.`,
+    tip: `Once the event is scheduled, this reminder stops on its own.`,
   },
   [REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED]: {
     label: 'Scheduled Date Approaching',
-    getDescription: (days) => `The scheduled event date is within ${days} days.`,
+    title: (org) => `${org} is coming up soon`,
+    short: (days) => `event within ${days} days`,
+    getDescription: (days) =>
+      `This event is within ${days} days. Just a heads-up in case there's anything you'd like to double-check.`,
   },
   [REMINDER_RULE_TYPES.STAFFING_UNMET]: {
     label: 'Staffing Needs Unmet',
-    getDescription: (days) => `The event is within ${days} days and still has unmet staffing needs.`,
+    title: (org) => `A few volunteer spots still open for ${org}`,
+    short: () => `volunteer spots still open`,
+    getDescription: (days) =>
+      `This event is within ${days} days and still has some open volunteer spots. Sharing in case it's helpful for planning.`,
+    tip: `This clears on its own once the spots are filled.`,
   },
   [REMINDER_RULE_TYPES.MISSING_DETAILS]: {
     label: 'Missing Key Details',
-    getDescription: (days) => `The event is within ${days} days and is still missing key details (sandwich count, type, location, or pickup time).`,
+    title: (org) => `A few details still open for ${org}`,
+    short: () => `a few details still open`,
+    getDescription: (days) =>
+      `This event is within ${days} days and a few details are still blank (like sandwich count, type, location, or pickup time). If you have them handy, adding them helps the team plan.`,
+    tip: `This clears on its own once the details are filled in.`,
   },
   [REMINDER_RULE_TYPES.GENERAL_CHECKIN]: {
     label: 'General Check-In',
-    getDescription: () => `Time for a scheduled check-in on this event.`,
+    title: (org) => `Your regular check-in on ${org}`,
+    short: () => `routine check-in`,
+    getDescription: () =>
+      `Here's your regular check-in on this event. Nothing needed unless something has changed.`,
   },
 };
+
+/**
+ * Standard List-Unsubscribe header: gives Gmail/Outlook their built-in
+ * "Unsubscribe" link and helps keep reminders out of spam.
+ */
+function reminderUnsubscribeHeaders(baseUrl: string): Record<string, string> {
+  return {
+    'List-Unsubscribe': `<mailto:katie@thesandwichproject.org?subject=Unsubscribe%20from%20reminders>, <${baseUrl}/profile?tab=notifications>`,
+  };
+}
+
+function friendlyStatus(status: string): string {
+  return STATUS_DEFINITIONS[status as EventStatus]?.label || status.replace(/_/g, ' ');
+}
 
 
 function isConditionBasedRule(ruleType: string): boolean {
@@ -190,14 +247,16 @@ async function sendReminderEmail(
   const ruleInfo = RULE_TYPE_LABELS[ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
 
   try {
+    const title = ruleInfo.title(orgName);
     const msg = {
       to: email,
       from: 'katie@thesandwichproject.org',
-      subject: `Reminder: ${ruleInfo.label} - ${orgName}`,
+      subject: title,
+      headers: reminderUnsubscribeHeaders(baseUrl),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
-            <h2 style="color: white; margin: 0;">${ruleInfo.label}</h2>
+            <h2 style="color: white; margin: 0;">${title}</h2>
           </div>
           <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
             <p style="font-size: 16px; color: #374151;">Hi ${userName},</p>
@@ -206,17 +265,16 @@ async function sendReminderEmail(
             </p>
             <div style="background: white; border-left: 4px solid #FBAD3F; padding: 16px; margin: 16px 0; border-radius: 4px;">
               <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1f2937;">${orgName}</p>
-              <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">Event Date: ${eventDate}</p>
-              <p style="margin: 0; font-size: 14px; color: #6b7280;">Status: ${eventStatus}</p>
+              <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">Event date: ${eventDate}</p>
+              <p style="margin: 0; font-size: 14px; color: #6b7280;">Status: ${friendlyStatus(eventStatus)}</p>
             </div>
-            <p style="font-size: 14px; color: #6b7280;">
-              Take a moment to review the event and follow up if needed.
-            </p>
             <a href="${eventUrl}" style="display: inline-block; background: #007E8C; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 12px 0;">
-              View Event Details
+              Open the event
             </a>
+            ${ruleInfo.tip ? `<p style="font-size: 14px; color: #6b7280;">${ruleInfo.tip}</p>` : ''}
             <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
-              You can adjust or turn off these reminders from the alarm icon on the event card.
+              You can change how often you get these, or turn them off, anytime in
+              <a href="${baseUrl}/profile?tab=notifications" style="color: #236383;">Profile → Alerts</a>.
             </p>
           </div>
           ${EMAIL_FOOTER_HTML}
@@ -236,12 +294,13 @@ async function sendReminderSMS(
   phoneNumber: string,
   orgName: string,
   eventId: number,
-  ruleType: string
+  ruleType: string,
+  thresholdDays: number
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
   const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
   const ruleInfo = RULE_TYPE_LABELS[ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
-  const message = `TSP Reminder (${ruleInfo.label}): ${orgName} needs attention. View: ${eventUrl}`;
+  const message = `TSP: Quick heads-up on ${orgName} (${ruleInfo.short(thresholdDays)}). ${eventUrl}`;
 
   try {
     const result = await sendTSPFollowupReminderSMS(phoneNumber, message);
@@ -250,6 +309,131 @@ async function sendReminderSMS(
     logger.error('Failed to send reminder SMS:', error);
     return false;
   }
+}
+
+/** Days an event in the first-run summary waits before it can send its own reminder. */
+const BACKLOG_GRACE_DAYS = 7;
+
+/**
+ * First run for a user (no baseline yet): instead of one reminder per event
+ * that is ALREADY overdue, send a single summary listing them, and give those
+ * reminders a grace period. After that, reminders behave normally — only
+ * problems that arise later fire individually. Runs again after the user
+ * saves new settings (the baseline is cleared then).
+ */
+async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<void> {
+  const metadata = getUserMetadata(user);
+  if (metadata.checkInRemindersBaselinedAt) return;
+
+  const rows = await db
+    .select()
+    .from(eventCheckInReminders)
+    .where(and(eq(eventCheckInReminders.userId, user.id), eq(eventCheckInReminders.enabled, true)));
+
+  const condRows = rows.filter(r => isConditionBasedRule(r.ruleType));
+  const eventIds = [...new Set(condRows.map(r => r.eventRequestId))];
+  const events = eventIds.length
+    ? await db.select().from(eventRequests).where(inArray(eventRequests.id, eventIds))
+    : [];
+  const eventById = new Map(events.map(e => [e.id, e]));
+
+  // event id -> labels of rules already triggered
+  const backlog = new Map<number, string[]>();
+  const graceUntil = new Date();
+  graceUntil.setDate(graceUntil.getDate() + BACKLOG_GRACE_DAYS);
+  graceUntil.setHours(9, 0, 0, 0);
+
+  for (const row of condRows) {
+    const event = eventById.get(row.eventRequestId);
+    if (!event || event.deletedAt) continue;
+    if (!evaluateRuleCondition(row.ruleType, row.thresholdDays || 7, event)) continue;
+    const copy = RULE_TYPE_LABELS[row.ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
+    const label = copy.short(row.thresholdDays || 7);
+    backlog.set(event.id, [...(backlog.get(event.id) || []), label]);
+    await db
+      .update(eventCheckInReminders)
+      .set({ nextDueAt: graceUntil, updatedAt: new Date() })
+      .where(eq(eventCheckInReminders.id, row.id));
+  }
+
+  if (backlog.size > 0) {
+    const baseUrl = getAppBaseUrl();
+    const items = [...backlog.entries()].map(([id, labels]) => ({
+      id,
+      orgName: eventById.get(id)?.organizationName || 'Unknown Organization',
+      labels,
+    }));
+    const count = items.length;
+    const title = 'A quick look at your events';
+    const message = `${count} event${count === 1 ? '' : 's'} could use a look when you have time:\n` +
+      items.map(i => `• ${i.orgName}: ${i.labels.join(', ')}`).join('\n');
+
+    await db.insert(notifications).values({
+      userId: user.id,
+      type: 'reminder',
+      priority: 'high',
+      title,
+      message,
+      category: 'events',
+      relatedType: 'event_request_summary',
+      actionUrl: '/dashboard?section=event-requests&tab=my_assignments',
+      actionText: 'Open my events',
+      metadata: { eventIds: items.map(i => i.id), source: 'check_in_reminder_summary' },
+    });
+
+    const prefs = getCheckInReminderPreferences(user);
+    const email = user.preferredEmail || user.email;
+    if (process.env.SENDGRID_API_KEY && email && (prefs.defaultChannel === 'email' || prefs.defaultChannel === 'both')) {
+      const userName = user.displayName || user.firstName || 'there';
+      const list = items
+        .map(i => `<li style="margin-bottom:8px;"><a href="${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${i.id}" style="color:#007E8C;font-weight:600;">${escapeHtml(i.orgName)}</a><br/><span style="font-size:13px;color:#6b7280;">${i.labels.join(', ')}</span></li>`)
+        .join('');
+      try {
+        await sgMail.send({
+          to: email,
+          from: 'katie@thesandwichproject.org',
+          subject: title,
+          headers: reminderUnsubscribeHeaders(baseUrl),
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
+                <h2 style="color: white; margin: 0;">${title}</h2>
+              </div>
+              <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+                <p style="font-size: 16px; color: #374151;">Hi ${escapeHtml(userName)},</p>
+                <p style="font-size: 15px; color: #4b5563;">
+                  Here's a quick snapshot of ${count === 1 ? 'an event' : 'a few events'} that could use a look when you have time.
+                  We put ${count === 1 ? 'it' : 'them'} together in one email so they don't arrive one at a time.
+                </p>
+                <ul style="padding-left: 18px; color: #1f2937;">${list}</ul>
+                <p style="font-size: 14px; color: #6b7280;">
+                  No rush. We'll hold off on separate reminders for these for the next week.
+                  If anything's still open after that, you'll get a gentle nudge for just that one.
+                </p>
+                <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
+                  You can change how often you get these, or turn them off, anytime in
+              <a href="${baseUrl}/profile?tab=notifications" style="color: #236383;">Profile → Alerts</a>.
+                </p>
+              </div>
+              ${EMAIL_FOOTER_HTML}
+            </div>
+          `,
+        });
+      } catch (error) {
+        logger.error(`[CheckInReminders] Failed to send backlog summary email to user ${user.id}:`, error);
+      }
+    }
+    logger.info(`[CheckInReminders] Sent backlog summary to user ${user.id} (${count} events)`);
+  }
+
+  await db
+    .update(users)
+    .set({ metadata: { ...metadata, checkInRemindersBaselinedAt: new Date().toISOString() } })
+    .where(eq(users.id, user.id));
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 }
 
 /**
@@ -323,6 +507,13 @@ async function applyGlobalDefaultsToNewEvents(): Promise<number> {
           }).onConflictDoNothing(); // unique index prevents duplicates
           provisioned++;
         }
+      }
+
+      // First run for this user: roll anything already overdue into one summary.
+      try {
+        await baselineUserBacklog(user);
+      } catch (error) {
+        logger.error(`[CheckInReminders] Backlog summary failed for user ${user.id}:`, error);
       }
     }
   } catch (error) {
@@ -531,13 +722,13 @@ export async function processCheckInReminders(): Promise<{
             userId: reminder.userId,
             type: 'reminder',
             priority: 'medium',
-            title: `${ruleInfo.label}: ${orgName}`,
+            title: ruleInfo.title(orgName),
             message: ruleInfo.getDescription(reminder.thresholdDays || 7),
             category: 'events',
             relatedType: 'event_request',
             relatedId: event.id,
             actionUrl: `/dashboard?section=event-requests&tab=all&eventId=${event.id}`,
-            actionText: 'View Event',
+            actionText: 'Open the event',
             metadata: { eventId: event.id, ruleType: reminder.ruleType, source: 'check_in_reminder' },
           });
         } catch (notifError) {
@@ -573,7 +764,8 @@ export async function processCheckInReminders(): Promise<{
               smsConsent.phoneNumber,
               orgName,
               event.id,
-              reminder.ruleType
+              reminder.ruleType,
+              reminder.thresholdDays || 7
             );
           }
         }
