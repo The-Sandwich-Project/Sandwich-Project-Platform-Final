@@ -91,6 +91,7 @@ import { aiAnalystRouter } from './ai-analyst';
 import { createAlertRequestsRouter, createAIAlertRouter } from './alert-requests';
 import { createAppSettingsRouter } from './app-settings';
 import { createCollectiveLearningAutoLogRouter } from './collective-learning-auto-log';
+import { createDbBackupRouter } from './db-backup';
 import { createNavUserViewRouter } from './nav-user-view';
 import { createCollectionFavoritesRouter } from './collection-favorites';
 import { createGroupEngagementRoutes } from './group-engagement';
@@ -1101,6 +1102,15 @@ export function createMainRoutes(deps: RouterDependencies) {
     '/api/collective-learning-auto-log',
     createErrorHandler('collective-learning-auto-log')
   );
+
+  // Admin-only manual trigger for the weekly Google Drive DB backup
+  router.use(
+    '/api/admin/db-backup',
+    deps.isAuthenticated,
+    ...createStandardMiddleware(),
+    createDbBackupRouter()
+  );
+  router.use('/api/admin/db-backup', createErrorHandler('db-backup'));
 
   const navUserViewRouter = createNavUserViewRouter(deps);
   router.use(
