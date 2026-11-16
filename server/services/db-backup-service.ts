@@ -28,6 +28,13 @@ import { appendErrorLogToSheet } from './error-log-sheet-sync';
 import { logger } from '../utils/production-safe-logger';
 
 const RETENTION_WEEKS = 10;
+/**
+ * Hard ceiling on one run. A hung COPY or Drive upload otherwise holds the
+ * in-memory lock until the process restarts, silently blocking every later run.
+ */
+const BACKUP_TIMEOUT_MS = 30 * 60 * 1000;
+/** pg's client.end() can wait forever on a socket we already destroyed. */
+const PG_CLOSE_TIMEOUT_MS = 5_000;
 const FILE_PREFIX = 'tsp-db-backup-';
 
 function backupBaseName(branch: 'dev' | 'production', dateStr: string): string {
@@ -167,6 +174,7 @@ function tarHeader(name: string, size: number, mtime: Date): Buffer {
 async function writeTarGz(
   outPath: string,
   entries: { name: string; filePath: string }[],
+  signal: AbortSignal,
 ): Promise<void> {
   const mtime = new Date();
   async function* tarStream() {
@@ -181,7 +189,9 @@ async function writeTarGz(
     }
     yield Buffer.alloc(1024, 0); // end-of-archive marker
   }
-  await pipeline(Readable.from(tarStream()), createGzip(), createWriteStream(outPath));
+  // { signal } destroys every stage on abort, which also ends the generator and
+  // closes whichever source file it was reading.
+  await pipeline(Readable.from(tarStream()), createGzip(), createWriteStream(outPath), { signal });
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +200,9 @@ async function writeTarGz(
 
 async function exportTables(
   workDir: string,
+  signal: AbortSignal,
 ): Promise<{ tables: TableExport[]; sequences: SequenceState[] }> {
+  signal.throwIfAborted();
   const connectionString = getDatabaseUrl();
   if (!connectionString) throw new Error('Database URL not configured');
 
@@ -202,10 +214,26 @@ async function exportTables(
   // An idle-connection error on this client must not crash the process.
   client.on('error', (err) => logger.error('[DbBackup] pg client error:', err));
 
-  await client.connect();
+  // On timeout, cut the socket: any in-flight query/COPY rejects immediately and
+  // Postgres cancels the backend when it sees the disconnect.
+  const onAbort = () => {
+    (client as any).connection?.stream?.destroy();
+  };
+  signal.addEventListener('abort', onAbort, { once: true });
+
   try {
+    await client.connect();
     // One read-only snapshot so all tables are consistent with each other.
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    // Server-side limits, so Postgres gives up on its own even if our socket is
+    // gone (a backend waiting on a lock doesn't notice the client left):
+    // - lock_timeout: a table locked by a migration fails fast instead of hanging
+    // - statement_timeout: no single COPY runs away
+    // - idle_in_transaction_session_timeout: a stalled client can't pin the snapshot
+    // SET LOCAL lasts only for this transaction, so it's safe through Neon's pooler.
+    await client.query(`SET LOCAL lock_timeout = '60s'`);
+    await client.query(`SET LOCAL statement_timeout = '20min'`);
+    await client.query(`SET LOCAL idle_in_transaction_session_timeout = '5min'`);
 
     const { rows } = await client.query<{ tablename: string }>(
       `SELECT tablename FROM pg_catalog.pg_tables
@@ -215,13 +243,14 @@ async function exportTables(
 
     const exports: TableExport[] = [];
     for (const { tablename } of rows) {
+      signal.throwIfAborted();
       const filePath = path.join(workDir, `${tablename}.csv.gz`);
       const copyStream = client.query(
         copyTo(
           `COPY public.${quoteIdent(tablename)} TO STDOUT WITH (FORMAT csv, HEADER true)`,
         ),
       );
-      await pipeline(copyStream, createGzip(), createWriteStream(filePath));
+      await pipeline(copyStream, createGzip(), createWriteStream(filePath), { signal });
       const { size } = await stat(filePath);
       exports.push({ table: tablename, rows: copyStream.rowCount ?? 0, bytes: size });
     }
@@ -239,7 +268,11 @@ async function exportTables(
     await client.query('COMMIT');
     return { tables: exports, sequences };
   } finally {
-    await client.end().catch((err) => logger.error('[DbBackup] Error closing pg client:', err));
+    signal.removeEventListener('abort', onAbort);
+    await Promise.race([
+      client.end().catch((err) => logger.error('[DbBackup] Error closing pg client:', err)),
+      new Promise((resolve) => setTimeout(resolve, PG_CLOSE_TIMEOUT_MS).unref()),
+    ]);
   }
 }
 
@@ -272,6 +305,7 @@ async function trashOldBackups(
   folderId: string,
   keepFileId: string,
   branch: 'dev' | 'production',
+  signal: AbortSignal,
 ): Promise<string[]> {
   const nameRe = backupNameRegex(branch);
   const cutoff = new Date();
@@ -289,16 +323,17 @@ async function trashOldBackups(
       supportsAllDrives: true,
       includeItemsFromAllDrives: true,
       corpora: 'allDrives',
-    });
+    }, { signal });
     for (const file of res.data.files ?? []) {
       if (!file.id || !file.name || file.id === keepFileId) continue;
       const match = nameRe.exec(file.name);
       if (!match || match[1] >= cutoffStr) continue;
+      signal.throwIfAborted();
       await drive.files.update({
         fileId: file.id,
         supportsAllDrives: true,
         requestBody: { trashed: true },
-      });
+      }, { signal });
       deleted.push(file.name);
     }
     pageToken = res.data.nextPageToken ?? undefined;
@@ -316,11 +351,115 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+interface BackupSuccess {
+  fileName: string;
+  driveFileId: string;
+  sizeBytes: number;
+  tableCount: number;
+  totalRows: number;
+  deletedOldBackups: string[];
+  retentionError?: string;
+}
+
+/** The actual work. Every slow step honours `signal`, so a timeout really stops it. */
+async function performBackup(
+  trigger: 'cron' | 'manual',
+  branch: 'dev' | 'production',
+  signal: AbortSignal,
+  ctx: { workDir?: string },
+): Promise<BackupSuccess> {
+  const folderId = process.env.BACKUP_DRIVE_FOLDER_ID?.trim();
+  if (!folderId) throw new Error('BACKUP_DRIVE_FOLDER_ID not configured');
+
+  const dateStr = easternDateString();
+  const baseName = backupBaseName(branch, dateStr);
+  const fileName = `${baseName}.tar.gz`;
+
+  const workDir = await mkdtemp(path.join(tmpdir(), 'tsp-db-backup-'));
+  ctx.workDir = workDir;
+  const tablesDir = path.join(workDir, 'tables');
+  await mkdir(tablesDir);
+
+  logger.log(`[DbBackup] Starting ${trigger} backup of ${branch} database`);
+  const { tables, sequences } = await exportTables(tablesDir, signal);
+  const totalRows = tables.reduce((sum, t) => sum + t.rows, 0);
+
+  const manifestPath = path.join(workDir, 'manifest.json');
+  await writeFile(
+    manifestPath,
+    JSON.stringify(
+      {
+        createdAt: new Date().toISOString(),
+        branch,
+        format: 'One gzipped CSV (with header row) per public-schema table, via COPY TO STDOUT',
+        tables,
+        sequences,
+      },
+      null,
+      2,
+    ),
+  );
+  const sequencesSqlPath = path.join(workDir, 'restore-sequences.sql');
+  await writeFile(sequencesSqlPath, buildRestoreSequencesSql(sequences));
+  const readmePath = path.join(workDir, 'README.txt');
+  await writeFile(readmePath, RESTORE_README);
+
+  signal.throwIfAborted();
+  const archivePath = path.join(workDir, fileName);
+  await writeTarGz(archivePath, [
+    { name: `${baseName}/README.txt`, filePath: readmePath },
+    { name: `${baseName}/manifest.json`, filePath: manifestPath },
+    { name: `${baseName}/restore-sequences.sql`, filePath: sequencesSqlPath },
+    ...tables.map((t) => ({
+      name: `${baseName}/${t.table}.csv.gz`,
+      filePath: path.join(tablesDir, `${t.table}.csv.gz`),
+    })),
+  ], signal);
+  const { size: sizeBytes } = await stat(archivePath);
+
+  signal.throwIfAborted();
+  const drive = getDriveClient();
+  const upload = await drive.files.create(
+    {
+      requestBody: { name: fileName, parents: [folderId], mimeType: 'application/gzip' },
+      media: { mimeType: 'application/gzip', body: createReadStream(archivePath) },
+      fields: 'id, name',
+      supportsAllDrives: true,
+    },
+    { signal },
+  );
+  const driveFileId = upload.data.id;
+  if (!driveFileId) throw new Error('Drive upload returned no file id');
+
+  // Retention failures shouldn't mark a successful backup as failed,
+  // but they are reported in the sheet row.
+  let deletedOldBackups: string[] = [];
+  let retentionError: string | undefined;
+  try {
+    deletedOldBackups = await trashOldBackups(drive, folderId, driveFileId, branch, signal);
+  } catch (err) {
+    retentionError = err instanceof Error ? err.message : String(err);
+    logger.error('[DbBackup] Failed to trash old backups:', err);
+  }
+
+  return {
+    fileName,
+    driveFileId,
+    sizeBytes,
+    tableCount: tables.length,
+    totalRows,
+    deletedOldBackups,
+    retentionError,
+  };
+}
+
 export async function runDatabaseBackup(
   trigger: 'cron' | 'manual' = 'cron',
+  options: { timeoutMs?: number } = {},
 ): Promise<DbBackupResult> {
   const branch = getDatabaseBranch();
   const started = Date.now();
+  const timeoutMs = options.timeoutMs ?? BACKUP_TIMEOUT_MS;
 
   if (running) {
     return {
@@ -333,105 +472,47 @@ export async function runDatabaseBackup(
   }
   running = true;
 
-  let workDir: string | undefined;
+  const controller = new AbortController();
+  const ctx: { workDir?: string } = {};
+  let timer: NodeJS.Timeout | undefined;
   try {
-    const folderId = process.env.BACKUP_DRIVE_FOLDER_ID?.trim();
-    if (!folderId) throw new Error('BACKUP_DRIVE_FOLDER_ID not configured');
-
-    const dateStr = easternDateString();
-    const baseName = backupBaseName(branch, dateStr);
-    const fileName = `${baseName}.tar.gz`;
-
-    workDir = await mkdtemp(path.join(tmpdir(), 'tsp-db-backup-'));
-    const tablesDir = path.join(workDir, 'tables');
-    await mkdir(tablesDir);
-
-    logger.log(`[DbBackup] Starting ${trigger} backup of ${branch} database`);
-    const { tables, sequences } = await exportTables(tablesDir);
-    const totalRows = tables.reduce((sum, t) => sum + t.rows, 0);
-
-    const manifestPath = path.join(workDir, 'manifest.json');
-    await writeFile(
-      manifestPath,
-      JSON.stringify(
-        {
-          createdAt: new Date().toISOString(),
-          branch,
-          format: 'One gzipped CSV (with header row) per public-schema table, via COPY TO STDOUT',
-          tables,
-          sequences,
-        },
-        null,
-        2,
-      ),
-    );
-    const sequencesSqlPath = path.join(workDir, 'restore-sequences.sql');
-    await writeFile(sequencesSqlPath, buildRestoreSequencesSql(sequences));
-    const readmePath = path.join(workDir, 'README.txt');
-    await writeFile(readmePath, RESTORE_README);
-
-    const archivePath = path.join(workDir, fileName);
-    await writeTarGz(archivePath, [
-      { name: `${baseName}/README.txt`, filePath: readmePath },
-      { name: `${baseName}/manifest.json`, filePath: manifestPath },
-      { name: `${baseName}/restore-sequences.sql`, filePath: sequencesSqlPath },
-      ...tables.map((t) => ({
-        name: `${baseName}/${t.table}.csv.gz`,
-        filePath: path.join(tablesDir, `${t.table}.csv.gz`),
-      })),
-    ]);
-    const { size: sizeBytes } = await stat(archivePath);
-
-    const drive = getDriveClient();
-    const upload = await drive.files.create({
-      requestBody: { name: fileName, parents: [folderId], mimeType: 'application/gzip' },
-      media: { mimeType: 'application/gzip', body: createReadStream(archivePath) },
-      fields: 'id, name',
-      supportsAllDrives: true,
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const limit =
+          timeoutMs >= 60_000 ? `${Math.round(timeoutMs / 60_000)} minutes` : `${timeoutMs / 1000}s`;
+        const err = new Error(`Backup timed out after ${limit} and was stopped`);
+        controller.abort(err);
+        reject(err);
+      }, timeoutMs);
     });
-    const driveFileId = upload.data.id;
-    if (!driveFileId) throw new Error('Drive upload returned no file id');
+    const work = performBackup(trigger, branch, controller.signal, ctx);
+    // If the timeout wins, the aborted work rejects later; don't let that go unhandled.
+    work.catch(() => undefined);
 
-    // Retention failures shouldn't mark a successful backup as failed,
-    // but they are reported in the sheet row.
-    let deletedOldBackups: string[] = [];
-    let retentionError: string | undefined;
-    try {
-      deletedOldBackups = await trashOldBackups(drive, folderId, driveFileId, branch);
-    } catch (err) {
-      retentionError = err instanceof Error ? err.message : String(err);
-      logger.error('[DbBackup] Failed to trash old backups:', err);
-    }
-
+    const done = await Promise.race([work, timedOut]);
     const result: DbBackupResult = {
       success: true,
       trigger,
       branch,
-      fileName,
-      driveFileId,
-      sizeBytes,
-      tableCount: tables.length,
-      totalRows,
+      ...done,
       durationMs: Date.now() - started,
-      deletedOldBackups,
-      retentionError,
     };
 
     logger.log('[DbBackup] Backup completed', result);
     appendErrorLogToSheet({
       type: 'db_backup',
       page: `db-backup (${trigger})`,
-      summary: `✅ Database backup succeeded: ${fileName} (${formatBytes(sizeBytes)}, ${tables.length} tables, ${totalRows.toLocaleString()} rows)`,
+      summary: `✅ Database backup succeeded: ${done.fileName} (${formatBytes(done.sizeBytes)}, ${done.tableCount} tables, ${done.totalRows.toLocaleString()} rows)`,
       details: [
         `Branch: ${branch}`,
         `Duration: ${Math.round(result.durationMs / 1000)}s`,
-        `Trashed old backups: ${deletedOldBackups.length ? deletedOldBackups.join(', ') : 'none'}`,
-        retentionError ? `⚠️ Retention cleanup failed: ${retentionError}` : null,
+        `Trashed old backups: ${done.deletedOldBackups.length ? done.deletedOldBackups.join(', ') : 'none'}`,
+        done.retentionError ? `⚠️ Retention cleanup failed: ${done.retentionError}` : null,
       ]
         .filter(Boolean)
         .join('\n'),
-      record: fileName,
-      sourceId: driveFileId,
+      record: done.fileName,
+      sourceId: done.driveFileId,
     });
 
     return result;
@@ -454,9 +535,12 @@ export async function runDatabaseBackup(
     });
     return result;
   } finally {
+    clearTimeout(timer);
+    // Stop anything still in flight (no-op after a normal finish).
+    if (!controller.signal.aborted) controller.abort(new Error('Backup finished'));
     running = false;
-    if (workDir) {
-      await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+    if (ctx.workDir) {
+      await rm(ctx.workDir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 }
