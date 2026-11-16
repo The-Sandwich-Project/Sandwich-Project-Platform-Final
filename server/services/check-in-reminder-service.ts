@@ -72,7 +72,9 @@ function lastContactDate(event: ReminderEvent): Date | null {
 function formatEventDate(d: Date | string | null | undefined): string {
   if (!d) return 'TBD';
   return new Date(d).toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York',
+    // Event dates are date-only values stored as UTC midnight: format in UTC
+    // so the calendar day isn't shifted back by the Eastern offset.
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
   });
 }
 
@@ -234,8 +236,10 @@ function evaluateRuleCondition(
       if (event.status !== 'in_process') return false;
       const contactLog = event.contactAttemptsLog as Array<{ timestamp: string }> | null;
       if (!contactLog || contactLog.length === 0) {
-        // No contact attempts ever — condition met
-        return true;
+        // Never contacted: count from when the request came in
+        const created = event.createdAt ? new Date(event.createdAt) : null;
+        if (!created) return true;
+        return (now.getTime() - created.getTime()) / msPerDay >= thresholdDays;
       }
       // Find the most recent contact attempt
       const lastAttempt = contactLog.reduce((latest: string, entry: { timestamp: string }) => {
@@ -392,9 +396,34 @@ async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<voi
   graceUntil.setDate(graceUntil.getDate() + BACKLOG_GRACE_DAYS);
   graceUntil.setHours(9, 0, 0, 0);
 
+  // Respect any pauses the user set before per-event controls were retired,
+  // the same way the regular reminder loop does.
+  const activeSnoozes = eventIds.length
+    ? await db
+        .select()
+        .from(eventReminderSnoozes)
+        .where(
+          and(
+            eq(eventReminderSnoozes.userId, user.id),
+            eq(eventReminderSnoozes.active, true),
+            inArray(eventReminderSnoozes.eventRequestId, eventIds),
+          ),
+        )
+    : [];
+  const isSnoozed = (event: ReminderEvent): boolean => {
+    const snooze = activeSnoozes.find(sn => sn.eventRequestId === event.id);
+    if (!snooze) return false;
+    if (snooze.snoozeType === 'until_contact') {
+      const last = lastContactDate(event);
+      return !(last && last > snooze.createdAt);
+    }
+    return !!snooze.snoozedUntil && new Date() <= snooze.snoozedUntil;
+  };
+
   for (const row of condRows) {
     const event = eventById.get(row.eventRequestId);
     if (!event || event.deletedAt) continue;
+    if (isSnoozed(event)) continue;
     if (!evaluateRuleCondition(row.ruleType, row.thresholdDays || 7, event)) continue;
     const label = buildReminderMessage(row.ruleType, row.thresholdDays || 7, event).short;
     backlog.set(event.id, [...(backlog.get(event.id) || []), label]);
@@ -471,13 +500,36 @@ async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<voi
         logger.error(`[CheckInReminders] Failed to send backlog summary email to user ${user.id}:`, error);
       }
     }
+    if (prefs.defaultChannel === 'sms' || prefs.defaultChannel === 'both') {
+      const smsConsent = metadata.smsConsent;
+      if (smsConsent?.enabled && smsConsent.phoneNumber) {
+        try {
+          await sendTSPFollowupReminderSMS(
+            smsConsent.phoneNumber,
+            `TSP: ${count === 1 ? '1 of your events' : `${count} of your events`} could use a look when you have time. ${baseUrl}/dashboard?section=event-requests&tab=my_assignments`,
+          );
+        } catch (error) {
+          logger.error(`[CheckInReminders] Failed to send backlog summary SMS to user ${user.id}:`, error);
+        }
+      }
+    }
     logger.info(`[CheckInReminders] Sent backlog summary to user ${user.id} (${count} events)`);
   }
 
+  // Set only the baseline key (don't overwrite the rest of metadata, which the
+  // user may have changed meanwhile), and only if their reminder settings are
+  // still the ones this summary was built from. If they saved new settings
+  // mid-run, leave it unset so the next run summarizes under the new ones.
+  const prefsAtRead = metadata.checkInReminderPreferences;
+  const prefsUnchanged = prefsAtRead
+    ? sql`(${users.metadata} -> 'checkInReminderPreferences') = ${JSON.stringify(prefsAtRead)}::jsonb`
+    : sql`(${users.metadata} -> 'checkInReminderPreferences') IS NULL`;
   await db
     .update(users)
-    .set({ metadata: { ...metadata, checkInRemindersBaselinedAt: new Date().toISOString() } })
-    .where(eq(users.id, user.id));
+    .set({
+      metadata: sql`jsonb_set(coalesce(${users.metadata}, '{}'::jsonb), '{checkInRemindersBaselinedAt}', to_jsonb(${new Date().toISOString()}::text))`,
+    })
+    .where(and(eq(users.id, user.id), prefsUnchanged));
 }
 
 function escapeHtml(s: string): string {
@@ -497,6 +549,8 @@ async function applyGlobalDefaultsToNewEvents(): Promise<number> {
     const activeStatuses = ['new', 'in_process', 'scheduled', 'stalled'];
 
     for (const user of allUsers) {
+      // Deactivated accounts keep old assignments; don't send them reminders.
+      if (user.isActive === false) continue;
       // Users who never saved their own settings get the org defaults.
       const prefs = getCheckInReminderPreferences(user);
 

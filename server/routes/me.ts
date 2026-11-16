@@ -6,8 +6,8 @@ import type { AuthenticatedRequest } from '../types/express';
 import { getUserMetadata, getEventNotificationPreferences, getCheckInReminderPreferences } from '@shared/types';
 import type { EventNotificationPreferences, CheckInReminderPreferences } from '@shared/types';
 import { db } from '../db';
-import { eventCheckInReminders } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eventCheckInReminders, eventReminderSnoozes } from '@shared/schema';
+import { and, eq } from 'drizzle-orm';
 
 interface DashboardItem {
   id: number;
@@ -570,6 +570,12 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     await db
       .delete(eventCheckInReminders)
       .where(eq(eventCheckInReminders.userId, fullUser.id));
+    // Per-event pauses had their own controls, which were retired with
+    // per-event settings. Clear them so new settings actually take effect.
+    await db
+      .update(eventReminderSnoozes)
+      .set({ active: false, cancelledAt: new Date() })
+      .where(and(eq(eventReminderSnoozes.userId, fullUser.id), eq(eventReminderSnoozes.active, true)));
 
     logger.info(`Updated check-in reminder preferences for user ${normalizedUserId}`);
     res.json({ success: true, preferences: updatedPreferences });
