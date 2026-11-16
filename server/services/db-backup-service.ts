@@ -22,7 +22,6 @@ import { createGzip } from 'zlib';
 import pg from 'pg';
 import { to as copyTo } from 'pg-copy-streams';
 import { google } from 'googleapis';
-import { JWT } from 'google-auth-library';
 import { getDatabaseUrl, getDatabaseBranch } from '../db-url';
 import { repairPrivateKey } from '../google-sheets-key-repair';
 import { appendErrorLogToSheet } from './error-log-sheet-sync';
@@ -30,14 +29,32 @@ import { logger } from '../utils/production-safe-logger';
 
 const RETENTION_WEEKS = 10;
 const FILE_PREFIX = 'tsp-db-backup-';
-// Matches only files this job creates: tsp-db-backup-YYYY-MM-DD.tar.gz
-// (and tsp-db-backup-dev-YYYY-MM-DD.tar.gz for manual runs against the dev branch).
-const BACKUP_NAME_RE = /^tsp-db-backup-(?:dev-)?(\d{4}-\d{2}-\d{2})\.tar\.gz$/;
+
+function backupBaseName(branch: 'dev' | 'production', dateStr: string): string {
+  return `${FILE_PREFIX}${branch === 'dev' ? 'dev-' : ''}${dateStr}`;
+}
+
+/**
+ * Matches only the files this job creates FOR THIS BRANCH:
+ * production → tsp-db-backup-YYYY-MM-DD.tar.gz, dev → tsp-db-backup-dev-YYYY-MM-DD.tar.gz.
+ * Keeps a dev test run from ever pruning production backups (and vice versa).
+ */
+function backupNameRegex(branch: 'dev' | 'production'): RegExp {
+  return branch === 'dev'
+    ? /^tsp-db-backup-dev-(\d{4}-\d{2}-\d{2})\.tar\.gz$/
+    : /^tsp-db-backup-(\d{4}-\d{2}-\d{2})\.tar\.gz$/;
+}
 
 export interface TableExport {
   table: string;
   rows: number;
   bytes: number;
+}
+
+export interface SequenceState {
+  sequence: string;
+  /** null when the sequence has never been used (nextval never called). */
+  lastValue: string | null;
 }
 
 export interface DbBackupResult {
@@ -74,6 +91,47 @@ function easternDateString(date = new Date()): string {
 function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
+
+function quoteLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/**
+ * SQL that puts every public sequence back where it was at backup time. Run it
+ * AFTER loading the CSVs, or new inserts will collide with restored ids.
+ */
+function buildRestoreSequencesSql(sequences: SequenceState[]): string {
+  const lines = [
+    '-- Run AFTER recreating the schema and loading every CSV.',
+    '-- Restores each public sequence to its value at backup time so new inserts',
+    '-- do not collide with restored primary keys.',
+    ...sequences.map(({ sequence, lastValue }) => {
+      const reg = quoteLiteral(`public.${quoteIdent(sequence)}`);
+      return lastValue === null
+        ? `SELECT setval(${reg}, 1, false);`
+        : `SELECT setval(${reg}, ${lastValue}, true);`;
+    }),
+  ];
+  return lines.join('\n') + '\n';
+}
+
+const RESTORE_README = `TSP database backup
+
+Contents
+  manifest.json             tables (with row counts) and sequence values at backup time
+  <table>.csv.gz            one gzipped CSV per public-schema table (header row included)
+  restore-sequences.sql     resets every sequence to its backed-up value
+
+This archive holds DATA ONLY. To restore into an empty database:
+  1. Recreate the schema (run the files in /migrations, or drizzle-kit push from shared/schema.ts).
+  2. Load each table, e.g.
+       gunzip -c users.csv.gz | psql "$URL" -c "\\copy public.users FROM STDIN WITH (FORMAT csv, HEADER true)"
+     (if foreign keys get in the way, load inside a session with
+      SET session_replication_role = replica;)
+  3. psql "$URL" -f restore-sequences.sql
+     Without this step, serial/identity ids restart at 1 and new inserts fail
+     with duplicate-key errors.
+`;
 
 // ---------------------------------------------------------------------------
 // Minimal ustar writer (avoids a new dependency for a ~30-line format)
@@ -130,7 +188,9 @@ async function writeTarGz(
 // Export
 // ---------------------------------------------------------------------------
 
-async function exportTables(workDir: string): Promise<TableExport[]> {
+async function exportTables(
+  workDir: string,
+): Promise<{ tables: TableExport[]; sequences: SequenceState[] }> {
   const connectionString = getDatabaseUrl();
   if (!connectionString) throw new Error('Database URL not configured');
 
@@ -166,8 +226,18 @@ async function exportTables(workDir: string): Promise<TableExport[]> {
       exports.push({ table: tablename, rows: copyStream.rowCount ?? 0, bytes: size });
     }
 
+    // Sequence positions from the same snapshot, so a restore can reseed ids.
+    const seqResult = await client.query<{ sequencename: string; last_value: string | null }>(
+      `SELECT sequencename, last_value::text AS last_value FROM pg_catalog.pg_sequences
+       WHERE schemaname = 'public' ORDER BY sequencename`,
+    );
+    const sequences = seqResult.rows.map((r) => ({
+      sequence: r.sequencename,
+      lastValue: r.last_value,
+    }));
+
     await client.query('COMMIT');
-    return exports;
+    return { tables: exports, sequences };
   } finally {
     await client.end().catch((err) => logger.error('[DbBackup] Error closing pg client:', err));
   }
@@ -183,7 +253,7 @@ function getDriveClient() {
   if (!email || !privateKey) {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_EMAIL / GOOGLE_PRIVATE_KEY not configured');
   }
-  const auth = new JWT({
+  const auth = new google.auth.JWT({
     email,
     key: repairPrivateKey(privateKey, true),
     scopes: ['https://www.googleapis.com/auth/drive'],
@@ -191,11 +261,19 @@ function getDriveClient() {
   return google.drive({ version: 'v3', auth });
 }
 
-async function deleteOldBackups(
+/**
+ * Moves this branch's backups older than RETENTION_WEEKS to the Shared Drive
+ * trash. Trashing (not files.delete) because permanent deletion in a Shared
+ * Drive needs the Manager role; Content Manager can trash, and Drive empties
+ * Shared Drive trash on its own after 30 days.
+ */
+async function trashOldBackups(
   drive: ReturnType<typeof google.drive>,
   folderId: string,
   keepFileId: string,
+  branch: 'dev' | 'production',
 ): Promise<string[]> {
+  const nameRe = backupNameRegex(branch);
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - RETENTION_WEEKS * 7);
   const cutoffStr = easternDateString(cutoff);
@@ -214,9 +292,13 @@ async function deleteOldBackups(
     });
     for (const file of res.data.files ?? []) {
       if (!file.id || !file.name || file.id === keepFileId) continue;
-      const match = BACKUP_NAME_RE.exec(file.name);
+      const match = nameRe.exec(file.name);
       if (!match || match[1] >= cutoffStr) continue;
-      await drive.files.delete({ fileId: file.id, supportsAllDrives: true });
+      await drive.files.update({
+        fileId: file.id,
+        supportsAllDrives: true,
+        requestBody: { trashed: true },
+      });
       deleted.push(file.name);
     }
     pageToken = res.data.nextPageToken ?? undefined;
@@ -257,7 +339,7 @@ export async function runDatabaseBackup(
     if (!folderId) throw new Error('BACKUP_DRIVE_FOLDER_ID not configured');
 
     const dateStr = easternDateString();
-    const baseName = `${FILE_PREFIX}${branch === 'dev' ? 'dev-' : ''}${dateStr}`;
+    const baseName = backupBaseName(branch, dateStr);
     const fileName = `${baseName}.tar.gz`;
 
     workDir = await mkdtemp(path.join(tmpdir(), 'tsp-db-backup-'));
@@ -265,7 +347,7 @@ export async function runDatabaseBackup(
     await mkdir(tablesDir);
 
     logger.log(`[DbBackup] Starting ${trigger} backup of ${branch} database`);
-    const tables = await exportTables(tablesDir);
+    const { tables, sequences } = await exportTables(tablesDir);
     const totalRows = tables.reduce((sum, t) => sum + t.rows, 0);
 
     const manifestPath = path.join(workDir, 'manifest.json');
@@ -277,15 +359,22 @@ export async function runDatabaseBackup(
           branch,
           format: 'One gzipped CSV (with header row) per public-schema table, via COPY TO STDOUT',
           tables,
+          sequences,
         },
         null,
         2,
       ),
     );
+    const sequencesSqlPath = path.join(workDir, 'restore-sequences.sql');
+    await writeFile(sequencesSqlPath, buildRestoreSequencesSql(sequences));
+    const readmePath = path.join(workDir, 'README.txt');
+    await writeFile(readmePath, RESTORE_README);
 
     const archivePath = path.join(workDir, fileName);
     await writeTarGz(archivePath, [
+      { name: `${baseName}/README.txt`, filePath: readmePath },
       { name: `${baseName}/manifest.json`, filePath: manifestPath },
+      { name: `${baseName}/restore-sequences.sql`, filePath: sequencesSqlPath },
       ...tables.map((t) => ({
         name: `${baseName}/${t.table}.csv.gz`,
         filePath: path.join(tablesDir, `${t.table}.csv.gz`),
@@ -308,10 +397,10 @@ export async function runDatabaseBackup(
     let deletedOldBackups: string[] = [];
     let retentionError: string | undefined;
     try {
-      deletedOldBackups = await deleteOldBackups(drive, folderId, driveFileId);
+      deletedOldBackups = await trashOldBackups(drive, folderId, driveFileId, branch);
     } catch (err) {
       retentionError = err instanceof Error ? err.message : String(err);
-      logger.error('[DbBackup] Failed to prune old backups:', err);
+      logger.error('[DbBackup] Failed to trash old backups:', err);
     }
 
     const result: DbBackupResult = {
@@ -336,7 +425,7 @@ export async function runDatabaseBackup(
       details: [
         `Branch: ${branch}`,
         `Duration: ${Math.round(result.durationMs / 1000)}s`,
-        `Deleted old backups: ${deletedOldBackups.length ? deletedOldBackups.join(', ') : 'none'}`,
+        `Trashed old backups: ${deletedOldBackups.length ? deletedOldBackups.join(', ') : 'none'}`,
         retentionError ? `⚠️ Retention cleanup failed: ${retentionError}` : null,
       ]
         .filter(Boolean)
