@@ -307,8 +307,8 @@ export default function CheckInReminderPreferencesEditor() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              You haven't set up your default reminders yet. Toggle on the rules
-              below and hit Save — they'll apply to all your events automatically.
+              You're using the standard reminders shown below, which already
+              apply to all your events. Change anything and hit Save to make them your own.
             </AlertDescription>
           </Alert>
         )}

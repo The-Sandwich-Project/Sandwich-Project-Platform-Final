@@ -13,7 +13,7 @@
 
 import sgMail from '@sendgrid/mail';
 import { db } from '../db';
-import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, REMINDER_RULE_TYPES } from '@shared/schema';
+import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, notifications, REMINDER_RULE_TYPES } from '@shared/schema';
 import { and, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { logger } from '../utils/production-safe-logger';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
@@ -253,7 +253,7 @@ async function sendReminderSMS(
 }
 
 /**
- * For users who have configured global defaults, auto-provision per-event
+ * For every user (own settings, or org defaults if unset), auto-provision per-event
  * rows on any assigned events that don't have rows yet.  This runs once
  * per cron cycle and is idempotent — if rows already exist, it skips.
  */
@@ -265,8 +265,8 @@ async function applyGlobalDefaultsToNewEvents(): Promise<number> {
     const activeStatuses = ['new', 'in_process', 'scheduled', 'stalled'];
 
     for (const user of allUsers) {
+      // Users who never saved their own settings get the org defaults.
       const prefs = getCheckInReminderPreferences(user);
-      if (!prefs?.configured) continue;
 
       const enabledRules = prefs.rules.filter(r => r.enabled);
       const enabledCorpRules = prefs.corporateRules?.filter(r => r.enabled) ?? [];
@@ -522,6 +522,27 @@ export async function processCheckInReminders(): Promise<{
               })
             : 'TBD';
         const eventStatus = event.status || 'unknown';
+
+        // Always record the reminder in the in-app notification bell first,
+        // so it exists even if email/SMS isn't configured or fails to send.
+        try {
+          const ruleInfo = RULE_TYPE_LABELS[reminder.ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
+          await db.insert(notifications).values({
+            userId: reminder.userId,
+            type: 'reminder',
+            priority: 'medium',
+            title: `${ruleInfo.label}: ${orgName}`,
+            message: ruleInfo.getDescription(reminder.thresholdDays || 7),
+            category: 'events',
+            relatedType: 'event_request',
+            relatedId: event.id,
+            actionUrl: `/dashboard?section=event-requests&tab=all&eventId=${event.id}`,
+            actionText: 'View Event',
+            metadata: { eventId: event.id, ruleType: reminder.ruleType, source: 'check_in_reminder' },
+          });
+        } catch (notifError) {
+          logger.error(`[CheckInReminders] Failed to create in-app notification for reminder ${reminder.id}:`, notifError);
+        }
 
         let emailSent = false;
         let smsSent = false;

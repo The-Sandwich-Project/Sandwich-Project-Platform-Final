@@ -278,14 +278,43 @@ export function getEventNotificationPreferences(
 }
 
 /**
+ * Organization-wide reminder defaults. Used for anyone who hasn't saved their
+ * own settings in Profile → Alerts, so reminders work without setup.
+ * Kept deliberately small to avoid flooding inboxes; users can turn on more.
+ */
+export const SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES: CheckInReminderPreferences = {
+  configured: false,
+  defaultChannel: 'email',
+  rules: [
+    { ruleType: 'no_contact', enabled: true, thresholdDays: 5, frequency: 'weekly' },
+    { ruleType: 'stale_event', enabled: false, thresholdDays: 7, frequency: 'weekly' },
+    { ruleType: 'date_approaching_inprocess', enabled: true, thresholdDays: 14, frequency: 'weekly' },
+    { ruleType: 'date_approaching_scheduled', enabled: false, thresholdDays: 7, frequency: 'weekly' },
+    { ruleType: 'staffing_unmet', enabled: true, thresholdDays: 7, frequency: 'weekly' },
+    { ruleType: 'missing_details', enabled: true, thresholdDays: 7, frequency: 'weekly' },
+    { ruleType: 'general_checkin', enabled: false, thresholdDays: 7, frequency: 'weekly' },
+  ],
+  corporateRules: [
+    { ruleType: 'no_contact', enabled: true, thresholdDays: 3, frequency: 'every_3_days' },
+    { ruleType: 'stale_event', enabled: false, thresholdDays: 3, frequency: 'every_3_days' },
+    { ruleType: 'date_approaching_inprocess', enabled: true, thresholdDays: 21, frequency: 'every_3_days' },
+    { ruleType: 'date_approaching_scheduled', enabled: false, thresholdDays: 14, frequency: 'every_3_days' },
+    { ruleType: 'staffing_unmet', enabled: true, thresholdDays: 14, frequency: 'every_3_days' },
+    { ruleType: 'missing_details', enabled: true, thresholdDays: 14, frequency: 'every_3_days' },
+    { ruleType: 'general_checkin', enabled: false, thresholdDays: 7, frequency: 'every_3_days' },
+  ],
+};
+
+/**
  * Helper to get check-in reminder preferences from user metadata.
- * Returns null if the user has never configured their defaults.
+ * Falls back to the organization defaults (configured: false) if the user
+ * has never saved their own.
  */
 export function getCheckInReminderPreferences(
   user: DrizzleUser | User | null | undefined
-): CheckInReminderPreferences | null {
+): CheckInReminderPreferences {
   const metadata = getUserMetadata(user);
-  return metadata.checkInReminderPreferences ?? null;
+  return metadata.checkInReminderPreferences ?? SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES;
 }
 
 // ============================================================================
