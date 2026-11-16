@@ -4202,6 +4202,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         both: <MessageSquare className="w-3 h-3" />,
                         phone_and_toolkit: <MessageSquare className="w-3 h-3" />,
                         email_and_toolkit: <Mail className="w-3 h-3" />,
+                        text_and_email: <MessageSquare className="w-3 h-3" />,
                       };
 
                       const methodLabels: Record<string, string> = {
@@ -4211,6 +4212,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         both: 'Phone & Email',
                         phone_and_toolkit: 'Phone + Toolkit',
                         email_and_toolkit: 'Email + Toolkit',
+                        text_and_email: 'Text + Email',
                       };
 
                       const outcomeLabels: Record<string, string> = {

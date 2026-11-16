@@ -55,20 +55,22 @@ const CONTACT_METHODS = [
   { value: 'phone', label: 'Phone', icon: Phone },
   { value: 'email', label: 'Email', icon: Mail },
   { value: 'text', label: 'Text', icon: MessageCircle },
-  { value: 'both', label: 'Phone & Email', icon: MessageSquare },
-  { value: 'phone_and_toolkit', label: 'Phone + Toolkit Email', icon: MessageSquare },
-  { value: 'email_and_toolkit', label: 'Email + Toolkit', icon: Mail },
+  { value: 'both', label: 'Phone + Email', icon: MessageSquare },
+  { value: 'text_and_email', label: 'Text + Email', icon: MessageSquare },
+  // Retired options: only shown when editing an older attempt that used them
+  { value: 'phone_and_toolkit', label: 'Phone + Toolkit Email', icon: MessageSquare, retired: true },
+  { value: 'email_and_toolkit', label: 'Email + Toolkit', icon: Mail, retired: true },
 ];
 
 const CONTACT_OUTCOMES = [
   { value: 'successful', label: 'Successfully contacted - Got response' },
   { value: 'toolkit_sent', label: 'Toolkit sent' },
   { value: 'toolkit_sent_left_message', label: 'Toolkit sent + Left voicemail' },
-  { value: 'no_answer', label: 'No answer - No response' },
+  { value: 'no_answer', label: 'No answer - No response', retired: true },
   { value: 'left_message', label: 'Left voicemail/message' },
   { value: 'wrong_number', label: 'Wrong/disconnected number' },
   { value: 'email_bounced', label: 'Email bounced/failed' },
-  { value: 'requested_callback', label: 'Requested callback/follow-up' },
+  { value: 'requested_callback', label: 'Requested callback/follow-up', retired: true },
   { value: 'other', label: 'Other (see notes)' },
 ];
 
@@ -332,7 +334,7 @@ export default function EditContactAttemptDialog({
                 <SelectValue placeholder="Select how you contacted them" />
               </SelectTrigger>
               <SelectContent>
-                {CONTACT_METHODS.map((method) => {
+                {CONTACT_METHODS.filter((m: any) => !m.retired || m.value === contactMethod).map((method) => {
                   const Icon = method.icon;
                   return (
                     <SelectItem key={method.value} value={method.value}>
@@ -357,7 +359,7 @@ export default function EditContactAttemptDialog({
                 <SelectValue placeholder="Select the outcome" />
               </SelectTrigger>
               <SelectContent>
-                {CONTACT_OUTCOMES.map((outcome) => (
+                {CONTACT_OUTCOMES.filter((o: any) => !o.retired || o.value === contactOutcome).map((outcome) => (
                   <SelectItem key={outcome.value} value={outcome.value}>
                     {outcome.label}
                   </SelectItem>

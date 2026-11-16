@@ -54,20 +54,17 @@ const CONTACT_METHODS = [
   { value: 'phone', label: 'Phone', icon: Phone },
   { value: 'email', label: 'Email', icon: Mail },
   { value: 'text', label: 'Text', icon: MessageCircle },
-  { value: 'both', label: 'Phone & Email', icon: MessageSquare },
-  { value: 'phone_and_toolkit', label: 'Phone + Toolkit Email', icon: MessageSquare },
-  { value: 'email_and_toolkit', label: 'Email + Toolkit', icon: Mail },
+  { value: 'both', label: 'Phone + Email', icon: MessageSquare },
+  { value: 'text_and_email', label: 'Text + Email', icon: MessageSquare },
 ];
 
 const CONTACT_OUTCOMES = [
   { value: 'successful', label: 'Successfully contacted - Got response' },
   { value: 'toolkit_sent', label: 'Toolkit sent' },
   { value: 'toolkit_sent_left_message', label: 'Toolkit sent + Left voicemail' },
-  { value: 'no_answer', label: 'No answer - No response' },
   { value: 'left_message', label: 'Left voicemail/message' },
   { value: 'wrong_number', label: 'Wrong/disconnected number' },
   { value: 'email_bounced', label: 'Email bounced/failed' },
-  { value: 'requested_callback', label: 'Requested callback/follow-up' },
   { value: 'other', label: 'Other (see notes)' },
 ];
 

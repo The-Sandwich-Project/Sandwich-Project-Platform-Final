@@ -8,7 +8,7 @@ export const EMAIL_FOOTER_TEXT = `
 The Sandwich Project
 Fighting food insecurity one sandwich at a time
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
 `;
 
 export const EMAIL_FOOTER_HTML = `
@@ -18,9 +18,8 @@ export const EMAIL_FOOTER_HTML = `
     Fighting food insecurity one sandwich at a time
   </p>
   <p style="color: #888; font-size: 11px; margin: 0;">
-    To unsubscribe from these emails, please contact us at 
-    <a href="mailto:katie@thesandwichproject.org" style="color: #236383;">katie@thesandwichproject.org</a> 
-    or reply STOP.
+    To unsubscribe from these emails, please contact us at
+    <a href="mailto:katie@thesandwichproject.org?subject=Unsubscribe" style="color: #236383;">katie@thesandwichproject.org</a>.
   </p>
 </div>
 `;
