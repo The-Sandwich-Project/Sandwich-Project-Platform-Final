@@ -53,6 +53,7 @@ import RequestFilters from '@/components/event-requests/RequestFilters';
 import { VanConflictsButton } from '@/components/event-requests/VanConflictsButton';
 import { PlanningSheetImportDialog } from '@/components/event-requests/PlanningSheetImportDialog';
 import { PlanningSheetGapsDialog } from '@/components/event-requests/PlanningSheetGapsDialog';
+import { ReminderSettingsButton } from '@/components/event-requests/ReminderSettingsButton';
 import EventSchedulingForm from '@/components/event-requests/EventSchedulingForm';
 import EventCollectionLog from '@/components/event-requests/EventCollectionLog';
 import ToolkitSentDialog from '@/components/event-requests/ToolkitSentDialog';
@@ -630,6 +631,7 @@ const EventRequestsManagementContent: React.FC = () => {
                 onOpenChange={setPlanningGapsOpen}
               />
               <VanConflictsButton isMobile={isMobile} />
+              <ReminderSettingsButton isMobile={isMobile} />
               {/* Export — available on any list-view tab. We export the same
                   rows the tab displays (via filterRequestsByStatus, skipping
                   pagination) rather than the raw eventRequests cache, because
