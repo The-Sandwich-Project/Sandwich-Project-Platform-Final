@@ -1173,6 +1173,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                           both: <MessageSquare className="w-3 h-3" />,
                           phone_and_toolkit: <MessageSquare className="w-3 h-3" />,
                           email_and_toolkit: <Mail className="w-3 h-3" />,
+                          text_and_email: <MessageSquare className="w-3 h-3" />,
                         };
 
                         const methodLabels = {
@@ -1182,6 +1183,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                           both: 'Phone & Email',
                           phone_and_toolkit: 'Phone + Toolkit',
                           email_and_toolkit: 'Email + Toolkit',
+                          text_and_email: 'Text + Email',
                         };
 
                         const outcomeLabels: { [key: string]: string } = {
@@ -1323,6 +1325,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                             both: <MessageSquare className="w-3 h-3" />,
                             phone_and_toolkit: <MessageSquare className="w-3 h-3" />,
                             email_and_toolkit: <Mail className="w-3 h-3" />,
+                            text_and_email: <MessageSquare className="w-3 h-3" />,
                           };
 
                           const methodLabels = {
@@ -1332,6 +1335,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                             both: 'Phone & Email',
                             phone_and_toolkit: 'Phone + Toolkit Email',
                             email_and_toolkit: 'Email + Toolkit',
+                            text_and_email: 'Text + Email',
                           };
 
                           const outcomeLabels: { [key: string]: string } = {
