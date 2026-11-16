@@ -86,6 +86,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Types matching backend
 interface EngagementScores {
   overall: number;
@@ -1253,6 +1254,12 @@ function AmbassadorCandidatesTab() {
 
 // Main component
 export default function GroupsInsightsDashboard() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Directory',
+    page: 'Groups Engagement Insights',
+  });
+
   const { user, isLoading: authLoading } = useAuth();
   const [selectedOrg, setSelectedOrg] = useState<OrganizationEngagement | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);

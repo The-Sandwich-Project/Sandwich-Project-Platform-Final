@@ -28,6 +28,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface LocationBreakdown {
   location: string;
   individual: number;
@@ -64,6 +65,12 @@ interface WeeklyReportResponse {
 }
 
 export default function WeeklyCollectionsReport() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Analytics',
+    page: 'Weekly Collections Report',
+  });
+
   const [startDate, setStartDate] = useState(() => {
     // Default to 3 months ago
     const date = new Date();

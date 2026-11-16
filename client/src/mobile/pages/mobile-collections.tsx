@@ -17,12 +17,19 @@ import { MobileShell } from '../components/mobile-shell';
 import { cn } from '@/lib/utils';
 import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
 
+import { usePageSession } from '@/hooks/usePageSession';
 type DateFilter = 'today' | 'week' | 'month' | 'all';
 
 /**
  * Mobile collections screen - view and log collections
  */
 export function MobileCollections() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Collections',
+  });
+
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);

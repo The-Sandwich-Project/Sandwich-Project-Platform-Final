@@ -57,6 +57,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Event Reminder types
 type EventReminder = {
   id: number;
@@ -106,6 +107,12 @@ const completeReminderSchema = z.object({
 type CompleteReminderInput = z.infer<typeof completeReminderSchema>;
 
 export default function EventRemindersManagement() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Event Requests',
+    page: 'Event Reminders',
+  });
+
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');

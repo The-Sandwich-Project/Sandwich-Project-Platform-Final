@@ -85,6 +85,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import type { HostResource } from '@shared/schema';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Brand colors: #236383 (dark teal), #47b3cb (light teal), #007e8c (primary teal), #a31c41 (burgundy), #fbad3f (gold)
 
 // Admin-only overflow menu — delete is server-restricted to admin/super_admin as well
@@ -665,6 +666,12 @@ function UploadResourceDialog({
 }
 
 export default function HostResources() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Volunteers',
+    page: 'Host Resources',
+  });
+
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { usePageSession } from '@/hooks/usePageSession';
 const COLORS = {
   navy: '#236383',
   teal: '#007E8C',
@@ -845,6 +846,12 @@ Every single one went straight to a neighbor in Metro Atlanta. Thank you for sho
 };
 
 export default function WishlistToolkit() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Resources',
+    page: 'Wishlist Manager',
+  });
+
   const [activeTab, setActiveTab] = useState('templates');
   const [activeTemplate, setActiveTemplate] = useState('supply-sunday');
   const [showCaption, setShowCaption] = useState(false);

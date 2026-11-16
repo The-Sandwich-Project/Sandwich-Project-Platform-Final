@@ -21,6 +21,7 @@ import { format, addWeeks, isWithinInterval, startOfToday, endOfDay } from 'date
 import { useToast } from '@/hooks/use-toast';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 
+import { usePageSession } from '@/hooks/usePageSession';
 /**
  * Parse a date string as a local date to avoid timezone shift issues.
  * Timestamps are stripped of their time component to avoid timezone shifts.
@@ -85,6 +86,12 @@ type DateFilter = 'today' | 'week' | '2weeks' | 'month';
  * Mobile driver planning screen
  */
 export function MobileDriverPlanning() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Driver Planning',
+  });
+
   console.log('[MobileDriverPlanning] Component rendering');
   const [, navigate] = useLocation();
   const { toast } = useToast();

@@ -5,6 +5,7 @@ import { FloatingAIChat } from '@/components/floating-ai-chat';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useQuery } from '@tanstack/react-query';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface PersonSearchResult {
   id: number | string;
   name: string;
@@ -18,6 +19,12 @@ interface PersonSearchResult {
 }
 
 export default function TSPNetwork() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Directory',
+    page: 'TSP Network',
+  });
+
   const { setActiveSection } = useDashboardNavigation();
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);

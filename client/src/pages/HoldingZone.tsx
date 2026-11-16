@@ -59,6 +59,7 @@ import { FloatingAIChat } from '@/components/floating-ai-chat';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PermissionDenied } from '@/components/permission-denied';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Types
 interface HoldingZoneCategory {
   id: number;
@@ -537,6 +538,12 @@ function PresenceIndicators({
 
 // Main Holding Zone component
 export default function HoldingZone() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Communication',
+    page: 'Holding Zone',
+  });
+
   const { toast } = useToast();
   const { user } = useAuth();
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);

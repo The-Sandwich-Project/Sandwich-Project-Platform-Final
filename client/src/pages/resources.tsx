@@ -64,6 +64,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Category definitions with icons and colors (using brand color scheme)
 const CATEGORIES = [
   {
@@ -740,6 +741,12 @@ function SandwichGuideEditDialog({
 }
 
 export function Resources() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Resources',
+    page: 'Reference Materials',
+  });
+
   const { user } = useAuth();
   const isAdmin =
     user?.role === 'admin' ||

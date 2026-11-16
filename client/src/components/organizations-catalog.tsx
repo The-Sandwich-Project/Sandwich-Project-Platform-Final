@@ -52,6 +52,7 @@ import type { UserForPermissions } from '@shared/types';
 import { FloatingAIChat } from '@/components/floating-ai-chat';
 import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface OrganizationContact {
   organizationName: string;
   contactName: string;
@@ -159,6 +160,12 @@ function isFutureEvent(org: OrganizationContact): boolean {
 export default function GroupCatalog({
   onNavigateToEventPlanning: _onNavigateToEventPlanning,
 }: GroupCatalogProps = {}) {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Directory',
+    page: 'Groups Catalog',
+  });
+
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [searchScope, setSearchScope] = useState<'all' | 'organization' | 'department'>('all');

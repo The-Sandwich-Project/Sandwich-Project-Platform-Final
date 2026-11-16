@@ -93,7 +93,14 @@ import type { AgendaItem, OffAgendaItemData } from './meetings/dashboard/hooks/u
 import { logger } from '@/lib/logger';
 import { FloatingAIChat } from '@/components/floating-ai-chat';
 
+import { usePageSession } from '@/hooks/usePageSession';
 export default function EnhancedMeetingDashboard() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Operations',
+    page: 'Meetings',
+  });
+
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = baseQueryClient;

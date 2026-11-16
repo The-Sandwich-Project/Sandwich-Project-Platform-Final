@@ -38,6 +38,7 @@ import UserEmailTemplatesSettings from './user-email-templates-settings';
 import { SMSSetupSection } from './alert-preferences/SMSSetupSection';
 import { useMobilePreference } from '@/mobile/components/mobile-layout-prompt';
 
+import { usePageSession } from '@/hooks/usePageSession';
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
@@ -97,6 +98,12 @@ function ApprovalBadge({ approved }: { approved?: boolean | null }) {
 }
 
 export default function UserProfile() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Profile',
+    page: 'My Profile',
+  });
+
   const { toast } = useToast();
   const { user } = useAuth();
   const [location, setLocation] = useLocation();

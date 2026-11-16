@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isTomorrow, isThisWeek } from 'date-fns';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 
+import { usePageSession } from '@/hooks/usePageSession';
 /**
  * Parse a date string as a local date to avoid timezone shift issues.
  * Date-only strings (YYYY-MM-DD) are treated as local dates.
@@ -37,6 +38,12 @@ type EventFilter = 'all' | 'today' | 'week' | 'upcoming';
  * Mobile events screen - view and manage events
  */
 export function MobileEvents() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Events',
+  });
+
   const [, navigate] = useLocation();
   const [filter, setFilter] = useState<EventFilter>('today');
 

@@ -14,7 +14,14 @@ import { ExpensesList } from '@/components/expenses/ExpensesList';
 import { PageBreadcrumbs } from '@/components/page-breadcrumbs';
 import { useOnboardingTracker } from '@/hooks/useOnboardingTracker';
 
+import { usePageSession } from '@/hooks/usePageSession';
 export default function ExpensesPage() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Operations',
+    page: 'Expenses & Receipts',
+  });
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { track } = useOnboardingTracker();
 

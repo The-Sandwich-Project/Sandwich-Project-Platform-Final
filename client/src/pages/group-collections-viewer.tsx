@@ -24,6 +24,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface GroupCollection {
   id: number;
   collectionDate: string;
@@ -39,6 +40,12 @@ interface GroupCollection {
 }
 
 export default function GroupCollectionsViewer() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Analytics',
+    page: 'Group Collections Viewer',
+  });
+
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
     date.setMonth(date.getMonth() - 3);

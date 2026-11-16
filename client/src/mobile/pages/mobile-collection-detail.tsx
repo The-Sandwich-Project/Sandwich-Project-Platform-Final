@@ -15,6 +15,7 @@ import { MobileShell } from '../components/mobile-shell';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
+import { usePageSession } from '@/hooks/usePageSession';
 /**
  * Mobile collection detail screen - view collection details
  */
@@ -22,6 +23,14 @@ export function MobileCollectionDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute('/collections/:id');
   const collectionId = params?.id;
+
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Collection Detail',
+    itemDescription: collectionId ? `Collection #${collectionId}` : undefined,
+    itemId: collectionId,
+  });
 
   // Fetch collection details
   const { data: collection, isLoading, error } = useQuery({

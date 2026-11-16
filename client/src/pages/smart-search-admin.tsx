@@ -65,6 +65,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface SearchableFeature {
   id: string;
   title: string;
@@ -127,6 +128,12 @@ interface QualityMetric {
 }
 
 export default function SmartSearchAdmin() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Administration',
+    page: 'SmartSearch AI',
+  });
+
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');

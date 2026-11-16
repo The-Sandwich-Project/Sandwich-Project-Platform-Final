@@ -82,6 +82,7 @@ import {
 // was relocated to the sidebar brand block (simple-nav.tsx) so the dashboard
 // can promote actionable content into the top slot.
 import { logger } from '@/lib/logger';
+import { usePageSession } from '@/hooks/usePageSession';
 // Using optimized SVG logos for faster loading
 const tspLogoSvg = '/logo-optimized.svg';
 const sandwichIconSvg = '/sandwich-icon-optimized.svg';
@@ -174,6 +175,12 @@ export default function DashboardOverview({
 }: {
   onSectionChange?: (section: string) => void;
 }) {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Dashboard',
+    page: 'Main Dashboard',
+  });
+
   const { user } = useAuth();
   const {
     COLLECTIONS_ADD,

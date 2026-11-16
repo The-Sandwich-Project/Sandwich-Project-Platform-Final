@@ -3,11 +3,18 @@ import { Loader2 } from 'lucide-react';
 import { useChatDock } from '@/components/chat/chat-dock-context';
 import { ChatConversationScreen } from '@/components/chat/chat-popup-window';
 
+import { usePageSession } from '@/hooks/usePageSession';
 /**
  * Phone screen for a single Team Chat DM (/m/chat/dm/:channelId).
  * Same conversation, event cards and read receipts as the desktop popup.
  */
 export function MobileChatConversation() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Chat Conversation',
+  });
+
   const [, params] = useRoute('/chat/dm/:channelId');
   const [, navigate] = useLocation();
   const { connection } = useChatDock();

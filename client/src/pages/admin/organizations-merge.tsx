@@ -24,6 +24,7 @@ import {
 import { Loader2, RefreshCw, GitMerge, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface DuplicatePair {
   org1: {
     name: string;
@@ -48,6 +49,12 @@ interface MergePreview {
 }
 
 export default function OrganizationsMerge() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Administration',
+    page: 'Merge Organizations',
+  });
+
   const [duplicates, setDuplicates] = useState<DuplicatePair[]>([]);
   const [loading, setLoading] = useState(false);
   const [threshold, setThreshold] = useState(0.85);

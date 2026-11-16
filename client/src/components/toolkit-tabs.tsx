@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { DocumentPreview } from './document-preview';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface ToolkitDocument {
   name: string;
   path: string;
@@ -263,6 +264,12 @@ function DocumentCard({
 }
 
 export function ToolkitTabs() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Resources',
+    page: 'Toolkit',
+  });
+
   const [previewDocument, setPreviewDocument] =
     useState<ToolkitDocument | null>(null);
 

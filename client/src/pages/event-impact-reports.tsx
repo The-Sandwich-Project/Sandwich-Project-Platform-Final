@@ -91,6 +91,7 @@ import { AIInsightsChat } from '@/components/ai-insights-chat';
 import { getReportableSandwichCount } from '@shared/sandwich-count-utils';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Helper to parse date strings in local timezone (avoids UTC midnight timezone shift)
 function parseLocalDate(dateInput: string | Date | null | undefined): Date | null {
   if (!dateInput) return null;
@@ -338,6 +339,12 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function EventImpactReports() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Analytics',
+    page: 'Event Impact Reports',
+  });
+
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = user && hasPermission(user, PERMISSIONS.ADMIN_PANEL_ACCESS);

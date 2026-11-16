@@ -21,6 +21,7 @@ import { MobileShell } from '../components/mobile-shell';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/context/theme-provider';
 
+import { usePageSession } from '@/hooks/usePageSession';
 const MOBILE_PREFERENCE_KEY = 'tsp-mobile-layout-preference';
 
 interface MenuItem {
@@ -42,6 +43,12 @@ interface MenuSection {
  * Mobile "More" screen - additional navigation options
  */
 export function MobileMore() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile More',
+  });
+
   const { user, logout } = useAuth();
   const [, navigate] = useLocation();
   const { theme, setTheme } = useTheme();

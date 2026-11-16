@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface Host {
   id: number;
   name: string;
@@ -28,6 +29,12 @@ interface Host {
  * Mobile quick collection entry - optimized for one-handed use
  */
 export function MobileCollectionEntry() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Collection Entry',
+  });
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();

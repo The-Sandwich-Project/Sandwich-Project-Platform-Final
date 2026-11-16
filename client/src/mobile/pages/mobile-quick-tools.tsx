@@ -13,6 +13,7 @@ import { MobileShell } from '../components/mobile-shell';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface QuickTool {
   id: string;
   name: string;
@@ -84,6 +85,12 @@ const QUICK_TOOLS: QuickTool[] = [
  * Mobile quick tools screen
  */
 export function MobileQuickTools() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Quick Tools',
+  });
+
   const { toast } = useToast();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 

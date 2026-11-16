@@ -104,6 +104,7 @@ import {
   downloadIcs,
 } from '@/lib/calendar-links';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Fix Leaflet default marker icon
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -1587,6 +1588,12 @@ export default function VolunteerEventHub({
 }: {
   initialView?: string | null;
 } = {}) {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Volunteers',
+    page: 'Volunteer Hub',
+  });
+
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();

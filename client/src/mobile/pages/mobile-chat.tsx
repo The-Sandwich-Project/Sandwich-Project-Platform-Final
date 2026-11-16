@@ -16,6 +16,7 @@ import type { Channel as StreamChannel } from 'stream-chat';
 import { useChatDock, isDirectMessage, otherMemberId } from '@/components/chat/chat-dock-context';
 import { getMessageEventContext } from '@/components/chat/event-context';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface Conversation {
   id: string;
   participantName: string;
@@ -98,6 +99,12 @@ const CHANNELS: { id: ChannelType; name: string; icon: React.ComponentType<{ cla
  * Mobile chat screen - channel list and direct messages
  */
 export function MobileChat() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Chat',
+  });
+
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<'channels' | 'direct'>('direct');
   const [searchQuery, setSearchQuery] = useState('');

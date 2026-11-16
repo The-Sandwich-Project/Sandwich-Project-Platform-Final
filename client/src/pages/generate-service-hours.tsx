@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Trash2, FileDown, Loader2 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface ServiceEntry {
   date: string;
   hours: string;
@@ -21,6 +22,12 @@ interface ServiceEntry {
 }
 
 export default function GenerateServiceHours() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Operations',
+    page: 'Service Hours Form',
+  });
+
   const { toast } = useToast();
   const [volunteerName, setVolunteerName] = useState('');
   const [approverName, setApproverName] = useState('Katie Long');

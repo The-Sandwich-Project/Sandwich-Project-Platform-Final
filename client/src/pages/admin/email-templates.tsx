@@ -13,6 +13,7 @@ import type { UserForPermissions } from '@shared/types';
 import { Shield, Mail, Save, RotateCcw, Loader2, Info, AlertCircle } from 'lucide-react';
 import { PageBreadcrumbs } from '@/components/page-breadcrumbs';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface EmailTemplateSection {
   id: number;
   templateType: string;
@@ -28,6 +29,12 @@ interface EmailTemplateSection {
 }
 
 export default function EmailTemplatesAdmin() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Administration',
+    page: 'Email Templates',
+  });
+
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [editedContents, setEditedContents] = useState<Record<number, string>>({});

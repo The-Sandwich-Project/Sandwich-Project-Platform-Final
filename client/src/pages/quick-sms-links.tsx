@@ -24,7 +24,14 @@ import { Send, Check, MessageSquare } from 'lucide-react';
 import { NAV_ITEMS } from '@/nav.config';
 import { PageBreadcrumbs } from '@/components/page-breadcrumbs';
 
+import { usePageSession } from '@/hooks/usePageSession';
 export default function QuickSMSLinks() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Resources',
+    page: 'Quick SMS Links',
+  });
+
   const { toast } = useToast();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [selectedSection, setSelectedSection] = useState('');

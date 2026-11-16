@@ -31,6 +31,7 @@ import {
 import { MessageContextBadge } from '@/components/message-context-badge';
 import { logger } from '@/lib/logger';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface MessageAttachment {
   name: string;
   url: string;
@@ -81,6 +82,12 @@ function parseAttachments(attachmentsStr?: string): MessageAttachment[] {
 }
 
 export default function MessagingInbox() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Communication',
+    page: 'Messaging Inbox',
+  });
+
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();

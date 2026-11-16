@@ -77,6 +77,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEventRequestSocket } from '@/hooks/useEventRequestSocket';
+import { usePageSession } from '@/hooks/usePageSession';
 
 // Import dialogs
 import { TspContactAssignmentDialog } from './dialogs/TspContactAssignmentDialog';
@@ -163,6 +164,13 @@ const EventRequestsManagementContent: React.FC = () => {
     weekScope,
     setWeekScope,
   } = useEventRequestContext();
+
+  // Track page session for activity logging (once per visit, not per tab switch)
+  usePageSession({
+    section: 'Event Requests',
+    page: 'Event Requests',
+    context: { activeTab },
+  });
 
   const {
     nextActionEventRequest,

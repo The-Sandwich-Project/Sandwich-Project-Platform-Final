@@ -11,7 +11,14 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 
+import { usePageSession } from '@/hooks/usePageSession';
 export default function EventsViewer() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Event Requests',
+    page: 'Events Google Sheet',
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(85); // Default zoom level (85%)
 

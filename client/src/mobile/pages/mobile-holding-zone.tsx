@@ -24,6 +24,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
+import { usePageSession } from '@/hooks/usePageSession';
 type ItemType = 'task' | 'note' | 'idea';
 type TabFilter = 'all' | 'tasks' | 'notes';
 
@@ -47,6 +48,12 @@ interface HoldingZoneItem {
  * Mobile holding zone screen - task drafts, notes, and ideas
  */
 export function MobileHoldingZone() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Holding Zone',
+  });
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();

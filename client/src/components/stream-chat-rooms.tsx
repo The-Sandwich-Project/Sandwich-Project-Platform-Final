@@ -68,6 +68,7 @@ import { logger } from '@/lib/logger';
 import { getStreamClient } from '@/lib/stream-client';
 import { MessageEventContext, getMessageEventContext } from '@/components/chat/event-context';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Custom Message component with read receipts and permission-based actions
 const CustomMessage = () => {
   const { message, readBy } = useMessageContext();
@@ -438,6 +439,12 @@ interface RoomWithMembers {
 }
 
 export default function StreamChatRooms({ defaultTab }: { defaultTab?: string | null }) {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Communication',
+    page: 'Team Chat',
+  });
+
   const { user } = useAuth();
   const { track } = useOnboardingTracker();
   const [client, setClient] = useState<StreamChat | null>(null);

@@ -10,6 +10,7 @@ import {
   Info,
 } from 'lucide-react';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface FormResult {
   success?: boolean;
   formType?: string;
@@ -21,6 +22,12 @@ interface FormResult {
 }
 
 export function AutoFormFiller() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Resources',
+    page: 'Auto Form Filler',
+  });
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formType, setFormType] = useState<string>('');
   const [loading, setLoading] = useState(false);

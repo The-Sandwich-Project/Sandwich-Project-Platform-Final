@@ -12,6 +12,7 @@ import { PullToRefresh } from '../components/pull-to-refresh';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface Message {
   id: number;
   subject: string;
@@ -25,6 +26,12 @@ interface Message {
  * Mobile inbox screen - view messages and notifications
  */
 export function MobileInbox() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Inbox',
+  });
+
   const [, navigate] = useLocation();
 
   // Fetch messages

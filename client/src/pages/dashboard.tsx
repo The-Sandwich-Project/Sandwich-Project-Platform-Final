@@ -274,6 +274,14 @@ const HELP_BUTTON_HIDDEN_SECTIONS = [
   'gmail-inbox',
 ];
 
+// Logs one "Opened <page>" activity entry per visit for dashboard sections that
+// are rendered inline here rather than by their own component. Each use gets a
+// unique key so switching between these sections remounts it.
+function SectionPageSession({ section, page }: { section: string; page: string }) {
+  usePageSession({ section, page });
+  return null;
+}
+
 function EventPlanningDenied({
   canViewVolunteerHub,
   onOpenVolunteerHub,
@@ -332,52 +340,6 @@ export default function Dashboard({
   // Active analytics tab — controlled so we can show a per-tab description
   // line beneath the tab row that updates when the user switches tabs.
   const [analyticsTab, setAnalyticsTab] = useState<string>('pace');
-
-  // Helper function to get readable section/page names for activity tracking
-  const getActivityContext = (section: string) => {
-    const sectionMap: Record<string, { section: string; page: string }> = {
-      'dashboard': { section: 'Dashboard', page: 'Main Dashboard' },
-      'collections': { section: 'Collections', page: 'Collections Log' },
-      'event-requests': { section: 'Events', page: 'Event Requests' },
-      'event-ops-dashboard': { section: 'Events', page: 'Events Operations Dashboard' },
-      'admin-overview': { section: 'Event Requests', page: 'Admin Overview' },
-      'event-calendar': { section: 'Events', page: 'Event Calendar' },
-      'event-conflict-detection': { section: 'Events', page: 'Conflict Detection' },
-      'driver-planning': { section: 'Events', page: 'Driver Planning' },
-      'contacts-directory': { section: 'Contacts', page: 'Contacts Directory' },
-      'organizations-directory': { section: 'Organizations', page: 'Organizations Directory' },
-      'hosts-directory': { section: 'Hosts', page: 'Hosts Directory' },
-      'host-stats': { section: 'Hosts', page: 'Host Statistics' },
-      'all-locations': { section: 'Locations', page: 'All Locations' },
-      'impact': { section: 'Analytics', page: 'Impact Dashboard' },
-      'analytics': { section: 'Analytics', page: 'Analytics' },
-      'reports': { section: 'Reports', page: 'Reports' },
-      'expense-management': { section: 'Finance', page: 'Expense Management' },
-      'chat': { section: 'Communication', page: 'Team Chat' },
-      'gmail-inbox': { section: 'Communication', page: 'Gmail Inbox' },
-      'announcements': { section: 'Communication', page: 'Announcements' },
-      'project-list': { section: 'Projects', page: 'Project List' },
-      'holding-zone': { section: 'Collections', page: 'Holding Zone' },
-      'weekly-summary': { section: 'Collections', page: 'Weekly Summary' },
-      'user-management': { section: 'Administration', page: 'User Management' },
-      'role-management': { section: 'Administration', page: 'Role Management' },
-      'settings': { section: 'Administration', page: 'Settings' },
-      'kudos': { section: 'Recognition', page: 'Kudos' },
-      'profile': { section: 'Profile', page: 'My Profile' },
-      'help': { section: 'Help', page: 'Help Center' },
-    };
-
-    return sectionMap[section] || { section: 'Dashboard', page: section };
-  };
-
-  const activityContext = getActivityContext(activeSection);
-
-  // Track page session for activity logging
-  usePageSession({
-    section: activityContext.section,
-    page: activityContext.page,
-    context: { currentSection: activeSection },
-  });
 
   // Show toast notifications when other users come online
   useOnlinePresenceNotifications();
@@ -609,6 +571,7 @@ export default function Dashboard({
       case 'weekly-monitoring':
         return (
           <div className="space-y-6 p-6">
+            <SectionPageSession key="weekly-monitoring" section="Analytics" page="Weekly Monitoring" />
             <div className="flex items-center gap-4 mb-6">
               <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-teal-100">
                 <Clock className="w-6 h-6 text-primary" />
@@ -665,6 +628,7 @@ export default function Dashboard({
       case 'kudos':
         return (
           <div className="space-y-6 p-6">
+            <SectionPageSession key="kudos" section="Communication" page="Kudos" />
             <div className="flex items-center gap-4 mb-6">
               <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-yellow-100">
                 <Trophy className="w-6 h-6 text-yellow-600" />
@@ -845,6 +809,7 @@ export default function Dashboard({
           hasPermission(user, PERMISSIONS.ANALYTICS_VIEW);
         return (
           <div className="p-6">
+            <SectionPageSession key="analytics" section="Analytics" page="Analytics" />
             <div className="mb-6">
               <h1 className="text-lg sm:text-xl md:text-2xl font-main-heading text-primary break-words">
                 Impact & Analytics Dashboard

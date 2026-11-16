@@ -18,6 +18,7 @@ import { MobileShell } from '../components/mobile-shell';
 import { cn } from '@/lib/utils';
 import { QUICK_ACTIONS } from '../types';
 
+import { usePageSession } from '@/hooks/usePageSession';
 const MOBILE_PREFERENCE_KEY = 'tsp-mobile-layout-preference';
 
 // Icon mapping for quick actions
@@ -32,6 +33,12 @@ const actionIconMap: Record<string, React.ComponentType<{ className?: string }>>
  * Mobile home screen - quick access dashboard
  */
 export function MobileHome() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Home',
+  });
+
   const { user } = useAuth();
   const [, navigate] = useLocation();
 

@@ -22,6 +22,7 @@ import {
 import { HelpCircle } from 'lucide-react';
 import type { EventContact } from '@shared/schema';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Category labels for display
 const CATEGORY_LABELS: Record<string, string> = {
   corp: 'Corporate',
@@ -118,6 +119,12 @@ function CompactContactCard({ contact, onClick }: { contact: EventContact; onCli
 }
 
 export default function EventContactsDirectory() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Directory',
+    page: 'Event Contacts',
+  });
+
   const [, setLocation] = useLocation();
 
   // Search and filter states

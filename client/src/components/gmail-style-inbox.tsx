@@ -77,6 +77,7 @@ import { MessageContextBadge } from '@/components/message-context-badge';
 import { InboxReadIndicator } from '@/components/read-receipts';
 import { logger } from '@/lib/logger';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface User {
   id: string;
   firstName: string;
@@ -153,6 +154,12 @@ function getFileIcon(type: string) {
 }
 
 export default function GmailStyleInbox() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Communication',
+    page: 'Project Threads',
+  });
+
   logger.log('🔍 GmailStyleInbox component is rendering');
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();

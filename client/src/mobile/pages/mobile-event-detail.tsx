@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { useState } from 'react';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 
+import { usePageSession } from '@/hooks/usePageSession';
 /**
  * Parse a date string as a local date to avoid timezone shift issues.
  * Timestamps are stripped of their time component to avoid timezone shifts.
@@ -41,6 +42,14 @@ export function MobileEventDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute('/events/:id');
   const eventId = params?.id;
+
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Event Detail',
+    itemDescription: eventId ? `Event #${eventId}` : undefined,
+    itemId: eventId,
+  });
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Fetch event details - use hierarchical queryKey for cache invalidation

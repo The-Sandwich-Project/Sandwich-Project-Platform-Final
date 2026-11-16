@@ -46,6 +46,7 @@ import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { PermissionDenied } from '@/components/permission-denied';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface AttentionItem {
   id: number;
   organizationName: string;
@@ -174,6 +175,12 @@ const DATE_RANGE_OPTIONS = [
 ];
 
 export default function EventOperationalDashboard() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Event Requests',
+    page: 'Events Operations Dashboard',
+  });
+
   const { user } = useAuth();
   if (!user || !hasPermission(user, PERMISSIONS.NAV_EVENT_PLANNING)) {
     return (

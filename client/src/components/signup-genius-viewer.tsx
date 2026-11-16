@@ -9,7 +9,14 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
+import { usePageSession } from '@/hooks/usePageSession';
 export default function SignUpGeniusViewer() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Resources',
+    page: 'SignUpGenius',
+  });
+
   const signupUrl =
     'https://www.signupgenius.com/go/5080A4BA5AA22A7F94-50444894-thesandwich#/';
   // SignUp Genius blocks iframe embedding, so show fallback immediately

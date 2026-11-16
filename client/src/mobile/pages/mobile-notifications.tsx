@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface Notification {
   id: number;
   type: string;
@@ -57,6 +58,12 @@ const notificationColors: Record<string, string> = {
  * Mobile notifications screen
  */
 export function MobileNotifications() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Notifications',
+  });
+
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();

@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface Resource {
   id: number;
   title: string;
@@ -45,6 +46,12 @@ const CATEGORIES = [
  * Mobile resources screen
  */
 export function MobileResources() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Resources',
+  });
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

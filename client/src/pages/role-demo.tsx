@@ -32,6 +32,7 @@ import {
 } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
 
+import { usePageSession } from '@/hooks/usePageSession';
 // Sample user objects for each role
 const sampleUsers = {
   [USER_ROLES.ADMIN]: {
@@ -420,6 +421,12 @@ function RoleView({ user }: { user: any }) {
 }
 
 export default function RoleDemo() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Administration',
+    page: 'Role Demo',
+  });
+
   const [selectedRole, setSelectedRole] = useState<string>(USER_ROLES.ADMIN);
 
   return (

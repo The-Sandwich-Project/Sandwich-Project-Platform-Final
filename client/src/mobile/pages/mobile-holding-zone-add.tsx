@@ -16,12 +16,19 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
 
+import { usePageSession } from '@/hooks/usePageSession';
 type ItemType = 'task' | 'note' | 'idea';
 
 /**
  * Mobile holding zone quick add form
  */
 export function MobileHoldingZoneAdd() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Holding Zone Editor',
+  });
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();

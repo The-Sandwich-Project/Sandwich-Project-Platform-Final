@@ -39,6 +39,7 @@ import { PermissionDenied } from '@/components/permission-denied';
 import { FloatingAIChat } from '@/components/floating-ai-chat';
 import { ButtonTooltip } from '@/components/ui/button-tooltip';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface YearlyCalendarItem {
   id: number;
   month: number; // 1-12
@@ -174,6 +175,12 @@ function formatDateRangeWithWeekday(startDate: string, endDate: string): string 
 }
 
 export default function YearlyCalendar() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Calendars',
+    page: 'Yearly Calendar',
+  });
+
   const { toast } = useToast();
   const { user } = useAuth();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());

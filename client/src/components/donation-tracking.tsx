@@ -45,6 +45,7 @@ import {
   parseISO,
 } from 'date-fns';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface Distribution {
   id: number;
   distributionDate: string;
@@ -80,6 +81,12 @@ interface Recipient {
 }
 
 export default function DonationTracking() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Operations',
+    page: 'Distribution Tracking',
+  });
+
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();

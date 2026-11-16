@@ -15,10 +15,17 @@ import { MobileShell } from '../components/mobile-shell';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
+import { usePageSession } from '@/hooks/usePageSession';
 /**
  * Mobile profile screen - view and edit user profile
  */
 export function MobileProfile() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile Profile',
+  });
+
   const [, navigate] = useLocation();
   const { user, logout } = useAuth();
 

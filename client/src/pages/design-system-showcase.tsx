@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+import { usePageSession } from '@/hooks/usePageSession';
 /**
  * Design System Showcase
  *
@@ -19,6 +20,12 @@ import {
  */
 
 export default function DesignSystemShowcase() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Administration',
+    page: 'Design System',
+  });
+
   const progress = 65;
 
   return (

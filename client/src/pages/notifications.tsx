@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select';
 import { useState } from 'react';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface Notification {
   id: number;
   type: string;
@@ -86,6 +87,12 @@ const priorityColors: Record<string, string> = {
 };
 
 export default function NotificationsPage() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Notifications',
+    page: 'Notifications',
+  });
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [filterCategory, setFilterCategory] = useState<string>('all');

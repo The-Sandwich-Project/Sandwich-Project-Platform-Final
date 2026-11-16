@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/useResourcePermissions';
 import sandwichLogo from '@assets/LOGOS/Copy of TSP_transparent.png';
 
+import { usePageSession } from '@/hooks/usePageSession';
 const ProjectsManagementContent: React.FC = () => {
   const {
     isLoading,
@@ -247,6 +248,12 @@ const ProjectsManagementContent: React.FC = () => {
 
 // Main component with provider wrapper
 export default function ProjectsManagementV2() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Operations',
+    page: 'Projects',
+  });
+
   return (
     <ProjectProvider>
       <ProjectsManagementContent />

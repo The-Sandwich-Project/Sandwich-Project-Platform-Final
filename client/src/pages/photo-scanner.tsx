@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface ExtractedEntry {
   location: string;
   sandwichCount: number;
@@ -52,6 +53,12 @@ interface CombinedEntry {
 type ScanStage = 'upload' | 'scanning' | 'review' | 'saving' | 'success';
 
 export default function PhotoScanner() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Collections',
+    page: 'Photo Scanner',
+  });
+
   const [, navigate] = useLocation();
   const [stage, setStage] = useState<ScanStage>('upload');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

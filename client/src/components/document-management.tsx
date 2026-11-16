@@ -47,6 +47,7 @@ import { hasPermission } from '@shared/unified-auth-utils';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { DocumentPreviewModal } from '@/components/document-preview-modal';
 
+import { usePageSession } from '@/hooks/usePageSession';
 export interface Document {
   id: number;
   title: string;
@@ -744,6 +745,12 @@ function getDocumentTypeFromMime(mimeType: string): string {
 }
 
 export default function DocumentManagement() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Administration',
+    page: 'Document Management',
+  });
+
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(
     null
   );

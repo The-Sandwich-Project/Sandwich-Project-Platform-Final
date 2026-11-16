@@ -46,7 +46,14 @@ import { ButtonTooltip } from '@/components/ui/button-tooltip';
 import { useResourcePermissions } from '@/hooks/useResourcePermissions';
 import { PermissionDenied } from '@/components/permission-denied';
 
+import { usePageSession } from '@/hooks/usePageSession';
 export default function VolunteerManagement() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Directory',
+    page: 'Volunteers Directory',
+  });
+
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();

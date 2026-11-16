@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { cn } from '@/lib/utils';
 
+import { usePageSession } from '@/hooks/usePageSession';
 interface BasicUser {
   id: string;
   firstName?: string | null;
@@ -25,6 +26,12 @@ function userName(u: BasicUser): string {
 
 /** Phone screen to pick someone and start (or reopen) a DM. */
 export function MobileChatNew() {
+  // Track page session for activity logging
+  usePageSession({
+    section: 'Mobile',
+    page: 'Mobile New Chat',
+  });
+
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
