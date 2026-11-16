@@ -34,78 +34,168 @@ if (process.env.SENDGRID_API_KEY) {
 
 // Rule type display labels and descriptions for emails
 /**
- * Reminder copy. Tone: a light, helpful heads-up — never "overdue" or
- * demanding. `label` is the internal rule name; everything else is what
- * people actually read.
+ * Reminder copy. Tone: friendly heads-up. The team are the experts on their
+ * events, so messages state what we noticed + give contact info; they never
+ * tell people how to run the process. Never say "overdue" or "needs attention".
  */
-type RuleCopy = {
-  label: string;
-  /** Email/notification heading */
-  title: (orgName: string) => string;
-  /** Short phrase used in lists and texts */
-  short: (days: number) => string;
-  /** Main sentence */
-  getDescription: (days: number) => string;
-  /** Gentle "how this clears" note (optional) */
-  tip?: string;
+type ReminderEvent = typeof eventRequests.$inferSelect;
+
+/** Rules that no longer send (staffing → Volunteer Hub later; missing details folded into date reminders). */
+const RETIRED_RULE_TYPES = new Set<string>([
+  REMINDER_RULE_TYPES.STAFFING_UNMET,
+  REMINDER_RULE_TYPES.MISSING_DETAILS,
+]);
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function wholeDays(ms: number): number {
+  return Math.max(0, Math.round(ms / MS_PER_DAY));
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items.join('');
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+function lastContactDate(event: ReminderEvent): Date | null {
+  const log = event.contactAttemptsLog as Array<{ timestamp: string }> | null;
+  if (!log || log.length === 0) return null;
+  const latest = log.reduce((max, e) => (e.timestamp > max ? e.timestamp : max), log[0].timestamp);
+  return new Date(latest);
+}
+
+function formatEventDate(d: Date | string | null | undefined): string {
+  if (!d) return 'TBD';
+  return new Date(d).toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York',
+  });
+}
+
+/** Critical info still blank on an event (used for the date-approaching reminders). */
+function missingEventInfo(event: ReminderEvent): string[] {
+  const missing: string[] = [];
+  if (!event.eventStartTime) missing.push('the event time');
+  if (!event.eventAddress) missing.push('the address');
+  const hasCount =
+    (event.estimatedSandwichCount ?? 0) > 0 ||
+    (event.estimatedSandwichCountMin ?? 0) > 0;
+  if (!hasCount) missing.push('the sandwich count');
+  const types = event.sandwichTypes as any[] | null;
+  if (!types || types.length === 0) missing.push('the sandwich types');
+  return missing;
+}
+
+export type ReminderMessage = {
+  /** Subject line, bell title */
+  subject: string;
+  /** Body sentences shown before the contact info */
+  intro: string;
+  /** Optional sentence shown after the contact info */
+  outro?: string;
+  /** Short phrase for the one-time summary list */
+  short: string;
 };
 
-const RULE_TYPE_LABELS: Record<string, RuleCopy> = {
-  [REMINDER_RULE_TYPES.NO_CONTACT]: {
-    label: 'No Contact Attempt',
-    title: (org) => `Checking in on ${org}`,
-    short: (days) => `no contact logged in ${days} days`,
-    getDescription: (days) =>
-      `It's been about ${days} days since the last logged contact. Whenever you get a chance, a quick call or email can help keep things moving.`,
-    tip: `Already been in touch? Logging it in the app will clear this one.`,
-  },
-  [REMINDER_RULE_TYPES.STALE_EVENT]: {
-    label: 'Stale Event',
-    title: (org) => `A quick look at ${org}`,
-    short: (days) => `no updates in ${days} days`,
-    getDescription: (days) =>
-      `There haven't been any updates on this event in about ${days} days. If you have a moment, it might be worth a quick look.`,
-    tip: `Any update to the event will reset this reminder.`,
-  },
-  [REMINDER_RULE_TYPES.DATE_APPROACHING_INPROCESS]: {
-    label: 'Date Approaching (In Process)',
-    title: (org) => `${org}'s requested date is coming up`,
-    short: (days) => `requested date within ${days} days`,
-    getDescription: (days) =>
-      `Their requested date is within ${days} days and the event is still being planned. This could be a good time to confirm the details.`,
-    tip: `Once the event is scheduled, this reminder stops on its own.`,
-  },
-  [REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED]: {
-    label: 'Scheduled Date Approaching',
-    title: (org) => `${org} is coming up soon`,
-    short: (days) => `event within ${days} days`,
-    getDescription: (days) =>
-      `This event is within ${days} days. Just a heads-up in case there's anything you'd like to double-check.`,
-  },
-  [REMINDER_RULE_TYPES.STAFFING_UNMET]: {
-    label: 'Staffing Needs Unmet',
-    title: (org) => `A few volunteer spots still open for ${org}`,
-    short: () => `volunteer spots still open`,
-    getDescription: (days) =>
-      `This event is within ${days} days and still has some open volunteer spots. Sharing in case it's helpful for planning.`,
-    tip: `This clears on its own once the spots are filled.`,
-  },
-  [REMINDER_RULE_TYPES.MISSING_DETAILS]: {
-    label: 'Missing Key Details',
-    title: (org) => `A few details still open for ${org}`,
-    short: () => `a few details still open`,
-    getDescription: (days) =>
-      `This event is within ${days} days and a few details are still blank (like sandwich count, type, location, or pickup time). If you have them handy, adding them helps the team plan.`,
-    tip: `This clears on its own once the details are filled in.`,
-  },
-  [REMINDER_RULE_TYPES.GENERAL_CHECKIN]: {
-    label: 'General Check-In',
-    title: (org) => `Your regular check-in on ${org}`,
-    short: () => `routine check-in`,
-    getDescription: () =>
-      `Here's your regular check-in on this event. Nothing needed unless something has changed.`,
-  },
-};
+export function buildReminderMessage(ruleType: string, thresholdDays: number, event: ReminderEvent): ReminderMessage {
+  const org = event.organizationName || 'this group';
+  const now = Date.now();
+
+  switch (ruleType) {
+    case REMINDER_RULE_TYPES.NO_CONTACT: {
+      const last = lastContactDate(event);
+      const days = last
+        ? wholeDays(now - last.getTime())
+        : wholeDays(now - new Date(event.createdAt).getTime());
+      const badgeLine = days >= 7
+        ? `If now isn't a good time, no worries. Next time you're in the app, this event's card will show a "follow-up needed" badge as a reminder.`
+        : `If now isn't a good time, no worries. Once it's been a week, this event's card will show a "follow-up needed" badge as a reminder.`;
+      return {
+        subject: `No contact reminder for ${org}`,
+        intro: last
+          ? `It's been ${plural(days, 'day')} since the last contact attempt was logged for ${org}. Here's their contact info if you'd like to reach out now.`
+          : `No contact attempt has been logged yet for ${org}, which came in ${plural(days, 'day')} ago. Here's their contact info if you'd like to reach out now.`,
+        outro: badgeLine,
+        short: last ? `no contact logged in ${plural(days, 'day')}` : 'no contact logged yet',
+      };
+    }
+
+    case REMINDER_RULE_TYPES.STALE_EVENT: {
+      const days = wholeDays(now - new Date(event.updatedAt ?? event.createdAt).getTime());
+      return {
+        subject: `${org}'s event hasn't been updated in ${plural(days, 'day')}`,
+        intro: `Just a heads-up that ${org}'s event hasn't been updated in ${plural(days, 'day')}. Have you heard anything new from them, or would it help to check in again? Here's their contact info:`,
+        short: `not updated in ${plural(days, 'day')}`,
+      };
+    }
+
+    case REMINDER_RULE_TYPES.DATE_APPROACHING_INPROCESS: {
+      const days = wholeDays(new Date(event.desiredEventDate!).getTime() - now);
+      const missing = missingEventInfo(event);
+      const missingLine = missing.length
+        ? ` For reference, ${joinList(missing)} ${missing.length === 1 ? "hasn't" : "haven't"} been recorded yet.`
+        : '';
+      return {
+        subject: `${org}'s event is coming up in ${plural(days, 'day')}`,
+        intro: `${org}'s requested date is ${plural(days, 'day')} from now (${formatEventDate(event.desiredEventDate)}), and it's still set to In Process in the app. Has anything new come in that would let you schedule it, or should it move to Stalled, Declined, or Cancelled?${missingLine} Here's their contact info in case it's useful:`,
+        short: `requested date in ${plural(days, 'day')}, still In Process`,
+      };
+    }
+
+    case REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED: {
+      const days = wholeDays(new Date(event.scheduledEventDate!).getTime() - now);
+      const missing = missingEventInfo(event);
+      const sentences: string[] = [];
+      if (missing.length) {
+        sentences.push(`${org}'s event is set for ${formatEventDate(event.scheduledEventDate)}, and ${joinList(missing)} ${missing.length === 1 ? "hasn't" : "haven't"} been recorded yet.`);
+      } else {
+        sentences.push(`${org}'s event is set for ${formatEventDate(event.scheduledEventDate)}.`);
+      }
+      if (!event.addedToOfficialSheet) {
+        sentences.push(`It also hasn't been marked as added to the planning sheet yet.`);
+      }
+      const shortBits = [...missing.map(m => m.replace(/^the /, ''))];
+      if (!event.addedToOfficialSheet) shortBits.push('planning sheet');
+      return {
+        subject: `${org}'s event is coming up in ${plural(days, 'day')} and is missing some information`,
+        intro: `${sentences.join(' ')} Here's the contact's info in case you need to reach out for anything:`,
+        short: `coming up in ${plural(days, 'day')}, missing ${joinList(shortBits)}`,
+      };
+    }
+
+    case REMINDER_RULE_TYPES.GENERAL_CHECKIN:
+    default:
+      return {
+        subject: `Your regular check-in on ${org}`,
+        intro: `Here's your regular check-in on ${org}'s event. Nothing needed unless something has changed. Their contact info, in case it's handy:`,
+        short: 'regular check-in',
+      };
+  }
+}
+
+function contactDetails(event: ReminderEvent): { name: string; phone: string | null; email: string | null } {
+  const name = [event.firstName, event.lastName].filter(Boolean).join(' ').trim() || 'No contact name on file';
+  return { name, phone: event.phone || null, email: event.email || null };
+}
+
+function contactHtml(event: ReminderEvent): string {
+  const c = contactDetails(event);
+  return `
+    <div style="background: white; border-left: 4px solid #FBAD3F; padding: 16px; margin: 16px 0; border-radius: 4px;">
+      <p style="margin: 0 0 6px 0; font-size: 16px; font-weight: 600; color: #1f2937;">${escapeHtml(c.name)}</p>
+      <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563;">Phone: ${c.phone ? `<a href="tel:${escapeHtml(c.phone)}" style="color:#236383;">${escapeHtml(c.phone)}</a>` : 'not on file'}</p>
+      <p style="margin: 0; font-size: 14px; color: #4b5563;">Email: ${c.email ? `<a href="mailto:${escapeHtml(c.email)}" style="color:#236383;">${escapeHtml(c.email)}</a>` : 'not on file'}</p>
+    </div>`;
+}
+
+function contactText(event: ReminderEvent): string {
+  const c = contactDetails(event);
+  return [c.name, c.phone, c.email].filter(Boolean).join(' · ');
+}
 
 /**
  * Standard List-Unsubscribe header: gives Gmail/Outlook their built-in
@@ -174,54 +264,21 @@ function evaluateRuleCondition(
     }
 
     case REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED: {
-      // Only applies to scheduled events
-      if (!isScheduledOrRescheduled(event.status)) return false;
-      const scheduledDate = event.scheduledEventDate ? new Date(event.scheduledEventDate) : null;
-      if (!scheduledDate) return false;
-      const daysUntilDate = (scheduledDate.getTime() - now.getTime()) / msPerDay;
-      return daysUntilDate <= thresholdDays && daysUntilDate >= 0;
-    }
-
-    case REMINDER_RULE_TYPES.STAFFING_UNMET: {
-      // Only applies to scheduled events with staffing needs
+      // Scheduled events coming up that are still missing critical info
+      // (time, address, sandwich count/types) or aren't on the planning sheet.
       if (!isScheduledOrRescheduled(event.status)) return false;
       const scheduledDate = event.scheduledEventDate ? new Date(event.scheduledEventDate) : null;
       if (!scheduledDate) return false;
       const daysUntilDate = (scheduledDate.getTime() - now.getTime()) / msPerDay;
       if (daysUntilDate > thresholdDays || daysUntilDate < 0) return false;
-
-      // Check if staffing needs are unmet (speaker role retired — no longer counted)
-      const driversNeeded = event.driversNeeded || 0;
-      const assignedDrivers = event.assignedDriverIds?.length || 0;
-      const volunteersNeeded = event.volunteersNeeded || 0;
-      const assignedVolunteers = event.assignedVolunteerIds?.length || 0;
-      const vanNeeded = event.vanDriverNeeded && !event.assignedVanDriverId && !event.customVanDriverName;
-
-      const hasUnmetNeeds =
-        assignedDrivers < driversNeeded ||
-        assignedVolunteers < volunteersNeeded ||
-        vanNeeded;
-
-      return hasUnmetNeeds;
+      return missingEventInfo(event).length > 0 || !event.addedToOfficialSheet;
     }
 
-    case REMINDER_RULE_TYPES.MISSING_DETAILS: {
-      // Only applies to scheduled events
-      if (!isScheduledOrRescheduled(event.status)) return false;
-      const scheduledDate = event.scheduledEventDate ? new Date(event.scheduledEventDate) : null;
-      if (!scheduledDate) return false;
-      const daysUntilDate = (scheduledDate.getTime() - now.getTime()) / msPerDay;
-      if (daysUntilDate > thresholdDays || daysUntilDate < 0) return false;
-
-      // Check if key details are missing
-      const missingSandwichCount = !event.estimatedSandwichCount && event.estimatedSandwichCount !== 0;
-      const sandwichTypes = event.sandwichTypes as any[] | null;
-      const missingSandwichType = !sandwichTypes || sandwichTypes.length === 0;
-      const missingLocation = !event.eventAddress;
-      const missingPickupTime = !event.pickupTime;
-
-      return missingSandwichCount || missingSandwichType || missingLocation || missingPickupTime;
-    }
+    case REMINDER_RULE_TYPES.STAFFING_UNMET:
+    case REMINDER_RULE_TYPES.MISSING_DETAILS:
+      // Retired: staffing alerts will live in the Volunteer Hub; missing
+      // details are now part of the two date-approaching reminders.
+      return false;
 
     case REMINDER_RULE_TYPES.GENERAL_CHECKIN:
     default:
@@ -230,48 +287,27 @@ function evaluateRuleCondition(
   }
 }
 
-async function sendReminderEmail(
-  email: string,
+/** HTML for a single-event reminder email (exported for previews/tests). */
+export function renderReminderEmailHtml(
   userName: string,
-  orgName: string,
-  eventDate: string,
-  eventStatus: string,
-  eventId: number,
-  ruleType: string,
-  thresholdDays: number
-): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) return false;
-
-  const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
-  const ruleInfo = RULE_TYPE_LABELS[ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
-
-  try {
-    const title = ruleInfo.title(orgName);
-    const msg = {
-      to: email,
-      from: 'katie@thesandwichproject.org',
-      subject: title,
-      headers: reminderUnsubscribeHeaders(baseUrl),
-      html: `
+  event: ReminderEvent,
+  msg: ReminderMessage,
+  baseUrl: string,
+): string {
+  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.id}`;
+  return `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
-            <h2 style="color: white; margin: 0;">${title}</h2>
+            <h2 style="color: white; margin: 0;">${escapeHtml(msg.subject)}</h2>
           </div>
           <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-            <p style="font-size: 16px; color: #374151;">Hi ${userName},</p>
-            <p style="font-size: 15px; color: #4b5563;">
-              ${ruleInfo.getDescription(thresholdDays)}
-            </p>
-            <div style="background: white; border-left: 4px solid #FBAD3F; padding: 16px; margin: 16px 0; border-radius: 4px;">
-              <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1f2937;">${orgName}</p>
-              <p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">Event date: ${eventDate}</p>
-              <p style="margin: 0; font-size: 14px; color: #6b7280;">Status: ${friendlyStatus(eventStatus)}</p>
-            </div>
+            <p style="font-size: 16px; color: #374151;">Hi ${escapeHtml(userName)},</p>
+            <p style="font-size: 15px; color: #4b5563;">${escapeHtml(msg.intro)}</p>
+            ${contactHtml(event)}
+            ${msg.outro ? `<p style="font-size: 15px; color: #4b5563;">${escapeHtml(msg.outro)}</p>` : ''}
             <a href="${eventUrl}" style="display: inline-block; background: #007E8C; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 12px 0;">
               Open the event
             </a>
-            ${ruleInfo.tip ? `<p style="font-size: 14px; color: #6b7280;">${ruleInfo.tip}</p>` : ''}
             <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
               You can change how often you get these, or turn them off, anytime in
               <a href="${baseUrl}/profile?tab=notifications" style="color: #236383;">Profile → Alerts</a>.
@@ -279,10 +315,27 @@ async function sendReminderEmail(
           </div>
           ${EMAIL_FOOTER_HTML}
         </div>
-      `,
-    };
+      `;
+}
 
-    await sgMail.send(msg);
+async function sendReminderEmail(
+  email: string,
+  userName: string,
+  event: ReminderEvent,
+  msg: ReminderMessage,
+): Promise<boolean> {
+  if (!process.env.SENDGRID_API_KEY) return false;
+
+  const baseUrl = getAppBaseUrl();
+
+  try {
+    await sgMail.send({
+      to: email,
+      from: 'katie@thesandwichproject.org',
+      subject: msg.subject,
+      headers: reminderUnsubscribeHeaders(baseUrl),
+      html: renderReminderEmailHtml(userName, event, msg, baseUrl),
+    });
     return true;
   } catch (error) {
     logger.error(`Failed to send reminder email to ${email}:`, error);
@@ -292,15 +345,11 @@ async function sendReminderEmail(
 
 async function sendReminderSMS(
   phoneNumber: string,
-  orgName: string,
-  eventId: number,
-  ruleType: string,
-  thresholdDays: number
+  event: ReminderEvent,
+  msg: ReminderMessage,
 ): Promise<boolean> {
-  const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
-  const ruleInfo = RULE_TYPE_LABELS[ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
-  const message = `TSP: Quick heads-up on ${orgName} (${ruleInfo.short(thresholdDays)}). ${eventUrl}`;
+  const eventUrl = `${getAppBaseUrl()}/dashboard?section=event-requests&tab=all&eventId=${event.id}`;
+  const message = `TSP reminder: ${msg.subject}. Contact: ${contactText(event)}. ${eventUrl}`;
 
   try {
     const result = await sendTSPFollowupReminderSMS(phoneNumber, message);
@@ -330,7 +379,7 @@ async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<voi
     .from(eventCheckInReminders)
     .where(and(eq(eventCheckInReminders.userId, user.id), eq(eventCheckInReminders.enabled, true)));
 
-  const condRows = rows.filter(r => isConditionBasedRule(r.ruleType));
+  const condRows = rows.filter(r => isConditionBasedRule(r.ruleType) && !RETIRED_RULE_TYPES.has(r.ruleType));
   const eventIds = [...new Set(condRows.map(r => r.eventRequestId))];
   const events = eventIds.length
     ? await db.select().from(eventRequests).where(inArray(eventRequests.id, eventIds))
@@ -347,8 +396,7 @@ async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<voi
     const event = eventById.get(row.eventRequestId);
     if (!event || event.deletedAt) continue;
     if (!evaluateRuleCondition(row.ruleType, row.thresholdDays || 7, event)) continue;
-    const copy = RULE_TYPE_LABELS[row.ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
-    const label = copy.short(row.thresholdDays || 7);
+    const label = buildReminderMessage(row.ruleType, row.thresholdDays || 7, event).short;
     backlog.set(event.id, [...(backlog.get(event.id) || []), label]);
     await db
       .update(eventCheckInReminders)
@@ -452,8 +500,8 @@ async function applyGlobalDefaultsToNewEvents(): Promise<number> {
       // Users who never saved their own settings get the org defaults.
       const prefs = getCheckInReminderPreferences(user);
 
-      const enabledRules = prefs.rules.filter(r => r.enabled);
-      const enabledCorpRules = prefs.corporateRules?.filter(r => r.enabled) ?? [];
+      const enabledRules = prefs.rules.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType));
+      const enabledCorpRules = prefs.corporateRules?.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType)) ?? [];
       if (enabledRules.length === 0 && enabledCorpRules.length === 0) continue;
 
       // Find events this user is TSP contact for (either tspContactAssigned or tspContact)
@@ -663,6 +711,15 @@ export async function processCheckInReminders(): Promise<{
           }
         }
 
+        // Retired reminder types: switch the row off instead of sending.
+        if (RETIRED_RULE_TYPES.has(reminder.ruleType)) {
+          await db
+            .update(eventCheckInReminders)
+            .set({ enabled: false, updatedAt: new Date() })
+            .where(eq(eventCheckInReminders.id, reminder.id));
+          continue;
+        }
+
         // Evaluate whether the rule's condition is met
         const conditionMet = evaluateRuleCondition(
           reminder.ruleType,
@@ -696,34 +753,17 @@ export async function processCheckInReminders(): Promise<{
         }
 
         const userName = user.displayName || user.firstName || 'there';
-        const orgName = event.organizationName || 'Unknown Organization';
-        const eventDate = event.scheduledEventDate
-          ? new Date(event.scheduledEventDate).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })
-          : event.desiredEventDate
-            ? new Date(event.desiredEventDate).toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })
-            : 'TBD';
-        const eventStatus = event.status || 'unknown';
+        const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
 
         // Always record the reminder in the in-app notification bell first,
         // so it exists even if email/SMS isn't configured or fails to send.
         try {
-          const ruleInfo = RULE_TYPE_LABELS[reminder.ruleType] || RULE_TYPE_LABELS[REMINDER_RULE_TYPES.GENERAL_CHECKIN];
           await db.insert(notifications).values({
             userId: reminder.userId,
             type: 'reminder',
             priority: 'medium',
-            title: ruleInfo.title(orgName),
-            message: ruleInfo.getDescription(reminder.thresholdDays || 7),
+            title: msg.subject,
+            message: `${msg.intro}\nContact: ${contactText(event)}${msg.outro ? `\n${msg.outro}` : ''}`,
             category: 'events',
             relatedType: 'event_request',
             relatedId: event.id,
@@ -738,35 +778,18 @@ export async function processCheckInReminders(): Promise<{
         let emailSent = false;
         let smsSent = false;
 
-        // Send email if channel includes email
         if (reminder.channel === 'email' || reminder.channel === 'both') {
           const email = user.preferredEmail || user.email;
           if (email) {
-            emailSent = await sendReminderEmail(
-              email,
-              userName,
-              orgName,
-              eventDate,
-              eventStatus,
-              event.id,
-              reminder.ruleType,
-              reminder.thresholdDays || 7
-            );
+            emailSent = await sendReminderEmail(email, userName, event, msg);
           }
         }
 
-        // Send SMS if channel includes SMS
         if (reminder.channel === 'sms' || reminder.channel === 'both') {
           const metadata = getUserMetadata(user);
           const smsConsent = metadata.smsConsent;
           if (smsConsent?.enabled && smsConsent.phoneNumber) {
-            smsSent = await sendReminderSMS(
-              smsConsent.phoneNumber,
-              orgName,
-              event.id,
-              reminder.ruleType,
-              reminder.thresholdDays || 7
-            );
+            smsSent = await sendReminderSMS(smsConsent.phoneNumber, event, msg);
           }
         }
 
