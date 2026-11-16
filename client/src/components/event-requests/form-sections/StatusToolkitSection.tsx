@@ -151,37 +151,6 @@ export const StatusToolkitSection: React.FC<StatusToolkitSectionProps> = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Toolkit Status Section */}
-      <div className="space-y-4">
-        <Label className="text-lg font-semibold">Toolkit Status</Label>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="toolkitStatus">Toolkit Status</Label>
-            <Select value={formData.toolkitStatus} onValueChange={(value) => setFormData((prev: any) => ({ ...prev, toolkitStatus: value }))}>
-              <SelectTrigger data-testid="select-toolkit-status">
-                <SelectValue placeholder="Select toolkit status" />
-              </SelectTrigger>
-              <SelectContent className="z-[200]" position="popper" sideOffset={5}>
-                <SelectItem value="not_sent">Not Sent</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="received_confirmed">Received Confirmed</SelectItem>
-                <SelectItem value="not_needed">Not Needed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="toolkitSentDate">Toolkit Sent Date</Label>
-            <Input
-              id="toolkitSentDate"
-              type="date"
-              value={formData.toolkitSentDate}
-              onChange={(e) => setFormData((prev: any) => ({ ...prev, toolkitSentDate: e.target.value }))}
-              disabled={formData.toolkitStatus === 'not_sent' || formData.toolkitStatus === 'not_needed'}
-              data-testid="input-toolkit-sent-date"
-            />
-          </div>
-        </div>
-      </div>
     </>
   );
 };

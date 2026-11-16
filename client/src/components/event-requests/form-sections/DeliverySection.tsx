@@ -19,12 +19,15 @@ interface DeliverySectionProps {
   formData: EventFormData;
   setFormData: React.Dispatch<React.SetStateAction<any>>;
   eventRequestId?: number;
+  /** Delivery destinations only matter once an event is scheduled/completed. */
+  showDestination?: boolean;
 }
 
 export const DeliverySection: React.FC<DeliverySectionProps> = ({
   formData,
   setFormData,
   eventRequestId,
+  showDestination = true,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -166,6 +169,7 @@ export const DeliverySection: React.FC<DeliverySectionProps> = ({
         )}
 
         {/* Final Delivery Destination - Multiple Recipients */}
+        {showDestination && (
         <div>
           <Label htmlFor="deliveryDestination">
             {formData.overnightHoldingLocation ? 'Final Delivery Destinations' : 'Delivery Destinations'}
@@ -182,6 +186,7 @@ export const DeliverySection: React.FC<DeliverySectionProps> = ({
             data-testid="delivery-destination-multi-selector"
           />
         </div>
+        )}
       </div>
     </>
   );

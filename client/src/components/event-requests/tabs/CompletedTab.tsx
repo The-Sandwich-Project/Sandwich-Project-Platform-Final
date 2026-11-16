@@ -128,10 +128,6 @@ export const CompletedTab: React.FC = () => {
                 handleStatusChange(request.id, 'scheduled');
               }
             }}
-            onDuplicate={() => {
-              setDuplicateSourceRequest(request);
-              setShowDuplicateDialog(true);
-            }}
             onAssignTspContact={() => {
               setTspContactEventRequest(request);
               openDialog('tspContactAssignment');
@@ -143,11 +139,6 @@ export const CompletedTab: React.FC = () => {
             onLogContact={() => {
               setLogContactEventRequest(request);
               openDialog('logContact');
-            }}
-            onAddNextAction={() => {
-              setNextActionEventRequest(request);
-              setNextActionMode('add');
-              openDialog('nextAction');
             }}
             onEditNextAction={() => {
               setNextActionEventRequest(request);

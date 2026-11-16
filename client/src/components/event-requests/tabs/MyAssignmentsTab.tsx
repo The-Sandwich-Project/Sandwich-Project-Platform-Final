@@ -179,10 +179,6 @@ export const MyAssignmentsTab: React.FC = () => {
         setContactEventRequest(request);
         openDialog('contactOrganizer');
       },
-      onDuplicate: () => {
-        setDuplicateSourceRequest(request);
-        setShowDuplicateDialog(true);
-      },
     };
 
     switch (request.status) {
@@ -190,10 +186,6 @@ export const MyAssignmentsTab: React.FC = () => {
         return (
           <NewRequestCard
             {...commonProps}
-            onIntakeCall={() => {
-              setIntakeCallEventRequest(request);
-              openDialog('intakeCall');
-            }}
             onToolkit={() => {
               setSelectedEventRequest(request);
               setToolkitEventRequest(request);
@@ -203,10 +195,6 @@ export const MyAssignmentsTab: React.FC = () => {
               setSelectedEventRequest(request);
               setToolkitEventRequest(request);
               openDialog('sendToolkit');
-            }}
-            onScheduleCall={() => {
-              setSelectedEventRequest(request);
-              openDialog('scheduleCall');
             }}
             onAssignTspContact={() => {
               setTspContactEventRequest(request);
@@ -234,11 +222,6 @@ export const MyAssignmentsTab: React.FC = () => {
             onLogContact={() => {
               setLogContactEventRequest(request);
               openDialog('logContact');
-            }}
-            onAddNextAction={() => {
-              setNextActionEventRequest(request);
-              setNextActionMode('add');
-              openDialog('nextAction');
             }}
             onEditNextAction={() => {
               setNextActionEventRequest(request);
@@ -269,10 +252,6 @@ export const MyAssignmentsTab: React.FC = () => {
               setSchedulingEventRequest(request);
               openDialog('scheduling');
             }}
-            onScheduleCall={() => {
-              setSelectedEventRequest(request);
-              openDialog('scheduleCall');
-            }}
             onResendToolkit={() => {
               setSelectedEventRequest(request);
               setToolkitEventRequest(request);
@@ -289,11 +268,6 @@ export const MyAssignmentsTab: React.FC = () => {
             onLogContact={() => {
               setLogContactEventRequest(request);
               openDialog('logContact');
-            }}
-            onAddNextAction={() => {
-              setNextActionEventRequest(request);
-              setNextActionMode('add');
-              openDialog('nextAction');
             }}
             onEditNextAction={() => {
               setNextActionEventRequest(request);
@@ -353,10 +327,6 @@ export const MyAssignmentsTab: React.FC = () => {
             onLogContact={() => {
               setLogContactEventRequest(request);
               openDialog('logContact');
-            }}
-            onDuplicate={() => {
-              setDuplicateSourceRequest(request);
-              setShowDuplicateDialog(true);
             }}
             startEditing={(field, value) => {
               setEditingScheduledId(request.id);
@@ -424,11 +394,6 @@ export const MyAssignmentsTab: React.FC = () => {
             openAssignmentDialog={(type, isVanDriver) => openAssignmentDialog(request.id, type, isVanDriver)}
             handleRemoveAssignment={(type, personId) => handleRemoveAssignment(personId, type, request.id)}
             canEdit={true}
-            onAddNextAction={() => {
-              setNextActionEventRequest(request);
-              setNextActionMode('add');
-              openDialog('nextAction');
-            }}
             onEditNextAction={() => {
               setNextActionEventRequest(request);
               setNextActionMode('edit');
@@ -525,10 +490,6 @@ export const MyAssignmentsTab: React.FC = () => {
         return (
           <NewRequestCard
             {...commonProps}
-            onIntakeCall={() => {
-              setIntakeCallEventRequest(request);
-              openDialog('intakeCall');
-            }}
             onToolkit={() => {
               setSelectedEventRequest(request);
               setToolkitEventRequest(request);
@@ -538,10 +499,6 @@ export const MyAssignmentsTab: React.FC = () => {
               setSelectedEventRequest(request);
               setToolkitEventRequest(request);
               openDialog('sendToolkit');
-            }}
-            onScheduleCall={() => {
-              setSelectedEventRequest(request);
-              openDialog('scheduleCall');
             }}
             onAssignTspContact={() => {
               setTspContactEventRequest(request);
@@ -569,11 +526,6 @@ export const MyAssignmentsTab: React.FC = () => {
             onLogContact={() => {
               setLogContactEventRequest(request);
               openDialog('logContact');
-            }}
-            onAddNextAction={() => {
-              setNextActionEventRequest(request);
-              setNextActionMode('add');
-              openDialog('nextAction');
             }}
             onEditNextAction={() => {
               setNextActionEventRequest(request);

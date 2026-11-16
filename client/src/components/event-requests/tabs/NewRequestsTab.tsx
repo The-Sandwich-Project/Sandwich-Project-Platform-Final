@@ -242,10 +242,6 @@ export const NewRequestsTab: React.FC = () => {
               }}
               onDelete={() => deleteEventRequestMutation.mutate(request.id)}
               onCall={() => handleCall(request)}
-              onIntakeCall={() => {
-                setIntakeCallEventRequest(request);
-                openDialog('intakeCall');
-              }}
               onContact={() => {
                 setContactEventRequest(request);
                 openDialog('contactOrganizer');
@@ -259,10 +255,6 @@ export const NewRequestsTab: React.FC = () => {
                 setSelectedEventRequest(request);
                 setToolkitEventRequest(request);
                 openDialog('sendToolkit');
-              }}
-              onScheduleCall={() => {
-                setSelectedEventRequest(request);
-                openDialog('scheduleCall');
               }}
               onAssignTspContact={() => {
                 setTspContactEventRequest(request);
@@ -290,23 +282,6 @@ export const NewRequestsTab: React.FC = () => {
               onLogContact={() => {
                 setLogContactEventRequest(request);
                 openDialog('logContact');
-              }}
-              onDuplicate={() => {
-                setDuplicateSourceRequest(request);
-                setShowDuplicateDialog(true);
-              }}
-              onAiSuggest={() => {
-                setAiSuggestionEventRequest(request);
-                openDialog('aiDateSuggestion');
-              }}
-              onAiIntakeAssist={() => {
-                setAiIntakeAssistantEventRequest(request);
-                openDialog('aiIntakeAssistant');
-              }}
-              onAddNextAction={() => {
-                setNextActionEventRequest(request);
-                setNextActionMode('add');
-                openDialog('nextAction');
               }}
               onEditNextAction={() => {
                 setNextActionEventRequest(request);

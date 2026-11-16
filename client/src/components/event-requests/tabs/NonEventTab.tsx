@@ -67,10 +67,6 @@ export const NonEventTab: React.FC = () => {
                   deleteEventRequestMutation.mutate(request.id);
                 }
               }}
-              onDuplicate={() => {
-                setDuplicateSourceRequest(request);
-                setShowDuplicateDialog(true);
-              }}
             />
           ))
         )}
