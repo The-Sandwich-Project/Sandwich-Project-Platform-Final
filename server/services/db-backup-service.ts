@@ -174,6 +174,7 @@ function tarHeader(name: string, size: number, mtime: Date): Buffer {
 async function writeTarGz(
   outPath: string,
   entries: { name: string; filePath: string }[],
+  signal: AbortSignal,
 ): Promise<void> {
   const mtime = new Date();
   async function* tarStream() {
@@ -188,7 +189,9 @@ async function writeTarGz(
     }
     yield Buffer.alloc(1024, 0); // end-of-archive marker
   }
-  await pipeline(Readable.from(tarStream()), createGzip(), createWriteStream(outPath));
+  // { signal } destroys every stage on abort, which also ends the generator and
+  // closes whichever source file it was reading.
+  await pipeline(Readable.from(tarStream()), createGzip(), createWriteStream(outPath), { signal });
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +250,7 @@ async function exportTables(
           `COPY public.${quoteIdent(tablename)} TO STDOUT WITH (FORMAT csv, HEADER true)`,
         ),
       );
-      await pipeline(copyStream, createGzip(), createWriteStream(filePath));
+      await pipeline(copyStream, createGzip(), createWriteStream(filePath), { signal });
       const { size } = await stat(filePath);
       exports.push({ table: tablename, rows: copyStream.rowCount ?? 0, bytes: size });
     }
@@ -411,7 +414,7 @@ async function performBackup(
       name: `${baseName}/${t.table}.csv.gz`,
       filePath: path.join(tablesDir, `${t.table}.csv.gz`),
     })),
-  ]);
+  ], signal);
   const { size: sizeBytes } = await stat(archivePath);
 
   signal.throwIfAborted();
