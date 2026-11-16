@@ -14,6 +14,13 @@ import { EyeOff, Eye, CalendarX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EventListSkeleton } from '../EventCardSkeleton';
 import { EventListBatchProviders } from '../EventListBatchProviders';
+import { InProcessFilterBar } from '../InProcessFilterBar';
+import {
+  EMPTY_IN_PROCESS_FILTERS,
+  applyInProcessFilters,
+  hasActiveInProcessFilters,
+  type InProcessFilters,
+} from '../lib/inProcessFilters';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { buildAttendancePatch } from '../form-utils';
 import type { EventRequest } from '@shared/schema';
@@ -37,6 +44,8 @@ export const InProcessTab: React.FC = () => {
 
   // Hide past-date events toggle
   const [hidePastDateEvents, setHidePastDateEvents] = useState(false);
+  const [inProcessFilters, setInProcessFilters] = useState<InProcessFilters>(EMPTY_IN_PROCESS_FILTERS);
+  const filtersActive = hasActiveInProcessFilters(inProcessFilters);
 
   const {
     isLoading,
@@ -60,7 +69,9 @@ export const InProcessTab: React.FC = () => {
     openDialog,
   } = useEventDialogState();
 
-  const inProcessRequests = filterRequestsByStatus('in_process');
+  // The list is paginated; when filtering/sorting, work from ALL in-process
+  // events so nothing on other pages is silently missed.
+  const inProcessRequests = filterRequestsByStatus('in_process', { skipPagination: filtersActive });
 
   // Helper to check if an event's date has passed
   const isEventDatePast = (request: any): boolean => {
@@ -77,12 +88,13 @@ export const InProcessTab: React.FC = () => {
     const pastDateEvents = inProcessRequests.filter(isEventDatePast);
     const pastDateCount = pastDateEvents.length;
 
-    const filteredRequests = hidePastDateEvents
+    const visible = hidePastDateEvents
       ? inProcessRequests.filter(req => !isEventDatePast(req))
       : inProcessRequests;
+    const filteredRequests = filtersActive ? applyInProcessFilters(visible, inProcessFilters) : visible;
 
     return { filteredRequests, pastDateCount };
-  }, [inProcessRequests, hidePastDateEvents]);
+  }, [inProcessRequests, hidePastDateEvents, filtersActive, inProcessFilters]);
 
   const handleCall = (request: any) => {
     const phoneNumber = request.phone;
@@ -303,6 +315,12 @@ export const InProcessTab: React.FC = () => {
         </div>
       </div>
 
+      <InProcessFilterBar
+        filters={inProcessFilters}
+        onChange={setInProcessFilters}
+        resultCount={filteredRequests.length}
+      />
+
       {/* Toggle button for hiding past-date events */}
       {pastDateCount > 0 && (
         <div className="mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -347,7 +365,9 @@ export const InProcessTab: React.FC = () => {
         <div className="text-center py-8 text-gray-500">
           {inProcessRequests.length === 0
             ? 'No events in process'
-            : 'All past-date events are hidden. Click "Show Past Events" to view them.'}
+            : filtersActive
+              ? 'No in-process events match these filters.'
+              : 'All past-date events are hidden. Click "Show Past Events" to view them.'}
         </div>
       ) : (
         <EventListBatchProviders events={filteredRequests}>
