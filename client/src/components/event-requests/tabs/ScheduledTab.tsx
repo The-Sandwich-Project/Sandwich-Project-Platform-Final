@@ -536,10 +536,6 @@ export const ScheduledTab: React.FC = () => {
                     openDialog('cancel');
                   }
                 }}
-                onDuplicate={() => {
-                  setDuplicateSourceRequest(request);
-                  setShowDuplicateDialog(true);
-                }}
                 onAssignTspContact={() => {
                   setTspContactEventRequest(request);
                   openDialog('tspContactAssignment');
@@ -547,10 +543,6 @@ export const ScheduledTab: React.FC = () => {
                 onEditTspContact={() => {
                   setTspContactEventRequest(request);
                   openDialog('tspContactAssignment');
-                }}
-                onAiIntakeAssist={() => {
-                  setAiIntakeAssistantEventRequest(request);
-                  openDialog('aiIntakeAssistant');
                 }}
                 startEditing={(field, value) => startEditing(request.id, field, value)}
                 saveEdit={saveEdit}
@@ -580,11 +572,6 @@ export const ScheduledTab: React.FC = () => {
                   });
                 }}
                 canEdit={true}
-                onAddNextAction={() => {
-                  setNextActionEventRequest(request);
-                  setNextActionMode('add');
-                  openDialog('nextAction');
-                }}
                 onEditNextAction={() => {
                   setNextActionEventRequest(request);
                   setNextActionMode('edit');

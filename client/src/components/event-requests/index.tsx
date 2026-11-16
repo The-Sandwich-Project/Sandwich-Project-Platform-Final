@@ -1202,11 +1202,6 @@ const EventRequestsManagementContent: React.FC = () => {
               setLogContactEventRequest(aiIntakeAssistantEventRequest);
               openDialog('logContact');
             }}
-            onScheduleCall={() => {
-              // Open contact organizer dialog for scheduling a call
-              setSelectedEventRequest(aiIntakeAssistantEventRequest);
-              openDialog('contactOrganizer');
-            }}
             onAddNote={() => {
               // Open edit dialog to add notes
               setSelectedEventRequest(aiIntakeAssistantEventRequest);

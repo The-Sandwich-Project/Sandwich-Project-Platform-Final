@@ -89,7 +89,7 @@ interface NewRequestCardProps {
    *  right now. Send-time becomes the toolkit-sent timestamp and the
    *  event moves to In Process automatically. */
   onSendToolkit?: () => void;
-  onScheduleCall: () => void;
+  onScheduleCall?: () => void;
   onAssignTspContact: () => void;
   onEditTspContact: () => void;
   onApprove: () => void;
@@ -1124,15 +1124,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={onScheduleCall}
-                      className="h-7 text-xs flex items-center gap-1 border-blue-300 hover:bg-blue-50 text-blue-700"
-                    >
-                      <Calendar className="w-3 h-3" />
-                      {request.scheduledCallDate ? 'Reschedule' : 'Schedule Call'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
                       onClick={onLogContact}
                       className="h-7 text-xs flex items-center gap-1"
                     >
@@ -1371,42 +1362,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                   </TooltipContent>
                 </Tooltip>
               )}
-
-              {/* Schedule Call */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={onScheduleCall}
-                    className="h-8 text-slate-600 hover:bg-slate-100"
-                  >
-                    <Phone className="w-4 h-4 mr-1.5" />
-                    Schedule Call
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Schedule a call with the organizer</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Log Contact */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={onLogContact}
-                    className="h-8 text-[#007E8C] hover:bg-[#007E8C]/10"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-1.5" />
-                    Log Contact
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Log a contact attempt or conversation</p>
-                </TooltipContent>
-              </Tooltip>
 
               {/* Reminders (component renders its own button) */}
               <ReminderRulesManager

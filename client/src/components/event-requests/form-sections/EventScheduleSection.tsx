@@ -87,38 +87,6 @@ export const EventScheduleSection: React.FC<EventScheduleSectionProps> = ({
             }}
             data-testid="input-event-date"
           />
-          <div className="flex items-center gap-2 mt-2">
-            <Label className="text-sm font-normal text-gray-600">Date flexibility:</Label>
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                size="sm"
-                variant={formData.dateFlexible === null ? "default" : "outline"}
-                className={`h-7 px-2 text-xs ${formData.dateFlexible === null ? 'bg-gray-500 hover:bg-gray-600' : ''}`}
-                onClick={() => setFormData((prev: any) => ({ ...prev, dateFlexible: null }))}
-              >
-                Unknown
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={formData.dateFlexible === true ? "default" : "outline"}
-                className={`h-7 px-2 text-xs ${formData.dateFlexible === true ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                onClick={() => setFormData((prev: any) => ({ ...prev, dateFlexible: true }))}
-              >
-                Flexible
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={formData.dateFlexible === false ? "default" : "outline"}
-                className={`h-7 px-2 text-xs ${formData.dateFlexible === false ? 'bg-red-600 hover:bg-red-700' : ''}`}
-                onClick={() => setFormData((prev: any) => ({ ...prev, dateFlexible: false }))}
-              >
-                Fixed
-              </Button>
-            </div>
-          </div>
         </div>
 
         {/* Backup Dates */}

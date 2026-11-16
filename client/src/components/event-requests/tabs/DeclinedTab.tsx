@@ -122,10 +122,6 @@ export const DeclinedTab: React.FC = () => {
                     setLogContactEventRequest(request);
                     openDialog('logContact');
                   }}
-                  onDuplicate={() => {
-                    setDuplicateSourceRequest(request);
-                    setShowDuplicateDialog(true);
-                  }}
                 />
               ))}
             </div>
@@ -175,10 +171,6 @@ export const DeclinedTab: React.FC = () => {
                   onLogContact={() => {
                     setLogContactEventRequest(request);
                     openDialog('logContact');
-                  }}
-                  onDuplicate={() => {
-                    setDuplicateSourceRequest(request);
-                    setShowDuplicateDialog(true);
                   }}
                 />
               ))}

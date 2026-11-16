@@ -129,10 +129,6 @@ export const StandbyTab: React.FC = () => {
                 });
               }
             }}
-            onDuplicate={() => {
-              setDuplicateSourceRequest(request);
-              setShowDuplicateDialog(true);
-            }}
           />
           ))}
           </EventListBatchProviders>

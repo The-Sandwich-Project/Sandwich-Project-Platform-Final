@@ -369,17 +369,9 @@ export const InProcessTab: React.FC = () => {
                 openDialog('scheduling');
               }}
               onCall={() => handleCall(request)}
-              onIntakeCall={() => {
-                setIntakeCallEventRequest(request);
-                openDialog('intakeCall');
-              }}
               onContact={() => {
                 setContactEventRequest(request);
                 openDialog('contactOrganizer');
-              }}
-              onScheduleCall={() => {
-                setSelectedEventRequest(request);
-                openDialog('scheduleCall');
               }}
               onResendToolkit={() => {
                 setSelectedEventRequest(request);
@@ -397,10 +389,6 @@ export const InProcessTab: React.FC = () => {
               onLogContact={() => {
                 setLogContactEventRequest(request);
                 openDialog('logContact');
-              }}
-              onDuplicate={() => {
-                setDuplicateSourceRequest(request);
-                setShowDuplicateDialog(true);
               }}
               onEditContactAttempt={(attemptNumber) => {
                 // Find the contact attempt to edit
@@ -443,19 +431,6 @@ export const InProcessTab: React.FC = () => {
                   title: 'Contact attempt deleted',
                   description: `Successfully deleted attempt #${attemptNumber}`,
                 });
-              }}
-              onAiSuggest={() => {
-                setAiSuggestionEventRequest(request);
-                openDialog('aiDateSuggestion');
-              }}
-              onAiIntakeAssist={() => {
-                setAiIntakeAssistantEventRequest(request);
-                openDialog('aiIntakeAssistant');
-              }}
-              onAddNextAction={() => {
-                setNextActionEventRequest(request);
-                setNextActionMode('add');
-                openDialog('nextAction');
               }}
               onEditNextAction={() => {
                 setNextActionEventRequest(request);
