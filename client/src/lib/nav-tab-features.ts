@@ -2,12 +2,11 @@ import { getNavigationTabEntries } from '@shared/nav-catalog';
 import { NAV_ITEMS } from '@/nav.config';
 import { PERMISSIONS } from '@shared/auth-utils';
 import type { LucideIcon } from 'lucide-react';
-import { FileInput, LayoutDashboard, Bell } from 'lucide-react';
+import { FileInput, LayoutDashboard } from 'lucide-react';
 
 const GHOST_ICONS: Record<string, LucideIcon> = {
   [PERMISSIONS.NAV_AUTO_FORM_FILLER]: FileInput,
   [PERMISSIONS.NAV_MY_ACTIONS]: LayoutDashboard,
-  [PERMISSIONS.NAV_EVENT_REMINDERS]: Bell,
 };
 
 export function getNavigationTabFeatures(): Array<{

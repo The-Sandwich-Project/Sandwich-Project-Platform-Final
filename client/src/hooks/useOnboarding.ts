@@ -6,7 +6,6 @@ export type OnboardingStep =
   | 'team-chat-badge'           // Team chat has unread messages
   | 'gmail-badge'               // Gmail inbox has unread
   | 'notifications-badge'       // Notifications bell
-  | 'event-reminders-badge'     // Event reminders
   | 'suggestions-badge'         // Suggestions/messaging
   | 'action-center-intro'       // Action center walkthrough
   | 'smart-search-intro'        // Smart search feature
@@ -133,11 +132,6 @@ export const onboardingContent: Record<OnboardingStep, { title: string; message:
     title: 'Notifications',
     message: 'System alerts, mentions, and updates appear here. Don\'t miss important activity!',
     action: 'View all'
-  },
-  'event-reminders-badge': {
-    title: 'Event Reminders',
-    message: 'Upcoming events you\'ve subscribed to. Review and prepare for what\'s coming up!',
-    action: 'See reminders'
   },
   'suggestions-badge': {
     title: 'Suggestions Inbox',

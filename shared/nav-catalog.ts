@@ -96,12 +96,6 @@ export const NAV_GHOST_FEATURES = [
     href: null,
     note: 'Permission exists (Help references it); no current page or nav item.',
   },
-  {
-    permissionKey: PERMISSIONS.NAV_EVENT_REMINDERS,
-    label: 'Event Reminders',
-    href: null,
-    note: 'Permission exists (Help / tours reference it); no current sidebar item.',
-  },
 ] as const;
 
 const SIGNUP_GENIUS_URL =

@@ -148,7 +148,6 @@ const QuickSMSLinks = lazyWithRetry(() => import('@/pages/quick-sms-links'));
 const CoolerTrackingPage = lazyWithRetry(() => import('@/pages/cooler-tracking'));
 const EventRequestsManagement = lazyWithRetry(() => import('@/components/event-requests'));
 const EventOperationalDashboard = lazyWithRetry(() => import('@/components/event-operational-dashboard'));
-const EventRemindersManagement = lazyWithRetry(() => import('@/components/event-reminders-management'));
 const GroupCatalog = lazyWithRetry(() => import('@/components/organizations-catalog'));
 const GroupsInsightsDashboard = lazyWithRetry(() => import('@/components/groups-insights-dashboard'));
 const EventContactsDirectory = lazyWithRetry(() => import('@/components/event-contacts-directory'));
@@ -793,8 +792,6 @@ export default function Dashboard({
           );
         }
         return <EventOperationalDashboard />;
-      case 'event-reminders':
-        return <EventRemindersManagement />;
       case 'historical-import':
         return <HistoricalImport />;
       case 'groups-catalog':

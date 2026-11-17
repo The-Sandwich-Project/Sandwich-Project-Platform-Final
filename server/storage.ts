@@ -38,7 +38,6 @@ import {
   eventRequests,
   organizations,
   eventVolunteers,
-  eventReminders,
   meetingNotes,
   importedExternalIds,
   availabilitySlots,
@@ -721,13 +720,6 @@ export interface IStorage {
     updates: Partial<EventVolunteer>
   ): Promise<EventVolunteer | undefined>;
   deleteEventVolunteer(id: number): Promise<boolean>;
-
-  // Event reminders
-  getEventRemindersCount(userId?: string): Promise<number>;
-  getAllEventReminders(userId?: string): Promise<any[]>;
-  createEventReminder(reminderData: any): Promise<any>;
-  updateEventReminder(id: number, updates: any): Promise<any>;
-  deleteEventReminder(id: number): Promise<boolean>;
 
   // Imported External IDs (Permanent Blacklist System)
   // These methods manage the permanent blacklist to prevent re-importing external_ids
@@ -3397,101 +3389,6 @@ export class MemStorage implements IStorage {
 
   async deleteEventVolunteer(id: number): Promise<boolean> {
     return this.eventVolunteers.delete(id);
-  }
-
-  // Event reminders methods - Database implementation
-  async getEventRemindersCount(userId?: string): Promise<number> {
-    try {
-      let query = this.db
-        .select({ count: sql<number>`count(*)` })
-        .from(eventReminders)
-        .where(eq(eventReminders.status, 'pending'));
-      
-      if (userId) {
-        query = query.where(eq(eventReminders.assignedToUserId, userId)) as any;
-      }
-      
-      const result = await query;
-      return Number(result[0]?.count || 0);
-    } catch (error) {
-      logger.error('Error getting event reminders count:', error);
-      throw error;
-    }
-  }
-
-  async getAllEventReminders(userId?: string): Promise<any[]> {
-    try {
-      let query = this.db
-        .select()
-        .from(eventReminders)
-        .orderBy(desc(eventReminders.createdAt));
-      
-      if (userId) {
-        query = query.where(
-          or(
-            eq(eventReminders.assignedToUserId, userId),
-            eq(eventReminders.createdBy, userId)
-          )
-        ) as any;
-      }
-      
-      return await query;
-    } catch (error) {
-      logger.error('Error getting all event reminders:', error);
-      throw error;
-    }
-  }
-
-  async createEventReminder(reminderData: any): Promise<any> {
-    try {
-      const [reminder] = await this.db
-        .insert(eventReminders)
-        .values({
-          ...reminderData,
-          status: reminderData.status || 'pending',
-          priority: reminderData.priority || 'medium',
-        })
-        .returning();
-      return reminder;
-    } catch (error) {
-      logger.error('Error creating event reminder:', error);
-      throw error;
-    }
-  }
-
-  async updateEventReminder(id: number, updates: any): Promise<any> {
-    try {
-      const updateData: any = { ...updates };
-      
-      // Handle completion
-      if (updates.status === 'completed' && !updates.completedAt) {
-        updateData.completedAt = new Date();
-      }
-      
-      const [updated] = await this.db
-        .update(eventReminders)
-        .set(updateData)
-        .where(eq(eventReminders.id, id))
-        .returning();
-      
-      return updated || null;
-    } catch (error) {
-      logger.error('Error updating event reminder:', error);
-      throw error;
-    }
-  }
-
-  async deleteEventReminder(id: number): Promise<boolean> {
-    try {
-      const result = await this.db
-        .delete(eventReminders)
-        .where(eq(eventReminders.id, id))
-        .returning();
-      return result.length > 0;
-    } catch (error) {
-      logger.error('Error deleting event reminder:', error);
-      throw error;
-    }
   }
 
   // External ID Blacklist methods (stub implementations for memory storage)

@@ -381,32 +381,6 @@ const HELP_TOPICS: HelpTopic[] = [
     },
   },
   {
-    id: 'event-reminders',
-    title: 'Setting Up Event Reminders',
-    description: 'Create automated reminders for upcoming events',
-    category: 'events-calendar',
-    icon: Clock,
-    tourId: 'event-reminders-guide',
-    requiredPermissions: [PERMISSIONS.NAV_EVENT_REMINDERS],
-    content: {
-      summary: 'Event Reminders help ensure no events are forgotten with automated notifications.',
-      steps: [
-        'Navigate to "Event Reminders" from the main menu',
-        'Click "Create Event Reminder" to set up a new reminder',
-        'Select the event you want to create a reminder for',
-        'Choose when to send the reminder (1 day, 1 week, custom)',
-        'Select who should receive the reminder',
-        'View pending and completed reminders in separate tabs',
-      ],
-      tips: [
-        'Set multiple reminders for important events',
-        'Use custom intervals for specific timing needs',
-        'Switch between Pending and Completed tabs to track reminder history',
-        'Complete reminders after following up',
-      ],
-    },
-  },
-  {
     id: 'my-availability',
     title: 'Setting Your Availability',
     description: 'Manage when you\'re available for volunteer activities',

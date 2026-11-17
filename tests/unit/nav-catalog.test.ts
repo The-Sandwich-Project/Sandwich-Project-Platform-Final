@@ -56,7 +56,6 @@ describe('nav catalog', () => {
     expect(keys).toContain(PERMISSIONS.NAV_FLYERS);
     expect(keys).toContain(PERMISSIONS.NAV_AUTO_FORM_FILLER);
     expect(keys).toContain(PERMISSIONS.NAV_MY_ACTIONS);
-    expect(keys).toContain(PERMISSIONS.NAV_EVENT_REMINDERS);
     expect(new Set(keys).size).toBe(keys.length);
 
     const labels = getNavigationTabEntries().map((entry) => entry.label);
