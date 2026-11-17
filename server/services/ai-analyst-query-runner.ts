@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { getDatabaseUrl } from '../db-url';
+import { getPgPool, isNeonDatabaseUrl } from '../sql-client';
 import {
   guardAnalystSql,
   MAX_ANALYST_QUERY_ROWS,
@@ -154,15 +155,34 @@ export async function runAnalystQuery(
     if (!databaseUrl) {
       throw new Error('Database URL is not configured.');
     }
-    const client = neon(databaseUrl, {
-      fullResults: true,
-      fetchOptions: { signal: controller.signal },
-    });
-    const results = await client.transaction(
-      [client(combineWithAnalystRelations(guard.sql, allowedRelations), [])],
-      { readOnly: true, fullResults: true }
-    );
-    const rows = asRows(results[0]);
+    const querySql = combineWithAnalystRelations(guard.sql, allowedRelations);
+    let rows: Array<Record<string, unknown>>;
+    if (isNeonDatabaseUrl(databaseUrl)) {
+      const client = neon(databaseUrl, {
+        fullResults: true,
+        fetchOptions: { signal: controller.signal },
+      });
+      const results = await client.transaction([client(querySql, [])], {
+        readOnly: true,
+        fullResults: true,
+      });
+      rows = asRows(results[0]);
+    } else {
+      // Plain Postgres (e.g. Replit dev DB): same read-only guarantee via a
+      // READ ONLY transaction, with a server-side timeout in place of abort.
+      const pgClient = await getPgPool(databaseUrl).connect();
+      try {
+        await pgClient.query('BEGIN READ ONLY');
+        await pgClient.query(
+          `SET LOCAL statement_timeout = ${Number(QUERY_TIMEOUT_MS)}`
+        );
+        const result = await pgClient.query(querySql);
+        rows = asRows(result.rows);
+      } finally {
+        await pgClient.query('ROLLBACK').catch(() => {});
+        pgClient.release();
+      }
+    }
 
     return {
       ok: true,

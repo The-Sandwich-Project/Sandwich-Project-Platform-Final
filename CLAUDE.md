@@ -24,7 +24,8 @@ npm run check      # TypeScript type check
 The app runs on a single port — Express serves both the API and the Vite-built frontend.
 
 ## Database
-- **Neon Postgres** with two branches: `dev` and `production`
+- **Production**: Neon Postgres. **Dev**: Replit's built-in Postgres (host `helium`, supplied as `DATABASE_URL` in the workspace; `DEV_DATABASE_URL` is not set)
+- **Driver**: `server/sql-client.ts` picks it by host — Neon hosts (`*.neon.tech`) use the Neon HTTP driver; anything else (e.g. `helium`) uses node-postgres. The Neon HTTP driver cannot talk to plain Postgres; when it was used against `helium`, every query failed and storage silently fell back to in-memory (`server/storage-wrapper.ts`)
 - **Connection logic** is in `server/db-url.ts` — the SINGLE source of truth:
   - Production (`NODE_ENV=production`): Uses `DATABASE_URL` or `PRODUCTION_DATABASE_URL`
   - Development: Uses `DEV_DATABASE_URL`, falls back to `DATABASE_URL`

@@ -6,7 +6,7 @@
  * for any mismatches so missing migrations are caught immediately instead of
  * silently falling back to in-memory storage.
  */
-import { neon } from '@neondatabase/serverless';
+import { createSqlClient } from './sql-client';
 import { getTableColumns, getTableName } from 'drizzle-orm';
 import type { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '@shared/schema';
@@ -38,7 +38,7 @@ export async function checkSchemaDrift(): Promise<void> {
   }
 
   try {
-    const sql_client = neon(databaseUrl);
+    const sql_client = createSqlClient(databaseUrl);
 
     // Query all columns from all tables in the public schema
     const dbColumns = await sql_client(`
