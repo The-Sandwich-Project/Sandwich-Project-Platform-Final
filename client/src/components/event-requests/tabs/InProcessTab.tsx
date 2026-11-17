@@ -14,6 +14,8 @@ import { EyeOff, Eye, CalendarX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { EventListSkeleton } from '../EventCardSkeleton';
 import { EventListBatchProviders } from '../EventListBatchProviders';
+import { InProcessFilterBar } from '../InProcessFilterBar';
+import { applyInProcessFilters, hasActiveInProcessFilters } from '../lib/inProcessFilters';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { buildAttendancePatch } from '../form-utils';
 import type { EventRequest } from '@shared/schema';
@@ -40,7 +42,10 @@ export const InProcessTab: React.FC = () => {
 
   const {
     isLoading,
+    inProcessFilters,
+    setInProcessFilters,
   } = useEventRequestContext();
+  const filtersActive = hasActiveInProcessFilters(inProcessFilters);
 
   const {
     setSelectedEventRequest,
@@ -60,7 +65,9 @@ export const InProcessTab: React.FC = () => {
     openDialog,
   } = useEventDialogState();
 
-  const inProcessRequests = filterRequestsByStatus('in_process');
+  // The list is paginated; when filtering/sorting, work from ALL in-process
+  // events so nothing on other pages is silently missed.
+  const inProcessRequests = filterRequestsByStatus('in_process', { skipPagination: filtersActive });
 
   // Helper to check if an event's date has passed
   const isEventDatePast = (request: any): boolean => {
@@ -77,12 +84,13 @@ export const InProcessTab: React.FC = () => {
     const pastDateEvents = inProcessRequests.filter(isEventDatePast);
     const pastDateCount = pastDateEvents.length;
 
-    const filteredRequests = hidePastDateEvents
+    const visible = hidePastDateEvents
       ? inProcessRequests.filter(req => !isEventDatePast(req))
       : inProcessRequests;
+    const filteredRequests = filtersActive ? applyInProcessFilters(visible, inProcessFilters) : visible;
 
     return { filteredRequests, pastDateCount };
-  }, [inProcessRequests, hidePastDateEvents]);
+  }, [inProcessRequests, hidePastDateEvents, filtersActive, inProcessFilters]);
 
   const handleCall = (request: any) => {
     const phoneNumber = request.phone;
@@ -303,6 +311,12 @@ export const InProcessTab: React.FC = () => {
         </div>
       </div>
 
+      <InProcessFilterBar
+        filters={inProcessFilters}
+        onChange={setInProcessFilters}
+        resultCount={filteredRequests.length}
+      />
+
       {/* Toggle button for hiding past-date events */}
       {pastDateCount > 0 && (
         <div className="mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3">
@@ -347,7 +361,9 @@ export const InProcessTab: React.FC = () => {
         <div className="text-center py-8 text-gray-500">
           {inProcessRequests.length === 0
             ? 'No events in process'
-            : 'All past-date events are hidden. Click "Show Past Events" to view them.'}
+            : filtersActive
+              ? 'No in-process events match these filters.'
+              : 'All past-date events are hidden. Click "Show Past Events" to view them.'}
         </div>
       ) : (
         <EventListBatchProviders events={filteredRequests}>
@@ -369,17 +385,9 @@ export const InProcessTab: React.FC = () => {
                 openDialog('scheduling');
               }}
               onCall={() => handleCall(request)}
-              onIntakeCall={() => {
-                setIntakeCallEventRequest(request);
-                openDialog('intakeCall');
-              }}
               onContact={() => {
                 setContactEventRequest(request);
                 openDialog('contactOrganizer');
-              }}
-              onScheduleCall={() => {
-                setSelectedEventRequest(request);
-                openDialog('scheduleCall');
               }}
               onResendToolkit={() => {
                 setSelectedEventRequest(request);
@@ -397,10 +405,6 @@ export const InProcessTab: React.FC = () => {
               onLogContact={() => {
                 setLogContactEventRequest(request);
                 openDialog('logContact');
-              }}
-              onDuplicate={() => {
-                setDuplicateSourceRequest(request);
-                setShowDuplicateDialog(true);
               }}
               onEditContactAttempt={(attemptNumber) => {
                 // Find the contact attempt to edit
@@ -443,19 +447,6 @@ export const InProcessTab: React.FC = () => {
                   title: 'Contact attempt deleted',
                   description: `Successfully deleted attempt #${attemptNumber}`,
                 });
-              }}
-              onAiSuggest={() => {
-                setAiSuggestionEventRequest(request);
-                openDialog('aiDateSuggestion');
-              }}
-              onAiIntakeAssist={() => {
-                setAiIntakeAssistantEventRequest(request);
-                openDialog('aiIntakeAssistant');
-              }}
-              onAddNextAction={() => {
-                setNextActionEventRequest(request);
-                setNextActionMode('add');
-                openDialog('nextAction');
               }}
               onEditNextAction={() => {
                 setNextActionEventRequest(request);

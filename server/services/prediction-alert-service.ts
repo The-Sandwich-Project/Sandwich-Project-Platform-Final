@@ -191,7 +191,7 @@ View forecast: ${forecastUrl}
 
 ---
 The Sandwich Project
-To unsubscribe, contact katie@thesandwichproject.org or reply STOP.
+To unsubscribe, contact katie@thesandwichproject.org.
   `.trim();
 
   try {

@@ -128,10 +128,6 @@ export const StalledTab: React.FC = () => {
                 openDialog('decline');
               }
             }}
-            onDuplicate={() => {
-              setDuplicateSourceRequest(request);
-              setShowDuplicateDialog(true);
-            }}
           />
           ))}
           </EventListBatchProviders>

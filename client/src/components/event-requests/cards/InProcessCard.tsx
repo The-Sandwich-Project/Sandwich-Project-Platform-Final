@@ -97,7 +97,7 @@ interface InProcessCardProps {
   onIntakeCall?: () => void;
   onDuplicate?: () => void;
   onContact: () => void;
-  onScheduleCall: () => void;
+  onScheduleCall?: () => void;
   onResendToolkit?: () => void;
   onAssignTspContact: () => void;
   onEditTspContact: () => void;
@@ -1138,15 +1138,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={onScheduleCall}
-                    className="h-7 text-xs flex items-center gap-1 border-blue-300 hover:bg-blue-50 text-blue-700"
-                  >
-                    <Calendar className="w-3 h-3" />
-                    {request.scheduledCallDate ? 'Reschedule' : 'Schedule Call'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
                     onClick={onLogContact}
                     className="h-7 text-xs flex items-center gap-1 border-amber-300 hover:bg-amber-100"
                   >
@@ -1183,6 +1174,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                           both: <MessageSquare className="w-3 h-3" />,
                           phone_and_toolkit: <MessageSquare className="w-3 h-3" />,
                           email_and_toolkit: <Mail className="w-3 h-3" />,
+                          text_and_email: <MessageSquare className="w-3 h-3" />,
                         };
 
                         const methodLabels = {
@@ -1192,6 +1184,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                           both: 'Phone & Email',
                           phone_and_toolkit: 'Phone + Toolkit',
                           email_and_toolkit: 'Email + Toolkit',
+                          text_and_email: 'Text + Email',
                         };
 
                         const outcomeLabels: { [key: string]: string } = {
@@ -1333,6 +1326,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                             both: <MessageSquare className="w-3 h-3" />,
                             phone_and_toolkit: <MessageSquare className="w-3 h-3" />,
                             email_and_toolkit: <Mail className="w-3 h-3" />,
+                            text_and_email: <MessageSquare className="w-3 h-3" />,
                           };
 
                           const methodLabels = {
@@ -1342,6 +1336,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                             both: 'Phone & Email',
                             phone_and_toolkit: 'Phone + Toolkit Email',
                             email_and_toolkit: 'Email + Toolkit',
+                            text_and_email: 'Text + Email',
                           };
 
                           const outcomeLabels: { [key: string]: string } = {
@@ -1780,33 +1775,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                 </TooltipContent>
               </Tooltip>
             )}
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onScheduleCall}
-                 
-                >
-                  <Phone className="w-4 h-4 mr-1" />
-                  {request.scheduledCallDate ? (
-                    <>
-                      <span className="sm:hidden">Reschedule</span>
-                      <span className="hidden sm:inline">Reschedule Call</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="sm:hidden">Call</span>
-                      <span className="hidden sm:inline">Schedule Call</span>
-                    </>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{request.scheduledCallDate ? 'Reschedule the call with organizer' : 'Schedule a call with organizer'}</p>
-              </TooltipContent>
-            </Tooltip>
 
             <Button
               size="sm"

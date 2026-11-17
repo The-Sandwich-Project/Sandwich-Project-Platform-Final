@@ -44,7 +44,6 @@ import {
   ResourceRequirementsSection,
   EventScheduleSection,
   DeliverySection,
-  AttendeeSection,
   NotesSection,
   InstructionsSection,
   StatusToolkitSection,
@@ -1406,15 +1405,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
             </div>
           </div>
 
-          {/* Workflow Guidance */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-blue-900 font-medium">Lifecycle workflow guidance</p>
-            <p className="text-sm text-blue-800 mt-1">
-              Save anytime as details come in. To move to <span className="font-semibold">Scheduled</span>, only an event date is required.
-              All other details can be completed later.
-            </p>
-          </div>
-
           {/* Van-possibly confirmation panel.
               Surfaces when the event was previously flagged "possibly needs a van"
               from the in-process card. All three choices just mutate local form
@@ -1545,19 +1535,12 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 isComplete={sectionStatus.sandwiches}
               />
 
-              {/* Attendees */}
-              <AttendeeSection
-                formData={formData as EventFormData}
-                setFormData={setFormData}
-                attendeeMode={attendeeMode}
-                setAttendeeMode={setAttendeeMode}
-              />
-
-              {/* Delivery */}
+              {/* Delivery — destination picker only shows once scheduled/completed */}
               <DeliverySection
                 formData={formData as EventFormData}
                 setFormData={setFormData}
                 eventRequestId={eventRequest?.id}
+                showDestination={['scheduled', 'rescheduled', 'completed'].includes(formData.status)}
               />
 
               {/* Refrigeration */}

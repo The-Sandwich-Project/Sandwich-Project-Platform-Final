@@ -166,7 +166,7 @@ export class EmailNotificationService {
                 <div class="footer">
                   <p>This notification was sent because you were mentioned in a chat message.</p>
                   <p>The Sandwich Project - Building community through food assistance</p>
-                  <p style="font-size: 11px; color: #888;">To unsubscribe from these emails, please contact us at <a href="mailto:katie@thesandwichproject.org" style="color: #236383;">katie@thesandwichproject.org</a> or reply STOP.</p>
+                  <p style="font-size: 11px; color: #888;">To unsubscribe from these emails, please contact us at <a href="mailto:katie@thesandwichproject.org" style="color: #236383;">katie@thesandwichproject.org</a>.</p>
                 </div>
               </div>
             </div>
@@ -187,7 +187,7 @@ Join the conversation: ${this.getChatUrl(notification.channel)}
 ---
 The Sandwich Project - Building community through food assistance
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
         `.trim(),
       };
 
@@ -335,7 +335,7 @@ View event details: ${eventUrl}
 ---
 The Sandwich Project - Fighting food insecurity one sandwich at a time
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
         `.trim(),
       };
 
@@ -496,7 +496,7 @@ Thank you for your commitment to fighting food insecurity!
 ---
 The Sandwich Project - Fighting food insecurity one sandwich at a time
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
         `.trim(),
       };
 
@@ -688,7 +688,7 @@ View Holding Zone: ${holdingZoneUrl}
 ---
 The Sandwich Project - Fighting food insecurity one sandwich at a time
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
           `.trim(),
         };
 
@@ -963,7 +963,7 @@ View Holding Zone: ${holdingZoneUrl}
 ---
 The Sandwich Project - Fighting food insecurity one sandwich at a time
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
         `.trim(),
       };
 
@@ -1248,7 +1248,7 @@ View event details and respond: ${eventUrl}
 ---
 The Sandwich Project - Fighting food insecurity one sandwich at a time
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
           `.trim(),
         };
 
@@ -1504,7 +1504,7 @@ Review event: ${eventUrl}
 ---
 The Sandwich Project - Fighting food insecurity one sandwich at a time
 
-To unsubscribe from these emails, please contact us at katie@thesandwichproject.org or reply STOP.
+To unsubscribe from these emails, please contact us at katie@thesandwichproject.org.
         `.trim(),
       };
 
