@@ -19,6 +19,9 @@ import { logger } from '../utils/production-safe-logger';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getAppBaseUrl } from '../config/constants';
 import { getUserMetadata, getCheckInReminderPreferences } from '@shared/types';
+import type { CheckInReminderPreferences, DefaultReminderRule } from '@shared/types';
+import { getLastContactTimestamp } from '@shared/contact-age';
+import { estimateStateFromFields } from '@shared/sandwich-estimate';
 import { isScheduledOrRescheduled, STATUS_DEFINITIONS, type EventStatus } from '../../shared/event-status-workflow';
 import { sendTSPFollowupReminderSMS } from '../sms-service';
 import {
@@ -62,11 +65,38 @@ function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
 }
 
+/** Last contact: structured log first, then the legacy lastContactAttempt field. */
 function lastContactDate(event: ReminderEvent): Date | null {
-  const log = event.contactAttemptsLog as Array<{ timestamp: string }> | null;
-  if (!log || log.length === 0) return null;
-  const latest = log.reduce((max, e) => (e.timestamp > max ? e.timestamp : max), log[0].timestamp);
-  return new Date(latest);
+  return getLastContactTimestamp(event as any);
+}
+
+/** Today's calendar date in Eastern, as a UTC-midnight timestamp. */
+function easternTodayUtcMs(now: Date = new Date()): number {
+  const ymd = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now); // YYYY-MM-DD
+  const [y, m, d] = ymd.split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+/**
+ * Whole calendar days from today (Eastern) until an event date. Event dates
+ * are date-only values stored as UTC midnight, so use their UTC date parts.
+ * 0 = today, 1 = tomorrow, negative = past.
+ */
+function calendarDaysUntil(date: Date | string | null | undefined): number | null {
+  if (!date) return null;
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return null;
+  const eventDay = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return Math.round((eventDay - easternTodayUtcMs()) / MS_PER_DAY);
+}
+
+/** "today" / "tomorrow" / "in 5 days" */
+function whenPhrase(days: number): string {
+  if (days <= 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  return `in ${days} days`;
 }
 
 function formatEventDate(d: Date | string | null | undefined): string {
@@ -83,12 +113,12 @@ function missingEventInfo(event: ReminderEvent): string[] {
   const missing: string[] = [];
   if (!event.eventStartTime) missing.push('the event time');
   if (!event.eventAddress) missing.push('the address');
-  const hasCount =
-    (event.estimatedSandwichCount ?? 0) > 0 ||
-    (event.estimatedSandwichCountMin ?? 0) > 0;
+  // Normalize with the shared helper: handles JSON-string sandwichTypes,
+  // ranges, and the legacy estimatedSandwichRangeType field.
+  const estimate = estimateStateFromFields(event as any);
+  const hasCount = !!estimate.total || estimate.lines.some(l => l.amount);
   if (!hasCount) missing.push('the sandwich count');
-  const types = event.sandwichTypes as any[] | null;
-  if (!types || types.length === 0) missing.push('the sandwich types');
+  if (estimate.lines.length === 0) missing.push('the sandwich types');
   return missing;
 }
 
@@ -136,20 +166,20 @@ export function buildReminderMessage(ruleType: string, thresholdDays: number, ev
     }
 
     case REMINDER_RULE_TYPES.DATE_APPROACHING_INPROCESS: {
-      const days = wholeDays(new Date(event.desiredEventDate!).getTime() - now);
+      const days = Math.max(0, calendarDaysUntil(event.desiredEventDate) ?? 0);
       const missing = missingEventInfo(event);
       const missingLine = missing.length
         ? ` For reference, ${joinList(missing)} ${missing.length === 1 ? "hasn't" : "haven't"} been recorded yet.`
         : '';
       return {
-        subject: `${org}'s event is coming up in ${plural(days, 'day')}`,
-        intro: `${org}'s requested date is ${plural(days, 'day')} from now (${formatEventDate(event.desiredEventDate)}), and it's still set to In Process in the app. Has anything new come in that would let you schedule it, or should it move to Stalled, Declined, or Cancelled?${missingLine} Here's their contact info in case it's useful:`,
-        short: `requested date in ${plural(days, 'day')}, still In Process`,
+        subject: `${org}'s event is coming up ${whenPhrase(days)}`,
+        intro: `${org}'s requested date is ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `${plural(days, 'day')} from now`} (${formatEventDate(event.desiredEventDate)}), and it's still set to In Process in the app. Has anything new come in that would let you schedule it, or should it move to Stalled, Declined, or Cancelled?${missingLine} Here's their contact info in case it's useful:`,
+        short: `requested date ${whenPhrase(days)}, still In Process`,
       };
     }
 
     case REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED: {
-      const days = wholeDays(new Date(event.scheduledEventDate!).getTime() - now);
+      const days = Math.max(0, calendarDaysUntil(event.scheduledEventDate) ?? 0);
       const missing = missingEventInfo(event);
       const sentences: string[] = [];
       if (missing.length) {
@@ -163,9 +193,9 @@ export function buildReminderMessage(ruleType: string, thresholdDays: number, ev
       const shortBits = [...missing.map(m => m.replace(/^the /, ''))];
       if (!event.addedToOfficialSheet) shortBits.push('planning sheet');
       return {
-        subject: `${org}'s event is coming up in ${plural(days, 'day')} and is missing some information`,
+        subject: `${org}'s event is coming up ${whenPhrase(days)} and is missing some information`,
         intro: `${sentences.join(' ')} Here's the contact's info in case you need to reach out for anything:`,
-        short: `coming up in ${plural(days, 'day')}, missing ${joinList(shortBits)}`,
+        short: `coming up ${whenPhrase(days)}, missing ${joinList(shortBits)}`,
       };
     }
 
@@ -234,19 +264,10 @@ function evaluateRuleCondition(
     case REMINDER_RULE_TYPES.NO_CONTACT: {
       // Only applies to in_process events
       if (event.status !== 'in_process') return false;
-      const contactLog = event.contactAttemptsLog as Array<{ timestamp: string }> | null;
-      if (!contactLog || contactLog.length === 0) {
-        // Never contacted: count from when the request came in
-        const created = event.createdAt ? new Date(event.createdAt) : null;
-        if (!created) return true;
-        return (now.getTime() - created.getTime()) / msPerDay >= thresholdDays;
-      }
-      // Find the most recent contact attempt
-      const lastAttempt = contactLog.reduce((latest: string, entry: { timestamp: string }) => {
-        return entry.timestamp > latest ? entry.timestamp : latest;
-      }, contactLog[0].timestamp);
-      const daysSinceContact = (now.getTime() - new Date(lastAttempt).getTime()) / msPerDay;
-      return daysSinceContact >= thresholdDays;
+      // Last contact (log or legacy field); never contacted counts from creation
+      const since = lastContactDate(event) ?? (event.createdAt ? new Date(event.createdAt) : null);
+      if (!since) return true;
+      return (now.getTime() - since.getTime()) / msPerDay >= thresholdDays;
     }
 
     case REMINDER_RULE_TYPES.STALE_EVENT: {
@@ -261,20 +282,18 @@ function evaluateRuleCondition(
     case REMINDER_RULE_TYPES.DATE_APPROACHING_INPROCESS: {
       // Only applies to in_process events with a desired date
       if (event.status !== 'in_process') return false;
-      const desiredDate = event.desiredEventDate ? new Date(event.desiredEventDate) : null;
-      if (!desiredDate) return false;
-      const daysUntilDate = (desiredDate.getTime() - now.getTime()) / msPerDay;
-      return daysUntilDate <= thresholdDays && daysUntilDate >= 0;
+      // Calendar days (Eastern), inclusive: today counts as 0
+      const daysUntilDate = calendarDaysUntil(event.desiredEventDate);
+      if (daysUntilDate === null) return false;
+      return daysUntilDate >= 0 && daysUntilDate <= thresholdDays;
     }
 
     case REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED: {
       // Scheduled events coming up that are still missing critical info
       // (time, address, sandwich count/types) or aren't on the planning sheet.
       if (!isScheduledOrRescheduled(event.status)) return false;
-      const scheduledDate = event.scheduledEventDate ? new Date(event.scheduledEventDate) : null;
-      if (!scheduledDate) return false;
-      const daysUntilDate = (scheduledDate.getTime() - now.getTime()) / msPerDay;
-      if (daysUntilDate > thresholdDays || daysUntilDate < 0) return false;
+      const daysUntilDate = calendarDaysUntil(event.scheduledEventDate);
+      if (daysUntilDate === null || daysUntilDate < 0 || daysUntilDate > thresholdDays) return false;
       return missingEventInfo(event).length > 0 || !event.addedToOfficialSheet;
     }
 
@@ -364,6 +383,24 @@ async function sendReminderSMS(
   }
 }
 
+/** Statuses where an assigned TSP contact gets reminders. */
+const REMINDER_STATUSES = ['new', 'in_process', 'scheduled', 'rescheduled', 'stalled'];
+
+function isAssignedTo(event: { tspContact?: string | null; tspContactAssigned?: string | null }, userId: string): boolean {
+  return event.tspContact === userId || event.tspContactAssigned === userId;
+}
+
+/**
+ * The rules that apply to one event for this user. An explicitly saved
+ * corporate rule set is used for corporate events even if every rule in it
+ * is off (that means "no reminders for corporate events"); only when no
+ * corporate set exists do corporate events fall back to the standard rules.
+ */
+function rulesForEvent(prefs: CheckInReminderPreferences, isCorporate: boolean): DefaultReminderRule[] {
+  const set = isCorporate && Array.isArray(prefs.corporateRules) ? prefs.corporateRules : prefs.rules;
+  return set.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType));
+}
+
 /** Days an event in the first-run summary waits before it can send its own reminder. */
 const BACKLOG_GRACE_DAYS = 7;
 
@@ -383,7 +420,12 @@ async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<voi
     .from(eventCheckInReminders)
     .where(and(eq(eventCheckInReminders.userId, user.id), eq(eventCheckInReminders.enabled, true)));
 
-  const condRows = rows.filter(r => isConditionBasedRule(r.ruleType) && !RETIRED_RULE_TYPES.has(r.ruleType));
+  // Condition rules, plus general check-ins that are already due (otherwise
+  // they'd still go out individually in this same run).
+  const nowForDue = new Date();
+  const condRows = rows.filter(r =>
+    !RETIRED_RULE_TYPES.has(r.ruleType) &&
+    (isConditionBasedRule(r.ruleType) || (!!r.nextDueAt && r.nextDueAt <= nowForDue)));
   const eventIds = [...new Set(condRows.map(r => r.eventRequestId))];
   const events = eventIds.length
     ? await db.select().from(eventRequests).where(inArray(eventRequests.id, eventIds))
@@ -423,6 +465,7 @@ async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<voi
   for (const row of condRows) {
     const event = eventById.get(row.eventRequestId);
     if (!event || event.deletedAt) continue;
+    if (!isAssignedTo(event, user.id)) continue;
     if (isSnoozed(event)) continue;
     if (!evaluateRuleCondition(row.ruleType, row.thresholdDays || 7, event)) continue;
     const label = buildReminderMessage(row.ruleType, row.thresholdDays || 7, event).short;
@@ -537,81 +580,121 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * For every user (own settings, or org defaults if unset), auto-provision per-event
- * rows on any assigned events that don't have rows yet.  This runs once
- * per cron cycle and is idempotent — if rows already exist, it skips.
+ * Hourly sync of every user's per-event reminder rows with their CURRENT
+ * settings and assignments (settings are global; rows are just the
+ * per-event bookkeeping the scheduler needs):
+ *  - inactive users: all rows switched off
+ *  - events they're no longer assigned to, or that left an active status: off
+ *  - rules not in their settings (or retired): off
+ *  - rules in their settings: on, with current threshold/frequency/channel
+ *  - missing rows: created
+ * Because this runs every hour against fresh settings, rows written from a
+ * stale read, older thresholds, or pre-existing per-event customizations
+ * converge to the user's settings on the next run.
  */
-async function applyGlobalDefaultsToNewEvents(): Promise<number> {
-  let provisioned = 0;
+async function syncReminderRows(): Promise<number> {
+  let changed = 0;
   try {
-    // Find users who have global defaults configured
-    const allUsers = await db.select().from(users);
-    const activeStatuses = ['new', 'in_process', 'scheduled', 'stalled'];
+    const allUsers = await db.select({ id: users.id }).from(users);
 
-    for (const user of allUsers) {
-      // Deactivated accounts keep old assignments; don't send them reminders.
-      if (user.isActive === false) continue;
-      // Users who never saved their own settings get the org defaults.
+    for (const { id: userId } of allUsers) {
+      // Re-read each user right before syncing them, to keep the window for
+      // a concurrent settings save as small as possible.
+      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user) continue;
+
+      const existing = await db
+        .select()
+        .from(eventCheckInReminders)
+        .where(eq(eventCheckInReminders.userId, user.id));
+
+      // Deactivated accounts keep old assignments; switch everything off.
+      if (user.isActive === false) {
+        const enabledIds = existing.filter(r => r.enabled).map(r => r.id);
+        if (enabledIds.length) {
+          await db
+            .update(eventCheckInReminders)
+            .set({ enabled: false, updatedAt: new Date() })
+            .where(inArray(eventCheckInReminders.id, enabledIds));
+          changed += enabledIds.length;
+        }
+        continue;
+      }
+
       const prefs = getCheckInReminderPreferences(user);
 
-      const enabledRules = prefs.rules.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType));
-      const enabledCorpRules = prefs.corporateRules?.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType)) ?? [];
-      if (enabledRules.length === 0 && enabledCorpRules.length === 0) continue;
-
-      // Find events this user is TSP contact for (either tspContactAssigned or tspContact)
       const assignedEvents = await db
-        .select({ id: eventRequests.id, status: eventRequests.status, isCorporatePriority: eventRequests.isCorporatePriority })
+        .select({ id: eventRequests.id, isCorporatePriority: eventRequests.isCorporatePriority })
         .from(eventRequests)
         .where(
           and(
-            or(
-              eq(eventRequests.tspContactAssigned, user.id),
-              eq(eventRequests.tspContact, user.id),
-            ),
-            sql`${eventRequests.status} IN (${sql.join(activeStatuses.map(s => sql`${s}`), sql`, `)})`,
+            or(eq(eventRequests.tspContactAssigned, user.id), eq(eventRequests.tspContact, user.id)),
+            sql`${eventRequests.status} IN (${sql.join(REMINDER_STATUSES.map(st => sql`${st}`), sql`, `)})`,
             sql`${eventRequests.deletedAt} IS NULL`,
           ),
         );
 
-      for (const event of assignedEvents) {
-        // Check if this event already has any rules for this user
-        const [existingRule] = await db
-          .select({ id: eventCheckInReminders.id })
-          .from(eventCheckInReminders)
-          .where(
-            and(
-              eq(eventCheckInReminders.eventRequestId, event.id),
-              eq(eventCheckInReminders.userId, user.id),
-            ),
-          )
-          .limit(1);
-
-        if (existingRule) continue; // Already has per-event rules
-
-        // Determine which rule set to use
-        const isCorp = event.isCorporatePriority === true;
-        const rulesToApply = isCorp && enabledCorpRules.length > 0
-          ? enabledCorpRules
-          : enabledRules;
-
-        // Create per-event rows from defaults
-        for (const rule of rulesToApply) {
-          const isCondBased = rule.ruleType !== 'general_checkin';
-          await db.insert(eventCheckInReminders).values({
-            eventRequestId: event.id,
-            userId: user.id,
-            ruleType: rule.ruleType,
-            enabled: true,
-            thresholdDays: rule.thresholdDays,
-            frequency: isCondBased ? 'daily' : rule.frequency,
-            channel: prefs.defaultChannel,
-            nextDueAt: calculateNextDue(isCondBased ? 'daily' : rule.frequency as ReminderFrequency),
-          }).onConflictDoNothing(); // unique index prevents duplicates
-          provisioned++;
+      // Desired (event, ruleType) -> rule
+      const desired = new Map<string, { eventId: number; rule: DefaultReminderRule }>();
+      for (const ev of assignedEvents) {
+        for (const rule of rulesForEvent(prefs, ev.isCorporatePriority === true)) {
+          desired.set(`${ev.id}:${rule.ruleType}`, { eventId: ev.id, rule });
         }
       }
 
-      // First run for this user: roll anything already overdue into one summary.
+      // Reconcile existing rows
+      const seen = new Set<string>();
+      for (const row of existing) {
+        const key = `${row.eventRequestId}:${row.ruleType}`;
+        const want = desired.get(key);
+        if (!want) {
+          if (row.enabled) {
+            await db
+              .update(eventCheckInReminders)
+              .set({ enabled: false, updatedAt: new Date() })
+              .where(eq(eventCheckInReminders.id, row.id));
+            changed++;
+          }
+          continue;
+        }
+        seen.add(key);
+        const patch: Partial<typeof eventCheckInReminders.$inferInsert> = {};
+        if (!row.enabled) {
+          patch.enabled = true;
+          patch.nextDueAt = calculateNextDue('daily');
+        }
+        if (row.thresholdDays !== want.rule.thresholdDays) patch.thresholdDays = want.rule.thresholdDays;
+        if (row.frequency !== want.rule.frequency) patch.frequency = want.rule.frequency;
+        if (row.channel !== prefs.defaultChannel) patch.channel = prefs.defaultChannel;
+        if (Object.keys(patch).length) {
+          await db
+            .update(eventCheckInReminders)
+            .set({ ...patch, updatedAt: new Date() })
+            .where(eq(eventCheckInReminders.id, row.id));
+          changed++;
+        }
+      }
+
+      // Create missing rows
+      for (const [key, { eventId, rule }] of desired) {
+        if (seen.has(key)) continue;
+        const isCondBased = isConditionBasedRule(rule.ruleType);
+        await db.insert(eventCheckInReminders).values({
+          eventRequestId: eventId,
+          userId: user.id,
+          ruleType: rule.ruleType,
+          enabled: true,
+          thresholdDays: rule.thresholdDays,
+          // Configured frequency = how often to repeat after a reminder goes
+          // out. Conditions are still checked daily (see processor).
+          frequency: rule.frequency,
+          channel: prefs.defaultChannel,
+          nextDueAt: calculateNextDue(isCondBased ? CONDITION_CHECK_FREQUENCY : rule.frequency as ReminderFrequency),
+        }).onConflictDoNothing(); // unique index prevents duplicates
+        changed++;
+      }
+
+      // First run for this user: roll anything already triggering into one summary.
       try {
         await baselineUserBacklog(user);
       } catch (error) {
@@ -619,9 +702,9 @@ async function applyGlobalDefaultsToNewEvents(): Promise<number> {
       }
     }
   } catch (error) {
-    logger.error('[CheckInReminders] Error applying global defaults:', error);
+    logger.error('[CheckInReminders] Error syncing reminder rows:', error);
   }
-  return provisioned;
+  return changed;
 }
 
 export async function processCheckInReminders(): Promise<{
@@ -636,9 +719,9 @@ export async function processCheckInReminders(): Promise<{
 
   try {
     // Auto-provision per-event rules from global defaults for new events
-    const provisioned = await applyGlobalDefaultsToNewEvents();
-    if (provisioned > 0) {
-      logger.info(`[CheckInReminders] Provisioned ${provisioned} rules from global defaults`);
+    const synced = await syncReminderRows();
+    if (synced > 0) {
+      logger.info(`[CheckInReminders] Synced ${synced} reminder rows with user settings`);
     }
 
     // Get all enabled reminders that are due
@@ -765,6 +848,16 @@ export async function processCheckInReminders(): Promise<{
           }
         }
 
+        // No longer this user's event (reassigned)? Switch off; never send a
+        // group's contact details to a former contact.
+        if (!isAssignedTo(event, reminder.userId)) {
+          await db
+            .update(eventCheckInReminders)
+            .set({ enabled: false, updatedAt: new Date() })
+            .where(eq(eventCheckInReminders.id, reminder.id));
+          continue;
+        }
+
         // Retired reminder types: switch the row off instead of sending.
         if (RETIRED_RULE_TYPES.has(reminder.ruleType)) {
           await db
@@ -803,6 +896,15 @@ export async function processCheckInReminders(): Promise<{
 
         if (!user) {
           errors++;
+          continue;
+        }
+
+        // Deactivated account: switch off instead of sending.
+        if (user.isActive === false) {
+          await db
+            .update(eventCheckInReminders)
+            .set({ enabled: false, updatedAt: new Date() })
+            .where(eq(eventCheckInReminders.id, reminder.id));
           continue;
         }
 
@@ -851,12 +953,14 @@ export async function processCheckInReminders(): Promise<{
           sent++;
         }
 
-        // Update lastSentAt and calculate next due date
-        // Condition-based rules use a cooldown after sending to avoid spam;
-        // frequency-based rules (general_checkin) use their configured frequency
-        const nextDue = isConditionBasedRule(reminder.ruleType)
-          ? calculateNextDue(CONDITION_COOLDOWN_FREQUENCY)
-          : calculateNextDue(reminder.frequency as ReminderFrequency);
+        // Update lastSentAt and calculate next due date. Repeat at the user's
+        // configured frequency (e.g. weekly). Legacy condition rows stored
+        // 'daily' as their frequency; give those the old cooldown instead of
+        // repeating every day.
+        const repeat = isConditionBasedRule(reminder.ruleType) && reminder.frequency === 'daily'
+          ? CONDITION_COOLDOWN_FREQUENCY
+          : (reminder.frequency as ReminderFrequency);
+        const nextDue = calculateNextDue(repeat);
         await db
           .update(eventCheckInReminders)
           .set({

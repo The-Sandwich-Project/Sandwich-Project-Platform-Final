@@ -51,6 +51,11 @@ function calendarDaysFromToday(t: number, now: number): number {
   return Math.round((b.getTime() - a.getTime()) / DAY_MS);
 }
 
+function requestedDateTime(request: any): number | null {
+  const d = parseEventDate(request?.desiredEventDate ?? null);
+  return d ? d.getTime() : null;
+}
+
 function eventDateTime(request: any): number | null {
   // Event dates are date-only values stored as UTC midnight; parse as the
   // intended calendar day (local noon) so Eastern doesn't shift it a day back.
@@ -72,7 +77,8 @@ export function applyInProcessFilters<T>(requests: T[], f: InProcessFilters): T[
       if (updated !== null && now - updated < f.noUpdateDays * DAY_MS) return false;
     }
     if (f.dateWithinDays !== null) {
-      const d = eventDateTime(r);
+      // "Requested date" = the date the group asked for, not an old scheduled date
+      const d = requestedDateTime(r);
       if (d === null) return false;
       // Compare calendar days (today = 0), inclusive of day N; not rolling hours.
       const diff = calendarDaysFromToday(d, now);
