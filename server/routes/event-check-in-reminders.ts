@@ -4,6 +4,7 @@ import { eventCheckInReminders, eventReminderSnoozes, eventRequests, REMINDER_RU
 import { eq, and } from 'drizzle-orm';
 import { logger } from '../utils/production-safe-logger';
 import { calculateNextDue, ReminderFrequency } from '../utils/reminder-scheduling';
+import { processCheckInReminders } from '../services/check-in-reminder-service';
 
 const router = express.Router();
 
@@ -13,6 +14,42 @@ const VALID_CHANNELS = ['email', 'sms', 'both'];
 
 // GET /api/event-check-in-reminders/:eventRequestId
 // Get ALL reminder rules for a specific event request (for current user)
+/**
+ * GET /dry-run (admins only)
+ * Runs the reminder job in dry-run mode right now and returns everything
+ * that WOULD go out: summaries and individual reminders, per person, with
+ * the email/phone each would use. Sends nothing and doesn't mark anything as
+ * sent, so the real first run is unaffected. Must be registered before
+ * '/:eventRequestId' so that route doesn't catch it.
+ */
+router.get('/dry-run', async (req: any, res) => {
+  const user = req.user;
+  if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+    return res.status(403).json({ message: 'Admins only' });
+  }
+  try {
+    const result = await processCheckInReminders({ dryRun: true });
+    const summaries = result.plan.filter(e => e.kind === 'summary');
+    const reminders = result.plan.filter(e => e.kind === 'reminder');
+    res.json({
+      dryRun: true,
+      note: 'Nothing was sent. This is what the reminder job would send if it ran now.',
+      totals: {
+        people: new Set(result.plan.map(e => e.userId)).size,
+        summaries: summaries.length,
+        reminders: reminders.length,
+        emails: result.plan.filter(e => e.wouldEmail).length,
+        texts: result.plan.filter(e => e.wouldText).length,
+      },
+      summaries,
+      reminders,
+    });
+  } catch (error) {
+    logger.error('[CheckInReminders] Dry run failed:', error);
+    res.status(500).json({ message: 'Dry run failed' });
+  }
+});
+
 router.get('/:eventRequestId', async (req: any, res) => {
   try {
     const eventRequestId = parseInt(req.params.eventRequestId);

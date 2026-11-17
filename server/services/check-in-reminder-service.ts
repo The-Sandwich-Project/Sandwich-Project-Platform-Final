@@ -401,6 +401,47 @@ function rulesForEvent(prefs: CheckInReminderPreferences, isCorporate: boolean):
   return set.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType));
 }
 
+/**
+ * Dry run: work out exactly who would get what, log it, and send NOTHING.
+ * Turned on with CHECK_IN_REMINDERS_DRY_RUN=true (the hourly job then runs in
+ * any environment, including dev), or on demand via the admin dry-run endpoint.
+ * A dry run never writes anything that would change the real first run: no
+ * notifications, no summary marker, no grace periods, no sent timestamps.
+ * (Row sync still runs; it's bookkeeping and idempotent.)
+ */
+export function isCheckInReminderDryRun(): boolean {
+  return process.env.CHECK_IN_REMINDERS_DRY_RUN === 'true';
+}
+
+export type DryRunEntry = {
+  kind: 'summary' | 'reminder';
+  userId: string;
+  userName: string;
+  /** Where it would go: email and/or SMS (bell is always included) */
+  wouldEmail: string | null;
+  wouldText: string | null;
+  subject: string;
+  /** Reminder: one event. Summary: every event in it. */
+  events: { id: number; organization: string; detail: string }[];
+};
+
+type RunContext = {
+  dryRun: boolean;
+  plan: DryRunEntry[];
+  /** Rows the (dry-run) summary covered, so the send loop doesn't list them twice */
+  summarizedRowIds: Set<number>;
+};
+
+function plannedChannels(user: typeof users.$inferSelect, channel: string): { wouldEmail: string | null; wouldText: string | null } {
+  const email = user.preferredEmail || user.email || null;
+  const consent = getUserMetadata(user).smsConsent;
+  const phone = consent?.enabled && consent.phoneNumber ? consent.phoneNumber : null;
+  return {
+    wouldEmail: channel === 'email' || channel === 'both' ? email : null,
+    wouldText: channel === 'sms' || channel === 'both' ? phone : null,
+  };
+}
+
 /** Days an event in the first-run summary waits before it can send its own reminder. */
 const BACKLOG_GRACE_DAYS = 7;
 
@@ -411,7 +452,7 @@ const BACKLOG_GRACE_DAYS = 7;
  * problems that arise later fire individually. Runs again after the user
  * saves new settings (the baseline is cleared then).
  */
-async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<void> {
+async function baselineUserBacklog(user: typeof users.$inferSelect, ctx: RunContext): Promise<void> {
   const metadata = getUserMetadata(user);
   if (metadata.checkInRemindersBaselinedAt) return;
 
@@ -470,10 +511,36 @@ async function baselineUserBacklog(user: typeof users.$inferSelect): Promise<voi
     if (!evaluateRuleCondition(row.ruleType, row.thresholdDays || 7, event)) continue;
     const label = buildReminderMessage(row.ruleType, row.thresholdDays || 7, event).short;
     backlog.set(event.id, [...(backlog.get(event.id) || []), label]);
+    if (ctx.dryRun) {
+      ctx.summarizedRowIds.add(row.id);
+      continue;
+    }
     await db
       .update(eventCheckInReminders)
       .set({ nextDueAt: graceUntil, updatedAt: new Date() })
       .where(eq(eventCheckInReminders.id, row.id));
+  }
+
+  if (ctx.dryRun) {
+    // Record what the summary would be; write nothing, so the real first run
+    // still sends it.
+    if (backlog.size > 0) {
+      const entry: DryRunEntry = {
+        kind: 'summary',
+        userId: user.id,
+        userName: user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id,
+        ...plannedChannels(user, getCheckInReminderPreferences(user).defaultChannel),
+        subject: 'A quick look at your events',
+        events: [...backlog.entries()].map(([id, labels]) => ({
+          id,
+          organization: eventById.get(id)?.organizationName || 'Unknown Organization',
+          detail: labels.join(', '),
+        })),
+      };
+      ctx.plan.push(entry);
+      logger.info(`[CheckInReminders][DRY RUN] would send summary to ${entry.userName}: ${entry.events.length} events`);
+    }
+    return;
   }
 
   if (backlog.size > 0) {
@@ -592,7 +659,7 @@ function escapeHtml(s: string): string {
  * stale read, older thresholds, or pre-existing per-event customizations
  * converge to the user's settings on the next run.
  */
-async function syncReminderRows(): Promise<number> {
+async function syncReminderRows(ctx: RunContext): Promise<number> {
   let changed = 0;
   try {
     const allUsers = await db.select({ id: users.id }).from(users);
@@ -696,7 +763,7 @@ async function syncReminderRows(): Promise<number> {
 
       // First run for this user: roll anything already triggering into one summary.
       try {
-        await baselineUserBacklog(user);
+        await baselineUserBacklog(user, ctx);
       } catch (error) {
         logger.error(`[CheckInReminders] Backlog summary failed for user ${user.id}:`, error);
       }
@@ -707,19 +774,30 @@ async function syncReminderRows(): Promise<number> {
   return changed;
 }
 
-export async function processCheckInReminders(): Promise<{
+export async function processCheckInReminders(options: { dryRun?: boolean } = {}): Promise<{
   processed: number;
   sent: number;
   errors: number;
+  dryRun: boolean;
+  /** Only filled in a dry run: everything that would have gone out */
+  plan: DryRunEntry[];
 }> {
   const now = new Date();
   let processed = 0;
   let sent = 0;
   let errors = 0;
+  const ctx: RunContext = {
+    dryRun: options.dryRun ?? isCheckInReminderDryRun(),
+    plan: [],
+    summarizedRowIds: new Set(),
+  };
+  if (ctx.dryRun) {
+    logger.info('[CheckInReminders][DRY RUN] Starting: nothing will be sent or marked as sent');
+  }
 
   try {
-    // Auto-provision per-event rules from global defaults for new events
-    const synced = await syncReminderRows();
+    // Bring per-event rows in line with each user's settings and assignments
+    const synced = await syncReminderRows(ctx);
     if (synced > 0) {
       logger.info(`[CheckInReminders] Synced ${synced} reminder rows with user settings`);
     }
@@ -736,7 +814,7 @@ export async function processCheckInReminders(): Promise<{
       );
 
     if (dueReminders.length === 0) {
-      return { processed: 0, sent: 0, errors: 0 };
+      return { processed: 0, sent: 0, errors: 0, dryRun: ctx.dryRun, plan: ctx.plan };
     }
 
     logger.info(`[CheckInReminders] Processing ${dueReminders.length} due reminders`);
@@ -911,6 +989,22 @@ export async function processCheckInReminders(): Promise<{
         const userName = user.displayName || user.firstName || 'there';
         const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
 
+        if (ctx.dryRun) {
+          // Already covered by this run's (dry-run) summary? Don't list twice.
+          if (ctx.summarizedRowIds.has(reminder.id)) continue;
+          const entry: DryRunEntry = {
+            kind: 'reminder',
+            userId: user.id,
+            userName: user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id,
+            ...plannedChannels(user, reminder.channel),
+            subject: msg.subject,
+            events: [{ id: event.id, organization: event.organizationName || 'Unknown Organization', detail: msg.short }],
+          };
+          ctx.plan.push(entry);
+          logger.info(`[CheckInReminders][DRY RUN] would send to ${entry.userName}: ${msg.subject}`);
+          continue; // no bell, no email/SMS, no sent timestamp
+        }
+
         // Always record the reminder in the in-app notification bell first,
         // so it exists even if email/SMS isn't configured or fails to send.
         try {
@@ -982,5 +1076,5 @@ export async function processCheckInReminders(): Promise<{
     logger.error('[CheckInReminders] Failed to process reminders:', error);
   }
 
-  return { processed, sent, errors };
+  return { processed, sent, errors, dryRun: ctx.dryRun, plan: ctx.plan };
 }
