@@ -705,54 +705,6 @@ export const useEventMutations = () => {
     },
   });
 
-  // Corporate priority toggle mutation
-  const toggleCorporatePriorityMutation = useMutation({
-    mutationFn: ({ id, isCorporatePriority, coreTeamMemberNotes }: {
-      id: number;
-      isCorporatePriority: boolean;
-      coreTeamMemberNotes?: string;
-    }) => {
-      logger.log('=== CORPORATE PRIORITY TOGGLE MUTATION ===');
-      logger.log('Event ID:', id);
-      logger.log('Corporate Priority:', isCorporatePriority);
-      return apiRequest('PATCH', `/api/event-requests/${id}/corporate-priority`, {
-        isCorporatePriority,
-        coreTeamMemberNotes
-      });
-    },
-    onSuccess: async (updatedEvent, variables) => {
-      logger.log('=== CORPORATE PRIORITY TOGGLE SUCCESS ===');
-      logger.log('Updated event:', updatedEvent);
-
-      const action = variables.isCorporatePriority ? 'marked as' : 'removed from';
-      toast({
-        title: `Event ${action} Corporate Priority`,
-        description: variables.isCorporatePriority
-          ? 'Christine and Katie have been notified. This event requires immediate attention and core team member assignment.'
-          : 'This event is no longer marked as corporate priority.',
-      });
-
-      await applyPatchResponseToCache(queryClient, updatedEvent, {
-        previousStatus: selectedEventRequest?.status,
-        touchedFields: ['isCorporatePriority', 'coreTeamMemberNotes'],
-      });
-
-      if (selectedEventRequest && selectedEventRequest.id === variables.id) {
-        setSelectedEventRequest(updatedEvent);
-      }
-    },
-    onError: (error: any) => {
-      logger.error('=== CORPORATE PRIORITY TOGGLE ERROR ===');
-      logger.error(error);
-
-      errorToast({
-        title: 'Failed to update corporate priority',
-        description: error?.data?.message || error?.message || 'There was an error updating the corporate priority status.',
-        report: { whatDoing: 'Toggle corporate priority on an event', ...eventReportContext() },
-      });
-    },
-  });
-
   return {
     deleteEventRequestMutation,
     updateEventRequestMutation,
@@ -765,6 +717,5 @@ export const useEventMutations = () => {
     rescheduleEventMutation,
     assignRecipientsMutation,
     assignTspContactMutation,
-    toggleCorporatePriorityMutation,
   };
 };

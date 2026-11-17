@@ -547,27 +547,6 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             </Tooltip>
           )}
 
-          {/* Corporate Priority Badge — outlined; lower visual weight than alert pills */}
-          {(request as any).isCorporatePriority && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className="px-2.5 py-0.5 text-sm font-medium inline-flex items-center whitespace-nowrap bg-amber-50 text-amber-700 border-amber-300"
-                >
-                  <Building className="w-3 h-3 mr-1" />
-                  Corporate
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                <div className="space-y-1">
-                  <p className="font-medium">This is a Corporate Event</p>
-                  <p className="text-sm">Requires immediate contact and core team member attendance.</p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          )}
-
           {/* Validation badges for missing intake info */}
           {(() => {
             const missingInfo = getMissingIntakeInfo(request);

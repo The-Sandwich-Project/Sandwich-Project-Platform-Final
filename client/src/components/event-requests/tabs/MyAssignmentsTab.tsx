@@ -35,7 +35,7 @@ export const MyAssignmentsTab: React.FC = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { filterRequestsByStatus } = useEventFilters();
-  const { deleteEventRequestMutation, updateEventRequestMutation, updateScheduledFieldMutation, toggleCorporatePriorityMutation, createEventRequestMutation } = useEventMutations();
+  const { deleteEventRequestMutation, updateEventRequestMutation, updateScheduledFieldMutation, createEventRequestMutation } = useEventMutations();
   const {
     handleStatusChange,
     openAssignmentDialog,
@@ -232,12 +232,6 @@ export const MyAssignmentsTab: React.FC = () => {
               setNextActionEventRequest(request);
               setNextActionMode('complete');
               openDialog('nextAction');
-            }}
-            onToggleCorporatePriority={(isCorporatePriority) => {
-              toggleCorporatePriorityMutation.mutate({
-                id: request.id,
-                isCorporatePriority
-              });
             }}
           />
         );
@@ -536,12 +530,6 @@ export const MyAssignmentsTab: React.FC = () => {
               setNextActionEventRequest(request);
               setNextActionMode('complete');
               openDialog('nextAction');
-            }}
-            onToggleCorporatePriority={(isCorporatePriority) => {
-              toggleCorporatePriorityMutation.mutate({
-                id: request.id,
-                isCorporatePriority
-              });
             }}
           />
         );

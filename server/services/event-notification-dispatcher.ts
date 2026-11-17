@@ -21,12 +21,10 @@ import {
   NOTIFICATION_TIER_CONFIG,
   shouldSendSMS,
   shouldSendEmail,
-  needsCorporate24hEscalation,
   isEventApproachingIncomplete,
   needsWeeklyContactReminder,
   shouldEscalateToAdmin,
   ContactAttemptLogEntry,
-  CorporateFollowUpProtocol,
 } from './notification-tiers';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
 
@@ -117,7 +115,6 @@ export async function sendTspAssignmentNotification(
   eventId: number,
   organizationName: string,
   eventDate: Date | string | null,
-  isCorporatePriority: boolean = false
 ): Promise<boolean> {
   const baseUrl = getAppBaseUrl();
   const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
@@ -145,9 +142,7 @@ export async function sendTspAssignmentNotification(
   }
 
   // Build SMS/email message body
-  const smsMessage = isCorporatePriority
-    ? `🏢 CORPORATE PRIORITY: You've been assigned to ${organizationName} (${dateStr}). Call today! ${eventUrl}`
-    : `🎯 New event: You're assigned to ${organizationName} (${dateStr}). ${eventUrl}`;
+  const smsMessage = `🎯 New event: You're assigned to ${organizationName} (${dateStr}). ${eventUrl}`;
 
   const phoneNumber = prefs.smsEnabled ? await getUserSMSNumber(userId) : null;
 
@@ -166,7 +161,6 @@ export async function sendTspAssignmentNotification(
           organizationName,
           dateStr,
           eventUrl,
-          isCorporatePriority
         )
       );
     }
@@ -183,7 +177,6 @@ export async function sendTspAssignmentNotification(
           organizationName,
           dateStr,
           eventUrl,
-          isCorporatePriority
         )
       );
     }
@@ -201,14 +194,11 @@ async function sendTspAssignmentEmail(
   organizationName: string,
   dateStr: string,
   eventUrl: string,
-  isCorporatePriority: boolean
 ): Promise<boolean> {
   if (!process.env.SENDGRID_API_KEY) return false;
 
   try {
-    const subject = isCorporatePriority
-      ? `🏢 CORPORATE PRIORITY: You've been assigned to ${organizationName}`
-      : `🎯 New Event Assignment: ${organizationName}`;
+    const subject = `🎯 New Event Assignment: ${organizationName}`;
 
     const msg = {
       to: email,
@@ -221,22 +211,19 @@ async function sendTspAssignmentEmail(
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: ${isCorporatePriority ? '#B8860B' : '#236383'}; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .header { background: #236383; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
             .content { background: #f9f9f9; padding: 20px; border-radius: 0 0 8px 8px; }
-            .event-box { background: white; padding: 15px; border-left: 4px solid ${isCorporatePriority ? '#B8860B' : '#236383'}; margin: 15px 0; }
-            .btn { display: inline-block; background: ${isCorporatePriority ? '#B8860B' : '#236383'}; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; }
-            ${isCorporatePriority ? '.urgent { background: #FEF3C7; border: 1px solid #F59E0B; padding: 12px; border-radius: 6px; margin: 15px 0; }' : ''}
+            .event-box { background: white; padding: 15px; border-left: 4px solid #236383; margin: 15px 0; }
+            .btn { display: inline-block; background: #236383; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="header">
-              <h1>${isCorporatePriority ? '🏢 Corporate Priority Assignment' : '🎯 New Event Assignment'}</h1>
+              <h1>🎯 New Event Assignment</h1>
             </div>
             <div class="content">
               <p>Hi ${userName}!</p>
-
-              ${isCorporatePriority ? '<div class="urgent"><strong>⚡ This is a CORPORATE PRIORITY event.</strong> Please make initial contact TODAY.</div>' : ''}
 
               <p>You've been assigned as TSP contact for:</p>
 
@@ -254,7 +241,7 @@ async function sendTspAssignmentEmail(
         </body>
         </html>
       `,
-      text: `Hi ${userName}!\n\n${isCorporatePriority ? '⚡ CORPORATE PRIORITY - Contact today!\n\n' : ''}You've been assigned to ${organizationName} (${dateStr}).\n\nView details: ${eventUrl}`,
+      text: `Hi ${userName}!\n\nYou've been assigned to ${organizationName} (${dateStr}).\n\nView details: ${eventUrl}`,
     };
 
     await sgMail.send(msg);
@@ -263,28 +250,6 @@ async function sendTspAssignmentEmail(
     logger.error('Error sending TSP assignment email:', error);
     return false;
   }
-}
-
-/**
- * Send Corporate 24-hour escalation SMS
- */
-export async function sendCorporate24hEscalationSMS(
-  userId: string,
-  eventId: number,
-  organizationName: string
-): Promise<boolean> {
-  const baseUrl = getAppBaseUrl();
-  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
-
-  const phoneNumber = await getUserSMSNumber(userId);
-  if (!phoneNumber) {
-    logger.warn(`Cannot send corporate escalation SMS: user ${userId} not opted into SMS`);
-    return false;
-  }
-
-  const message = `⚠️ URGENT: ${organizationName} (corporate) needs contact TODAY. No successful response logged yet. ${eventUrl}`;
-
-  return await sendUrgentSMS(phoneNumber, message, 'corporate_no_contact_24h');
 }
 
 /**
@@ -850,98 +815,6 @@ export async function sendBatchedStaleEventEscalation(
 // ============================================================================
 
 /**
- * Process corporate events that need 24-hour escalation SMS
- */
-export async function processCorporate24hEscalations(): Promise<{ sent: number; skipped: number }> {
-  logger.log('🏢 Processing corporate 24-hour escalations...');
-
-  const results = { sent: 0, skipped: 0 };
-
-  // Find corporate priority events in active statuses only
-  // Explicitly exclude: completed, declined, cancelled, stalled, standby, scheduled
-  const corporateEvents = await db
-    .select()
-    .from(eventRequests)
-    .where(
-      and(
-        eq(eventRequests.isCorporatePriority, true),
-        inArray(eventRequests.status, ['new', 'in_process']),
-        isNull(eventRequests.deletedAt)
-      )
-    );
-
-  for (const event of corporateEvents) {
-    const contactLog = event.contactAttemptsLog as ContactAttemptLogEntry[] | null;
-    const protocol = event.corporateFollowUpProtocol as CorporateFollowUpProtocol | null;
-
-    const needsEscalation = needsCorporate24hEscalation(
-      true,
-      event.status || 'new',
-      event.tspContactAssignedDate,
-      event.lastContactAttempt,
-      contactLog,
-      protocol
-    );
-
-    if (!needsEscalation) {
-      results.skipped++;
-      continue;
-    }
-
-    // Rate limit: Only send corporate escalation SMS once per day per event
-    // Use the corporateFollowUpProtocol to track last notification
-    const lastNotificationTime = protocol?.lastEscalationSentAt 
-      ? new Date(protocol.lastEscalationSentAt).getTime() 
-      : 0;
-    const hoursSinceLastNotification = (Date.now() - lastNotificationTime) / (1000 * 60 * 60);
-    
-    if (lastNotificationTime > 0 && hoursSinceLastNotification < 24) {
-      logger.log(`Skipping corporate escalation for ${event.organizationName} - last sent ${hoursSinceLastNotification.toFixed(1)} hours ago`);
-      results.skipped++;
-      continue;
-    }
-
-    // Determine which TSP contact to notify
-    const tspContactId = event.tspContactAssigned || event.tspContact;
-    if (!tspContactId) {
-      logger.warn(`Corporate event ${event.id} has no TSP contact assigned`);
-      results.skipped++;
-      continue;
-    }
-
-    // Skip users with suppressed event notifications (only get assignments + comments)
-    if (isNotificationSuppressed(tspContactId)) {
-      results.skipped++;
-      continue;
-    }
-
-    const success = await sendCorporate24hEscalationSMS(
-      tspContactId,
-      event.id,
-      event.organizationName || 'Unknown Organization'
-    );
-
-    if (success) {
-      // Update the protocol to track when we sent this notification
-      const updatedProtocol: CorporateFollowUpProtocol = {
-        ...(protocol || {}),
-        lastEscalationSentAt: new Date().toISOString(),
-      };
-      await db.update(eventRequests)
-        .set({ corporateFollowUpProtocol: updatedProtocol })
-        .where(eq(eventRequests.id, event.id));
-      
-      results.sent++;
-    } else {
-      results.skipped++;
-    }
-  }
-
-  logger.log(`🏢 Corporate escalations complete: ${results.sent} sent, ${results.skipped} skipped`);
-  return results;
-}
-
-/**
  * Process events approaching their date but not yet scheduled
  */
 export async function processApproachingIncompleteEvents(): Promise<{ sent: number; skipped: number }> {
@@ -1161,14 +1034,12 @@ export async function processWeeklyContactReminders(): Promise<{ sent: number; s
 
 export default {
   sendTspAssignmentNotification,
-  sendCorporate24hEscalationSMS,
   sendEventApproachingSMS,
   sendEventChangedNotification,
   sendWeeklyContactReminderEmail,
   sendStandbyFollowupEmail,
   sendStaleEventEscalation,
   sendBatchedStaleEventEscalation,
-  processCorporate24hEscalations,
   processApproachingIncompleteEvents,
   processWeeklyContactReminders,
 };

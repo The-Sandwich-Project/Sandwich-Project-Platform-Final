@@ -1249,21 +1249,6 @@ export function initializeCronJobs() {
 
   cronLogger.info('TSP contact follow-up job DISABLED (replaced by check-in reminders)');
 
-  // Corporate priority event follow-up - runs daily at 9:00 AM and 2:00 PM
-  // Sends strict follow-up reminders to TSP contacts for corporate priority events
-  // that don't have successful contact logged
-  // Cron format: minute hour day-of-month month day-of-week
-  // '0 9,14 * * *' = At 9:00 AM and 2:00 PM every day
-  const corporateFollowupJob = cron.schedule('0 9,14 * * *', async () => {
-    // DISABLED: Replaced by user-controlled per-event check-in reminders
-    cronLogger.info('Corporate follow-up job is DISABLED - replaced by user-controlled check-in reminders');
-  }, {
-    scheduled: false,
-    timezone: 'America/New_York'
-  });
-
-  cronLogger.info('Corporate follow-up job DISABLED (replaced by check-in reminders)');
-
   // Driver availability status transition - runs daily at 12:10 AM
   // Transitions drivers to unavailable when unavailableStartDate arrives
   // Transitions drivers to pending_checkin when checkInDate arrives
@@ -1340,20 +1325,6 @@ export function initializeCronJobs() {
     schedule: 'Mondays at 8:00 AM',
     timezone: 'America/New_York',
   });
-
-  // Corporate 24-hour escalation SMS - runs 3x daily at 9 AM, 1 PM, and 5 PM
-  // Sends urgent SMS to TSP contacts for corporate events without successful contact after 24 hours
-  // Cron format: minute hour day-of-month month day-of-week
-  // '0 9,13,17 * * *' = At 9:00 AM, 1:00 PM, and 5:00 PM every day
-  // DISABLED: Replaced by user-controlled per-event check-in reminders
-  const corporate24hEscalationJob = cron.schedule('0 9,13,17 * * *', async () => {
-    cronLogger.info('Corporate 24h escalation job is DISABLED - replaced by user-controlled check-in reminders');
-  }, {
-    scheduled: false,
-    timezone: 'America/New_York'
-  });
-
-  cronLogger.info('Corporate 24h escalation job DISABLED (replaced by check-in reminders)');
 
   // DISABLED: Replaced by user-controlled per-event check-in reminders
   const eventApproachingJob = cron.schedule('0 9 * * *', async () => {
@@ -1700,10 +1671,8 @@ export function initializeCronJobs() {
     autoCompleteJob,
     pastDateNotificationJob,
     tspFollowupJob,
-    corporateFollowupJob,
     driverAvailabilityJob,
     weeklyDigestJob,
-    corporate24hEscalationJob,
     eventApproachingJob,
     weeklyContactReminderJob,
     adminDigestJob,
@@ -1729,10 +1698,8 @@ export function stopAllCronJobs(jobs: ReturnType<typeof initializeCronJobs>) {
   jobs.autoCompleteJob.stop();
   jobs.pastDateNotificationJob.stop();
   jobs.tspFollowupJob.stop();
-  jobs.corporateFollowupJob.stop();
   jobs.driverAvailabilityJob.stop();
   jobs.weeklyDigestJob.stop();
-  jobs.corporate24hEscalationJob.stop();
   jobs.eventApproachingJob.stop();
   jobs.weeklyContactReminderJob.stop();
   jobs.adminDigestJob.stop();
