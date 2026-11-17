@@ -9,6 +9,7 @@ import { buildEventRequestsListQuery, EVENT_REQUEST_LIST_FRESHNESS, type EventRe
 import { EventDialogProvider, useEventDialogState } from './EventDialogContext';
 import { useIssueReport } from '@/contexts/issue-report-context';
 import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
+import { EMPTY_IN_PROCESS_FILTERS, type InProcessFilters } from '../lib/inProcessFilters';
 import {
   computeUnviewedNewCount,
   markEventRequestsViewed,
@@ -44,6 +45,9 @@ interface EventRequestContextType {
   setConfirmationFilter: (filter: 'all' | 'confirmed' | 'requested') => void;
   sortBy: 'event_date_desc' | 'event_date_asc' | 'organization_asc' | 'organization_desc' | 'created_date_desc' | 'created_date_asc';
   setSortBy: (sort: any) => void;
+  /** In Process tab filters/sort (shared so Export can match the visible rows) */
+  inProcessFilters: InProcessFilters;
+  setInProcessFilters: (filters: InProcessFilters) => void;
 
   // Pagination
   currentPage: number;
@@ -299,6 +303,7 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
 
   const [confirmationFilter, setConfirmationFilter] = useState<'all' | 'confirmed' | 'requested'>(roleDefaults.defaultConfirmationFilter);
   const [sortBy, setSortBy] = useState<'event_date_desc' | 'event_date_asc' | 'organization_asc' | 'organization_desc' | 'created_date_desc' | 'created_date_asc'>(roleDefaults.defaultSort);
+  const [inProcessFilters, setInProcessFilters] = useState<InProcessFilters>(EMPTY_IN_PROCESS_FILTERS);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -670,6 +675,8 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
     confirmationFilter,
     setConfirmationFilter,
     sortBy,
+    inProcessFilters,
+    setInProcessFilters,
     setSortBy,
 
     // Pagination
@@ -684,7 +691,7 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
     requestsByStatus, statusCounts, unviewedNewCount,
     // View state this context owns
     quickFilter, weekScope, viewMode, scheduledViewMode, activeTab, searchQuery, debouncedSearchQuery,
-    statusFilter, myAssignmentsStatusFilter, confirmationFilter, sortBy,
+    statusFilter, myAssignmentsStatusFilter, confirmationFilter, sortBy, inProcessFilters,
     // Pagination
     currentPage, itemsPerPage,
   ]);

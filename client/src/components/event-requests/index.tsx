@@ -53,6 +53,7 @@ import RequestFilters from '@/components/event-requests/RequestFilters';
 import { VanConflictsButton } from '@/components/event-requests/VanConflictsButton';
 import { PlanningSheetImportDialog } from '@/components/event-requests/PlanningSheetImportDialog';
 import { PlanningSheetGapsDialog } from '@/components/event-requests/PlanningSheetGapsDialog';
+import { applyInProcessFilters, hasActiveInProcessFilters } from '@/components/event-requests/lib/inProcessFilters';
 import EventSchedulingForm from '@/components/event-requests/EventSchedulingForm';
 import EventCollectionLog from '@/components/event-requests/EventCollectionLog';
 import ToolkitSentDialog from '@/components/event-requests/ToolkitSentDialog';
@@ -162,6 +163,7 @@ const EventRequestsManagementContent: React.FC = () => {
     setQuickFilter,
     weekScope,
     setWeekScope,
+    inProcessFilters,
   } = useEventRequestContext();
 
   const {
@@ -653,7 +655,10 @@ const EventRequestsManagementContent: React.FC = () => {
                             ...filterRequestsByStatus('declined', { skipPagination: true }),
                             ...filterRequestsByStatus('cancelled', { skipPagination: true }),
                           ]
-                        : filterRequestsByStatus(activeTab, { skipPagination: true });
+                        : activeTab === 'in_process' && hasActiveInProcessFilters(inProcessFilters)
+                          // Match what the In Process tab is showing (filters + sort)
+                          ? applyInProcessFilters(filterRequestsByStatus('in_process', { skipPagination: true }), inProcessFilters)
+                          : filterRequestsByStatus(activeTab, { skipPagination: true });
                       if (rows.length === 0) {
                         toast({ title: 'Nothing to export', description: 'No events match the current view.' });
                         return;

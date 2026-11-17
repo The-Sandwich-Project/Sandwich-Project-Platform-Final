@@ -3,6 +3,7 @@
  */
 import { getLastContactTimestamp } from '@shared/contact-age';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
+import { parseEventDate } from '@/lib/date-utils';
 
 export type InProcessSort = 'default' | 'event_date' | 'last_contact' | 'created' | 'updated';
 
@@ -43,8 +44,23 @@ function lastContactTime(request: any): number | null {
   return ts ? ts.getTime() : null;
 }
 
+/** Whole calendar days from today to `t` in the viewer's timezone (team is in Eastern). */
+function calendarDaysFromToday(t: number, now: number): number {
+  const a = new Date(now); a.setHours(0, 0, 0, 0);
+  const b = new Date(t); b.setHours(0, 0, 0, 0);
+  return Math.round((b.getTime() - a.getTime()) / DAY_MS);
+}
+
+function requestedDateTime(request: any): number | null {
+  const d = parseEventDate(request?.desiredEventDate ?? null);
+  return d ? d.getTime() : null;
+}
+
 function eventDateTime(request: any): number | null {
-  return time(getEffectiveEventDate(request));
+  // Event dates are date-only values stored as UTC midnight; parse as the
+  // intended calendar day (local noon) so Eastern doesn't shift it a day back.
+  const d = parseEventDate(getEffectiveEventDate(request) as any);
+  return d ? d.getTime() : null;
 }
 
 /** Apply filters and sort. Pure: safe to call inside useMemo. */
@@ -61,10 +77,12 @@ export function applyInProcessFilters<T>(requests: T[], f: InProcessFilters): T[
       if (updated !== null && now - updated < f.noUpdateDays * DAY_MS) return false;
     }
     if (f.dateWithinDays !== null) {
-      const d = eventDateTime(r);
+      // "Requested date" = the date the group asked for, not an old scheduled date
+      const d = requestedDateTime(r);
       if (d === null) return false;
-      const until = d - now;
-      if (until < -DAY_MS || until > f.dateWithinDays * DAY_MS) return false;
+      // Compare calendar days (today = 0), inclusive of day N; not rolling hours.
+      const diff = calendarDaysFromToday(d, now);
+      if (diff < 0 || diff > f.dateWithinDays) return false;
     }
     return true;
   });
