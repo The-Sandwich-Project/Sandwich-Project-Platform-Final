@@ -435,7 +435,7 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/maps/config | 1 | client/src/components/maps/BaseMapTiles.tsx |
 | /api/maps/copyright?${params} | 1 | client/src/components/maps/BaseMapTiles.tsx |
 | /api/maps/tiles/{z}/{x}/{y} | 1 | client/src/components/maps/BaseMapTiles.tsx |
-| /api/me/check-in-reminder-preferences | 8 | client/src/components/check-in-reminder-preferences.tsx<br>client/src/components/event-requests/InProcessFilterBar.tsx<br>client/src/components/event-requests/ReminderRulesManager.tsx |
+| /api/me/check-in-reminder-preferences | 10 | client/src/components/check-in-reminder-preferences.tsx<br>client/src/components/event-requests/InProcessFilterBar.tsx<br>client/src/components/event-requests/ReminderRulesManager.tsx<br>client/src/components/event-requests/ReminderSettingsButton.tsx |
 | /api/me/dashboard | 3 | client/src/components/action-tracking-enhanced.tsx<br>client/src/components/dashboard-action-tracker.tsx |
 | /api/me/notification-preferences | 4 | client/src/components/notification-preferences.tsx |
 | /api/me/sms-campaigns | 1 | client/src/components/alert-preferences/SMSSetupSection.tsx |

@@ -60,7 +60,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
-import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
 import { useToast } from '@/hooks/use-toast';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
 import { CommentThread, CompactPresenceBadge } from '@/components/collaboration';
@@ -1363,12 +1362,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                 </Tooltip>
               )}
 
-              {/* Reminders (component renders its own button) */}
-              <ReminderRulesManager
-                eventRequestId={request.id}
-                tspContactUserId={request.tspContact || request.tspContactAssigned}
-                eventStatus={request.status}
-              />
 
               {/* Non-Event */}
               {onNonEvent && (

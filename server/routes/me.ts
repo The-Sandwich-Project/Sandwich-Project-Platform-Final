@@ -5,6 +5,9 @@ import { logger } from '../utils/production-safe-logger';
 import type { AuthenticatedRequest } from '../types/express';
 import { getUserMetadata, getEventNotificationPreferences, getCheckInReminderPreferences } from '@shared/types';
 import type { EventNotificationPreferences, CheckInReminderPreferences } from '@shared/types';
+import { db } from '../db';
+import { eventReminderSnoozes } from '@shared/schema';
+import { and, eq } from 'drizzle-orm';
 
 interface DashboardItem {
   id: number;
@@ -500,7 +503,7 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     const normalizedUserId = normalizeToString(user.id);
     if (!normalizedUserId) return res.status(400).json({ message: 'Invalid user identifier' });
 
-    const { defaultChannel, rules, corporateRules } = req.body as CheckInReminderPreferences;
+    const { defaultChannel, rules } = req.body as CheckInReminderPreferences;
 
     if (!VALID_CHANNELS.includes(defaultChannel)) {
       return res.status(400).json({ message: 'Invalid channel' });
@@ -534,13 +537,6 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     if (validatedRules === null) {
       return res.status(400).json({ message: 'rules contains invalid entries' });
     }
-    let validatedCorpRules: ValidatedRule[] | undefined;
-    if (Array.isArray(corporateRules)) {
-      validatedCorpRules = validateRuleArray(corporateRules);
-      if (validatedCorpRules === null) {
-        return res.status(400).json({ message: 'corporateRules contains invalid entries' });
-      }
-    }
 
     const allUsers = await storage.getAllUsers();
     const fullUser = allUsers.find((u) => normalizeToString(u.id) === normalizedUserId);
@@ -551,12 +547,23 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
       configured: true,
       defaultChannel,
       rules: validatedRules,
-      corporateRules: validatedCorpRules,
     };
 
     await storage.updateUser(normalizedUserId, {
-      metadata: { ...metadata, checkInReminderPreferences: updatedPreferences },
+      // Clearing the baseline makes the next run send one summary for anything
+      // already overdue under the new rules, instead of a burst of reminders.
+      metadata: { ...metadata, checkInReminderPreferences: updatedPreferences, checkInRemindersBaselinedAt: undefined },
     });
+
+    // Defaults are the ONLY reminder settings (per-event customization was
+    // retired). The hourly sync brings this user's per-event rows in line
+    // with the new settings within the hour, keeping their schedules intact.
+    // Per-event pauses had their own controls, which were retired with
+    // per-event settings. Clear them so new settings actually take effect.
+    await db
+      .update(eventReminderSnoozes)
+      .set({ active: false, cancelledAt: new Date() })
+      .where(and(eq(eventReminderSnoozes.userId, fullUser.id), eq(eventReminderSnoozes.active, true)));
 
     logger.info(`Updated check-in reminder preferences for user ${normalizedUserId}`);
     res.json({ success: true, preferences: updatedPreferences });

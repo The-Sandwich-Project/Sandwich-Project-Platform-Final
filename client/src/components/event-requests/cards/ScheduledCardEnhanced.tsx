@@ -79,7 +79,6 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { MultiRecipientSelector } from '@/components/ui/multi-recipient-selector';
 import { getMissingIntakeInfo } from '@/lib/event-request-validation';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
-import { ReminderRulesManager } from '@/components/event-requests/ReminderRulesManager';
 import { useMessageAboutEvent } from '@/components/chat/chat-dock-context';
 import { InstructionsSection } from '../form-sections/InstructionsSection';
 import { MlkDayBadge } from '@/components/event-requests/MlkDayBadge';
@@ -3960,11 +3959,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               </Button>
             )}
 
-            <ReminderRulesManager
-              eventRequestId={request.id}
-              tspContactUserId={request.tspContact || request.tspContactAssigned}
-              eventStatus={request.status}
-            />
 
             <Button size="sm" variant="outline" onClick={onReschedule}>
               Reschedule

@@ -3,16 +3,14 @@
  *
  * Global "default reminder rules" configuration.  Users set this up once in
  * their profile → Alerts tab.  These defaults automatically apply to every
- * event they're the TSP contact for, unless they override per-event.
- *
- * Pattern: toggle on the rules you care about, set thresholds, pick a
- * channel → Save.  Per-event cards then just show a bell icon (on/off) with
- * an optional "Customize" escape hatch.
+ * event they're the TSP contact for. Per-event customization was retired —
+ * these defaults are the only reminder settings. Saving clears the user's
+ * per-event copies so the hourly job re-applies the new defaults.
  */
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { AlarmClock, Loader2, Save, Info, Building2 } from 'lucide-react';
+import { AlarmClock, Loader2, Save, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -47,7 +45,7 @@ const RULE_TYPES = [
   {
     ruleType: 'no_contact',
     label: 'No Contact Logged',
-    description: 'Alert when no contact has been logged for a set number of days',
+    description: 'When no contact attempt has been logged for a while (In Process events)',
     defaultThreshold: 5,
     thresholdPrefix: 'After',
     thresholdLabel: 'days with no contact',
@@ -55,8 +53,8 @@ const RULE_TYPES = [
   },
   {
     ruleType: 'stale_event',
-    label: 'Stale / No Updates',
-    description: 'Alert when no updates have been made for a set number of days',
+    label: 'No Updates',
+    description: "When an In Process event hasn't been updated for a while",
     defaultThreshold: 7,
     thresholdPrefix: 'After',
     thresholdLabel: 'days with no updates',
@@ -64,61 +62,23 @@ const RULE_TYPES = [
   },
   {
     ruleType: 'date_approaching_inprocess',
-    label: 'Desired Date Approaching',
-    description: 'Alert when the desired event date is coming up soon (while still in process)',
+    label: 'Requested Date Coming Up',
+    description: 'When the requested date is getting close and the event is still In Process',
     defaultThreshold: 14,
     thresholdPrefix: 'Within',
-    thresholdLabel: 'days of desired date',
+    thresholdLabel: 'days of requested date',
     category: 'in_process' as const,
   },
   {
     ruleType: 'date_approaching_scheduled',
-    label: 'Event Date Approaching',
-    description: 'Alert when a scheduled event date is coming up soon',
+    label: 'Event Coming Up, Missing Info',
+    description: "When a scheduled event is getting close and is missing its time, address, sandwich count or types, or isn't on the planning sheet yet",
     defaultThreshold: 7,
     thresholdPrefix: 'Within',
     thresholdLabel: 'days of event',
     category: 'scheduled' as const,
-  },
-  {
-    ruleType: 'staffing_unmet',
-    label: 'Staffing Needs Unmet',
-    description: 'Alert if roles are still unfilled close to the event date',
-    defaultThreshold: 7,
-    thresholdPrefix: 'Within',
-    thresholdLabel: 'days of event',
-    category: 'scheduled' as const,
-  },
-  {
-    ruleType: 'missing_details',
-    label: 'Missing Key Details',
-    description: 'Alert if sandwich count/type, location, or pickup time are still missing within your specified number of days before the event',
-    defaultThreshold: 7,
-    thresholdPrefix: 'Within',
-    thresholdLabel: 'days of event',
-    category: 'scheduled' as const,
-  },
-  {
-    ruleType: 'general_checkin',
-    label: 'General Check-In',
-    description: 'Periodic reminder to check in on events',
-    defaultThreshold: 7,
-    thresholdLabel: '',
-    category: 'all' as const,
-    isFrequencyBased: true,
   },
 ] as const;
-
-// Tighter default thresholds for corporate priority events
-const CORPORATE_THRESHOLD_DEFAULTS: Record<string, number> = {
-  no_contact: 3,
-  stale_event: 3,
-  date_approaching_inprocess: 21,
-  date_approaching_scheduled: 14,
-  staffing_unmet: 14,
-  missing_details: 14,
-  general_checkin: 7,
-};
 
 const CHANNEL_OPTIONS = [
   { value: 'email', label: 'Email' },
@@ -161,33 +121,17 @@ export default function CheckInReminderPreferencesEditor() {
     [serverPrefs],
   );
 
-  const defaultCorpRules: DefaultReminderRule[] = useMemo(
-    () =>
-      RULE_TYPES.map((rt) => {
-        const existing = serverPrefs?.corporateRules?.find((r) => r.ruleType === rt.ruleType);
-        return {
-          ruleType: rt.ruleType,
-          enabled: existing?.enabled ?? false,
-          thresholdDays: existing?.thresholdDays ?? (CORPORATE_THRESHOLD_DEFAULTS[rt.ruleType] ?? rt.defaultThreshold),
-          frequency: existing?.frequency ?? 'every_3_days',
-        };
-      }),
-    [serverPrefs],
-  );
-
   const [rules, setRules] = useState<DefaultReminderRule[]>(defaultRules);
-  const [corpRules, setCorpRules] = useState<DefaultReminderRule[]>(defaultCorpRules);
   const [channel, setChannel] = useState<ReminderChannel>(
     serverPrefs?.defaultChannel ?? 'email'
   );
 
   // Reset local state when server data changes (e.g. after a reload or cache update).
-  // `defaultRules` and `defaultCorpRules` are useMemo values derived solely from
+  // `defaultRules` is a useMemo value derived solely from
   // `serverPrefs`, so they will always be in sync when `serverPrefs` changes.
   // Including them as effect dependencies would cause a double-run without benefit.
   useEffect(() => {
     setRules(defaultRules);
-    setCorpRules(defaultCorpRules);
     setChannel(serverPrefs?.defaultChannel ?? 'email');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverPrefs]);
@@ -202,7 +146,7 @@ export default function CheckInReminderPreferencesEditor() {
       toast({
         title: 'Preferences saved',
         description:
-          'Your default reminder rules will apply to all events unless overridden.',
+          'Your reminder settings now apply to all your events.',
       });
     },
     onError: () => {
@@ -231,29 +175,11 @@ export default function CheckInReminderPreferencesEditor() {
     );
   };
 
-  // Corporate rule handlers
-  const handleCorpToggle = (ruleType: string, enabled: boolean) => {
-    setCorpRules((prev) =>
-      prev.map((r) => (r.ruleType === ruleType ? { ...r, enabled } : r)),
-    );
-  };
-  const handleCorpThreshold = (ruleType: string, thresholdDays: number) => {
-    setCorpRules((prev) =>
-      prev.map((r) => (r.ruleType === ruleType ? { ...r, thresholdDays } : r)),
-    );
-  };
-  const handleCorpFrequency = (ruleType: string, frequency: ReminderFrequency) => {
-    setCorpRules((prev) =>
-      prev.map((r) => (r.ruleType === ruleType ? { ...r, frequency } : r)),
-    );
-  };
-
   const handleSave = () => {
     saveMutation.mutate({
       configured: true,
       defaultChannel: channel,
       rules,
-      corporateRules: corpRules,
     });
   };
 
@@ -267,7 +193,6 @@ export default function CheckInReminderPreferencesEditor() {
 
   const inProcessRules = RULE_TYPES.filter((rt) => rt.category === 'in_process');
   const scheduledRules = RULE_TYPES.filter((rt) => rt.category === 'scheduled');
-  const generalRules = RULE_TYPES.filter((rt) => rt.category === 'all');
 
   return (
     <Card data-tour="reminder-preferences">
@@ -278,8 +203,8 @@ export default function CheckInReminderPreferencesEditor() {
         </CardTitle>
         <CardDescription>
           Set your default reminder rules here. They'll automatically apply to
-          every event you're assigned to as TSP contact. You can still customize
-          or snooze reminders on individual events.
+          every event you're assigned to as TSP contact. Changes apply to all
+          your events within the hour.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -309,8 +234,8 @@ export default function CheckInReminderPreferencesEditor() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              You haven't set up your default reminders yet. Toggle on the rules
-              below and hit Save — they'll apply to all your events automatically.
+              You're using the standard reminders shown below, which already
+              apply to all your events. Change anything and hit Save to make them your own.
             </AlertDescription>
           </Alert>
         )}
@@ -337,70 +262,6 @@ export default function CheckInReminderPreferencesEditor() {
           onFrequency={handleFrequency}
         />
 
-        {/* General */}
-        <RuleSection
-          title="General"
-          subtitle="Applies to events in any status"
-          ruleTypes={generalRules}
-          rules={rules}
-          onToggle={handleToggle}
-          onThreshold={handleThreshold}
-          onFrequency={handleFrequency}
-        />
-
-        {/* Corporate priority overrides */}
-        <div className="border-t pt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Building2 className="w-4 h-4 text-purple-600" />
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800">
-                Corporate Priority Events
-              </h3>
-              <p className="text-xs text-gray-500">
-                Tighter thresholds for corporate events that need faster follow-up. Toggle individual rules on/off and customize their thresholds.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pl-1 border-l-2 border-purple-200 ml-2">
-            <div className="pl-4">
-              <RuleSection
-                title="In-process corporate events"
-                subtitle="Tighter cadence for high-priority corporate requests"
-                ruleTypes={inProcessRules}
-                rules={corpRules}
-                onToggle={handleCorpToggle}
-                onThreshold={handleCorpThreshold}
-                onFrequency={handleCorpFrequency}
-                accentColor="purple"
-              />
-            </div>
-            <div className="pl-4">
-              <RuleSection
-                title="Scheduled corporate events"
-                subtitle="Earlier warnings for corporate event dates"
-                ruleTypes={scheduledRules}
-                rules={corpRules}
-                onToggle={handleCorpToggle}
-                onThreshold={handleCorpThreshold}
-                onFrequency={handleCorpFrequency}
-                accentColor="purple"
-              />
-            </div>
-            <div className="pl-4">
-              <RuleSection
-                title="General (corporate)"
-                subtitle="Periodic check-in for corporate events"
-                ruleTypes={generalRules}
-                rules={corpRules}
-                onToggle={handleCorpToggle}
-                onThreshold={handleCorpThreshold}
-                onFrequency={handleCorpFrequency}
-                accentColor="purple"
-              />
-            </div>
-          </div>
-        </div>
 
         {/* Save */}
         <Button
@@ -483,7 +344,7 @@ function RuleSection({
             </div>
 
             {rule.enabled && (
-              <div className="flex items-center gap-2 pl-10">
+              <div className="flex flex-wrap items-center gap-2 pl-10">
                 {isFreqBased ? (
                   <>
                     <span className="text-xs text-gray-500">Remind me</span>
@@ -521,6 +382,22 @@ function RuleSection({
                     <span className="text-xs text-gray-500 whitespace-nowrap">
                       {rt.thresholdLabel}
                     </span>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">, then remind me</span>
+                    <Select
+                      value={rule.frequency}
+                      onValueChange={(val) => onFrequency(rt.ruleType, val as ReminderFrequency)}
+                    >
+                      <SelectTrigger className="w-32 h-7 text-xs" aria-label={`How often to repeat: ${rt.label}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FREQUENCY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </>
                 )}
               </div>
