@@ -30,7 +30,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { PERMISSIONS } from '@shared/auth-utils';
 import { TollFreeVerificationPanel } from './toll-free-verification-panel';
 import AlertPreferences from './alert-preferences';
 import CheckInReminderPreferences from './check-in-reminder-preferences';
@@ -845,16 +844,13 @@ export default function UserProfile() {
         </Card>
       )}
 
-      {/* Notifications Tab - Alert Preferences first, then intake-only
-          Check-In Reminders below (gated by EVENT_CHECK_IN_ALERTS). */}
+      {/* Notifications Tab - Alert Preferences first, then Check-In Reminders. */}
       {activeTab === 'notifications' && (
         <div className="space-y-6">
           <AlertPreferences />
-          {(user?.role === 'super_admin' ||
-            (Array.isArray(user?.permissions) &&
-              (user.permissions as string[]).includes(PERMISSIONS.EVENT_CHECK_IN_ALERTS))) && (
-            <CheckInReminderPreferences />
-          )}
+          {/* Everyone assigned as a TSP contact gets reminders by default, so
+              everyone can manage their own reminder settings here. */}
+          <CheckInReminderPreferences />
         </div>
       )}
 

@@ -19,7 +19,7 @@ import { processWeeklyDigests } from './weekly-digest-service';
 import { isNotificationSuppressed } from '../utils/notification-suppression';
 import { processAdminWeeklyDigest, processAdminWeeklySms } from './admin-weekly-digest-service';
 import { processPredictionAlerts } from './prediction-alert-service';
-import { processCheckInReminders } from './check-in-reminder-service';
+import { processCheckInReminders, isCheckInReminderDryRun } from './check-in-reminder-service';
 import { processStandbyFollowups } from './tsp-contact-followup-service';
 import { sendDailyErrorDigest } from './application-error-logger';
 import { ALERT_TYPES } from '@shared/alert-catalog';
@@ -1496,17 +1496,24 @@ export function initializeCronJobs() {
   // User-controlled check-in reminders - runs every hour at :15
   // Processes per-event reminder toggles set by TSP contacts
   const checkInReminderJob = cron.schedule('15 * * * *', async () => {
-    if (!isProduction) {
+    // Dry run (CHECK_IN_REMINDERS_DRY_RUN=true) runs in any environment and
+    // sends nothing; otherwise real reminders only go out in production.
+    const dryRun = isCheckInReminderDryRun();
+    if (!isProduction && !dryRun) {
       cronLogger.info('Skipping check-in reminders - not production environment');
       return;
     }
-    cronLogger.info('Running check-in reminder processing...');
+    cronLogger.info(dryRun
+      ? 'Running check-in reminders in DRY RUN mode (nothing will be sent)...'
+      : 'Running check-in reminder processing...');
     try {
       const result = await processCheckInReminders();
       cronLogger.info('Check-in reminder processing completed', {
         processed: result.processed,
         sent: result.sent,
         errors: result.errors,
+        dryRun: result.dryRun,
+        wouldSend: result.dryRun ? result.plan.length : undefined,
         timestamp: new Date(),
       });
     } catch (error) {

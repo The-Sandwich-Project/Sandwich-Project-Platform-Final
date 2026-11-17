@@ -71,23 +71,16 @@ export interface DefaultReminderRule {
 
 /**
  * Global Check-In Reminder Preferences
- * Stored in user metadata. Sets default reminder rules that apply to all
- * events unless overridden per-event. Eliminates the need to configure
- * reminders individually on every event card.
- *
- * Supports two tiers: standard (default) and corporate priority.
- * Corporate events use `corporateRules` if present, otherwise fall back
- * to `rules`.
+ * Stored in user metadata. One set of reminder rules per person that applies
+ * to every event they're the TSP contact for.
  */
 export interface CheckInReminderPreferences {
   /** Whether the user has configured their defaults (false = never set up) */
   configured: boolean;
   /** Default notification channel for all rules */
   defaultChannel: 'email' | 'sms' | 'both';
-  /** Default rules and their thresholds (standard events) */
+  /** Reminder rules and their thresholds (all events) */
   rules: DefaultReminderRule[];
-  /** Optional tighter rules for corporate priority events */
-  corporateRules?: DefaultReminderRule[];
 }
 
 /**
@@ -106,6 +99,12 @@ export interface UserMetadata {
 
   // Global check-in reminder defaults (applied to all events unless overridden)
   checkInReminderPreferences?: CheckInReminderPreferences;
+  /**
+   * When this user's existing backlog was rolled into one summary reminder.
+   * Unset = next reminder run sends a summary instead of one reminder per
+   * already-overdue event. Cleared when they save new reminder settings.
+   */
+  checkInRemindersBaselinedAt?: string;
 
   // Additional contact information
   phoneNumber?: string;
@@ -278,14 +277,32 @@ export function getEventNotificationPreferences(
 }
 
 /**
+ * Organization-wide reminder defaults. Used for anyone who hasn't saved their
+ * own settings in Profile → Alerts, so reminders work without setup.
+ * The four reminders the planning team asked for: no contact, no updates,
+ * requested date coming up, and event coming up with missing info.
+ */
+export const SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES: CheckInReminderPreferences = {
+  configured: false,
+  defaultChannel: 'email',
+  rules: [
+    { ruleType: 'no_contact', enabled: true, thresholdDays: 5, frequency: 'weekly' },
+    { ruleType: 'stale_event', enabled: true, thresholdDays: 7, frequency: 'weekly' },
+    { ruleType: 'date_approaching_inprocess', enabled: true, thresholdDays: 14, frequency: 'weekly' },
+    { ruleType: 'date_approaching_scheduled', enabled: true, thresholdDays: 7, frequency: 'weekly' },
+  ],
+};
+
+/**
  * Helper to get check-in reminder preferences from user metadata.
- * Returns null if the user has never configured their defaults.
+ * Falls back to the organization defaults (configured: false) if the user
+ * has never saved their own.
  */
 export function getCheckInReminderPreferences(
   user: DrizzleUser | User | null | undefined
-): CheckInReminderPreferences | null {
+): CheckInReminderPreferences {
   const metadata = getUserMetadata(user);
-  return metadata.checkInReminderPreferences ?? null;
+  return metadata.checkInReminderPreferences ?? SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES;
 }
 
 // ============================================================================
