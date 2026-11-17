@@ -43,10 +43,15 @@ if (process.env.SENDGRID_API_KEY) {
  */
 type ReminderEvent = typeof eventRequests.$inferSelect;
 
-/** Rules that no longer send (staffing → Volunteer Hub later; missing details folded into date reminders). */
+/**
+ * Rules that no longer send: staffing (Volunteer Hub later), missing details
+ * (folded into the date reminders), and the general timed check-in (removed
+ * at the planning team's request). Existing rows switch off automatically.
+ */
 const RETIRED_RULE_TYPES = new Set<string>([
   REMINDER_RULE_TYPES.STAFFING_UNMET,
   REMINDER_RULE_TYPES.MISSING_DETAILS,
+  REMINDER_RULE_TYPES.GENERAL_CHECKIN,
 ]);
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -399,15 +404,9 @@ function isAssignedTo(event: { tspContact?: string | null; tspContactAssigned?: 
   return current === userId;
 }
 
-/**
- * The rules that apply to one event for this user. An explicitly saved
- * corporate rule set is used for corporate events even if every rule in it
- * is off (that means "no reminders for corporate events"); only when no
- * corporate set exists do corporate events fall back to the standard rules.
- */
-function rulesForEvent(prefs: CheckInReminderPreferences, isCorporate: boolean): DefaultReminderRule[] {
-  const set = isCorporate && Array.isArray(prefs.corporateRules) ? prefs.corporateRules : prefs.rules;
-  return set.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType));
+/** The rules that apply to the user's events (same for every event). */
+function activeRules(prefs: CheckInReminderPreferences): DefaultReminderRule[] {
+  return prefs.rules.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType));
 }
 
 /**
@@ -708,7 +707,7 @@ async function syncReminderRows(ctx: RunContext): Promise<number> {
       const prefs = getCheckInReminderPreferences(user);
 
       const assignedEvents = await db
-        .select({ id: eventRequests.id, isCorporatePriority: eventRequests.isCorporatePriority })
+        .select({ id: eventRequests.id })
         .from(eventRequests)
         .where(
           and(
@@ -728,7 +727,7 @@ async function syncReminderRows(ctx: RunContext): Promise<number> {
       // Desired (event, ruleType) -> rule
       const desired = new Map<string, { eventId: number; rule: DefaultReminderRule }>();
       for (const ev of assignedEvents) {
-        for (const rule of rulesForEvent(prefs, ev.isCorporatePriority === true)) {
+        for (const rule of activeRules(prefs)) {
           desired.set(`${ev.id}:${rule.ruleType}`, { eventId: ev.id, rule });
         }
       }

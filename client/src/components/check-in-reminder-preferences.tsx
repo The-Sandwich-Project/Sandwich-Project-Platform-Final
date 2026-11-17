@@ -10,7 +10,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { AlarmClock, Loader2, Save, Info, Building2 } from 'lucide-react';
+import { AlarmClock, Loader2, Save, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -78,25 +78,7 @@ const RULE_TYPES = [
     thresholdLabel: 'days of event',
     category: 'scheduled' as const,
   },
-  {
-    ruleType: 'general_checkin',
-    label: 'General Check-In',
-    description: 'A regular check-in on every event you own, whether or not anything has changed',
-    defaultThreshold: 7,
-    thresholdLabel: '',
-    category: 'all' as const,
-    isFrequencyBased: true,
-  },
 ] as const;
-
-// Tighter default thresholds for corporate priority events
-const CORPORATE_THRESHOLD_DEFAULTS: Record<string, number> = {
-  no_contact: 3,
-  stale_event: 3,
-  date_approaching_inprocess: 21,
-  date_approaching_scheduled: 14,
-  general_checkin: 7,
-};
 
 const CHANNEL_OPTIONS = [
   { value: 'email', label: 'Email' },
@@ -139,38 +121,17 @@ export default function CheckInReminderPreferencesEditor() {
     [serverPrefs],
   );
 
-  const defaultCorpRules: DefaultReminderRule[] = useMemo(
-    () =>
-      RULE_TYPES.map((rt) => {
-        const existing = serverPrefs?.corporateRules?.find((r) => r.ruleType === rt.ruleType);
-        // No corporate set saved yet: corporate events currently follow the
-        // standard rules, so start from those (saving must not silently turn
-        // corporate reminders off).
-        const standard = serverPrefs?.rules?.find((r) => r.ruleType === rt.ruleType);
-        const fallbackEnabled = !serverPrefs?.corporateRules ? standard?.enabled ?? false : false;
-        return {
-          ruleType: rt.ruleType,
-          enabled: existing?.enabled ?? fallbackEnabled,
-          thresholdDays: existing?.thresholdDays ?? (CORPORATE_THRESHOLD_DEFAULTS[rt.ruleType] ?? rt.defaultThreshold),
-          frequency: existing?.frequency ?? 'every_3_days',
-        };
-      }),
-    [serverPrefs],
-  );
-
   const [rules, setRules] = useState<DefaultReminderRule[]>(defaultRules);
-  const [corpRules, setCorpRules] = useState<DefaultReminderRule[]>(defaultCorpRules);
   const [channel, setChannel] = useState<ReminderChannel>(
     serverPrefs?.defaultChannel ?? 'email'
   );
 
   // Reset local state when server data changes (e.g. after a reload or cache update).
-  // `defaultRules` and `defaultCorpRules` are useMemo values derived solely from
+  // `defaultRules` is a useMemo value derived solely from
   // `serverPrefs`, so they will always be in sync when `serverPrefs` changes.
   // Including them as effect dependencies would cause a double-run without benefit.
   useEffect(() => {
     setRules(defaultRules);
-    setCorpRules(defaultCorpRules);
     setChannel(serverPrefs?.defaultChannel ?? 'email');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverPrefs]);
@@ -185,7 +146,7 @@ export default function CheckInReminderPreferencesEditor() {
       toast({
         title: 'Preferences saved',
         description:
-          'Your default reminder rules will apply to all events unless overridden.',
+          'Your reminder settings now apply to all your events.',
       });
     },
     onError: () => {
@@ -214,29 +175,11 @@ export default function CheckInReminderPreferencesEditor() {
     );
   };
 
-  // Corporate rule handlers
-  const handleCorpToggle = (ruleType: string, enabled: boolean) => {
-    setCorpRules((prev) =>
-      prev.map((r) => (r.ruleType === ruleType ? { ...r, enabled } : r)),
-    );
-  };
-  const handleCorpThreshold = (ruleType: string, thresholdDays: number) => {
-    setCorpRules((prev) =>
-      prev.map((r) => (r.ruleType === ruleType ? { ...r, thresholdDays } : r)),
-    );
-  };
-  const handleCorpFrequency = (ruleType: string, frequency: ReminderFrequency) => {
-    setCorpRules((prev) =>
-      prev.map((r) => (r.ruleType === ruleType ? { ...r, frequency } : r)),
-    );
-  };
-
   const handleSave = () => {
     saveMutation.mutate({
       configured: true,
       defaultChannel: channel,
       rules,
-      corporateRules: corpRules,
     });
   };
 
@@ -250,7 +193,6 @@ export default function CheckInReminderPreferencesEditor() {
 
   const inProcessRules = RULE_TYPES.filter((rt) => rt.category === 'in_process');
   const scheduledRules = RULE_TYPES.filter((rt) => rt.category === 'scheduled');
-  const generalRules = RULE_TYPES.filter((rt) => rt.category === 'all');
 
   return (
     <Card data-tour="reminder-preferences">
@@ -320,70 +262,6 @@ export default function CheckInReminderPreferencesEditor() {
           onFrequency={handleFrequency}
         />
 
-        {/* General */}
-        <RuleSection
-          title="General"
-          subtitle="Applies to events in any status"
-          ruleTypes={generalRules}
-          rules={rules}
-          onToggle={handleToggle}
-          onThreshold={handleThreshold}
-          onFrequency={handleFrequency}
-        />
-
-        {/* Corporate priority overrides */}
-        <div className="border-t pt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Building2 className="w-4 h-4 text-purple-600" />
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800">
-                Corporate Priority Events
-              </h3>
-              <p className="text-xs text-gray-500">
-                Tighter thresholds for corporate events that need faster follow-up. Toggle individual rules on/off and customize their thresholds.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pl-1 border-l-2 border-purple-200 ml-2">
-            <div className="pl-4">
-              <RuleSection
-                title="In-process corporate events"
-                subtitle="Tighter cadence for high-priority corporate requests"
-                ruleTypes={inProcessRules}
-                rules={corpRules}
-                onToggle={handleCorpToggle}
-                onThreshold={handleCorpThreshold}
-                onFrequency={handleCorpFrequency}
-                accentColor="purple"
-              />
-            </div>
-            <div className="pl-4">
-              <RuleSection
-                title="Scheduled corporate events"
-                subtitle="Earlier warnings for corporate event dates"
-                ruleTypes={scheduledRules}
-                rules={corpRules}
-                onToggle={handleCorpToggle}
-                onThreshold={handleCorpThreshold}
-                onFrequency={handleCorpFrequency}
-                accentColor="purple"
-              />
-            </div>
-            <div className="pl-4">
-              <RuleSection
-                title="General (corporate)"
-                subtitle="Periodic check-in for corporate events"
-                ruleTypes={generalRules}
-                rules={corpRules}
-                onToggle={handleCorpToggle}
-                onThreshold={handleCorpThreshold}
-                onFrequency={handleCorpFrequency}
-                accentColor="purple"
-              />
-            </div>
-          </div>
-        </div>
 
         {/* Save */}
         <Button

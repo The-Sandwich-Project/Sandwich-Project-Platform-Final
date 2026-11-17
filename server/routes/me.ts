@@ -503,7 +503,7 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     const normalizedUserId = normalizeToString(user.id);
     if (!normalizedUserId) return res.status(400).json({ message: 'Invalid user identifier' });
 
-    const { defaultChannel, rules, corporateRules } = req.body as CheckInReminderPreferences;
+    const { defaultChannel, rules } = req.body as CheckInReminderPreferences;
 
     if (!VALID_CHANNELS.includes(defaultChannel)) {
       return res.status(400).json({ message: 'Invalid channel' });
@@ -537,13 +537,6 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     if (validatedRules === null) {
       return res.status(400).json({ message: 'rules contains invalid entries' });
     }
-    let validatedCorpRules: ValidatedRule[] | undefined;
-    if (Array.isArray(corporateRules)) {
-      validatedCorpRules = validateRuleArray(corporateRules);
-      if (validatedCorpRules === null) {
-        return res.status(400).json({ message: 'corporateRules contains invalid entries' });
-      }
-    }
 
     const allUsers = await storage.getAllUsers();
     const fullUser = allUsers.find((u) => normalizeToString(u.id) === normalizedUserId);
@@ -554,7 +547,6 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
       configured: true,
       defaultChannel,
       rules: validatedRules,
-      corporateRules: validatedCorpRules,
     };
 
     await storage.updateUser(normalizedUserId, {
