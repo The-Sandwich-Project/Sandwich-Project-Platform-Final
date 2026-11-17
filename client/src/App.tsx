@@ -434,9 +434,6 @@ function Router() {
         <Route path="/host-resources">
           {() => <Dashboard initialSection="host-resources" />}
         </Route>
-        <Route path="/event-reminders">
-          {() => <Dashboard initialSection="event-reminders" />}
-        </Route>
         <Route path="/event-impact-reports">
           {() => <Dashboard initialSection="event-impact-reports" />}
         </Route>

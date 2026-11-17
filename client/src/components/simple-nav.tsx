@@ -87,22 +87,6 @@ export default function SimpleNav({
       retry: false,
     });
 
-    const { data: remindersCount = 0 } = useQuery({
-      queryKey: ['/api/event-reminders/count', (user as { id?: string } | null)?.id || 'no-user'],
-      queryFn: async () => {
-        if (!(user as { id?: string } | null)?.id) return 0;
-        try {
-          const response = await apiRequest('GET', '/api/event-reminders/count');
-          return typeof response?.count === 'number' ? response.count : 0;
-        } catch (error) {
-          logger.warn('Event reminders count fetch failed:', error);
-          return 0;
-        }
-      },
-      enabled: !!(user as { id?: string } | null)?.id,
-      refetchInterval: 60000,
-      retry: false,
-    });
 
     const userForPermissions: UserForPermissions | null | undefined = user
       ? {
@@ -169,8 +153,6 @@ export default function SimpleNav({
           return unreadCounts.suggestions || 0;
         case 'kudos':
           return unreadCounts.kudos || 0;
-        case 'event-reminders':
-          return remindersCount;
         default:
           return 0;
       }
@@ -184,8 +166,6 @@ export default function SimpleNav({
           return 'team-chat-badge';
         case 'suggestions':
           return 'suggestions-badge';
-        case 'event-reminders':
-          return 'event-reminders-badge';
         case 'inbox-consolidated':
           return 'project-threads-intro';
         case 'holding-zone':

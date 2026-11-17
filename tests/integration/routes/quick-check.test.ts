@@ -20,7 +20,6 @@ describe('Route Migration Checklist', () => {
     'drivers',
     'volunteers',
     'hosts',
-    'event-reminders',
     'emails',
     'onboarding',
     'google-sheets',

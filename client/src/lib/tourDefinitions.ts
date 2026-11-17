@@ -930,49 +930,6 @@ export const TOURS: Tour[] = [
     ]
   },
   {
-    id: 'event-reminders-guide',
-    title: 'Setting Up Event Reminders',
-    description: 'Create automated reminders for upcoming events',
-    category: 'events-calendar',
-    icon: 'Clock',
-    estimatedTime: '2 min',
-    requiredPermission: 'NAV_EVENT_REMINDERS',
-    steps: [
-      {
-        id: 'reminders-intro',
-        title: 'Event Reminders System',
-        description: 'Event Reminders help you stay on top of upcoming events with automated notifications. Click Next and we\'ll open the Event Reminders page.',
-        targetSelector: '[data-tour="navigation"]',
-        position: 'center'
-      },
-      {
-        id: 'reminders-create',
-        title: 'Create New Reminder',
-        description: 'This is the Event Reminders page. Click here to set up a reminder - choose the event, when to send the reminder, and who should receive it.',
-        targetSelector: '[data-testid="create-reminder-btn"]',
-        position: 'bottom',
-        highlightPadding: 8,
-        waitForElement: true,
-        beforeShow: () => {
-          // Event Reminders is a route, not a sidebar item, so navigate directly.
-          // The tour resumes on this step after the page loads (see GuidedTour resume).
-          if (!window.location.pathname.includes('/event-reminders')) {
-            window.location.href = '/event-reminders';
-          }
-        }
-      },
-      {
-        id: 'reminders-list',
-        title: 'Active Reminders',
-        description: 'Switch between Pending and Completed reminders here. You can edit, complete, or delete reminders from these lists.',
-        targetSelector: '[data-testid="tab-pending"]',
-        position: 'top',
-        highlightPadding: 16,
-        waitForElement: true
-      }
-    ]
-  },
-  {
     id: 'my-availability-guide',
     title: 'Setting Your Availability',
     description: 'Manage when you\'re available for volunteer activities',

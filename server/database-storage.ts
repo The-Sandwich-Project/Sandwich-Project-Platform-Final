@@ -4608,13 +4608,6 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(eventRequests.createdAt));
   }
 
-  // Event reminders count - returns count of pending reminders for a user
-  async getEventRemindersCount(userId?: string): Promise<number> {
-    // For now, return 0 as there's no specific event reminders table structure
-    // This could be enhanced to count pending tasks, upcoming events, etc.
-    return 0;
-  }
-
   async checkOrganizationDuplicates(
     organizationName: string
   ): Promise<{ exists: boolean; matches: Organization[] }> {

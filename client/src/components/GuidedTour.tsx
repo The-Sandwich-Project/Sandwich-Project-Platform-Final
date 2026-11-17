@@ -72,7 +72,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   // Restore an in-progress tour after a full-page navigation. Some tours jump to
-  // a route that isn't a sidebar item (e.g. Event Reminders), which requires a
+  // a route that isn't a sidebar item (e.g. a page reached only by URL), which requires a
   // real page load — without this, the active tour would be lost on the way there.
   // Persisted to localStorage by the "Save tour progress" effect below.
   const [activeTour, setActiveTour] = useState<Tour | null>(() => readPersistedTour()?.tour ?? null);

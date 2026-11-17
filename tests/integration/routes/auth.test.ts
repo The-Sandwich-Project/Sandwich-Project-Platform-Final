@@ -20,7 +20,6 @@ describe('Authentication Tests', () => {
       { method: 'get', path: '/api/drivers' },
       { method: 'get', path: '/api/volunteers' },
       { method: 'get', path: '/api/hosts' },
-      { method: 'get', path: '/api/event-reminders' },
       { method: 'get', path: '/api/emails' },
       { method: 'get', path: '/api/onboarding/challenges' },
       { method: 'get', path: '/api/google-sheets' },

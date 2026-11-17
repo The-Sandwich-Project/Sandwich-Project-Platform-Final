@@ -72,8 +72,6 @@ Copy this checklist and test each route:
 - [ ] POST /api/hosts - Requires auth
 
 ### Feature Routes
-- [ ] GET /api/event-reminders - Requires auth
-- [ ] POST /api/event-reminders - Requires auth
 - [ ] GET /api/emails - Requires auth
 - [ ] POST /api/emails - Requires auth
 - [ ] GET /api/onboarding/challenges - Requires auth

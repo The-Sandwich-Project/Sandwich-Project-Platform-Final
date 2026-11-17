@@ -55,7 +55,6 @@ import { createDashboardDocumentsRoutes } from './dashboard-documents';
 import { createDriversRouter } from './drivers';
 import { createVolunteersRouter } from './volunteers';
 import { createHostsRouter } from './hosts';
-import { createEventRemindersRouter } from './event-reminders';
 import eventCheckInRemindersRouter from './event-check-in-reminders';
 import { createEmailRouter } from './email-routes';
 import { createEmailDraftsRouter } from './email-drafts';
@@ -1051,16 +1050,6 @@ export function createMainRoutes(deps: RouterDependencies) {
   );
   router.use('/api/dashboard*', createErrorHandler('dashboard'));
   router.use('/api/activity*', createErrorHandler('activity'));
-
-  // Event reminders
-  const eventRemindersRouter = createEventRemindersRouter(deps);
-  router.use(
-    '/api/event-reminders',
-    deps.isAuthenticated,
-    ...createStandardMiddleware(),
-    eventRemindersRouter
-  );
-  router.use('/api/event-reminders', createErrorHandler('event-reminders'));
 
   // Event check-in reminders (per-event recurring notification toggle)
   router.use(
