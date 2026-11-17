@@ -6,7 +6,7 @@ import type { AuthenticatedRequest } from '../types/express';
 import { getUserMetadata, getEventNotificationPreferences, getCheckInReminderPreferences } from '@shared/types';
 import type { EventNotificationPreferences, CheckInReminderPreferences } from '@shared/types';
 import { db } from '../db';
-import { eventCheckInReminders, eventReminderSnoozes } from '@shared/schema';
+import { eventReminderSnoozes } from '@shared/schema';
 import { and, eq } from 'drizzle-orm';
 
 interface DashboardItem {
@@ -564,12 +564,8 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     });
 
     // Defaults are the ONLY reminder settings (per-event customization was
-    // retired). The hourly job copies defaults onto each assigned event, so
-    // clear this user's existing copies — the next run (:15 past the hour)
-    // re-creates them from the new defaults for all their active events.
-    await db
-      .delete(eventCheckInReminders)
-      .where(eq(eventCheckInReminders.userId, fullUser.id));
+    // retired). The hourly sync brings this user's per-event rows in line
+    // with the new settings within the hour, keeping their schedules intact.
     // Per-event pauses had their own controls, which were retired with
     // per-event settings. Clear them so new settings actually take effect.
     await db

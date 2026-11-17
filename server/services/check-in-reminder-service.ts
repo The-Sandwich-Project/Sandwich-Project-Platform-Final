@@ -118,7 +118,10 @@ function missingEventInfo(event: ReminderEvent): string[] {
   const estimate = estimateStateFromFields(event as any);
   const hasCount = !!estimate.total || estimate.lines.some(l => l.amount);
   if (!hasCount) missing.push('the sandwich count');
-  if (estimate.lines.length === 0) missing.push('the sandwich types');
+  // No types at all, or some sandwiches still marked "unknown" type
+  if (estimate.lines.length === 0 || estimate.lines.some(l => l.type === 'unknown')) {
+    missing.push('the sandwich types');
+  }
   return missing;
 }
 
@@ -386,8 +389,14 @@ async function sendReminderSMS(
 /** Statuses where an assigned TSP contact gets reminders. */
 const REMINDER_STATUSES = ['new', 'in_process', 'scheduled', 'rescheduled', 'stalled'];
 
+/**
+ * The event's current TSP contact: tspContact is authoritative; the legacy
+ * tspContactAssigned only counts when tspContact is empty. (After a
+ * reassignment the legacy field can still hold the former contact.)
+ */
 function isAssignedTo(event: { tspContact?: string | null; tspContactAssigned?: string | null }, userId: string): boolean {
-  return event.tspContact === userId || event.tspContactAssigned === userId;
+  const current = event.tspContact || event.tspContactAssigned || null;
+  return current === userId;
 }
 
 /**
@@ -475,6 +484,9 @@ async function baselineUserBacklog(user: typeof users.$inferSelect, ctx: RunCont
 
   // event id -> labels of rules already triggered
   const backlog = new Map<number, string[]>();
+  // Rows to pause for the grace period. Applied only after the summary's bell
+  // entry is saved, so a failure there can't silence reminders for a week.
+  const graceRowIds: number[] = [];
   const graceUntil = new Date();
   graceUntil.setDate(graceUntil.getDate() + BACKLOG_GRACE_DAYS);
   graceUntil.setHours(9, 0, 0, 0);
@@ -515,10 +527,7 @@ async function baselineUserBacklog(user: typeof users.$inferSelect, ctx: RunCont
       ctx.summarizedRowIds.add(row.id);
       continue;
     }
-    await db
-      .update(eventCheckInReminders)
-      .set({ nextDueAt: graceUntil, updatedAt: new Date() })
-      .where(eq(eventCheckInReminders.id, row.id));
+    graceRowIds.push(row.id);
   }
 
   if (ctx.dryRun) {
@@ -563,10 +572,18 @@ async function baselineUserBacklog(user: typeof users.$inferSelect, ctx: RunCont
       message,
       category: 'events',
       relatedType: 'event_request_summary',
-      actionUrl: '/dashboard?section=event-requests&tab=my_assignments',
-      actionText: 'Open my events',
+      actionUrl: '/dashboard?section=event-requests&tab=all',
+      actionText: 'Open events',
       metadata: { eventIds: items.map(i => i.id), source: 'check_in_reminder_summary' },
     });
+
+    // The summary is saved in the bell; now pause the summarized reminders.
+    if (graceRowIds.length) {
+      await db
+        .update(eventCheckInReminders)
+        .set({ nextDueAt: graceUntil, updatedAt: new Date() })
+        .where(inArray(eventCheckInReminders.id, graceRowIds));
+    }
 
     const prefs = getCheckInReminderPreferences(user);
     const email = user.preferredEmail || user.email;
@@ -616,7 +633,7 @@ async function baselineUserBacklog(user: typeof users.$inferSelect, ctx: RunCont
         try {
           await sendTSPFollowupReminderSMS(
             smsConsent.phoneNumber,
-            `TSP: ${count === 1 ? '1 of your events' : `${count} of your events`} could use a look when you have time. ${baseUrl}/dashboard?section=event-requests&tab=my_assignments`,
+            `TSP: ${count === 1 ? '1 of your events' : `${count} of your events`} could use a look when you have time. ${baseUrl}/dashboard?section=event-requests&tab=all`,
           );
         } catch (error) {
           logger.error(`[CheckInReminders] Failed to send backlog summary SMS to user ${user.id}:`, error);
@@ -695,7 +712,14 @@ async function syncReminderRows(ctx: RunContext): Promise<number> {
         .from(eventRequests)
         .where(
           and(
-            or(eq(eventRequests.tspContactAssigned, user.id), eq(eventRequests.tspContact, user.id)),
+            // Same rule as isAssignedTo: tspContact wins; legacy field only if empty
+            or(
+              eq(eventRequests.tspContact, user.id),
+              and(
+                sql`(${eventRequests.tspContact} IS NULL OR ${eventRequests.tspContact} = '')`,
+                eq(eventRequests.tspContactAssigned, user.id),
+              ),
+            ),
             sql`${eventRequests.status} IN (${sql.join(REMINDER_STATUSES.map(st => sql`${st}`), sql`, `)})`,
             sql`${eventRequests.deletedAt} IS NULL`,
           ),
@@ -728,7 +752,11 @@ async function syncReminderRows(ctx: RunContext): Promise<number> {
         const patch: Partial<typeof eventCheckInReminders.$inferInsert> = {};
         if (!row.enabled) {
           patch.enabled = true;
-          patch.nextDueAt = calculateNextDue('daily');
+          patch.nextDueAt = calculateNextDue(
+            isConditionBasedRule(want.rule.ruleType)
+              ? CONDITION_CHECK_FREQUENCY
+              : want.rule.frequency as ReminderFrequency,
+          );
         }
         if (row.thresholdDays !== want.rule.thresholdDays) patch.thresholdDays = want.rule.thresholdDays;
         if (row.frequency !== want.rule.frequency) patch.frequency = want.rule.frequency;

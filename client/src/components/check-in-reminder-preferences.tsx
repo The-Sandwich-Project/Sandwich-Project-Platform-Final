@@ -143,9 +143,14 @@ export default function CheckInReminderPreferencesEditor() {
     () =>
       RULE_TYPES.map((rt) => {
         const existing = serverPrefs?.corporateRules?.find((r) => r.ruleType === rt.ruleType);
+        // No corporate set saved yet: corporate events currently follow the
+        // standard rules, so start from those (saving must not silently turn
+        // corporate reminders off).
+        const standard = serverPrefs?.rules?.find((r) => r.ruleType === rt.ruleType);
+        const fallbackEnabled = !serverPrefs?.corporateRules ? standard?.enabled ?? false : false;
         return {
           ruleType: rt.ruleType,
-          enabled: existing?.enabled ?? false,
+          enabled: existing?.enabled ?? fallbackEnabled,
           thresholdDays: existing?.thresholdDays ?? (CORPORATE_THRESHOLD_DEFAULTS[rt.ruleType] ?? rt.defaultThreshold),
           frequency: existing?.frequency ?? 'every_3_days',
         };
@@ -461,7 +466,7 @@ function RuleSection({
             </div>
 
             {rule.enabled && (
-              <div className="flex items-center gap-2 pl-10">
+              <div className="flex flex-wrap items-center gap-2 pl-10">
                 {isFreqBased ? (
                   <>
                     <span className="text-xs text-gray-500">Remind me</span>
@@ -499,6 +504,22 @@ function RuleSection({
                     <span className="text-xs text-gray-500 whitespace-nowrap">
                       {rt.thresholdLabel}
                     </span>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">, then remind me</span>
+                    <Select
+                      value={rule.frequency}
+                      onValueChange={(val) => onFrequency(rt.ruleType, val as ReminderFrequency)}
+                    >
+                      <SelectTrigger className="w-32 h-7 text-xs" aria-label={`How often to repeat: ${rt.label}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FREQUENCY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </>
                 )}
               </div>
