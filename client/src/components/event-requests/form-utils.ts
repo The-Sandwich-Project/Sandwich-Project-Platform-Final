@@ -233,8 +233,6 @@ export function buildEventDataForServer(
     }),
     toolkitSentDate: serializeDateToISO(formData.toolkitSentDate),
 
-    // Corporate priority
-    isCorporatePriority: formData.isCorporatePriority || false,
 
     // Standby
     standbyExpectedDate: (() => {

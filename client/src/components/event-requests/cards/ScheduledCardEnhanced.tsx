@@ -25,7 +25,6 @@ import {
   Clock,
   Package,
   MapPin,
-  Building,
   Building2,
   Edit2,
   Save,
@@ -1159,7 +1158,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             </div>
           )}
 
-
           {/* Status & Action Badges — visually tiered.
               Two-tier rule of thumb applied across all chips below:
                 STATUS (informational, no action required): muted gray
@@ -1228,15 +1226,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             </Badge>
 
             {request.isMlkDayEvent && <MlkDayBadge />}
-
-            {/* Corporate Badge */}
-            {(request as any).isCorporatePriority && (
-              <Badge className="bg-gradient-to-br from-[#B8860B] to-[#DAA520] text-white text-xs sm:text-sm font-medium flex items-center gap-1">
-                <Building className="w-3 h-3" />
-                <span className="hidden sm:inline">Corporate</span>
-                <span className="sm:hidden">Corp</span>
-              </Badge>
-            )}
 
             <RefrigerationWarningBadge
               sandwichTypes={request.sandwichTypes}
@@ -3830,7 +3819,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
           </div>
         )}
 
-
         {/* Action Buttons Row — actions grouped by purpose with thin vertical dividers:
             (1) organizer outreach, (2) recipient SMS, (3) team coordination,
             (4) event management, (5) official calendar/sheet, and finally the
@@ -4328,7 +4316,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
           </div>
         )}
       </CardContent>
-
 
       {/* Driver / Volunteer Instructions Dialog */}
       <Dialog open={showInstructionsDialog} onOpenChange={setShowInstructionsDialog}>

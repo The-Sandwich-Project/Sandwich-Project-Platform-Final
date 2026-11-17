@@ -2,7 +2,7 @@
  * Notification Tiering System for TSP Event Management
  *
  * This module defines the notification hierarchy to prevent alert fatigue:
- * - URGENT (SMS): Requires immediate action - new assignments, approaching deadlines, corporate escalations
+ * - URGENT (SMS): Requires immediate action - new assignments, approaching deadlines
  * - IMPORTANT (Rich Email): Actionable but not time-critical - comments, changes, follow-up reminders
  * - DIGEST (Weekly Email): Operational overview - portfolio summary, completed events, next actions
  */
@@ -34,7 +34,6 @@ export type EventNotificationType =
   // URGENT TIER - SMS
   | 'tsp_contact_assigned'           // You've been assigned to a new event
   | 'event_approaching_incomplete'   // Event in X days but not scheduled yet
-  | 'corporate_no_contact_24h'       // Corporate event with no successful contact in 24hrs
 
   // IMPORTANT TIER - Rich Email
   | 'event_comment_added'            // Someone commented on your event
@@ -65,13 +64,6 @@ export const NOTIFICATION_TIER_CONFIG: Record<EventNotificationType, Notificatio
     description: 'Event approaching but not yet scheduled',
     digestable: false,
     priority: 2,
-  },
-  corporate_no_contact_24h: {
-    tier: 'urgent',
-    channel: 'sms',
-    description: 'Corporate event needs immediate contact',
-    digestable: false,
-    priority: 1,
   },
 
   // IMPORTANT - Rich Email
@@ -293,56 +285,6 @@ export function getLastContactAttemptTime(
   return null;
 }
 
-/**
- * Check if a corporate event needs 24-hour escalation SMS
- * Criteria: Corporate priority + no successful contact + 24+ hours since assignment or last attempt
- */
-export function needsCorporate24hEscalation(
-  isCorporatePriority: boolean,
-  status: string,
-  tspContactAssignedDate: Date | string | null,
-  lastContactAttempt: Date | string | null,
-  contactAttemptsLog: ContactAttemptLogEntry[] | null,
-  corporateFollowUpProtocol: CorporateFollowUpProtocol | null
-): boolean {
-  // Only applies to corporate priority events
-  if (!isCorporatePriority) {
-    return false;
-  }
-
-  // Skip if already has successful contact
-  if (hasSuccessfulContact(status, contactAttemptsLog, corporateFollowUpProtocol)) {
-    return false;
-  }
-
-  // Skip terminal/inactive statuses
-  if (['completed', 'declined', 'cancelled', 'stalled', 'standby', 'scheduled', 'non_event'].includes(status)) {
-    return false;
-  }
-
-  // Determine the reference time (assignment date or last attempt)
-  const lastAttemptTime = getLastContactAttemptTime(lastContactAttempt, contactAttemptsLog);
-  const assignmentTime = tspContactAssignedDate ? new Date(tspContactAssignedDate) : null;
-
-  // Use whichever is more recent
-  let referenceTime: Date | null = null;
-  if (lastAttemptTime && assignmentTime) {
-    referenceTime = lastAttemptTime > assignmentTime ? lastAttemptTime : assignmentTime;
-  } else {
-    referenceTime = lastAttemptTime || assignmentTime;
-  }
-
-  if (!referenceTime) {
-    // No reference time means we can't determine, but corporate events should always have assignment date
-    logger.warn('Corporate event missing both assignment date and contact attempts');
-    return false;
-  }
-
-  // Check if 24+ hours have passed
-  const hoursSinceReference = (Date.now() - referenceTime.getTime()) / (1000 * 60 * 60);
-
-  return hoursSinceReference >= 24;
-}
 
 // ============================================================================
 // EVENT APPROACHING CRITERIA
@@ -486,13 +428,10 @@ export function getNextActionForEvent(
   lastContactAttempt: Date | string | null,
   eventDate: Date | string | null,
   toolkitStatus: string | null,
-  isCorporatePriority: boolean
 ): string {
   switch (status) {
     case 'new':
-      return isCorporatePriority
-        ? 'CALL TODAY - Corporate priority, make initial contact'
-        : 'Make initial contact with organization';
+      return 'Make initial contact with organization';
 
     case 'in_process':
       const daysSinceContact = lastContactAttempt
@@ -539,20 +478,7 @@ export function getEventUrgency(
   status: string,
   eventDate: Date | string | null,
   lastContactAttempt: Date | string | null,
-  isCorporatePriority: boolean
 ): 'high' | 'medium' | 'low' {
-  // Corporate priority is always at least medium (but only for active events)
-  if (isCorporatePriority && !['completed', 'declined', 'cancelled', 'stalled', 'standby', 'scheduled', 'non_event'].includes(status)) {
-    // Check if it needs escalation
-    const daysSinceContact = lastContactAttempt
-      ? (Date.now() - new Date(lastContactAttempt).getTime()) / (1000 * 60 * 60 * 24)
-      : 999;
-
-    if (daysSinceContact >= 1) {
-      return 'high';
-    }
-    return 'medium';
-  }
 
   // Event approaching but not scheduled
   if (eventDate && ['new', 'in_process'].includes(status)) {
@@ -590,7 +516,6 @@ export default {
   isDigestable,
   hasSuccessfulContact,
   getLastContactAttemptTime,
-  needsCorporate24hEscalation,
   isEventApproachingIncomplete,
   needsWeeklyContactReminder,
   shouldEscalateToAdmin,

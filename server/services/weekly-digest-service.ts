@@ -75,13 +75,11 @@ async function getActiveEventsForContact(tspContactId: string): Promise<DigestEv
         event.lastContactAttempt,
         eventDate,
         event.toolkitStatus,
-        event.isCorporatePriority || false
       ),
       urgency: getEventUrgency(
         event.status || 'new',
         eventDate,
         event.lastContactAttempt,
-        event.isCorporatePriority || false
       ),
       daysSinceLastContact,
       contactName: event.contactName || null,
