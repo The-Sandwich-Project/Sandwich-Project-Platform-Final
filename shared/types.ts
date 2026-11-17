@@ -72,7 +72,7 @@ export interface DefaultReminderRule {
 /**
  * Global Check-In Reminder Preferences
  * Stored in user metadata. One set of reminder rules per person that applies
- * to every event they're the TSP contact for (no per-event or corporate tiers).
+ * to every event they're the TSP contact for.
  */
 export interface CheckInReminderPreferences {
   /** Whether the user has configured their defaults (false = never set up) */
@@ -81,8 +81,6 @@ export interface CheckInReminderPreferences {
   defaultChannel: 'email' | 'sms' | 'both';
   /** Reminder rules and their thresholds (all events) */
   rules: DefaultReminderRule[];
-  /** @deprecated Corporate events no longer have separate rules; ignored if present in old saved data. */
-  corporateRules?: DefaultReminderRule[];
 }
 
 /**
