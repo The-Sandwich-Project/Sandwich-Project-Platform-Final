@@ -31,9 +31,14 @@ router.get('/dry-run', async (req: any, res) => {
     const result = await processCheckInReminders({ dryRun: true });
     const summaries = result.plan.filter(e => e.kind === 'summary');
     const reminders = result.plan.filter(e => e.kind === 'reminder');
-    res.json({
+    const complete = result.errors === 0;
+    res.status(complete ? 200 : 500).json({
       dryRun: true,
-      note: 'Nothing was sent. This is what the reminder job would send if it ran now.',
+      complete,
+      errors: result.errors,
+      note: complete
+        ? 'Nothing was sent. This is what the reminder job would send if it ran now.'
+        : `Nothing was sent, but ${result.errors} part(s) of the dry run failed (see server logs), so this list is INCOMPLETE. Fix the errors and run it again before relying on it.`,
       totals: {
         people: new Set(result.plan.map(e => e.userId)).size,
         summaries: summaries.length,

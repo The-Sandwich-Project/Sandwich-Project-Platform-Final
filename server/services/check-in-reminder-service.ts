@@ -27,7 +27,6 @@ import { sendTSPFollowupReminderSMS } from '../sms-service';
 import {
   calculateNextDue,
   ReminderFrequency,
-  CONDITION_COOLDOWN_FREQUENCY,
   CONDITION_CHECK_FREQUENCY,
 } from '../utils/reminder-scheduling';
 
@@ -121,7 +120,9 @@ function missingEventInfo(event: ReminderEvent): string[] {
   // Normalize with the shared helper: handles JSON-string sandwichTypes,
   // ranges, and the legacy estimatedSandwichRangeType field.
   const estimate = estimateStateFromFields(event as any);
-  const hasCount = !!estimate.total || estimate.lines.some(l => l.amount);
+  // A count is known if there's a total, or every type line has an amount
+  // (150 deli + PBJ amount TBD doesn't tell us the count).
+  const hasCount = !!estimate.total || (estimate.lines.length > 0 && estimate.lines.every(l => l.amount));
   if (!hasCount) missing.push('the sandwich count');
   // No types at all, or some sandwiches still marked "unknown" type
   if (estimate.lines.length === 0 || estimate.lines.some(l => l.type === 'unknown')) {
@@ -438,6 +439,10 @@ type RunContext = {
   plan: DryRunEntry[];
   /** Rows the (dry-run) summary covered, so the send loop doesn't list them twice */
   summarizedRowIds: Set<number>;
+  /** When this run started; rows due at or before it are processed this run */
+  runStartedAt: Date;
+  /** Failures in sync/summary (the per-reminder loop counts its own) */
+  errors: number;
 };
 
 function plannedChannels(user: typeof users.$inferSelect, channel: string): { wouldEmail: string | null; wouldText: string | null } {
@@ -460,7 +465,11 @@ const BACKLOG_GRACE_DAYS = 7;
  * problems that arise later fire individually. Runs again after the user
  * saves new settings (the baseline is cleared then).
  */
-async function baselineUserBacklog(user: typeof users.$inferSelect, ctx: RunContext): Promise<void> {
+async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: RunContext): Promise<void> {
+  // Re-read the account: the sync for this user may have taken a while, and a
+  // summary must not go to an account deactivated in the meantime.
+  const [user] = await db.select().from(users).where(eq(users.id, staleUser.id)).limit(1);
+  if (!user || user.isActive === false) return;
   const metadata = getUserMetadata(user);
   if (metadata.checkInRemindersBaselinedAt) return;
 
@@ -580,7 +589,11 @@ async function baselineUserBacklog(user: typeof users.$inferSelect, ctx: RunCont
     if (graceRowIds.length) {
       await db
         .update(eventCheckInReminders)
-        .set({ nextDueAt: graceUntil, updatedAt: new Date() })
+        // Push out to the grace date, but never pull an already-later date in
+        .set({
+          nextDueAt: sql`GREATEST(COALESCE(${eventCheckInReminders.nextDueAt}, ${graceUntil.toISOString()}::timestamp), ${graceUntil.toISOString()}::timestamp)`,
+          updatedAt: new Date(),
+        })
         .where(inArray(eventCheckInReminders.id, graceRowIds));
     }
 
@@ -751,11 +764,11 @@ async function syncReminderRows(ctx: RunContext): Promise<number> {
         const patch: Partial<typeof eventCheckInReminders.$inferInsert> = {};
         if (!row.enabled) {
           patch.enabled = true;
-          patch.nextDueAt = calculateNextDue(
-            isConditionBasedRule(want.rule.ruleType)
-              ? CONDITION_CHECK_FREQUENCY
-              : want.rule.frequency as ReminderFrequency,
-          );
+          // Conditions are checked right away (this run); general rules wait
+          // for their frequency.
+          patch.nextDueAt = isConditionBasedRule(want.rule.ruleType)
+            ? ctx.runStartedAt
+            : calculateNextDue(want.rule.frequency as ReminderFrequency);
         }
         if (row.thresholdDays !== want.rule.thresholdDays) patch.thresholdDays = want.rule.thresholdDays;
         if (row.frequency !== want.rule.frequency) patch.frequency = want.rule.frequency;
@@ -783,7 +796,8 @@ async function syncReminderRows(ctx: RunContext): Promise<number> {
           // out. Conditions are still checked daily (see processor).
           frequency: rule.frequency,
           channel: prefs.defaultChannel,
-          nextDueAt: calculateNextDue(isCondBased ? CONDITION_CHECK_FREQUENCY : rule.frequency as ReminderFrequency),
+          // Check conditions this run; general rules wait for their frequency
+          nextDueAt: isCondBased ? ctx.runStartedAt : calculateNextDue(rule.frequency as ReminderFrequency),
         }).onConflictDoNothing(); // unique index prevents duplicates
         changed++;
       }
@@ -792,13 +806,74 @@ async function syncReminderRows(ctx: RunContext): Promise<number> {
       try {
         await baselineUserBacklog(user, ctx);
       } catch (error) {
+        ctx.errors++;
         logger.error(`[CheckInReminders] Backlog summary failed for user ${user.id}:`, error);
       }
     }
   } catch (error) {
+    ctx.errors++;
     logger.error('[CheckInReminders] Error syncing reminder rows:', error);
   }
   return changed;
+}
+
+/**
+ * Dry run of the send loop: the same checks as the real loop (event still
+ * active, current contact, account active, rule not retired, not paused,
+ * condition met), recorded in ctx.plan. Strictly read-only: no schedule,
+ * pause, row, bell or delivery writes. Returns how many reminders errored.
+ */
+async function previewDueReminders(
+  dueReminders: (typeof eventCheckInReminders.$inferSelect)[],
+  ctx: RunContext,
+): Promise<number> {
+  let errors = 0;
+  const now = new Date();
+  for (const reminder of dueReminders) {
+    try {
+      if (ctx.summarizedRowIds.has(reminder.id)) continue; // in this run's summary
+      if (RETIRED_RULE_TYPES.has(reminder.ruleType)) continue;
+      const [event] = await db.select().from(eventRequests).where(eq(eventRequests.id, reminder.eventRequestId)).limit(1);
+      if (!event || event.deletedAt) continue;
+      if (['completed', 'declined', 'cancelled'].includes(event.status || '')) continue;
+      if (!isAssignedTo(event, reminder.userId)) continue;
+      const [user] = await db.select().from(users).where(eq(users.id, reminder.userId)).limit(1);
+      if (!user || user.isActive === false) continue;
+      const [snooze] = await db
+        .select()
+        .from(eventReminderSnoozes)
+        .where(and(
+          eq(eventReminderSnoozes.eventRequestId, event.id),
+          eq(eventReminderSnoozes.userId, reminder.userId),
+          eq(eventReminderSnoozes.active, true),
+        ))
+        .limit(1);
+      if (snooze) {
+        const last = lastContactDate(event);
+        const paused = snooze.snoozeType === 'until_contact'
+          ? !(last && last > snooze.createdAt)
+          : !!snooze.snoozedUntil && now <= snooze.snoozedUntil;
+        if (paused) continue;
+      }
+      if (!evaluateRuleCondition(reminder.ruleType, reminder.thresholdDays || 7, event)) continue;
+
+      const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
+      const entry: DryRunEntry = {
+        kind: 'reminder',
+        userId: user.id,
+        userName: user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id,
+        ...plannedChannels(user, reminder.channel),
+        subject: msg.subject,
+        events: [{ id: event.id, organization: event.organizationName || 'Unknown Organization', detail: msg.short }],
+      };
+      ctx.plan.push(entry);
+      logger.info(`[CheckInReminders][DRY RUN] would send to ${entry.userName}: ${msg.subject}`);
+    } catch (error) {
+      errors++;
+      logger.error(`[CheckInReminders][DRY RUN] Error previewing reminder ${reminder.id}:`, error);
+    }
+  }
+  return errors;
 }
 
 export async function processCheckInReminders(options: { dryRun?: boolean } = {}): Promise<{
@@ -817,6 +892,8 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
     dryRun: options.dryRun ?? isCheckInReminderDryRun(),
     plan: [],
     summarizedRowIds: new Set(),
+    runStartedAt: now,
+    errors: 0,
   };
   if (ctx.dryRun) {
     logger.info('[CheckInReminders][DRY RUN] Starting: nothing will be sent or marked as sent');
@@ -841,10 +918,16 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
       );
 
     if (dueReminders.length === 0) {
-      return { processed: 0, sent: 0, errors: 0, dryRun: ctx.dryRun, plan: ctx.plan };
+      return { processed: 0, sent: 0, errors: ctx.errors, dryRun: ctx.dryRun, plan: ctx.plan };
     }
 
     logger.info(`[CheckInReminders] Processing ${dueReminders.length} due reminders`);
+
+    if (ctx.dryRun) {
+      // Read-only: evaluate the same checks as the real loop, write nothing.
+      const previewErrors = await previewDueReminders(dueReminders, ctx);
+      return { processed: dueReminders.length, sent: 0, errors: ctx.errors + previewErrors, dryRun: true, plan: ctx.plan };
+    }
 
     // Prefetch all active snoozes for the affected event+user pairs to avoid per-reminder N+1 queries.
     const affectedEventIds = [...new Set(dueReminders.map(r => r.eventRequestId))];
@@ -1016,25 +1099,12 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
         const userName = user.displayName || user.firstName || 'there';
         const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
 
-        if (ctx.dryRun) {
-          // Already covered by this run's (dry-run) summary? Don't list twice.
-          if (ctx.summarizedRowIds.has(reminder.id)) continue;
-          const entry: DryRunEntry = {
-            kind: 'reminder',
-            userId: user.id,
-            userName: user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id,
-            ...plannedChannels(user, reminder.channel),
-            subject: msg.subject,
-            events: [{ id: event.id, organization: event.organizationName || 'Unknown Organization', detail: msg.short }],
-          };
-          ctx.plan.push(entry);
-          logger.info(`[CheckInReminders][DRY RUN] would send to ${entry.userName}: ${msg.subject}`);
-          continue; // no bell, no email/SMS, no sent timestamp
-        }
 
         // Always record the reminder in the in-app notification bell first,
         // so it exists even if email/SMS isn't configured or fails to send.
-        try {
+        // If this insert fails, the error goes to the per-reminder catch and
+        // the row stays due for a retry next run (nothing sent, nothing marked).
+        {
           await db.insert(notifications).values({
             userId: reminder.userId,
             type: 'reminder',
@@ -1048,8 +1118,6 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
             actionText: 'Open the event',
             metadata: { eventId: event.id, ruleType: reminder.ruleType, source: 'check_in_reminder' },
           });
-        } catch (notifError) {
-          logger.error(`[CheckInReminders] Failed to create in-app notification for reminder ${reminder.id}:`, notifError);
         }
 
         let emailSent = false;
@@ -1074,14 +1142,9 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
           sent++;
         }
 
-        // Update lastSentAt and calculate next due date. Repeat at the user's
-        // configured frequency (e.g. weekly). Legacy condition rows stored
-        // 'daily' as their frequency; give those the old cooldown instead of
-        // repeating every day.
-        const repeat = isConditionBasedRule(reminder.ruleType) && reminder.frequency === 'daily'
-          ? CONDITION_COOLDOWN_FREQUENCY
-          : (reminder.frequency as ReminderFrequency);
-        const nextDue = calculateNextDue(repeat);
+        // Update lastSentAt; repeat at the user's chosen frequency (the sync
+        // has already copied their current setting onto this row).
+        const nextDue = calculateNextDue(reminder.frequency as ReminderFrequency);
         await db
           .update(eventCheckInReminders)
           .set({
