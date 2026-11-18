@@ -8,7 +8,7 @@ import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Shared test state for the mocked API
-const api: { smsStatus: any; prefs: any; calls: Array<[string, string, any]> } = {
+const api: { smsStatus: any; prefs: any; failSave?: boolean; calls: Array<[string, string, any]> } = {
   smsStatus: null,
   prefs: null,
   calls: [],
@@ -27,6 +27,10 @@ jest.mock('@/lib/queryClient', () => ({
     if (url === '/api/users/sms-opt-in') {
       api.smsStatus = { hasConfirmedOptIn: false, isPendingConfirmation: true, phoneNumber: '+14045551234' };
       return { ok: true };
+    }
+    if (url === '/api/me/check-in-reminder-preferences' && method === 'PUT') {
+      if (api.failSave) throw new Error('save failed');
+      return {};
     }
     if (url === '/api/users/sms-confirm') {
       api.smsStatus = { hasConfirmedOptIn: true, isPendingConfirmation: false, phoneNumber: '+14045551234' };
@@ -65,6 +69,7 @@ jest.mock('@/components/ui/select', () => {
 });
 
 import CheckInReminderPreferencesEditor from '../check-in-reminder-preferences';
+import { ReminderSettingsButton } from '../event-requests/ReminderSettingsButton';
 
 function renderEditor() {
   return render(
@@ -82,6 +87,7 @@ describe('Reminder channel SMS gating', () => {
     api.calls = [];
     api.prefs = { configured: true, defaultChannel: 'email', rules: [] };
     api.smsStatus = { hasConfirmedOptIn: false, isPendingConfirmation: false, phoneNumber: null };
+    api.failSave = false;
   });
 
   it('blocks SMS and shows the setup notice when texts are not set up', async () => {
@@ -144,5 +150,42 @@ describe('Reminder channel SMS gating', () => {
     await waitFor(() => expect(channelSelect().value).toBe('both'));
     expect(screen.getByText(/Hit Save below/)).toBeInTheDocument();
     expect(screen.queryByTestId('sms-not-enabled-notice')).toBeNull();
+  });
+});
+
+describe('Reminders popup', () => {
+  beforeEach(() => {
+    mockQueryClient.clear();
+    api.calls = [];
+    api.prefs = { configured: true, defaultChannel: 'email', rules: [] };
+    api.smsStatus = { hasConfirmedOptIn: true, isPendingConfirmation: false, phoneNumber: '+1' };
+    api.failSave = false;
+  });
+
+  const openPopup = async () => {
+    render(
+      <QueryClientProvider client={mockQueryClient}>
+        <ReminderSettingsButton isMobile={false} />
+      </QueryClientProvider>
+    );
+    fireEvent.click(screen.getByTestId('button-reminder-settings'));
+    return screen.findByRole('button', { name: /save default reminder rules/i });
+  };
+
+  it('closes after a successful save', async () => {
+    fireEvent.click(await openPopup());
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.calls.some(([m, u]) => m === 'PUT' && u === '/api/me/check-in-reminder-preferences')).toBe(true);
+  });
+
+  it('stays open if the save fails', async () => {
+    api.failSave = true;
+    const save = await openPopup();
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(api.calls.some(([m]) => m === 'PUT')).toBe(true)
+    );
+    await waitFor(() => expect(save).toBeEnabled());
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

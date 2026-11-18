@@ -100,7 +100,12 @@ const FREQUENCY_OPTIONS = [
 // Component
 // ---------------------------------------------------------------------------
 
-export default function CheckInReminderPreferencesEditor() {
+export default function CheckInReminderPreferencesEditor({
+  onSaved,
+}: {
+  /** Called after a successful save — e.g. so a popup can close itself. */
+  onSaved?: () => void;
+} = {}) {
   const { toast } = useToast();
 
   // Fetch current preferences
@@ -183,6 +188,7 @@ export default function CheckInReminderPreferencesEditor() {
         description:
           'Your reminder settings now apply to all your events.',
       });
+      onSaved?.();
     },
     onError: () => {
       toast({

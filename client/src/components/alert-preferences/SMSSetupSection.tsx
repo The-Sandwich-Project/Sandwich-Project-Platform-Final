@@ -282,8 +282,8 @@ export function SMSSetupSection({
               <AlertDescription className="text-amber-800">
                 <strong>Verification required.</strong>
                 <br />
-                We sent a code to {userSMSStatus?.phoneNumber}. Enter it below or reply
-                "YES" to the text.
+                We sent a code to {userSMSStatus?.phoneNumber}. Type the code from
+                that text below.
               </AlertDescription>
             </Alert>
 
