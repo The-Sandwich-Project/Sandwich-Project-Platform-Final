@@ -31,6 +31,22 @@ import { USER_ROLES } from '@shared/auth-utils';
 import { ALERT_TYPES } from '@shared/alert-catalog';
 import { shouldSendOverChannel } from './notifications/preferences';
 
+
+/**
+ * Format a date-only value ("2026-11-26") as "Nov 26". These come from DATE
+ * columns as plain strings; new Date("2026-11-26") is UTC midnight, which is
+ * the previous evening in Eastern, so format in UTC to keep the calendar day.
+ */
+function formatDateOnly(value: string | null | undefined): string {
+  if (!value) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+  const d = m
+    ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+    : new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
 // ─── Data Gathering ────────────────────────────────────────────────
 
 interface PipelineSnapshot {
@@ -328,8 +344,8 @@ function buildDigestEmailHtml(data: AdminDigestData): string {
       <h3 style="color:${BRAND_PRIMARY};margin:24px 0 12px;font-size:16px;">🏫 Upcoming School Breaks &amp; Holidays</h3>
       <div style="margin:0;">
         ${data.upcomingTrackedItems.map(item => {
-          const start = new Date(item.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
-          const end = new Date(item.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+          const start = formatDateOnly(item.startDate);
+          const end = formatDateOnly(item.endDate);
           return `
           <div style="background:#fff8e1;border-left:3px solid #f39c12;padding:10px 14px;margin:8px 0;border-radius:4px;">
             <strong>${categoryEmoji(item.category)} ${item.title}</strong>
