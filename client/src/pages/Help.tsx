@@ -172,29 +172,6 @@ const HELP_TOPICS: HelpTopic[] = [
     },
   },
   {
-    id: 'dashboard-assignments',
-    title: 'Dashboard Assignments Widget',
-    description: 'Quick overview of your assignments on the main dashboard',
-    category: 'my-work',
-    icon: LayoutDashboard,
-    tourId: 'dashboard-assignments',
-    requiredPermissions: [PERMISSIONS.NAV_DASHBOARD],
-    content: {
-      summary: 'The dashboard provides a quick snapshot of your current assignments without navigating to different sections.',
-      steps: [
-        'Go to the main "Dashboard"',
-        'Locate the "My Assignments" widget',
-        'See at-a-glance what needs your attention',
-        'Click on any assignment to jump directly to that task',
-      ],
-      tips: [
-        'The dashboard shows your most urgent assignments first',
-        'Badges indicate the number of pending items',
-        'Use this as your daily starting point',
-      ],
-    },
-  },
-  {
     id: 'calendar-view',
     title: 'Calendar View & Status Symbols',
     description: 'Understanding the event calendar and status indicators',

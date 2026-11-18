@@ -186,7 +186,7 @@ export function RealTimeKudosNotifier() {
 
   const handleViewArchive = () => {
     // Navigate to the kudos archive page
-    window.location.hash = '#/dashboard?section=kudos';
+    window.location.assign('/dashboard?section=kudos');
   };
 
   // This component doesn't render anything - it only manages notifications

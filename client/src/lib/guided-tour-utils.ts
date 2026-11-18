@@ -16,6 +16,11 @@ export function markWelcomeTourPromptShown(userId: string): void {
   localStorage.setItem(`${WELCOME_PROMPT_KEY_PREFIX}${userId}`, 'shown');
 }
 
-export function getDefaultWelcomeTourId(hasEventPlanningAccess: boolean): string {
-  return hasEventPlanningAccess ? 'platform-getting-started' : 'dashboard-assignments';
+/**
+ * The welcome tour offered on first login. Everyone gets the Quick Start
+ * (sidebar + help button), which works for every role. (The old
+ * non-planner default toured the removed "My Action Tracker" widget.)
+ */
+export function getDefaultWelcomeTourId(_hasEventPlanningAccess?: boolean): string {
+  return 'platform-getting-started';
 }

@@ -12,8 +12,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { hasPermission } from '@shared/unified-auth-utils';
-import { PERMISSIONS } from '@shared/auth-utils';
 import {
   getDefaultWelcomeTourId,
   getWelcomeTourPromptState,
@@ -40,15 +38,7 @@ export function FirstLoginTourPrompt() {
 
   if (!user?.id) return null;
 
-  const userForPermissions = {
-    ...user,
-    permissions: (user.permissions as string[] | null) ?? null,
-  };
-  const hasEventPlanningAccess = hasPermission(
-    userForPermissions,
-    PERMISSIONS.NAV_EVENT_PLANNING
-  );
-  const tourId = getDefaultWelcomeTourId(hasEventPlanningAccess);
+  const tourId = getDefaultWelcomeTourId();
 
   const handleDismiss = () => {
     markWelcomeTourPromptShown(user.id);
@@ -62,7 +52,14 @@ export function FirstLoginTourPrompt() {
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        // Escape / click-outside count as "skip" so it doesn't come back every load.
+        if (!next) markWelcomeTourPromptShown(user.id);
+        setOpen(next);
+      }}
+    >
       <AlertDialogContent className="sm:max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
@@ -71,11 +68,12 @@ export function FirstLoginTourPrompt() {
           </AlertDialogTitle>
           <AlertDialogDescription className="text-left space-y-2 pt-1">
             <p>
-              New here? Take a short guided tour to learn where key tools live —
-              event planning, help guides, and your dashboard.
+              New here? Take a one-minute tour of the sidebar, where your tools
+              live, and the help button, where step-by-step guides for each
+              feature are.
             </p>
             <p className="text-xs text-muted-foreground">
-              You can always reopen tours from the blue help button in the
+              You can open tours anytime from the blue help button in the
               bottom-right corner.
             </p>
           </AlertDialogDescription>

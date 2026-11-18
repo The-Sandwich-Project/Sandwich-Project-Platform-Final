@@ -10,7 +10,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { AlarmClock, Loader2, Save, Info } from 'lucide-react';
+import { AlarmClock, Loader2, Save, Info, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -33,6 +33,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { DefaultReminderRule, CheckInReminderPreferences as Prefs } from '@shared/types';
+import { SmsQuickSetupDialog, useSmsStatus } from '@/components/sms-quick-setup-dialog';
 
 type ReminderChannel = Prefs['defaultChannel'];
 type ReminderFrequency = DefaultReminderRule['frequency'];
@@ -86,6 +87,8 @@ const CHANNEL_OPTIONS = [
   { value: 'both', label: 'Email & SMS' },
 ] as const;
 
+const usesSms = (channel: ReminderChannel) => channel === 'sms' || channel === 'both';
+
 const FREQUENCY_OPTIONS = [
   { value: 'daily', label: 'Daily' },
   { value: 'every_3_days', label: 'Every 3 days' },
@@ -125,6 +128,38 @@ export default function CheckInReminderPreferencesEditor() {
   const [channel, setChannel] = useState<ReminderChannel>(
     serverPrefs?.defaultChannel ?? 'email'
   );
+
+  // Text reminders only go out once the user has confirmed their number
+  // (the reminder job skips SMS otherwise). Until then, picking an SMS
+  // option shows a notice with a shortcut to the quick setup window.
+  // If the status can't be loaded, don't block the choice.
+  const { data: smsStatus, isError: smsStatusError } = useSmsStatus();
+  const smsReady = smsStatusError || !smsStatus || smsStatus.hasConfirmedOptIn;
+  const [blockedChannel, setBlockedChannel] = useState<ReminderChannel | null>(null);
+  const [smsSetupOpen, setSmsSetupOpen] = useState(false);
+  const [smsJustEnabled, setSmsJustEnabled] = useState(false);
+
+  const handleChannelChange = (value: ReminderChannel) => {
+    setSmsJustEnabled(false);
+    if (usesSms(value) && !smsReady) {
+      setBlockedChannel(value);
+      return;
+    }
+    setBlockedChannel(null);
+    setChannel(value);
+  };
+
+  const handleSmsEnabled = () => {
+    if (blockedChannel) {
+      setChannel(blockedChannel);
+      setBlockedChannel(null);
+      setSmsJustEnabled(true);
+    }
+  };
+
+  // A saved SMS choice from before texts were set up: those texts aren't sending.
+  const savedSmsNotSending =
+    !smsReady && !blockedChannel && usesSms(channel);
 
   // Reset local state when server data changes (e.g. after a reload or cache update).
   // `defaultRules` is a useMemo value derived solely from
@@ -215,7 +250,7 @@ export default function CheckInReminderPreferencesEditor() {
           </Label>
           <Select
             value={channel}
-            onValueChange={(value) => setChannel(value as ReminderChannel)}
+            onValueChange={(value) => handleChannelChange(value as ReminderChannel)}
           >
             <SelectTrigger className="w-40 h-8 text-sm">
               <SelectValue />
@@ -224,11 +259,51 @@ export default function CheckInReminderPreferencesEditor() {
               {CHANNEL_OPTIONS.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
+                  {usesSms(opt.value) && !smsReady && (
+                    <span className="text-xs text-gray-500"> (needs setup)</span>
+                  )}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+
+        {(blockedChannel || savedSmsNotSending) && (
+          <Alert className="border-amber-200 bg-amber-50" data-testid="sms-not-enabled-notice">
+            <Smartphone className="h-4 w-4 text-amber-700" />
+            <AlertDescription className="text-amber-900">
+              <p>
+                {blockedChannel
+                  ? "Text messages aren't turned on for your account yet, so we can't send reminders by text."
+                  : "Your reminders are set to text you, but text messages aren't turned on for your account yet, so no texts are being sent."}
+              </p>
+              <Button
+                size="sm"
+                className="mt-2 bg-[#007E8C] hover:bg-[#006570] text-white"
+                onClick={() => setSmsSetupOpen(true)}
+                data-testid="button-open-sms-setup"
+              >
+                Set up text messages
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {smsJustEnabled && (
+          <Alert className="border-green-200 bg-green-50">
+            <Info className="h-4 w-4 text-green-700" />
+            <AlertDescription className="text-green-900">
+              Text messages are on. Hit Save below to start getting reminders by text.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <SmsQuickSetupDialog
+          open={smsSetupOpen}
+          onOpenChange={setSmsSetupOpen}
+          onEnabled={handleSmsEnabled}
+          reason="Confirm your mobile number so we can text you event reminders."
+        />
 
         {!serverPrefs?.configured && (
           <Alert>

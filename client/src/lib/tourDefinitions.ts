@@ -90,7 +90,7 @@ export const TOURS: Tour[] = [
         id: 'platform-help',
         title: 'Guided Tours & Help',
         description:
-          'Tap the blue help button anytime to browse step-by-step tours for specific features — like Driver Planning, school breaks, and more.',
+          'Tap the blue help button anytime to browse step-by-step tours for specific features — like Event Planning, Driver Planning, Logging Collections, and more.',
         targetSelector: '[data-testid="tour-help-button"]',
         position: 'top',
         highlightPadding: 12,
@@ -422,64 +422,6 @@ export const TOURS: Tour[] = [
         const myAssignmentsTab = document.querySelector('[data-tour="my-assignments-tab"]');
         if (myAssignmentsTab instanceof HTMLElement) {
           myAssignmentsTab.click();
-        }
-      }, 300);
-    }
-  },
-  {
-    id: 'dashboard-assignments',
-    title: 'My Action Tracker Overview',
-    description: 'Quick view of your assignments and action items on the dashboard',
-    category: 'my-work',
-    icon: 'LayoutDashboard',
-    estimatedTime: '1 min',
-    steps: [
-      {
-        id: 'dash-assignments-intro',
-        title: 'Dashboard Quick View',
-        description: 'Your dashboard shows a quick overview of all your assigned projects, events, tasks, and messages.',
-        targetSelector: '[data-tour="navigation"]',
-        position: 'right'
-      },
-      {
-        id: 'dash-nav',
-        title: 'Go to Dashboard',
-        description: 'Let\'s navigate to the main Dashboard for an overview.',
-        targetSelector: '[data-nav-id="dashboard"]',
-        position: 'right',
-        navigationAction: {
-          section: 'dashboard'
-        },
-        beforeShow: () => {
-          const navItem = document.querySelector('[data-nav-id="dashboard"]');
-          if (navItem instanceof HTMLElement) {
-            navItem.click();
-          }
-        }
-      },
-      {
-        id: 'dash-action-tracker',
-        title: 'My Action Tracker',
-        description: 'This widget shows all your assigned work and communications. It displays projects, events, tasks, and messages that need your attention.',
-        targetSelector: '[data-testid="dashboard-action-tracker"]',
-        position: 'top',
-        highlightPadding: 16
-      },
-      {
-        id: 'dash-action-cards',
-        title: 'Action Categories',
-        description: 'Your assignments are organized into cards: Projects, Events, Tasks, and Messages. Click on any item to jump directly to it!',
-        targetSelector: '[data-testid="projects-card"], [data-testid="events-card"]',
-        position: 'bottom',
-        highlightPadding: 12
-      }
-    ],
-    afterComplete: () => {
-      // User is already on Dashboard - stay there
-      setTimeout(() => {
-        const navItem = document.querySelector('[data-nav-id="dashboard"]');
-        if (navItem instanceof HTMLElement) {
-          navItem.click();
         }
       }, 300);
     }
@@ -1335,7 +1277,7 @@ export const TOURS: Tour[] = [
   {
     id: 'event-reminders-walkthrough',
     title: 'Event Reminders',
-    description: 'Learn how to set up automatic reminders so you never miss an event deadline — unfilled roles, missing details, and more.',
+    description: 'Learn how to set up automatic check-in reminders for the events you\'re the TSP contact for.',
     category: 'events-calendar',
     icon: 'Bell',
     estimatedTime: '3 min',
@@ -1349,7 +1291,7 @@ export const TOURS: Tour[] = [
       {
         id: 'reminders-intro',
         title: 'Introducing Event Reminders',
-        description: 'The new Reminders feature helps you stay on top of your events automatically. It works in two layers: global defaults (set once in your profile) and per-event controls (on each event card). Let\'s walk through both!',
+        description: 'Reminders nudge you about the events you\'re the TSP contact for, like when no contact has been logged for a while or an event is coming up with missing info. You set them up once and they apply to all your events. You can open the same settings from Profile → Alerts or from the Reminders button on the Event Requests page.',
         targetSelector: '[data-nav-id="event-requests"]',
         position: 'center',
       },
@@ -1383,7 +1325,7 @@ export const TOURS: Tour[] = [
       {
         id: 'reminders-preferences-card',
         title: 'Your Default Reminder Rules',
-        description: 'This is the Event Check-In Reminders card. Here you can toggle on rules like "Staffing Needs Unmet" or "Missing Key Details," set how many days before an event they should fire, and choose to be notified by email, SMS, or both. These defaults apply to every event you\'re assigned to.',
+        description: 'This is the Event Check-In Reminders card. Turn on the rules you want: "No Contact Logged," "No Updates," "Requested Date Coming Up," and "Event Coming Up, Missing Info." Set the number of days for each and how often to repeat, and choose email, text, or both. To get texts, turn on text messages first; the card shows a button for that if they aren\'t on yet. Hit Save when you\'re done.',
         targetSelector: '[data-tour="reminder-preferences"]',
         position: 'top',
         waitForElement: true,
@@ -1397,14 +1339,14 @@ export const TOURS: Tour[] = [
       {
         id: 'reminders-how-rules-work',
         title: 'How Reminder Rules Work',
-        description: 'Each rule monitors a specific condition. For example, "Staffing Needs Unmet" checks if driver/volunteer roles are still unfilled within your threshold (e.g., 7 days before the event). The system checks conditions daily at 9 AM and sends you an alert if the condition is met.',
+        description: 'Each rule watches for one condition. For example, "Event Coming Up, Missing Info" fires when a scheduled event is within your set number of days and is still missing its time, address, sandwich details, or planning-sheet entry. The system checks every hour and reminds you on the schedule you picked until the condition is resolved.',
         targetSelector: '[data-tour="reminder-preferences"]',
         position: 'top',
       },
       {
         id: 'reminders-go-to-events',
-        title: 'Step 2: Per-Event Reminders',
-        description: 'Now let\'s see how reminders work on individual event cards. Navigate to Event Requests to see your scheduled events.',
+        title: 'Step 2: The Reminders Button',
+        description: 'Now let\'s go to Event Requests. You can get back to these same settings anytime from there.',
         targetSelector: '[data-nav-id="event-requests"]',
         position: 'right',
         navigationAction: {
@@ -1418,24 +1360,17 @@ export const TOURS: Tour[] = [
         }
       },
       {
-        id: 'reminders-bell-button',
-        title: 'The Reminders Button',
-        description: 'On each scheduled event card, you\'ll see a Reminders button (bell icon). If it\'s teal, your default reminders are active. If it\'s gray, no reminders are set. Click it to see the quick-action menu.',
-        targetSelector: '[data-tour="reminder-button"]',
-        position: 'left',
+        id: 'reminders-settings-button',
+        title: 'Reminders',
+        description: 'This Reminders button at the top of Event Requests opens your reminder settings in a popup. There are no separate per-event settings; one set of rules covers all your events. A small yellow dot means you\'re still on the standard settings.',
+        targetSelector: '[data-tour="reminder-settings-button"]',
+        position: 'bottom',
         waitForElement: true,
-      },
-      {
-        id: 'reminders-popover-actions',
-        title: 'Quick Actions',
-        description: 'From this menu you can: toggle all reminders on/off for this event, snooze reminders temporarily (1 day, 3 days, 1 week, or until a custom date with a reason), or click "Customize" to override your global defaults with event-specific thresholds. Most of the time, just the toggle and snooze are all you need!',
-        targetSelector: '[data-tour="reminder-button"]',
-        position: 'left',
       },
       {
         id: 'reminders-summary',
         title: 'You\'re All Set!',
-        description: 'To recap: (1) Set your default rules in Profile → Alerts — this is a one-time setup. (2) On each event card, use the bell button to toggle, snooze, or customize. The system checks daily and sends alerts by email or SMS when conditions are met. You\'ll never miss an approaching deadline again!',
+        description: 'To recap: set your reminder rules once, in Profile → Alerts or with the Reminders button on Event Requests, and they apply to every event you\'re the TSP contact for. The system checks every hour and reminds you by email, text, or both.',
         targetSelector: '[data-nav-id="event-requests"]',
         position: 'center',
       },

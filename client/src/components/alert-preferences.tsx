@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
@@ -24,6 +24,8 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { USER_ROLES } from '@shared/auth-utils';
 import { ALERT_TYPES } from '@shared/alert-catalog';
+import { Button } from '@/components/ui/button';
+import { SmsQuickSetupDialog } from '@/components/sms-quick-setup-dialog';
 
 /**
  * Alert Preferences
@@ -92,6 +94,7 @@ export default function AlertPreferences() {
   });
 
   const hasSmsOptIn = !!smsStatus?.hasConfirmedOptIn;
+  const [smsSetupOpen, setSmsSetupOpen] = useState(false);
 
   const updateMutation = useMutation({
     mutationFn: (args: UpdateArgs) =>
@@ -171,11 +174,21 @@ export default function AlertPreferences() {
         <CardContent className="space-y-4">
           {!hasSmsOptIn && !smsStatusLoading && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <span className="font-medium">SMS isn't set up yet.</span> You can
-              still choose SMS for any alert below, but you won't actually receive
-              text messages until you set up SMS in the section below.
+              <span className="font-medium">Text messages aren't turned on yet.</span>{' '}
+              Turn them on to choose SMS for any alert below.
+              <div>
+                <Button
+                  size="sm"
+                  className="mt-2 bg-[#007E8C] hover:bg-[#006570] text-white"
+                  onClick={() => setSmsSetupOpen(true)}
+                  data-testid="button-open-sms-setup-alerts"
+                >
+                  Set up text messages
+                </Button>
+              </div>
             </div>
           )}
+          <SmsQuickSetupDialog open={smsSetupOpen} onOpenChange={setSmsSetupOpen} />
 
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading your preferences…</p>
@@ -323,7 +336,7 @@ function AlertRow({ alert, hasSmsOptIn, lockedOnReason, onChange }: AlertRowProp
           {alert.availableChannels.includes('sms') && (
             <label
               className={`flex items-center gap-2 text-sm ${hasSmsOptIn ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
-              title={hasSmsOptIn ? undefined : 'Set up SMS below to enable this channel'}
+              title={hasSmsOptIn ? undefined : 'Turn on text messages above to use this channel'}
             >
               <Checkbox
                 checked={alert.smsEnabled}

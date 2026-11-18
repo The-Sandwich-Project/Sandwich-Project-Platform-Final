@@ -37,6 +37,7 @@ export function ReminderSettingsButton({ isMobile }: { isMobile: boolean }) {
           ? "You're using the standard reminders. Click to see or adjust them."
           : 'Your reminder settings (apply to all your events)'}
         data-testid="button-reminder-settings"
+        data-tour="reminder-settings-button"
       >
         <Bell className="w-4 h-4" />
         {showDot && (
