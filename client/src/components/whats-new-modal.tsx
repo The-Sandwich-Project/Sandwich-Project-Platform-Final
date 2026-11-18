@@ -7,17 +7,27 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Users, Sparkles, Bell } from 'lucide-react';
+import { MessageCircle, Users, Sparkles } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { getWelcomeTourPromptState } from '@/lib/guided-tour-utils';
 import { isMobileDevice } from '@/lib/device-detection';
 
-const STORAGE_KEY = 'whats_new_2024_v3_instant_messaging';
+export const WHATS_NEW_STORAGE_KEY = 'whats_new_2024_v3_instant_messaging';
+const STORAGE_KEY = WHATS_NEW_STORAGE_KEY;
 
 export function WhatsNewModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Don't show on mobile devices - let the mobile layout prompt take priority
-    if (isMobileDevice()) {
+    // Desktop only.
+    if (isMobileDevice() || !user?.id) {
+      return;
+    }
+
+    // One popup at a time: a brand-new user sees only the welcome/tour
+    // prompt; this waits until a later visit.
+    if (getWelcomeTourPromptState(user.id) !== 'shown') {
       return;
     }
 
@@ -26,11 +36,12 @@ export function WhatsNewModal() {
 
     if (!hasSeenAnnouncement) {
       // Show modal after a short delay so the page loads first
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setIsOpen(true);
       }, 1000);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [user?.id]);
 
   const handleDismiss = () => {
     // Mark as seen in localStorage
@@ -91,15 +102,6 @@ export function WhatsNewModal() {
                 <div>
                   <span className="font-medium text-gray-900">Click any name to message</span>
                   <p className="text-xs text-gray-600">Select a person from the list to start a conversation</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 bg-white rounded-md p-3 shadow-sm">
-                <div className="p-2 bg-purple-100 rounded-md">
-                  <Bell className="w-4 h-4 text-purple-600" />
-                </div>
-                <div>
-                  <span className="font-medium text-gray-900">Sound notifications</span>
-                  <p className="text-xs text-gray-600">You'll hear a chime when you receive a new message</p>
                 </div>
               </div>
             </div>

@@ -209,7 +209,12 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
       }
     };
 
+    // Give up looking for a missing target after ~10s, and stop when the
+    // step changes or the tour closes (this used to poll forever).
+    let cancelled = false;
+    let attempts = 0;
     const scrollToElement = () => {
+      if (cancelled) return;
       const target = document.querySelector(currentStep.targetSelector);
       if (target) {
         // Scroll element into view - use 'center' vertically to ensure visibility
@@ -224,7 +229,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
         setTimeout(highlightElement, 400);
       } else {
         // Element not found, try again after a delay
-        setTimeout(scrollToElement, 200);
+        if (++attempts < 50) setTimeout(scrollToElement, 200);
       }
     };
 
@@ -243,6 +248,7 @@ export function GuidedTour({ onClose }: GuidedTourProps) {
     window.addEventListener('resize', highlightElement);
     
     return () => {
+      cancelled = true;
       window.removeEventListener('scroll', highlightElement, true);
       window.removeEventListener('resize', highlightElement);
     };

@@ -12,15 +12,21 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquareText, Lightbulb, Phone, CheckCircle } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
-import { useLocation } from 'wouter';
 import { isMobileDevice } from '@/lib/device-detection';
+import { useAuth } from '@/hooks/useAuth';
+import { getWelcomeTourPromptState } from '@/lib/guided-tour-utils';
+import { WHATS_NEW_STORAGE_KEY } from '@/components/whats-new-modal';
+import { SmsQuickSetupDialog, useSmsStatus } from '@/components/sms-quick-setup-dialog';
 
 const ANNOUNCEMENT_ID = 'text_idea_feature_2024';
 
 export function TextIdeaAnnouncementModal() {
-  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [smsSetupOpen, setSmsSetupOpen] = useState(false);
+  const { data: smsStatus } = useSmsStatus();
+  const smsOn = !!smsStatus?.hasConfirmedOptIn;
 
   // Check if user has dismissed this announcement
   const { data: dismissStatus, isLoading } = useQuery({
@@ -46,7 +52,16 @@ export function TextIdeaAnnouncementModal() {
   // Show modal if user hasn't dismissed it
   useEffect(() => {
     // Don't show on mobile devices
-    if (isMobileDevice()) {
+    if (isMobileDevice() || !user?.id) {
+      return;
+    }
+
+    // One popup at a time: wait until the welcome prompt and the
+    // "New Features" window have each had their turn on earlier visits.
+    if (
+      getWelcomeTourPromptState(user.id) !== 'shown' ||
+      !localStorage.getItem(WHATS_NEW_STORAGE_KEY)
+    ) {
       return;
     }
 
@@ -55,11 +70,13 @@ export function TextIdeaAnnouncementModal() {
       const timer = setTimeout(() => setIsOpen(true), 1500);
       return () => clearTimeout(timer);
     }
-  }, [dismissStatus, isLoading]);
+  }, [dismissStatus, isLoading, user?.id]);
 
-  const handleGoToSettings = () => {
+  // Open the quick text setup right here instead of sending people to the
+  // Profile page.
+  const handleSetUpTexts = () => {
     dismissMutation.mutate();
-    setLocation('/profile?tab=notifications');
+    setSmsSetupOpen(true);
   };
 
   const handleDismiss = () => {
@@ -69,6 +86,12 @@ export function TextIdeaAnnouncementModal() {
   if (isLoading) return null;
 
   return (
+    <>
+    <SmsQuickSetupDialog
+      open={smsSetupOpen}
+      onOpenChange={setSmsSetupOpen}
+      reason="Turn on text messages, then you can text your ideas to TSP."
+    />
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleDismiss()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
@@ -97,11 +120,17 @@ export function TextIdeaAnnouncementModal() {
               <ol className="text-sm text-gray-700 space-y-2">
                 <li className="flex items-start gap-2">
                   <span className="bg-[#236383] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">1</span>
-                  <span><strong>Enable SMS alerts</strong> in your profile settings</span>
+                  <span>
+                    {smsOn ? (
+                      <><strong>Text messages are on</strong> for your account</>
+                    ) : (
+                      <><strong>Turn on text messages</strong> (button below, takes a minute)</>
+                    )}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="bg-[#236383] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">2</span>
-                  <span><strong>Save our number</strong> to your phone contacts</span>
+                  <span><strong>Save the number</strong> our texts come from to your contacts</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="bg-[#236383] text-white rounded-full w-5 h-5 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">3</span>
@@ -135,17 +164,20 @@ export function TextIdeaAnnouncementModal() {
           >
             Got It!
           </Button>
-          <Button
-            onClick={handleGoToSettings}
-            disabled={dismissMutation.isPending}
-            className="flex-1 bg-[#FBAD3F] hover:bg-[#E99E30] text-white"
-            data-testid="button-setup-text-idea"
-          >
-            <Phone className="w-4 h-4 mr-2" />
-            Set Up SMS Alerts
-          </Button>
+          {!smsOn && (
+            <Button
+              onClick={handleSetUpTexts}
+              disabled={dismissMutation.isPending}
+              className="flex-1 bg-[#FBAD3F] hover:bg-[#E99E30] text-white"
+              data-testid="button-setup-text-idea"
+            >
+              <Phone className="w-4 h-4 mr-2" />
+              Turn On Text Messages
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
