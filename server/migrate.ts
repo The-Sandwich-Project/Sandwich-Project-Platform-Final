@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { createSqlClient } from './sql-client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -123,8 +123,8 @@ export async function runMigrationsAutomatically() {
 
   logger.log('🔄 Checking for pending database migrations...');
 
-  // Connect to database using Neon HTTP
-  const sql = neon(DATABASE_URL);
+  // Neon HTTP on Neon hosts, node-postgres elsewhere (see sql-client.ts)
+  const sql = createSqlClient(DATABASE_URL);
 
   try {
     // Create migrations tracking table if it doesn't exist
