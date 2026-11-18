@@ -431,7 +431,7 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/maps/config | 1 | client/src/components/maps/BaseMapTiles.tsx |
 | /api/maps/copyright?${params} | 1 | client/src/components/maps/BaseMapTiles.tsx |
 | /api/maps/tiles/{z}/{x}/{y} | 1 | client/src/components/maps/BaseMapTiles.tsx |
-| /api/me/check-in-reminder-preferences | 10 | client/src/components/check-in-reminder-preferences.tsx<br>client/src/components/event-requests/InProcessFilterBar.tsx<br>client/src/components/event-requests/ReminderRulesManager.tsx<br>client/src/components/event-requests/ReminderSettingsButton.tsx |
+| /api/me/check-in-reminder-preferences | 11 | client/src/components/__tests__/sms-reminder-gating.test.tsx<br>client/src/components/check-in-reminder-preferences.tsx<br>client/src/components/event-requests/InProcessFilterBar.tsx<br>client/src/components/event-requests/ReminderRulesManager.tsx |
 | /api/me/dashboard | 3 | client/src/components/action-tracking-enhanced.tsx<br>client/src/components/dashboard-action-tracker.tsx |
 | /api/me/notification-preferences | 4 | client/src/components/notification-preferences.tsx |
 | /api/me/sms-campaigns | 1 | client/src/components/alert-preferences/SMSSetupSection.tsx |
@@ -740,10 +740,10 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/users/map | 3 | client/src/hooks/useUserManagement.ts<br>client/src/pages/driver-planning.tsx |
 | /api/users/online | 10 | client/src/components/chat/chat-dock.tsx<br>client/src/components/online-users.tsx<br>client/src/hooks/useOnlinePresenceNotifications.ts<br>client/src/mobile/pages/mobile-chat-new.tsx |
 | /api/users/send-sms-instructions | 1 | client/src/components/user-management-redesigned.tsx |
-| /api/users/sms-confirm | 2 | client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/user-profile.tsx |
-| /api/users/sms-opt-in | 5 | client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/user-profile.tsx<br>client/src/pages/sms-events.tsx<br>client/src/pages/sms-opt-in.tsx |
-| /api/users/sms-opt-out | 5 | client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/user-profile.tsx<br>client/src/pages/sms-events.tsx<br>client/src/pages/sms-opt-in.tsx |
-| /api/users/sms-status | 21 | client/src/components/alert-preferences.tsx<br>client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/notification-preferences.tsx<br>client/src/components/sms-opt-in-prompt.tsx |
+| /api/users/sms-confirm | 4 | client/src/components/__tests__/sms-reminder-gating.test.tsx<br>client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/sms-quick-setup-dialog.tsx<br>client/src/components/user-profile.tsx |
+| /api/users/sms-opt-in | 8 | client/src/components/__tests__/sms-reminder-gating.test.tsx<br>client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/sms-quick-setup-dialog.tsx<br>client/src/components/user-profile.tsx |
+| /api/users/sms-opt-out | 6 | client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/sms-quick-setup-dialog.tsx<br>client/src/components/user-profile.tsx<br>client/src/pages/sms-events.tsx |
+| /api/users/sms-status | 25 | client/src/components/__tests__/sms-reminder-gating.test.tsx<br>client/src/components/alert-preferences.tsx<br>client/src/components/alert-preferences/SMSSetupSection.tsx<br>client/src/components/notification-preferences.tsx |
 | /api/users/toll-free-verification/status?verificationSid=${verificationSid} | 1 | client/src/components/toll-free-verification-panel.tsx |
 | /api/users/toll-free-verification/submit | 1 | client/src/components/toll-free-verification-panel.tsx |
 | /api/verify-reset-token/${resetToken} | 1 | client/src/pages/reset-password.tsx |
