@@ -543,6 +543,20 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     if (!fullUser) return res.status(404).json({ message: 'User not found' });
 
     const metadata = getUserMetadata(fullUser);
+
+    // Text reminders only go out to a confirmed number (the reminder job
+    // checks the same thing), so don't let anyone save an SMS channel that
+    // would silently send nothing.
+    const smsConsent = metadata.smsConsent;
+    const smsReady = !!(smsConsent?.enabled && smsConsent.phoneNumber);
+    if ((defaultChannel === 'sms' || defaultChannel === 'both') && !smsReady) {
+      return res.status(400).json({
+        code: 'SMS_NOT_ENABLED',
+        message:
+          "Text messages aren't turned on for your account yet. Turn on text messages first, then you can get reminders by text.",
+      });
+    }
+
     const updatedPreferences: CheckInReminderPreferences = {
       configured: true,
       defaultChannel,

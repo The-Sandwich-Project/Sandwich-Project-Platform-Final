@@ -90,15 +90,35 @@ describe('Reminder channel SMS gating', () => {
     api.failSave = false;
   });
 
-  it('blocks SMS and shows the setup notice when texts are not set up', async () => {
+  it('shows the setup notice when SMS is picked without texts set up', async () => {
     renderEditor();
     await screen.findByText('Default notification channel');
     await waitFor(() => expect(screen.getAllByText('(needs setup)').length).toBe(2));
 
     fireEvent.change(channelSelect(), { target: { value: 'sms' } });
 
+    expect(channelSelect().value).toBe('sms');
     expect(await screen.findByTestId('sms-not-enabled-notice')).toBeInTheDocument();
-    expect(channelSelect().value).toBe('email');
+  });
+
+  it('saving an SMS channel without texts set up shows an error and does not save', async () => {
+    renderEditor();
+    await screen.findByText('Default notification channel');
+    await waitFor(() => expect(screen.getAllByText('(needs setup)').length).toBe(2));
+
+    fireEvent.change(channelSelect(), { target: { value: 'both' } });
+    fireEvent.click(screen.getByRole('button', { name: /save default reminder rules/i }));
+
+    expect(await screen.findByTestId('reminder-save-error')).toHaveTextContent(
+      /turn on text messages before you can get reminders by text/i
+    );
+    expect(api.calls.some(([m]) => m === 'PUT')).toBe(false);
+
+    // Switching back to email clears the error and saves normally.
+    fireEvent.change(channelSelect(), { target: { value: 'email' } });
+    expect(screen.queryByTestId('reminder-save-error')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /save default reminder rules/i }));
+    await waitFor(() => expect(api.calls.some(([m]) => m === 'PUT')).toBe(true));
   });
 
   it('lets confirmed users pick SMS with no notice', async () => {
@@ -119,7 +139,7 @@ describe('Reminder channel SMS gating', () => {
     expect(await screen.findByText(/no texts are being sent/)).toBeInTheDocument();
   });
 
-  it('setup window: number + consent, code, then applies the SMS choice', async () => {
+  it('setup window: number + consent, code, then SMS can be saved', async () => {
     renderEditor();
     await screen.findByText('Default notification channel');
     await waitFor(() => expect(screen.getAllByText('(needs setup)').length).toBe(2));
@@ -145,11 +165,20 @@ describe('Reminder channel SMS gating', () => {
     fireEvent.change(codeInput, { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
-    // Done → the blocked choice is applied
+    // Done → SMS choice kept, notice gone, and saving works
     expect(await screen.findByTestId('sms-setup-done')).toBeInTheDocument();
-    await waitFor(() => expect(channelSelect().value).toBe('both'));
+    expect(channelSelect().value).toBe('both');
+    await waitFor(() => expect(screen.queryByTestId('sms-not-enabled-notice')).toBeNull());
     expect(screen.getByText(/Hit Save below/)).toBeInTheDocument();
-    expect(screen.queryByTestId('sms-not-enabled-notice')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: /save default reminder rules/i }));
+    await waitFor(() =>
+      expect(api.calls).toContainEqual([
+        'PUT',
+        '/api/me/check-in-reminder-preferences',
+        expect.objectContaining({ defaultChannel: 'both' }),
+      ])
+    );
   });
 });
 

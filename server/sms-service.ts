@@ -511,7 +511,7 @@ export async function sendConfirmationSMS(
       logger.log(`📱 Phone number formatting: ${phoneNumber} -> ${formattedPhone}`);
 
       // Simplified message to avoid carrier filtering
-      const confirmationMessage = `Sandwich Project: Your verification code is ${verificationCode}. Reply with this code or YES to confirm weekly reminders.`;
+      const confirmationMessage = `Sandwich Project: Your verification code is ${verificationCode}. Enter it in the app to finish turning on text alerts.`;
 
       logger.log('📤 Sending SMS via Twilio...');
       logger.log('Message length:', confirmationMessage.length, 'characters');
@@ -554,7 +554,7 @@ export async function sendConfirmationSMS(
       // MONITORING: Notify admin of Twilio fallback failure
       const errorMessage = twilioError.message || 'Unknown Twilio error';
       try {
-        const confirmationMessage = `Sandwich Project: Your verification code is ${verificationCode}. Reply with this code or YES to confirm weekly reminders.`;
+        const confirmationMessage = `Sandwich Project: Your verification code is ${verificationCode}. Enter it in the app to finish turning on text alerts.`;
         const { notifyAdminOfSMS } = await import('./utils/sms-monitoring');
         await notifyAdminOfSMS({
           to: phoneNumber,
