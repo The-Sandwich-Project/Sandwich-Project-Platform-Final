@@ -4845,11 +4845,13 @@ router.patch('/:id/tsp-contact', isAuthenticated, async (req, res) => {
     // Send tiered notification for TSP contact assignment:
     // URGENT tier: SMS-first, email fallback if no SMS opt-in
     // This reduces notification fatigue by not sending both email AND SMS
+    // Skip already-scheduled events (e.g. ones pulled in from the Google Sheet
+    // already scheduled): the "new event, you're assigned" alert is for intake.
+    const statusesWithoutAssignmentAlert = ['completed', 'declined', 'scheduled', 'rescheduled'];
     if (
       validatedData.tspContact &&
       originalEvent.tspContact !== validatedData.tspContact &&
-      originalEvent.status !== 'completed' &&
-      originalEvent.status !== 'declined'
+      !statusesWithoutAssignmentAlert.includes(originalEvent.status || '')
     ) {
       try {
         // Use the new tiered notification dispatcher (SMS-first, email fallback)

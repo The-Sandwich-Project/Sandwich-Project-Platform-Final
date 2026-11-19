@@ -116,6 +116,16 @@ function ComprehensivePersonSelector({
     }))
   );
 
+  // Create lookup map for ALL team members (allPeople is search-filtered, so a
+  // selected user who doesn't match the current search would otherwise show as a raw id)
+  const userNameLookup = new Map<string, string>();
+  users.forEach((user: any) => {
+    userNameLookup.set(
+      String(user.id),
+      `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.displayName || user.email || 'Unknown User'
+    );
+  });
+
   // Create lookup map for ALL drivers (for name resolution of already-assigned drivers)
   const driverNameLookup = new Map<string, string>();
   drivers.forEach((driver: any) => {
@@ -256,6 +266,9 @@ function ComprehensivePersonSelector({
     // First check allPeople (for available/selectable people)
     const person = allPeople.find(p => p.id === personId);
     if (person?.displayName) return person.displayName;
+    // Fall back to team member lookup (selected users hidden by the search filter)
+    const userName = userNameLookup.get(personId);
+    if (userName) return userName;
     // Fall back to driver lookup (for already-assigned unavailable drivers)
     const driverName = driverNameLookup.get(personId);
     if (driverName) return driverName;
