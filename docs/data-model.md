@@ -251,7 +251,7 @@ Each step is its own PR.
 0. Schema rules, the integrity check, and this document. ✅
 1. Recipients directory: plain list as the default view; the detailed views move to a secondary tab. ✅
 2. ✅ Data audit (read-only, `npm run audit:people`): duplicates across the five people tables, conflicting phones/emails, abbreviated "First L." names, survey-driver names edited after entry, distinct region names in `sandwich_collections` (with counts and date ranges, plus a proposed historic roll-up), and a **column-usage report for `drivers`** (per column: how many rows have a value, and how recently one was set) so the `driver_profiles` columns are chosen from real data.
-3. `regions` table + historic roll-up mapping.
+3. `regions` table + historic roll-up mapping. The table is created by `migrations/20261120_create_regions.sql`; its rows come from `npm run regions:seed -- --dry-run` / `--apply` (`scripts/seed-regions.ts`, which holds the agreed list below and reports any collection-log name still without a row). Nothing in the app reads `regions` yet.
 4. `people`, `person_name_aliases`, `legacy_person_ids` (additive only).
 5. Backfill script with `--dry-run`. **A script, not a migration**: migrations run automatically on every boot, including production. Tested against a Neon branch of production.
 6. Volunteer directory reads from `people`; volunteer sheet sync.
