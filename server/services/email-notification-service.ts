@@ -2,7 +2,7 @@ import sgMail from '@sendgrid/mail';
 import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { db } from '../db';
 import { users, eventRequests, eventCollaborationComments } from '@shared/schema';
-import { eq, or, like, sql, inArray } from 'drizzle-orm';
+import { and, eq, or, like, sql, inArray } from 'drizzle-orm';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { logger } from '../utils/production-safe-logger';
 import { getUserMetadata } from '@shared/types';
