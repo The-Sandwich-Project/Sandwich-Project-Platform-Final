@@ -42,6 +42,7 @@ import {
   RecipientDetailDrawer,
   RecipientWeeklyCalendar,
   RecipientScheduleMatrix,
+  RecipientDirectoryList,
 } from './recipients';
 import {
   WEEK_DAYS,
@@ -58,6 +59,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useResourcePermissions } from '@/hooks/useResourcePermissions';
 import { usePageSession } from '@/hooks/usePageSession';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getRegionFromCoordinates } from '@/lib/atlanta-regions';
 import { normalizeFocusArea } from '@/lib/focus-area-groups';
 import type { Recipient } from '@shared/schema';
@@ -93,6 +95,9 @@ export default function RecipientsManagement({ highlightRecipientId }: { highlig
   const [sortColumn, setSortColumn] = useState<SortColumn>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [showFilters, setShowFilters] = useState(false);
+  // The plain directory list is the default view. The schedule-focused
+  // views (detailed table, calendar, matrix) live under "Detailed views".
+  const [topView, setTopView] = useState<'list' | 'detailed'>('list');
   const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'matrix'>('table');
   const [inlineSavingId, setInlineSavingId] = useState<number | null>(null);
   const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null);
@@ -246,6 +251,13 @@ export default function RecipientsManagement({ highlightRecipientId }: { highlig
 
     return sortRecipients(filtered, sortColumn, sortDirection);
   }, [recipients, searchTerm, statusFilter, showInactive, contractFilter, regionFilter, tspContactFilter, sandwichTypeFilter, focusAreaFilter, collectionDayFilter, feedingDayFilter, cadenceFilter, servingFrequencyFilter, sortColumn, sortDirection]);
+
+  // The directory list has no sortable headers, so it's always A–Z by name
+  // regardless of the sort chosen in the detailed table.
+  const listRecipients = useMemo(
+    () => sortRecipients(filteredRecipients, 'name', 'asc'),
+    [filteredRecipients]
+  );
 
   // Scroll to highlighted card once data is loaded and rendered
   useEffect(() => {
@@ -763,6 +775,17 @@ export default function RecipientsManagement({ highlightRecipientId }: { highlig
           )}
         </div>
 
+        <Tabs value={topView} onValueChange={(v) => setTopView(v as 'list' | 'detailed')}>
+          <TabsList>
+            <TabsTrigger value="list" data-testid="tab-recipients-list">
+              Directory
+            </TabsTrigger>
+            <TabsTrigger value="detailed" data-testid="tab-recipients-detailed">
+              Detailed views
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         {/* Results Count + View Switcher */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-4 flex-wrap text-sm text-slate-600">
@@ -783,6 +806,7 @@ export default function RecipientsManagement({ highlightRecipientId }: { highlig
               </label>
             )}
           </div>
+          {topView === 'detailed' && (
           <div className="flex items-center gap-2">
             <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
               <button
@@ -815,33 +839,35 @@ export default function RecipientsManagement({ highlightRecipientId }: { highlig
               </button>
             </div>
           </div>
+          )}
         </div>
 
-        {viewMode === 'table' ? (
-          <>
-            {filteredRecipients.length === 0 && recipients.length > 0 ? (
-              <div className="text-center py-12 text-slate-500 rounded-lg border border-dashed border-slate-300 bg-slate-50">
-                No recipients match your current filters. Try adjusting your search or filter criteria.
-              </div>
-            ) : filteredRecipients.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 rounded-lg border border-dashed border-slate-300 bg-slate-50">
-                No recipients found. Add a new recipient to get started.
-              </div>
-            ) : (
-              <RecipientTable
-                recipients={filteredRecipients}
-                sortColumn={sortColumn}
-                sortDirection={sortDirection}
-                onSort={handleSortColumn}
-                onRowClick={handleOpenDrawer}
-                highlightedId={highlightedId}
-                highlightRowRef={highlightRowRef}
-                canEdit={canEdit}
-                savingId={inlineSavingId}
-                onUpdateRecipient={handleInlineUpdate}
-              />
-            )}
-          </>
+        {filteredRecipients.length === 0 && (topView === 'list' || viewMode === 'table') ? (
+          <div className="text-center py-12 text-slate-500 rounded-lg border border-dashed border-slate-300 bg-slate-50">
+            {recipients.length > 0
+              ? 'No recipients match your current filters. Try adjusting your search or filter criteria.'
+              : 'No recipients found. Add a new recipient to get started.'}
+          </div>
+        ) : topView === 'list' ? (
+          <RecipientDirectoryList
+            recipients={listRecipients}
+            onRowClick={handleOpenDrawer}
+            highlightedId={highlightedId}
+            highlightRowRef={highlightRowRef}
+          />
+        ) : viewMode === 'table' ? (
+          <RecipientTable
+            recipients={filteredRecipients}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+            onSort={handleSortColumn}
+            onRowClick={handleOpenDrawer}
+            highlightedId={highlightedId}
+            highlightRowRef={highlightRowRef}
+            canEdit={canEdit}
+            savingId={inlineSavingId}
+            onUpdateRecipient={handleInlineUpdate}
+          />
         ) : viewMode === 'matrix' ? (
           <RecipientScheduleMatrix
             recipients={filteredRecipients}

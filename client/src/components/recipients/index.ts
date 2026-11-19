@@ -6,3 +6,4 @@ export { RecipientScheduleMatrix } from './RecipientScheduleMatrix';
 export { RecipientDetailDrawer } from './RecipientDetailDrawer';
 export { ScheduleDayChips } from './ScheduleDayChips';
 export * from './recipient-schedule-utils';
+export { RecipientDirectoryList } from './RecipientDirectoryList';
