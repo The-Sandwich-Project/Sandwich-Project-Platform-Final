@@ -249,7 +249,7 @@ export default function UserProfile() {
       queryClient.invalidateQueries({ queryKey: ['/api/users/sms-status'] });
       toast({
         title: 'Confirmation SMS Sent!',
-        description: "Please check your phone and reply with your verification code or 'YES' to complete signup.",
+        description: 'Enter the verification code from the text to finish signing up.',
       });
       setPhoneNumber('');
       setConsent(false);

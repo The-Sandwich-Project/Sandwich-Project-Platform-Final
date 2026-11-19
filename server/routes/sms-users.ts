@@ -201,7 +201,7 @@ router.post('/users/sms-opt-in', isAuthenticated, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Confirmation SMS sent! Please reply with your verification code or "YES" to complete signup.',
+      message: 'Confirmation SMS sent! Enter the verification code from the text to finish signing up.',
       phoneNumber: formattedPhone,
       status: 'pending_confirmation',
       campaignType: category,

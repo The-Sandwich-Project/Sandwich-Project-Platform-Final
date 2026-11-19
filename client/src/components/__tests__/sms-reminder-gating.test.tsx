@@ -8,7 +8,7 @@ import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Shared test state for the mocked API
-const api: { smsStatus: any; prefs: any; calls: Array<[string, string, any]> } = {
+const api: { smsStatus: any; prefs: any; failSave?: boolean; calls: Array<[string, string, any]> } = {
   smsStatus: null,
   prefs: null,
   calls: [],
@@ -27,6 +27,10 @@ jest.mock('@/lib/queryClient', () => ({
     if (url === '/api/users/sms-opt-in') {
       api.smsStatus = { hasConfirmedOptIn: false, isPendingConfirmation: true, phoneNumber: '+14045551234' };
       return { ok: true };
+    }
+    if (url === '/api/me/check-in-reminder-preferences' && method === 'PUT') {
+      if (api.failSave) throw new Error('save failed');
+      return {};
     }
     if (url === '/api/users/sms-confirm') {
       api.smsStatus = { hasConfirmedOptIn: true, isPendingConfirmation: false, phoneNumber: '+14045551234' };
@@ -65,6 +69,7 @@ jest.mock('@/components/ui/select', () => {
 });
 
 import CheckInReminderPreferencesEditor from '../check-in-reminder-preferences';
+import { ReminderSettingsButton } from '../event-requests/ReminderSettingsButton';
 
 function renderEditor() {
   return render(
@@ -82,17 +87,38 @@ describe('Reminder channel SMS gating', () => {
     api.calls = [];
     api.prefs = { configured: true, defaultChannel: 'email', rules: [] };
     api.smsStatus = { hasConfirmedOptIn: false, isPendingConfirmation: false, phoneNumber: null };
+    api.failSave = false;
   });
 
-  it('blocks SMS and shows the setup notice when texts are not set up', async () => {
+  it('shows the setup notice when SMS is picked without texts set up', async () => {
     renderEditor();
     await screen.findByText('Default notification channel');
     await waitFor(() => expect(screen.getAllByText('(needs setup)').length).toBe(2));
 
     fireEvent.change(channelSelect(), { target: { value: 'sms' } });
 
+    expect(channelSelect().value).toBe('sms');
     expect(await screen.findByTestId('sms-not-enabled-notice')).toBeInTheDocument();
-    expect(channelSelect().value).toBe('email');
+  });
+
+  it('saving an SMS channel without texts set up shows an error and does not save', async () => {
+    renderEditor();
+    await screen.findByText('Default notification channel');
+    await waitFor(() => expect(screen.getAllByText('(needs setup)').length).toBe(2));
+
+    fireEvent.change(channelSelect(), { target: { value: 'both' } });
+    fireEvent.click(screen.getByRole('button', { name: /save default reminder rules/i }));
+
+    expect(await screen.findByTestId('reminder-save-error')).toHaveTextContent(
+      /turn on text messages before you can get reminders by text/i
+    );
+    expect(api.calls.some(([m]) => m === 'PUT')).toBe(false);
+
+    // Switching back to email clears the error and saves normally.
+    fireEvent.change(channelSelect(), { target: { value: 'email' } });
+    expect(screen.queryByTestId('reminder-save-error')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /save default reminder rules/i }));
+    await waitFor(() => expect(api.calls.some(([m]) => m === 'PUT')).toBe(true));
   });
 
   it('lets confirmed users pick SMS with no notice', async () => {
@@ -113,7 +139,7 @@ describe('Reminder channel SMS gating', () => {
     expect(await screen.findByText(/no texts are being sent/)).toBeInTheDocument();
   });
 
-  it('setup window: number + consent, code, then applies the SMS choice', async () => {
+  it('setup window: number + consent, code, then SMS can be saved', async () => {
     renderEditor();
     await screen.findByText('Default notification channel');
     await waitFor(() => expect(screen.getAllByText('(needs setup)').length).toBe(2));
@@ -139,10 +165,56 @@ describe('Reminder channel SMS gating', () => {
     fireEvent.change(codeInput, { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
-    // Done → the blocked choice is applied
+    // Done → SMS choice kept, notice gone, and saving works
     expect(await screen.findByTestId('sms-setup-done')).toBeInTheDocument();
-    await waitFor(() => expect(channelSelect().value).toBe('both'));
+    expect(channelSelect().value).toBe('both');
+    await waitFor(() => expect(screen.queryByTestId('sms-not-enabled-notice')).toBeNull());
     expect(screen.getByText(/Hit Save below/)).toBeInTheDocument();
-    expect(screen.queryByTestId('sms-not-enabled-notice')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: /save default reminder rules/i }));
+    await waitFor(() =>
+      expect(api.calls).toContainEqual([
+        'PUT',
+        '/api/me/check-in-reminder-preferences',
+        expect.objectContaining({ defaultChannel: 'both' }),
+      ])
+    );
+  });
+});
+
+describe('Reminders popup', () => {
+  beforeEach(() => {
+    mockQueryClient.clear();
+    api.calls = [];
+    api.prefs = { configured: true, defaultChannel: 'email', rules: [] };
+    api.smsStatus = { hasConfirmedOptIn: true, isPendingConfirmation: false, phoneNumber: '+1' };
+    api.failSave = false;
+  });
+
+  const openPopup = async () => {
+    render(
+      <QueryClientProvider client={mockQueryClient}>
+        <ReminderSettingsButton isMobile={false} />
+      </QueryClientProvider>
+    );
+    fireEvent.click(screen.getByTestId('button-reminder-settings'));
+    return screen.findByRole('button', { name: /save default reminder rules/i });
+  };
+
+  it('closes after a successful save', async () => {
+    fireEvent.click(await openPopup());
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.calls.some(([m, u]) => m === 'PUT' && u === '/api/me/check-in-reminder-preferences')).toBe(true);
+  });
+
+  it('stays open if the save fails', async () => {
+    api.failSave = true;
+    const save = await openPopup();
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(api.calls.some(([m]) => m === 'PUT')).toBe(true)
+    );
+    await waitFor(() => expect(save).toBeEnabled());
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

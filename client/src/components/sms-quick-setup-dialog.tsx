@@ -5,7 +5,7 @@
  * offer SMS (e.g. the reminder channel picker) when the user hasn't finished
  * SMS sign-up yet, so they don't have to hunt for the full setup page.
  *
- * Steps: phone + consent → we text a 6-digit code → enter it (or reply YES)
+ * Steps: phone + consent → we text a 6-digit code → type it in here
  * → done. Uses the same endpoints as the full SMS setup in Profile → Alerts.
  */
 import { useEffect, useState } from 'react';
@@ -69,9 +69,6 @@ export function SmsQuickSetupDialog({
     queryKey: SMS_STATUS_QUERY_KEY,
     queryFn: () => apiRequest('GET', '/api/users/sms-status'),
     enabled: open,
-    // While we wait on a code, poll so replying "YES" by text also completes setup.
-    refetchInterval: (query) =>
-      open && query.state.data?.isPendingConfirmation ? 5000 : false,
   });
 
   const [phone, setPhone] = useState('');
@@ -91,7 +88,7 @@ export function SmsQuickSetupDialog({
     }
   }, [open]);
 
-  // Finished — via the code here, or a "YES" reply picked up by polling.
+  // Finished once the code is confirmed.
   const confirmed = !!status?.hasConfirmedOptIn;
   useEffect(() => {
     if (open && confirmed && !justEnabled) {
@@ -184,7 +181,7 @@ export function SmsQuickSetupDialog({
             <StepLabel current={2} />
             <p className="text-sm text-gray-700">
               We texted a 6-digit code to <strong>{status?.phoneNumber}</strong>.
-              Type it below, or just reply <strong>YES</strong> to that text.
+              Type the code from that text below. You don't need to reply to it.
             </p>
             <div>
               <Label htmlFor="sms-quick-code">Code</Label>
@@ -208,7 +205,7 @@ export function SmsQuickSetupDialog({
               {confirmCode.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Confirm
             </Button>
-            <div className="flex justify-between text-sm">
+            <div className="text-sm">
               <button
                 type="button"
                 className="text-[#007E8C] hover:underline disabled:opacity-50"
@@ -217,7 +214,6 @@ export function SmsQuickSetupDialog({
               >
                 Use a different number
               </button>
-              <span className="text-gray-500">Checking for your reply…</span>
             </div>
           </form>
         ) : (

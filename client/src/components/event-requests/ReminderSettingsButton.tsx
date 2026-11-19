@@ -58,7 +58,7 @@ export function ReminderSettingsButton({ isMobile }: { isMobile: boolean }) {
               settings as Profile → Alerts.
             </DialogDescription>
           </DialogHeader>
-          <CheckInReminderPreferencesEditor />
+          <CheckInReminderPreferencesEditor onSaved={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
     </>

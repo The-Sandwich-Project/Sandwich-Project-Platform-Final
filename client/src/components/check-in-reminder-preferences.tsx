@@ -100,7 +100,12 @@ const FREQUENCY_OPTIONS = [
 // Component
 // ---------------------------------------------------------------------------
 
-export default function CheckInReminderPreferencesEditor() {
+export default function CheckInReminderPreferencesEditor({
+  onSaved,
+}: {
+  /** Called after a successful save — e.g. so a popup can close itself. */
+  onSaved?: () => void;
+} = {}) {
   const { toast } = useToast();
 
   // Fetch current preferences
@@ -130,36 +135,30 @@ export default function CheckInReminderPreferencesEditor() {
   );
 
   // Text reminders only go out once the user has confirmed their number
-  // (the reminder job skips SMS otherwise). Until then, picking an SMS
-  // option shows a notice with a shortcut to the quick setup window.
-  // If the status can't be loaded, don't block the choice.
+  // (the reminder job skips SMS otherwise, and the server refuses to save
+  // an SMS channel without it). Picking an SMS option shows a notice with a
+  // shortcut to the quick setup window; saving without it shows an error.
+  // If the status can't be loaded, don't block — the server still checks.
   const { data: smsStatus, isError: smsStatusError } = useSmsStatus();
   const smsReady = smsStatusError || !smsStatus || smsStatus.hasConfirmedOptIn;
-  const [blockedChannel, setBlockedChannel] = useState<ReminderChannel | null>(null);
   const [smsSetupOpen, setSmsSetupOpen] = useState(false);
   const [smsJustEnabled, setSmsJustEnabled] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const smsNeedsSetup = usesSms(channel) && !smsReady;
+  const SMS_NOT_ENABLED_MESSAGE =
+    "You need to turn on text messages before you can get reminders by text. Use the Set up text messages button above, or choose Email.";
 
   const handleChannelChange = (value: ReminderChannel) => {
     setSmsJustEnabled(false);
-    if (usesSms(value) && !smsReady) {
-      setBlockedChannel(value);
-      return;
-    }
-    setBlockedChannel(null);
+    setSaveError(null);
     setChannel(value);
   };
 
   const handleSmsEnabled = () => {
-    if (blockedChannel) {
-      setChannel(blockedChannel);
-      setBlockedChannel(null);
-      setSmsJustEnabled(true);
-    }
+    setSaveError(null);
+    if (usesSms(channel)) setSmsJustEnabled(true);
   };
-
-  // A saved SMS choice from before texts were set up: those texts aren't sending.
-  const savedSmsNotSending =
-    !smsReady && !blockedChannel && usesSms(channel);
 
   // Reset local state when server data changes (e.g. after a reload or cache update).
   // `defaultRules` is a useMemo value derived solely from
@@ -183,11 +182,17 @@ export default function CheckInReminderPreferencesEditor() {
         description:
           'Your reminder settings now apply to all your events.',
       });
+      onSaved?.();
     },
-    onError: () => {
+    onError: (error) => {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to save reminder preferences.';
+      setSaveError(message);
       toast({
-        title: 'Error',
-        description: 'Failed to save reminder preferences.',
+        title: "Couldn't save your reminder settings",
+        description: message,
         variant: 'destructive',
       });
     },
@@ -211,6 +216,16 @@ export default function CheckInReminderPreferencesEditor() {
   };
 
   const handleSave = () => {
+    setSaveError(null);
+    if (smsNeedsSetup) {
+      setSaveError(SMS_NOT_ENABLED_MESSAGE);
+      toast({
+        title: 'Turn on text messages first',
+        description: SMS_NOT_ENABLED_MESSAGE,
+        variant: 'destructive',
+      });
+      return;
+    }
     saveMutation.mutate({
       configured: true,
       defaultChannel: channel,
@@ -268,14 +283,15 @@ export default function CheckInReminderPreferencesEditor() {
           </Select>
         </div>
 
-        {(blockedChannel || savedSmsNotSending) && (
+        {smsNeedsSetup && (
           <Alert className="border-amber-200 bg-amber-50" data-testid="sms-not-enabled-notice">
             <Smartphone className="h-4 w-4 text-amber-700" />
             <AlertDescription className="text-amber-900">
               <p>
-                {blockedChannel
-                  ? "Text messages aren't turned on for your account yet, so we can't send reminders by text."
-                  : "Your reminders are set to text you, but text messages aren't turned on for your account yet, so no texts are being sent."}
+                {usesSms(serverPrefs?.defaultChannel ?? 'email') &&
+                channel === serverPrefs?.defaultChannel
+                  ? "Your reminders are set to text you, but text messages aren't turned on for your account yet, so no texts are being sent."
+                  : "Text messages aren't turned on for your account yet. Turn them on to get reminders by text."}
               </p>
               <Button
                 size="sm"
@@ -337,6 +353,12 @@ export default function CheckInReminderPreferencesEditor() {
           onFrequency={handleFrequency}
         />
 
+
+        {saveError && (
+          <p className="text-sm text-red-600" role="alert" data-testid="reminder-save-error">
+            {saveError}
+          </p>
+        )}
 
         {/* Save */}
         <Button
