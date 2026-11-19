@@ -73,7 +73,6 @@ interface EventEditDraftData {
   tspContact: string;
   customTspContact: string;
   vanDriverNeeded: boolean;
-  isCorporatePriority: boolean;
   assignedDriverIds: string[];
   assignedVolunteerIds: string[];
   assignedVanDriverId: string | null;
@@ -455,18 +454,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   
-  // Check if current user can remove corporate priority (only Katie and Christine)
-  const canRemoveCorporatePriority = useMemo(() => {
-    const allowedEmails = [
-      'admin@sandwich.project',
-      'katielong2316@gmail.com',
-      'katie@thesandwichproject.org',
-      'christine@thesandwichproject.org'
-    ];
-    const userEmail = user?.email?.toLowerCase();
-    return userEmail && allowedEmails.includes(userEmail);
-  }, [user?.email]);
-
   // Persistent save-error state. Toasts are easy to miss (auto-dismiss,
   // can be covered by other UI), so when a save attempt is rejected we
   // ALSO surface a persistent banner inside the dialog that names the
@@ -490,7 +477,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
   const [tspContact, setTspContact] = useState('');
   const [customTspContact, setCustomTspContact] = useState('');
   const [vanDriverNeeded, setVanDriverNeeded] = useState(false);
-  const [isCorporatePriority, setIsCorporatePriority] = useState(false);
 
   // Staffing assignments
   const [assignedDriverIds, setAssignedDriverIds] = useState<string[]>([]);
@@ -540,7 +526,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
     tspContact: evt.tspContact || '',
     customTspContact: evt.customTspContact || '',
     vanDriverNeeded: evt.vanDriverNeeded || false,
-    isCorporatePriority: (evt as any).isCorporatePriority || false,
     assignedDriverIds: getDriverIds(evt),
     assignedVolunteerIds: getVolunteerIds(evt),
     assignedVanDriverId: evt.assignedVanDriverId || null,
@@ -557,7 +542,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
     setTspContact(d.tspContact);
     setCustomTspContact(d.customTspContact);
     setVanDriverNeeded(d.vanDriverNeeded);
-    setIsCorporatePriority(d.isCorporatePriority);
     setAssignedDriverIds(d.assignedDriverIds);
     setAssignedVolunteerIds(d.assignedVolunteerIds);
     setAssignedVanDriverId(d.assignedVanDriverId);
@@ -607,7 +591,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
     tspContact,
     customTspContact,
     vanDriverNeeded,
-    isCorporatePriority,
     assignedDriverIds,
     assignedVolunteerIds,
     assignedVanDriverId,
@@ -658,7 +641,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
       tspContact: d.tspContact ?? '',
       customTspContact: d.customTspContact ?? '',
       vanDriverNeeded: Boolean(d.vanDriverNeeded),
-      isCorporatePriority: Boolean(d.isCorporatePriority),
       assignedDriverIds: Array.isArray(d.assignedDriverIds) ? d.assignedDriverIds : [],
       assignedVolunteerIds: Array.isArray(d.assignedVolunteerIds) ? d.assignedVolunteerIds : [],
       assignedVanDriverId: d.assignedVanDriverId ?? null,
@@ -814,11 +796,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
       updates.vanDriverNeeded = vanDriverNeeded;
     }
     
-    // Corporate Priority
-    if (isCorporatePriority !== ((event as any)?.isCorporatePriority || false)) {
-      updates.isCorporatePriority = isCorporatePriority;
-    }
-
     // TSP Contact
     const currentTspContact = event?.tspContact || '';
     const currentCustomTspContact = event?.customTspContact || '';
@@ -1037,40 +1014,6 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
                   <Truck className="w-4 h-4 text-amber-600" />
                   Van Driver Needed
                 </Label>
-              </div>
-
-              {/* Corporate Priority */}
-              <div className={`flex items-center space-x-3 p-3 rounded-lg border ${
-                (event as any)?.isCorporatePriority && !canRemoveCorporatePriority 
-                  ? 'bg-amber-100/70 border-amber-300' 
-                  : 'bg-amber-50/50'
-              }`}>
-                <input
-                  type="checkbox"
-                  id="isCorporatePriority"
-                  checked={isCorporatePriority}
-                  onChange={(e) => setIsCorporatePriority(e.target.checked)}
-                  disabled={(event as any)?.isCorporatePriority && !canRemoveCorporatePriority}
-                  className={`h-5 w-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 ${
-                    (event as any)?.isCorporatePriority && !canRemoveCorporatePriority 
-                      ? 'opacity-60 cursor-not-allowed' 
-                      : ''
-                  }`}
-                />
-                <div>
-                  <Label htmlFor="isCorporatePriority" className={`text-amber-900 font-medium ${
-                    (event as any)?.isCorporatePriority && !canRemoveCorporatePriority 
-                      ? 'cursor-not-allowed' 
-                      : 'cursor-pointer'
-                  }`}>
-                    Corporate Priority Event
-                  </Label>
-                  <p className="text-xs text-amber-700">
-                    {(event as any)?.isCorporatePriority && !canRemoveCorporatePriority 
-                      ? 'Only Christine and Katie can remove the corporate priority flag.' 
-                      : 'Mark this as a corporate priority event requiring immediate attention and core team member attendance.'}
-                  </p>
-                </div>
               </div>
 
               <Separator />

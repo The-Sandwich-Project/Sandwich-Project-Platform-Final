@@ -2731,7 +2731,8 @@ export const eventRequests = pgTable(
     mlkDayMarkedAt: timestamp('mlk_day_marked_at'), // When it was marked as MLK Day event
     mlkDayMarkedBy: varchar('mlk_day_marked_by'), // User ID who marked it as MLK Day event
 
-    // Corporate priority tracking - manually assigned, triggers strict follow-up protocol
+    // RETIRED: corporate priority was removed from the app. These columns (through
+    // corporateFollowUpProtocol) are kept for history only; nothing reads or writes them.
     isCorporatePriority: boolean('is_corporate_priority').default(false), // Whether this is a corporate priority event requiring immediate attention
     corporatePriorityMarkedAt: timestamp('corporate_priority_marked_at'), // When it was marked as corporate priority
     corporatePriorityMarkedBy: varchar('corporate_priority_marked_by'), // User ID who marked it as corporate priority
