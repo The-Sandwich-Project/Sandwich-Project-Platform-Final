@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useState } from 'react';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
+import { copyToClipboard as copyText, openMaps as openAddressInMaps } from '../lib/native-actions';
 
 /**
  * Parse a date string as a local date to avoid timezone shift issues.
@@ -60,7 +61,7 @@ export function MobileEventDetail() {
 
   const copyToClipboard = async (text: string, field: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
     } catch (err) {
@@ -68,10 +69,7 @@ export function MobileEventDetail() {
     }
   };
 
-  const openMaps = (address: string) => {
-    const encoded = encodeURIComponent(address);
-    window.open(`https://maps.google.com?q=${encoded}`, '_blank');
-  };
+  const openMaps = (address: string) => openAddressInMaps(address);
 
   if (isLoading) {
     return (

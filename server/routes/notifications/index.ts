@@ -11,6 +11,7 @@ import { actionsRouter } from './actions';
 import { alertPreferencesRouter } from './alert-preferences';
 import { z } from 'zod';
 import { logger } from '../../utils/production-safe-logger';
+import { withMobileRoute } from '../../../shared/mobile/deep-links';
 
 const notificationsRouter = Router();
 
@@ -83,7 +84,7 @@ notificationsRouter.get('/', async (req, res) => {
       );
 
     res.json({
-      notifications: userNotifications,
+      notifications: userNotifications.map(withMobileRoute),
       unreadCount: parseInt(unreadCount[0]?.count as string) || 0,
       pagination: {
         limit: parseInt(limit as string),
@@ -146,6 +147,32 @@ notificationsRouter.get('/counts', async (req, res) => {
   }
 });
 
+// Mobile/native-friendly badge count alias.
+notificationsRouter.get('/badge-count', async (req, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, code: 'NOT_AUTHENTICATED', message: 'Not authenticated' });
+    }
+
+    const linkedIds = await getLinkedUserIds(req.user.id);
+    const unreadCount = await db
+      .select({ count: sql`count(*)` })
+      .from(notifications)
+      .where(
+        and(
+          inArray(notifications.userId, linkedIds),
+          eq(notifications.isRead, false),
+          eq(notifications.isArchived, false)
+        )
+      );
+
+    res.json({ success: true, unreadCount: parseInt(unreadCount[0]?.count as string) || 0 });
+  } catch (error) {
+    logger.error('Error fetching notification badge count:', error);
+    res.status(500).json({ success: false, code: 'BADGE_COUNT_FAILED', message: 'Failed to fetch badge count' });
+  }
+});
+
 // Mark notification as read
 notificationsRouter.patch('/:id/read', async (req, res) => {
   try {
@@ -178,6 +205,41 @@ notificationsRouter.patch('/:id/read', async (req, res) => {
   } catch (error) {
     logger.error('Error marking notification as read:', error);
     res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+// Mobile contract alias for marking a single notification read.
+notificationsRouter.post('/:id/read', async (req, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, code: 'NOT_AUTHENTICATED', message: 'Not authenticated' });
+    }
+
+    const notificationId = parseInt(req.params.id);
+    if (isNaN(notificationId)) {
+      return res.status(400).json({ success: false, code: 'INVALID_NOTIFICATION_ID', message: 'Invalid notification ID' });
+    }
+
+    const linkedIds = await getLinkedUserIds(req.user.id);
+    const result = await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          inArray(notifications.userId, linkedIds)
+        )
+      )
+      .returning();
+
+    if (result.length === 0) {
+      return res.status(404).json({ success: false, code: 'NOTIFICATION_NOT_FOUND', message: 'Notification not found' });
+    }
+
+    res.json({ success: true, notification: withMobileRoute(result[0]) });
+  } catch (error) {
+    logger.error('Error marking notification as read:', error);
+    res.status(500).json({ success: false, code: 'MARK_READ_FAILED', message: 'Failed to mark notification as read' });
   }
 });
 
@@ -229,6 +291,31 @@ notificationsRouter.patch('/bulk/read', async (req, res) => {
   } catch (error) {
     logger.error('Error bulk marking notifications as read:', error);
     res.status(500).json({ error: 'Failed to mark notifications as read' });
+  }
+});
+
+// Mobile contract alias for marking all notifications read.
+notificationsRouter.post('/mark-all-read', async (req, res) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, code: 'NOT_AUTHENTICATED', message: 'Not authenticated' });
+    }
+
+    const linkedIds = await getLinkedUserIds(req.user.id);
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(
+        and(
+          inArray(notifications.userId, linkedIds),
+          eq(notifications.isRead, false)
+        )
+      );
+
+    return res.json({ success: true, message: 'All notifications marked as read' });
+  } catch (error) {
+    logger.error('Error marking all notifications as read:', error);
+    res.status(500).json({ success: false, code: 'MARK_ALL_READ_FAILED', message: 'Failed to mark notifications as read' });
   }
 });
 
