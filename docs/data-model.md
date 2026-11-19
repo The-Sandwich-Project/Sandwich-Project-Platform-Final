@@ -152,9 +152,46 @@ erDiagram
    `regions.rolls_up_into_region_id`. (Today `server/bulk-map-hosts.ts` and the
    host-rename path in `server/database-storage.ts` rewrite old collection rows.
    That behaviour goes away.)
+
+   The only roll-up logic in the app today is a naming convention: a combined
+   region is named with a slash (e.g. "Dunwoody/PTC"), and the "Include
+   Historical Data" toggle in `client/src/components/host-analytics.tsx` also
+   counts collections logged under each part ("Dunwoody", "PTC"). Historic
+   names that don't follow that pattern aren't connected to anything. The
+   mapping is built in step 2: the audit lists every distinct
+   `sandwich_collections.host_name` with its record count and first/last date,
+   proposes a mapping for the slash-named ones, and leaves the rest for a person
+   to assign. (`server/bulk-map-hosts.ts` holds a `"Group 1"` → `"West Metro"`
+   style mapping that doesn't match known region names; the audit checks
+   whether any of those names exist in the data.)
 7. **Google Sheet sync**: someone missing from the sheet is marked "not on
    sheet," never deleted. Every sync writes a report (added / updated /
    flagged / possible new).
+8. **Sheet vs app conflicts: the sheet wins by default, but app edits are
+   allowed and never silently lost.** For each field the sheet owns, the sync
+   stores the value it last read from the sheet (`last_synced_value`). On each
+   sync it compares three values: the sheet now, the app now, and the last
+   synced value.
+
+   | Sheet since last sync | App since last sync | Result |
+   |---|---|---|
+   | unchanged | unchanged | nothing to do |
+   | changed | unchanged | sheet value applied |
+   | unchanged | edited in the app | app edit kept; the sheet is not touched |
+   | changed | edited in the app, and they differ | **conflict**: goes to a review list where someone picks which value wins |
+   | sheet value is malformed (phone not 10 digits once formatting is stripped, email without `@`/domain) | any | sheet value **not** applied; flagged "sheet value looks wrong" |
+   | sheet and app phone differ by a single digit | any | flagged "possible typo" for review, never auto-applied |
+
+   Phone numbers are compared after stripping formatting, so `(404) 555-1234`
+   and `404.555.1234` are the same number and never count as a change.
+
+   **First sync** (no last synced value yet): blank app fields are filled from
+   the sheet; fields where the app and sheet already disagree go to the review
+   list, with an "accept the sheet for all of these" option for the bulk case.
+
+   Writing app edits back into the sheet is out of scope for now. The review list
+   and the sync report show app edits the sheet doesn't have, so a coordinator
+   can update the sheet by hand.
 
 ### Sheet sources
 
@@ -170,7 +207,7 @@ Each step is its own PR.
 
 0. Schema rules, the integrity check, and this document. ✅
 1. Recipients directory: plain list as the default view; the detailed views move to a secondary tab.
-2. Data audit (read-only): duplicates across the five people tables, conflicting phones/emails, abbreviated "First L." names, survey-driver names edited after entry, distinct region names in `sandwich_collections`.
+2. Data audit (read-only): duplicates across the five people tables, conflicting phones/emails, abbreviated "First L." names, survey-driver names edited after entry, distinct region names in `sandwich_collections` (with counts and date ranges, plus a proposed historic roll-up), and a **column-usage report for `drivers`** (per column: how many rows have a value, and how recently one was set) so the `driver_profiles` columns are chosen from real data.
 3. `regions` table + historic roll-up mapping.
 4. `people`, `person_name_aliases`, `legacy_person_ids` (additive only).
 5. Backfill script with `--dry-run`. **A script, not a migration**: migrations run automatically on every boot, including production. Tested against a Neon branch of production.
@@ -236,12 +273,14 @@ In the target design it is one flag: `people.is_van_driver`.
 
 ## 4. Open decisions
 
-- **Sheet vs app on conflicts:** when the volunteer sheet and the app disagree on
-  phone/email, which wins? (Leaning: the sheet owns the columns it has, and the app
-  labels those fields "managed by Google Sheet.")
-- **Historic regions:** which current region each historic sub-region rolls
-  up into. Known by someone, or derived from collection records?
 - **Driver roster:** what the driver coordinator's sheet becomes once cleaned up, and whether
   all of her drivers also count as volunteers.
 - **`driver_profiles` columns:** which of the ~45 legacy `drivers` columns are
-  actually used. Decided by the data audit.
+  actually used. Decided from the step 2 column-usage report.
+
+Resolved:
+
+- **Sheet vs app on conflicts:** three-way comparison; see rule 8 in section 1.
+- **Historic regions:** the current regions are known and will be supplied
+  directly; historic ones are reconstructed from the collections log in step 2
+  (see rule 6).
