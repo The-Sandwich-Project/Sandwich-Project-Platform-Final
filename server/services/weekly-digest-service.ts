@@ -47,7 +47,12 @@ async function getActiveEventsForContact(tspContactId: string): Promise<DigestEv
       and(
         or(
           eq(eventRequests.tspContact, tspContactId),
-          eq(eventRequests.tspContactAssigned, tspContactId),
+          // Legacy field only counts when tspContact is empty (after a
+          // reassignment it can still hold the former contact)
+          and(
+            sql`(${eventRequests.tspContact} IS NULL OR ${eventRequests.tspContact} = '')`,
+            eq(eventRequests.tspContactAssigned, tspContactId),
+          ),
           eq(eventRequests.additionalContact1, tspContactId),
           eq(eventRequests.additionalContact2, tspContactId)
         ),
@@ -105,7 +110,12 @@ async function getRecentlyCompletedEvents(tspContactId: string): Promise<DigestE
       and(
         or(
           eq(eventRequests.tspContact, tspContactId),
-          eq(eventRequests.tspContactAssigned, tspContactId),
+          // Legacy field only counts when tspContact is empty (after a
+          // reassignment it can still hold the former contact)
+          and(
+            sql`(${eventRequests.tspContact} IS NULL OR ${eventRequests.tspContact} = '')`,
+            eq(eventRequests.tspContactAssigned, tspContactId),
+          ),
           eq(eventRequests.additionalContact1, tspContactId),
           eq(eventRequests.additionalContact2, tspContactId)
         ),
@@ -140,7 +150,12 @@ async function getCompletedHistory(tspContactId: string): Promise<DigestEventSum
       and(
         or(
           eq(eventRequests.tspContact, tspContactId),
-          eq(eventRequests.tspContactAssigned, tspContactId),
+          // Legacy field only counts when tspContact is empty (after a
+          // reassignment it can still hold the former contact)
+          and(
+            sql`(${eventRequests.tspContact} IS NULL OR ${eventRequests.tspContact} = '')`,
+            eq(eventRequests.tspContactAssigned, tspContactId),
+          ),
           eq(eventRequests.additionalContact1, tspContactId),
           eq(eventRequests.additionalContact2, tspContactId)
         ),
@@ -175,7 +190,12 @@ async function getTotalCompletedCount(tspContactId: string): Promise<number> {
       and(
         or(
           eq(eventRequests.tspContact, tspContactId),
-          eq(eventRequests.tspContactAssigned, tspContactId),
+          // Legacy field only counts when tspContact is empty (after a
+          // reassignment it can still hold the former contact)
+          and(
+            sql`(${eventRequests.tspContact} IS NULL OR ${eventRequests.tspContact} = '')`,
+            eq(eventRequests.tspContactAssigned, tspContactId),
+          ),
           eq(eventRequests.additionalContact1, tspContactId),
           eq(eventRequests.additionalContact2, tspContactId)
         ),
@@ -206,7 +226,12 @@ async function getUpcomingContactNeededEvents(tspContactId: string): Promise<Dig
       and(
         or(
           eq(eventRequests.tspContact, tspContactId),
-          eq(eventRequests.tspContactAssigned, tspContactId),
+          // Legacy field only counts when tspContact is empty (after a
+          // reassignment it can still hold the former contact)
+          and(
+            sql`(${eventRequests.tspContact} IS NULL OR ${eventRequests.tspContact} = '')`,
+            eq(eventRequests.tspContactAssigned, tspContactId),
+          ),
           eq(eventRequests.additionalContact1, tspContactId),
           eq(eventRequests.additionalContact2, tspContactId)
         ),
@@ -255,6 +280,11 @@ export async function buildDigestDataForContact(tspContactId: string): Promise<W
 
     if (!user || !user.email) {
       logger.warn(`Cannot build digest for user ${tspContactId}: user not found or no email`);
+      return null;
+    }
+    // Deactivated accounts don't get digests (they include groups' contact info)
+    if (user.isActive === false) {
+      logger.log(`Skipping digest for inactive user ${tspContactId}`);
       return null;
     }
 
@@ -812,7 +842,8 @@ async function getAllActiveTspContacts(): Promise<string[]> {
   const contactIds = new Set<string>();
   for (const row of result) {
     if (row.tspContact) contactIds.add(row.tspContact);
-    if (row.tspContactAssigned) contactIds.add(row.tspContactAssigned);
+    // Legacy field only when tspContact is empty (it can hold a former contact)
+    if (row.tspContactAssigned && !row.tspContact) contactIds.add(row.tspContactAssigned);
     if (row.additionalContact1) contactIds.add(row.additionalContact1);
     if (row.additionalContact2) contactIds.add(row.additionalContact2);
   }
@@ -829,6 +860,15 @@ async function getAllActiveTspContacts(): Promise<string[]> {
     contactIds.add(adminUser[0].id);
   }
 
+  if (contactIds.size === 0) return [];
+
+  // Drop deactivated accounts: they may still be listed on old events, and
+  // the digest includes groups' contact details.
+  const inactive = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(inArray(users.id, Array.from(contactIds)), eq(users.isActive, false)));
+  for (const u of inactive) contactIds.delete(u.id);
   if (contactIds.size === 0) return [];
 
   // Filter out users who have opted out of the weekly portfolio digest.
