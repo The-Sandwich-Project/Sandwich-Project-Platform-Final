@@ -34,6 +34,7 @@ router.post(
         try {
           logger.log(`Testing from address: ${fromAddress}`);
           await sendEmail({
+            emailStream: 'newsletter',
             to: testEmail,
             from: fromAddress,
             subject: 'SendGrid Test - TSP Platform',
@@ -176,6 +177,7 @@ router.post(
         for (const sender of verifiedSenders) {
           try {
             await sendEmail({
+              emailStream: 'newsletter',
               to: validRecipients[0].email,
               from: sender,
               subject: subject,
@@ -222,6 +224,7 @@ router.post(
         const recipient = validRecipients[i];
         try {
           await sendEmail({
+            emailStream: 'newsletter',
             to: recipient.email,
             from: workingSender,
             subject: subject,

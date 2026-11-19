@@ -383,6 +383,7 @@ export class SmartDeliveryService {
 
       // Send email using SendGrid
       await sendEmail({
+        emailStream: 'operational',
         to: user[0].email,
         from: fromEmail,
         subject: notification.title,

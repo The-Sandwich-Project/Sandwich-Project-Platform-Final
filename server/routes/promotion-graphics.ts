@@ -563,6 +563,7 @@ async function sendNotificationEmail(graphic: PromotionGraphic, uploader: any) {
 
       try {
         await sendEmail({
+          emailStream: 'newsletter',
           to: recipientEmail,
           from: 'katielong2316@gmail.com',
           subject: `New Social Media Graphic Available: ${graphic.title}`,

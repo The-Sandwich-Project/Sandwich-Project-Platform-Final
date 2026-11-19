@@ -72,6 +72,7 @@ async function sendAdminNotification(
       : '';
 
     await sendEmail({
+      emailStream: 'operational',
       to: ADMIN_EMAIL,
       from: FROM_EMAIL,
       subject: `[TSP App ${severity.toUpperCase()}] ${input.source}: ${input.message.slice(0, 80)}`,
@@ -234,6 +235,7 @@ export async function sendDailyErrorDigest(): Promise<{
   try {
     const { sendEmailWithResult } = await import('../sendgrid');
     const sendResult = await sendEmailWithResult({
+      emailStream: 'operational',
       to: ADMIN_EMAIL,
       from: FROM_EMAIL,
       subject: `[TSP App] Daily error digest — ${rows.length} errors, ${sorted.length} types${criticalCount ? `, ${criticalCount} critical` : ''}`,

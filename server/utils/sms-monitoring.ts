@@ -107,6 +107,7 @@ ${EMAIL_FOOTER_TEXT}
     
     // Send the monitoring email
     await sendEmail({
+      emailStream: 'operational',
       to: ADMIN_EMAIL,
       from: 'katie@thesandwichproject.org',
       subject,

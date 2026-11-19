@@ -12,6 +12,7 @@
  */
 
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { db } from '../db';
 import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, notifications, REMINDER_RULE_TYPES } from '@shared/schema';
 import { and, eq, inArray, lte, or, sql } from 'drizzle-orm';
@@ -361,13 +362,13 @@ async function sendReminderEmail(
   const baseUrl = getAppBaseUrl();
 
   try {
-    await sgMail.send({
+    await sgMail.send(withUnsubscribeSettings({
       to: email,
       from: 'katie@thesandwichproject.org',
       subject: msg.subject,
       headers: reminderUnsubscribeHeaders(baseUrl),
       html: renderReminderEmailHtml(userName, event, msg, baseUrl),
-    });
+    }, 'operational'));
     return true;
   } catch (error) {
     logger.error(`Failed to send reminder email to ${email}:`, error);
@@ -605,7 +606,7 @@ async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: Ru
         .map(i => `<li style="margin-bottom:8px;"><a href="${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${i.id}" style="color:#007E8C;font-weight:600;">${escapeHtml(i.orgName)}</a><br/><span style="font-size:13px;color:#6b7280;">${i.labels.join(', ')}</span></li>`)
         .join('');
       try {
-        await sgMail.send({
+        await sgMail.send(withUnsubscribeSettings({
           to: email,
           from: 'katie@thesandwichproject.org',
           subject: title,
@@ -634,7 +635,7 @@ async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: Ru
               ${EMAIL_FOOTER_HTML}
             </div>
           `,
-        });
+        }, 'operational'));
       } catch (error) {
         logger.error(`[CheckInReminders] Failed to send backlog summary email to user ${user.id}:`, error);
       }

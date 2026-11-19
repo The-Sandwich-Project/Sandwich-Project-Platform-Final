@@ -1,4 +1,5 @@
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 
 export interface EmailTemplate {
   id: string;
@@ -354,7 +355,7 @@ View full dashboard: {{dashboardLink}}
         return true;
       }
 
-      const result = await sgMail.send(emailData);
+      const result = await sgMail.send(withUnsubscribeSettings(emailData, 'newsletter'));
       console.log('Email sent successfully:', result[0].statusCode);
       return true;
     } catch (error) {

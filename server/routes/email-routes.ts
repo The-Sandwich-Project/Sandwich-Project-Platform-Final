@@ -681,7 +681,9 @@ export function createEmailRouter(deps: RouterDependencies) {
       html: string;
       bcc?: string;
       attachments?: typeof attachmentsForSendgrid;
+      emailStream: 'operational';
     } = {
+      emailStream: 'operational',
       to: recipientEmail,
       from: fromEmail,
       replyTo: replyToEmail,

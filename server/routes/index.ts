@@ -1493,6 +1493,7 @@ export function createMainRoutes(deps: RouterDependencies) {
           .join('\n');
 
         await sendEmail({
+          emailStream: 'operational',
           to: 'katie@thesandwichproject.org',
           from: 'noreply@thesandwichproject.org',
           subject: `[TSP App Error] ${message || 'Unknown error'} — ${url || 'unknown page'}`,

@@ -8,6 +8,7 @@
  */
 
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { predictMonthlySandwichNeeds, type PredictionResult } from './ai-predictions';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getAppBaseUrl } from '../config/constants';
@@ -195,13 +196,13 @@ To unsubscribe, contact katie@thesandwichproject.org.
   `.trim();
 
   try {
-    await sgMail.send({
+    await sgMail.send(withUnsubscribeSettings({
       to: ALERT_RECIPIENT,
       from: 'katie@thesandwichproject.org',
       subject,
       html,
       text,
-    });
+    }, 'operational'));
     log.info(`Prediction alert email sent to ${ALERT_RECIPIENT} for ${monthLabel}`);
     return true;
   } catch (error) {

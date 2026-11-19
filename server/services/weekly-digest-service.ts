@@ -8,6 +8,7 @@
  */
 
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { db } from '../db';
 import { eventRequests, users } from '@shared/schema';
 import { eq, and, or, inArray, desc, gte, lte, sql } from 'drizzle-orm';
@@ -776,7 +777,7 @@ export async function sendWeeklyDigestEmail(data: WeeklyDigestData): Promise<boo
       text: buildDigestEmailText(data),
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     logger.log(`Weekly digest sent to ${data.tspContactEmail} (${data.stats.totalActive} active, ${data.stats.needsUrgentAttention} urgent)`);
     return true;
   } catch (error) {

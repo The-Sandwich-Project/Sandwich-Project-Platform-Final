@@ -24,6 +24,7 @@ import type { AuthenticatedRequest } from '../types/express';
 import { EmailNotificationService } from '../services/email-notification-service';
 import { getAppBaseUrl } from '../config/constants';
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getUnfilledCounts, getVolunteerCount, getTotalDriverCount } from '../utils/assignment-utils';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
@@ -189,7 +190,7 @@ The Sandwich Project - Fighting food insecurity one sandwich at a time
       `.trim(),
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     logger.info(`Volunteer signup notification sent to coordinators for event ${eventId}`);
   } catch (error) {
     logger.error('Error sending volunteer signup notification:', error);
@@ -297,7 +298,7 @@ The Sandwich Project - Fighting food insecurity one sandwich at a time
       `.trim(),
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     logger.info(`Volunteer signup confirmation email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending volunteer signup confirmation email:', error);
@@ -715,7 +716,7 @@ Thank you for making a difference with The Sandwich Project!
       `.trim(),
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     logger.info(`Volunteer approval email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending volunteer approval email:', error);
@@ -807,7 +808,7 @@ If this change doesn't work for you, please reply to this email.
 Thank you!
       `.trim(),
     };
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     logger.info(`Role-change email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending role change email:', error);
@@ -882,7 +883,7 @@ You're welcome to sign up again any time. If you have questions, please reply to
 Thanks!
       `.trim(),
     };
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     logger.info(`Removal email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending removal email:', error);

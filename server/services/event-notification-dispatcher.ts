@@ -6,6 +6,7 @@
  */
 
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { db } from '../db';
 import { eventRequests, users } from '@shared/schema';
 import { eq, and, or, inArray, lt, lte, gte, isNull, sql } from 'drizzle-orm';
@@ -257,7 +258,7 @@ async function sendTspAssignmentEmail(
       text: `Hi ${userName}!\n\n${isCorporatePriority ? '⚡ CORPORATE PRIORITY - Contact today!\n\n' : ''}You've been assigned to ${organizationName} (${dateStr}).\n\nView details: ${eventUrl}`,
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     return true;
   } catch (error) {
     logger.error('Error sending TSP assignment email:', error);
@@ -371,7 +372,7 @@ async function sendEventApproachingEmail(
       text: `URGENT: ${organizationName} event in ${daysUntil} days (${dateStr}) but NOT scheduled yet!\n\nPlease finalize immediately: ${eventUrl}`,
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     return true;
   } catch (error) {
     logger.error('Error sending event approaching email:', error);
@@ -474,7 +475,7 @@ export async function sendEventChangedNotification(
         text: `Hi ${userName},\n\n${changedBy} made changes to ${organizationName}:\n\n${changes.map((c) => `${c.field}: "${c.oldValue}" → "${c.newValue}"`).join('\n')}\n\nView details: ${eventUrl}`,
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       sentCount++;
     } catch (error) {
       logger.error(`Error sending event changed notification to ${user.email}:`, error);
@@ -551,7 +552,7 @@ export async function sendWeeklyContactReminderEmail(
       text: `Hi ${userName},\n\nIt's been ${daysSinceContact} days since the last contact with ${organizationName} (${dateStr}).\n\nConsider following up to keep momentum.\n\nView event: ${eventUrl}`,
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     logger.log(`Weekly contact reminder sent to ${user.email} for ${organizationName}`);
     return true;
   } catch (error) {
@@ -617,7 +618,7 @@ export async function sendStandbyFollowupEmail(
       text: `Hi ${userName},\n\n${organizationName} is on standby${daysSinceLastContact ? ` (last contact ${daysSinceLastContact} days ago)` : ''}.\n\nCheck in about their timeline: ${eventUrl}`,
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     return true;
   } catch (error) {
     logger.error(`Error sending standby followup email:`, error);
@@ -703,7 +704,7 @@ export async function sendStaleEventEscalation(
         text: `ESCALATION: ${organizationName}\n\nAssigned to: ${tspContactName} (${tspContactEmail})\nNo contact in ${daysSinceContact} days.\n\nPlease review: ${eventUrl}`,
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       sentCount++;
       logger.log(`Escalation sent to admin ${admin.email} for ${organizationName}`);
     } catch (error) {
@@ -834,7 +835,7 @@ export async function sendBatchedStaleEventEscalation(
         text: `Weekly Stalled Events Summary\n\nHi ${adminName}!\n\n${staleEvents.length} event(s) have had no contact logged for 2+ weeks:\n${eventsText}\n\nPlease review and follow up with the assigned contacts.\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       sentCount++;
       logger.log(`Batched escalation summary sent to admin ${admin.email} for ${staleEvents.length} events`);
     } catch (error) {

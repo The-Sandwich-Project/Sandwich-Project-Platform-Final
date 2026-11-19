@@ -682,6 +682,7 @@ router.post('/test-email', async (req, res) => {
 
     // Import required modules
     const mailService = (await import('@sendgrid/mail')).default;
+    const { withUnsubscribeSettings } = await import('../utils/sendgrid-unsubscribe');
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
     
     const previousWednesday = new Date();
@@ -749,13 +750,13 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       </div>
     `;
 
-    await mailService.send({
+    await mailService.send(withUnsubscribeSettings({
       to: emailAddress,
       from: 'katie@thesandwichproject.org',
       subject: emailSubject,
       text: emailText,
       html: emailHtml,
-    });
+    }, 'operational'));
 
     res.json({
       success: true,

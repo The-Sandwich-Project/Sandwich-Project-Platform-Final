@@ -5182,6 +5182,7 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
 
     // Send email via SendGrid with actual file attachments
     const emailSent = await sendEmail({
+      emailStream: 'operational',
       to: recipientEmail,
       from: fromEmail,
       replyTo: replyToEmail,

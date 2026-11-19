@@ -1,4 +1,5 @@
 import { MailService } from '@sendgrid/mail';
+import { withUnsubscribeSettings } from './utils/sendgrid-unsubscribe';
 import {
   NotificationTypes,
   type NotificationType,
@@ -69,7 +70,7 @@ export class NotificationService {
         text: `New message from ${senderName}: ${messageContent}\n\nView the message at: ${process.env.REPL_URL || 'https://your-platform-url.com'}/messages`,
       };
 
-      await mailService.send(emailData);
+      await mailService.send(withUnsubscribeSettings(emailData, 'operational'));
       logger.log(
         `Direct message email notification sent to ${recipientEmail}`
       );
@@ -136,7 +137,7 @@ export class NotificationService {
         text: `New message from ${senderName} in ${channelName}:\n\n"${messageContent}"\n\nView the conversation at: ${appUrl}/dashboard?section=chat`,
       };
 
-      await mailService.send(emailData);
+      await mailService.send(withUnsubscribeSettings(emailData, 'operational'));
       logger.log(
         `Chat notification email sent to ${recipientEmail}`
       );
@@ -195,7 +196,7 @@ export class NotificationService {
         text: `You've been assigned to project: ${projectTitle}\n\n${assignedBy ? `Assigned by: ${assignedBy}\n\n` : ''}Please log into the platform to view project details.\n\nView project at: ${process.env.REPL_URL || 'https://your-platform-url.com'}/projects/${projectId}`,
       };
 
-      await mailService.send(emailData);
+      await mailService.send(withUnsubscribeSettings(emailData, 'operational'));
       logger.log(
         `Project assignment email notification sent to ${assigneeEmails.length} recipients`
       );
@@ -232,7 +233,7 @@ export class NotificationService {
         text: template.body.replace(/<[^>]*>/g, ''), // Strip HTML for text version
       };
 
-      await mailService.send(emailData);
+      await mailService.send(withUnsubscribeSettings(emailData, 'operational'));
       logger.log(
         `Email notification sent: ${type} to ${recipientEmails.length} recipients`
       );
@@ -408,7 +409,7 @@ Thanks for helping us fight hunger, one sandwich at a time! 🥪
         text: textContent,
       };
 
-      await mailService.send(emailData);
+      await mailService.send(withUnsubscribeSettings(emailData, 'operational'));
       logger.log(`SMS opt-in instructions email sent to ${recipientEmail}`);
       return true;
     } catch (error) {

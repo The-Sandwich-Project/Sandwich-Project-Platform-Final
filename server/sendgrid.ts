@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/production-safe-logger';
 import { ADMIN_EMAIL } from './config/organization';
+import { withUnsubscribeSettings, type EmailStream } from './utils/sendgrid-unsubscribe';
 
 const mailService = new MailService();
 
@@ -33,6 +34,12 @@ interface EmailParams {
   text?: string;
   html?: string;
   attachments?: (string | EmailAttachment | Base64Attachment)[];
+  /**
+   * Which SendGrid unsubscribe group this email belongs to. 'operational'
+   * (assignments, reminders, schedule changes, alerts) also bypasses the global
+   * unsubscribe list; 'newsletter' (bulk announcements) does not.
+   */
+  emailStream: EmailStream;
 }
 
 /**
@@ -192,7 +199,7 @@ export async function sendEmailWithResult(params: EmailParams): Promise<SendEmai
       }
     }
     
-    await mailService.send(emailData);
+    await mailService.send(withUnsubscribeSettings(emailData, params.emailStream));
     logger.log(`Email sent successfully to ${params.to}`);
     return { success: true };
   } catch (error) {
@@ -286,6 +293,7 @@ This is an automated notification from The Sandwich Project suggestions portal.$
     subject: `New Suggestion: ${suggestion.title}`,
     text: emailContent,
     html: htmlContent,
+    emailStream: 'operational',
   });
 }
 

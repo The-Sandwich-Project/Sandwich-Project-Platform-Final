@@ -309,6 +309,7 @@ export function createEventEmailRouter(): Router {
 
       // Build the SendGrid payload with replyTo and BCC
       const emailPayload: any = {
+        emailStream: 'operational',
         to: recipientEmail,
         from: fromEmail,
         replyTo: tspContactEmail,

@@ -1,6 +1,7 @@
 import sgMail from '@sendgrid/mail';
 import { logger } from '../utils/production-safe-logger';
 import { logApplicationError } from './application-error-logger';
+import { withUnsubscribeSettings, type EmailStream } from '../utils/sendgrid-unsubscribe';
 
 // Initialize SendGrid
 if (!process.env.SENDGRID_API_KEY) {
@@ -16,6 +17,8 @@ interface EmailParams {
   subject: string;
   text?: string;
   html?: string;
+  /** SendGrid unsubscribe group; see server/utils/sendgrid-unsubscribe.ts. */
+  emailStream: EmailStream;
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
@@ -32,7 +35,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       html: params.html || params.text?.replace(/\n/g, '<br>') || '',
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, params.emailStream));
     logger.log(`✅ Email sent successfully to ${params.to}`);
     return true;
   } catch (error) {

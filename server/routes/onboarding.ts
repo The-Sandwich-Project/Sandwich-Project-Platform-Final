@@ -227,6 +227,7 @@ router.post('/admin/send-announcement', isAuthenticated, async (req: any, res) =
     for (const user of activeUsers) {
       try {
         await sendEmail({
+          emailStream: 'newsletter',
           to: user.email,
           subject: '🎉 Onboarding Challenges Are Now Live!',
           html: emailTemplate,
