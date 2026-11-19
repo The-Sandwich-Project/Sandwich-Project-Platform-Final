@@ -4870,8 +4870,8 @@ router.patch('/:id/tsp-contact', isAuthenticated, async (req, res) => {
       }
 
       // Initialize corporate follow-up protocol if this is a corporate priority event
-      // BUT only for events that are not yet scheduled (new/in_progress) - scheduled/completed events don't need "call now" alerts
-      const statusesNeedingCallNotification = ['new', 'in_progress'];
+      // BUT only for events that are not yet scheduled (new/in_process) - scheduled/completed events don't need "call now" alerts
+      const statusesNeedingCallNotification = ['new', 'in_process'];
       if (originalEvent.isCorporatePriority && statusesNeedingCallNotification.includes(originalEvent.status || '')) {
         try {
           const { initializeCorporateProtocol } = await import('../services/corporate-followup-service');
@@ -5022,8 +5022,8 @@ router.patch('/:id/corporate-priority', isAuthenticated, async (req, res) => {
 
       // If event already has a TSP contact assigned, initialize the corporate protocol
       // and send immediate call notification to that contact
-      // BUT only for events that are not yet scheduled (new/in_progress) - scheduled/completed events don't need "call now" alerts
-      const statusesNeedingCallNotification = ['new', 'in_progress'];
+      // BUT only for events that are not yet scheduled (new/in_process) - scheduled/completed events don't need "call now" alerts
+      const statusesNeedingCallNotification = ['new', 'in_process'];
       if (originalEvent.tspContact && statusesNeedingCallNotification.includes(originalEvent.status || '')) {
         try {
           const { initializeCorporateProtocol } = await import('../services/corporate-followup-service');
