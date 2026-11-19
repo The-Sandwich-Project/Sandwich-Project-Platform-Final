@@ -125,6 +125,3 @@ Thumbs.db
 
 # Claude Code personal/local settings (machine-specific, should not be tracked)
 .claude/settings.local.json
-
-# People-data audit reports (contain personal contact details)
-audit-output/
