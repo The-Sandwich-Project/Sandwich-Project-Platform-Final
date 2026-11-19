@@ -7,6 +7,7 @@ import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { logger } from '../utils/production-safe-logger';
 import { sendEmail } from '../sendgrid';
+import { buildUserSender } from '../utils/user-sender';
 import type { AuthenticatedRequest } from '../types/express';
 
 function escapeHtml(str: string): string {
@@ -305,13 +306,16 @@ export function createEventEmailRouter(): Router {
       // Import email footer
       const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
 
-      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'katielong2316@gmail.com';
+      // From: the sender's own address when it's on our SendGrid-authenticated
+      // domain, otherwise the org address (a verified sender) shown as
+      // "<Name> via The Sandwich Project". See server/utils/user-sender.ts.
+      const sender = buildUserSender(senderUser || user);
 
       // Build the SendGrid payload with replyTo and BCC
       const emailPayload: any = {
         emailStream: 'operational',
         to: recipientEmail,
-        from: fromEmail,
+        from: sender.from,
         replyTo: tspContactEmail,
         subject: processedSubject,
         text: `${processedBody}\n\n${EMAIL_FOOTER_TEXT}`,
