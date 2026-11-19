@@ -662,31 +662,29 @@ export function createEmailRouter(deps: RouterDependencies) {
       `;
     }
 
-    // Use the organization's VERIFIED SendGrid sender identity
-    // (katie@thesandwichproject.org). The previous fallback of
-    // katielong2316@gmail.com is NOT a verified sender, so SendGrid rejected
-    // every send with a `field: null` sender-identity error — surfacing to the
-    // user as an opaque 500 "can't send toolkit". Match every other email
-    // sender in the app (event-notification-dispatcher, email-notification-service,
-    // etc.) which all send from the org address.
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || FROM_EMAIL;
-    const bccEmail = process.env.SENDGRID_TOOLKIT_BCC || FROM_EMAIL;
+    // From: the sender's own address when it's on our SendGrid-authenticated
+    // domain, otherwise the org address shown as "<Name> via The Sandwich
+    // Project". Reply-To is the sender. See server/utils/user-sender.ts.
+    const { buildUserSender } = await import('../utils/user-sender');
+    const sender = buildUserSender(fullUserData || user);
+    const replyTo = sender.replyTo || replyToEmail;
+    const orgBcc = process.env.SENDGRID_TOOLKIT_BCC || FROM_EMAIL;
 
     const emailPayload: {
       to: string;
-      from: string;
+      from: { email: string; name?: string };
       replyTo: string;
       subject: string;
       text?: string;
       html: string;
-      bcc?: string;
+      bcc?: string[];
       attachments?: typeof attachmentsForSendgrid;
       emailStream: 'operational';
     } = {
       emailStream: 'operational',
       to: recipientEmail,
-      from: fromEmail,
-      replyTo: replyToEmail,
+      from: sender.from,
+      replyTo,
       subject,
       html: finalHtml,
     };
@@ -696,9 +694,15 @@ export function createEmailRouter(deps: RouterDependencies) {
       emailPayload.text = `${textContent}\n\n${EMAIL_FOOTER_TEXT}`;
     }
 
-    // Only add BCC if it's different from the recipient email to avoid SendGrid duplicate error
-    if (bccEmail && bccEmail.toLowerCase() !== recipientEmail.toLowerCase()) {
-      emailPayload.bcc = bccEmail;
+    // BCC the org inbox and the sender (so they keep a copy). Skip anything
+    // matching the recipient to avoid SendGrid's duplicate-address error;
+    // sendEmailWithResult also de-duplicates.
+    const bccList = [orgBcc, sender.senderCopyBcc].filter(
+      (addr): addr is string =>
+        !!addr && addr.toLowerCase() !== recipientEmail.toLowerCase()
+    );
+    if (bccList.length > 0) {
+      emailPayload.bcc = bccList;
     }
 
     if (attachmentsForSendgrid.length > 0) {
@@ -707,8 +711,9 @@ export function createEmailRouter(deps: RouterDependencies) {
 
     logger.log('[Event Email API] Sending email via SendGrid:', {
       to: recipientEmail,
-      from: fromEmail,
-      replyTo: replyToEmail,
+      from: sender.from.email,
+      replyTo,
+      bcc: emailPayload.bcc,
       subject,
       attachmentsCount: attachmentsForSendgrid.length,
       isFullHtml,

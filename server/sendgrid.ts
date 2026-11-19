@@ -27,7 +27,8 @@ interface Base64Attachment {
 
 interface EmailParams {
   to: string;
-  from: string;
+  /** An address, or an address with a display name ("Brenda via The Sandwich Project"). */
+  from: string | { email: string; name?: string };
   replyTo?: string;
   bcc?: string | string[];
   subject: string;
@@ -66,7 +67,7 @@ export async function sendEmailWithResult(params: EmailParams): Promise<SendEmai
 
   try {
     logger.log(
-      `Attempting to send email to ${params.to} from ${params.from} with subject: ${params.subject}`
+      `Attempting to send email to ${params.to} from ${typeof params.from === 'string' ? params.from : params.from.email} with subject: ${params.subject}`
     );
     const emailData: any = {
       to: params.to,
