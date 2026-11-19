@@ -11,11 +11,14 @@
  * here were wrong.
  *
  * Usage:
+ *   AUDIT_DATABASE_URL=postgres://... npm run audit:people
  *   AUDIT_DATABASE_URL=postgres://... npx tsx scripts/audit-people-data.ts
  *   npx tsx scripts/audit-people-data.ts --url postgres://... [--out path.md]
  *
  * Point it at a Neon branch of production (or production itself; it can't
- * write). The report contains names, emails and phone numbers: it is written
+ * write). It deliberately does NOT fall back to DATABASE_URL: in the Replit
+ * workspace that is the dev database, and a report built from dev data would
+ * be silently wrong. The report contains names, emails and phone numbers: it is written
  * to audit-output/ (gitignored). Don't commit it or paste it anywhere public.
  *
  * Sections:
@@ -26,7 +29,7 @@
  *   5. `name_source`: survey drivers, and whether their name changed since
  *   6. Proposed `regions` rows, with historic roll-ups
  *   7. Candidate `driver_profiles` columns (what the drivers data actually uses)
- *   8. `is_van_driver`: where approval is recorded today, and disagreements
+ *   8. `is_van_driver`: who's approved, and where it's recorded today
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,13 +44,6 @@ function arg(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-const url = arg('--url') || process.env.AUDIT_DATABASE_URL || process.env.DATABASE_URL;
-if (!url) {
-  console.error('Set AUDIT_DATABASE_URL (or pass --url). Use a Neon branch of production.');
-  process.exit(1);
-}
-const today = new Date().toISOString().slice(0, 10);
-const outPath = arg('--out') || path.join('audit-output', `people-data-audit-${today}.md`);
 
 // ---------------------------------------------------------------------------
 // Normalisation helpers
@@ -171,6 +167,25 @@ export function isNickname(a: string, b: string): boolean {
   return false;
 }
 
+/**
+ * Do two names plausibly belong to the same person, for joining records that
+ * share an email or phone? Same first name (or a known nickname, or one is
+ * just an initial) AND same last name (or one is just an initial, or one side
+ * has no last name). Deliberately strict: typos like Jon/John or Myler/Mylar
+ * are NOT accepted here, so a family sharing a phone isn't merged; those go
+ * to section 2b / 3 for a person to decide.
+ */
+export function namesCompatible(a: string, b: string): boolean {
+  const x = normName(a).replace(/\./g, '').split(' ').filter(Boolean);
+  const y = normName(b).replace(/\./g, '').split(' ').filter(Boolean);
+  if (x.length === 0 || y.length === 0) return true;
+  const part = (p: string, q: string) =>
+    p === q || (p.length === 1 && q.startsWith(p)) || (q.length === 1 && p.startsWith(q));
+  const firstOk = part(x[0], y[0]) || isNickname(x[0], y[0]);
+  if (x.length === 1 || y.length === 1) return firstOk;
+  return firstOk && part(x[x.length - 1], y[y.length - 1]);
+}
+
 // ---------------------------------------------------------------------------
 // Report helpers
 // ---------------------------------------------------------------------------
@@ -206,11 +221,23 @@ type PersonRecord = {
   vanApproved: boolean | null;
   hostContactId?: number | null; // volunteers only: machine-maintained copy
   surveySubmitted?: boolean; // drivers only
-  region?: string | null; // host_contacts only: name of its hosts row
+  region?: string | null; // host_contacts only: the contact's area
+  hostVolunteer?: boolean; // host_contacts only: "Also a volunteer"
 };
+const isCurrent = (r: PersonRecord) => r.active !== false;
 const ref = (r: PersonRecord) => `${r.source}#${r.id}`;
 
 async function main() {
+  const url = arg('--url') || process.env.AUDIT_DATABASE_URL;
+  if (!url) {
+    console.error(
+      'Set AUDIT_DATABASE_URL (or pass --url) to a Neon branch of production.\n' +
+        'DATABASE_URL is not used on purpose: in the Replit workspace it is the dev database.'
+    );
+    process.exit(1);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const outPath = arg('--out') || path.join('audit-output', `people-data-audit-${today}.md`);
   const host = (() => {
     try {
       return new URL(url!).hostname;
@@ -283,8 +310,12 @@ async function main() {
       });
     }
     for (const h of await q(
+      // The Hosts page edits a contact's area via host_location and leaves
+      // host_id alone, so prefer host_location (same as
+      // host-contact-volunteer-sync.ts) and fall back to the parent's name.
       `SELECT hc.id, hc.name, hc.email, hc.phone, hc.is_former_host, hc.van_approved,
-              h.name AS region
+              hc.is_volunteer,
+              COALESCE(NULLIF(TRIM(hc.host_location), ''), h.name) AS region
          FROM host_contacts hc LEFT JOIN hosts h ON h.id = hc.host_id`
     )) {
       records.push({
@@ -297,6 +328,7 @@ async function main() {
         active: h.is_former_host === null ? null : !h.is_former_host,
         vanApproved: h.van_approved,
         region: h.region,
+        hostVolunteer: h.is_volunteer === true,
       });
     }
     for (const c of await q(`SELECT id, name, email, phone, is_active FROM contacts`)) {
@@ -313,8 +345,12 @@ async function main() {
     }
 
     // ---- group records into proposed people --------------------------------
-    // Records are joined when they share an email, a 10-digit phone, or an
-    // identical full name (abbreviated names excluded). One group = one
+    // Records are joined when they have an identical full name (abbreviated
+    // names excluded), or when they share an email or 10-digit phone AND
+    // their names agree (same name, a known nickname, or an abbreviation of
+    // it). Records that share contact details under different names are NOT
+    // joined: that's often a couple's shared email or a school's main line.
+    // They're listed in section 2b for a person to decide. One group = one
     // proposed `people` row.
     const sources = ['users', 'volunteers', 'drivers', 'host_contacts', 'contacts'] as const;
     const parent = records.map((_, i) => i);
@@ -324,17 +360,29 @@ async function main() {
       const rb = find(b);
       if (ra !== rb) parent[ra] = rb;
     };
-    const byKey = new Map<string, number>();
-    const link = (key: string, i: number) => {
-      const j = byKey.get(key);
-      if (j === undefined) byKey.set(key, i);
-      else union(i, j);
+    const byName = new Map<string, number>();
+    const byContact = new Map<string, number[]>();
+    const sharedContact: { key: string; a: number; b: number }[] = [];
+    const linkContact = (key: string, i: number) => {
+      const seen = byContact.get(key) || [];
+      for (const j of seen) {
+        if (namesCompatible(records[i].name, records[j].name)) union(i, j);
+        else sharedContact.push({ key, a: j, b: i });
+      }
+      seen.push(i);
+      byContact.set(key, seen);
     };
     records.forEach((r, i) => {
-      r.emails.forEach((e) => link(`e:${e}`, i));
-      if (r.phone.length === 10) link(`p:${r.phone}`, i);
       const n = normName(r.name);
-      if (n && !isAbbreviated(r.name)) link(`n:${n}`, i);
+      if (n && !isAbbreviated(r.name)) {
+        const j = byName.get(n);
+        if (j === undefined) byName.set(n, i);
+        else union(i, j);
+      }
+    });
+    records.forEach((r, i) => {
+      new Set(r.emails).forEach((e) => linkContact(`email ${e}`, i));
+      if (r.phone.length === 10) linkContact(`phone ${r.phone}`, i);
     });
     const clusters = new Map<number, number[]>();
     records.forEach((_, i) => {
@@ -348,10 +396,15 @@ async function main() {
       name: string;
       nameSource: 'self_reported' | 'legacy_import';
       aliases: string[];
+      // Current roles (from active records only) ...
       isVolunteer: boolean;
       isDriver: boolean;
       isHost: boolean;
-      isVanDriver: boolean | 'conflict';
+      // ... and roles seen in any record, active or not.
+      wasVolunteer: boolean;
+      wasDriver: boolean;
+      wasHost: boolean;
+      isVanDriver: boolean;
       hasLogin: boolean;
       regions: string[];
       conflicts: { kind: string; detail: string }[];
@@ -359,6 +412,8 @@ async function main() {
     // Canonical name per the trust order in docs/data-model.md: a survey
     // driver's name is self_reported; otherwise the most common full
     // (non-abbreviated) spelling, ties broken by length, is legacy_import.
+    const isVolunteerRecord = (r: PersonRecord) =>
+      (r.source === 'volunteers' && !r.hostContactId) || (r.source === 'host_contacts' && !!r.hostVolunteer);
     const propose = (rs: PersonRecord[]): Proposed => {
       const survey = rs.find((r) => r.surveySubmitted && r.name);
       const counts = new Map<string, { n: number; display: string }>();
@@ -375,25 +430,33 @@ async function main() {
       );
       const name = survey ? survey.name.trim() : ranked[0]?.[1].display || '';
       const aliases = ranked.map(([, v]) => v.display).filter((d) => normName(d) !== normName(name));
-      const vans = new Set(rs.filter((r) => r.vanApproved !== null).map((r) => r.vanApproved));
       const conflicts: Proposed['conflicts'] = [];
       if (aliases.length) conflicts.push({ kind: 'name', detail: [name, ...aliases].join(' / ') });
+      // Grouping can chain (A~B by name, B~C by phone). If that put two
+      // names that don't agree in one group, surface it.
+      const distinct = ranked.map(([, v]) => v.display);
+      const clash = distinct.some((a, i) => distinct.slice(i + 1).some((b) => !namesCompatible(a, b)));
+      if (clash) conflicts.push({ kind: 'different people?', detail: distinct.join(' / ') });
       const phones = new Set(rs.map((r) => r.phone).filter((p) => p.length === 10));
       if (phones.size > 1) conflicts.push({ kind: 'phone', detail: [...phones].join(' / ') });
       const emails = new Set(rs.flatMap((r) => r.emails));
       if (emails.size > 1) conflicts.push({ kind: 'email', detail: [...emails].join(' / ') });
-      if (vans.size > 1) conflicts.push({ kind: 'van approval', detail: 'approved in some sources, not others' });
       return {
         members: rs,
         name,
         nameSource: survey ? 'self_reported' : 'legacy_import',
         aliases,
-        // A volunteers row that is only a machine copy of a host contact
-        // doesn't make someone a volunteer.
-        isVolunteer: rs.some((r) => r.source === 'volunteers' && !r.hostContactId),
-        isDriver: rs.some((r) => r.source === 'drivers'),
-        isHost: rs.some((r) => r.source === 'host_contacts'),
-        isVanDriver: vans.size > 1 ? 'conflict' : vans.has(true),
+        // A volunteers row with host_contact_id is a machine copy of a host
+        // contact; the contact's own "Also a volunteer" flag is what counts.
+        isVolunteer: rs.some((r) => isCurrent(r) && isVolunteerRecord(r)),
+        isDriver: rs.some((r) => isCurrent(r) && r.source === 'drivers'),
+        isHost: rs.some((r) => isCurrent(r) && r.source === 'host_contacts'),
+        wasVolunteer: rs.some(isVolunteerRecord),
+        wasDriver: rs.some((r) => r.source === 'drivers'),
+        wasHost: rs.some((r) => r.source === 'host_contacts'),
+        // van_approved defaults to false everywhere, so false means "not
+        // recorded", not "refused". Approved anywhere = approved.
+        isVanDriver: rs.some((r) => r.vanApproved === true),
         hasLogin: rs.some((r) => r.source === 'users'),
         regions: [...new Set(rs.map((r) => r.region).filter((x): x is string => !!x))],
         conflicts,
@@ -405,25 +468,43 @@ async function main() {
     w('## 1. Proposed `people`');
     w();
     w(
-      `Today's ${records.length} person records (in \`users\`, \`volunteers\`, \`drivers\`, \`host_contacts\`, \`contacts\`) collapse to about **${people.length} people**. Records are grouped when they share an email, a 10-digit phone, or an identical full name.`
+      `Today's ${records.length} person records (in \`users\`, \`volunteers\`, \`drivers\`, \`host_contacts\`, \`contacts\`) collapse to about **${people.length} people**. Records are grouped when they have an identical full name, or share an email or 10-digit phone under a matching name (same name, a nickname, or an initial). Role flags count only active records (an inactive driver, deactivated volunteer or former host doesn't count); lapsed roles are counted separately.`
     );
     w();
     const roleCount = (f: (p: Proposed) => boolean) => people.filter(f).length;
+    // Contact details shared under different names, between people that
+    // stayed separate (one row per pair of groups).
+    const sharedPairs = (() => {
+      const seen = new Map<string, { key: string; a: number; b: number; keys: string[] }>();
+      for (const x of sharedContact) {
+        const ra = find(x.a);
+        const rb = find(x.b);
+        if (ra === rb) continue;
+        const k = [ra, rb].sort().join('-');
+        const e = seen.get(k);
+        if (e) e.keys.includes(x.key) || e.keys.push(x.key);
+        else seen.set(k, { ...x, keys: [x.key] });
+      }
+      return [...seen.values()];
+    })();
     table(
       ['Flag / attribute', 'People'],
       [
         ['`is_volunteer`', roleCount((p) => p.isVolunteer)],
         ['`is_driver`', roleCount((p) => p.isDriver)],
         ['`is_host`', roleCount((p) => p.isHost)],
-        ['`is_van_driver`', roleCount((p) => p.isVanDriver === true)],
-        ['`is_van_driver` undecided (sources disagree)', roleCount((p) => p.isVanDriver === 'conflict')],
+        ['…only lapsed volunteer records', roleCount((p) => p.wasVolunteer && !p.isVolunteer)],
+        ['…only lapsed driver records', roleCount((p) => p.wasDriver && !p.isDriver)],
+        ['…only former-host records', roleCount((p) => p.wasHost && !p.isHost)],
+        ['`is_van_driver` (approved in any record)', roleCount((p) => p.isVanDriver)],
         ['has a login (`users.person_id` would point here)', roleCount((p) => p.hasLogin)],
-        ['no role at all (only in `users` or `contacts`)', roleCount((p) => !p.isVolunteer && !p.isDriver && !p.isHost)],
+        ['no current role', roleCount((p) => !p.isVolunteer && !p.isDriver && !p.isHost)],
         ['more than one role', roleCount((p) => [p.isVolunteer, p.isDriver, p.isHost].filter(Boolean).length > 1)],
         ['`name_source = self_reported` (survey drivers)', roleCount((p) => p.nameSource === 'self_reported')],
         ['has at least one alias', roleCount((p) => p.aliases.length > 0)],
         ['host in more than one region', roleCount((p) => p.regions.length > 1)],
         ['needs a decision before backfill (section 2)', roleCount((p) => p.conflicts.some((c) => c.kind !== 'name'))],
+        ['shares an email/phone with someone of a different name (section 2a)', new Set(sharedPairs.flatMap((x) => [find(x.a), find(x.b)])).size],
       ]
     );
     w('Role combinations:');
@@ -456,7 +537,7 @@ async function main() {
     w('## 2. People whose details conflict');
     w();
     w(
-      'Each row is one proposed person whose sources disagree on phone, email or van approval. A `people` row holds one phone and one email, so each needs a decision before the backfill. Name differences alone are fine: the extra spellings become `person_name_aliases`.'
+      'Each row is one proposed person whose sources disagree on phone or email, or whose grouped records carry names that don\'t match (possibly two people). A `people` row holds one phone and one email, so each needs a decision before the backfill. Spelling differences alone are fine: the extra spellings become `person_name_aliases`.'
     );
     w();
     const conflicted = people
@@ -473,7 +554,18 @@ async function main() {
           .join('<br>'),
       ])
     );
-    w('### 2a. Proposed aliases');
+    w('### 2a. Different names sharing an email or phone');
+    w();
+    w(
+      'Kept as separate people. The sheet-sync rule in docs/data-model.md would auto-merge these (matching contact, different name), so each needs a person to say whether it\'s one person under another name (nickname, married name) or two people sharing a contact (family, a school\'s main line).'
+    );
+    w();
+    const fmt = (i: number) => {
+      const p = people.find((pp) => pp.members.includes(records[i]))!;
+      return `${p.name} (${p.members.map(ref).join(', ')})`;
+    };
+    table(['Shared', 'Person A', 'Person B'], sharedPairs.map((x) => [x.keys.join('<br>'), fmt(x.a), fmt(x.b)]));
+    w('### 2b. Proposed aliases');
     w();
     w('Spellings that would be recorded in `person_name_aliases` (canonical name first).');
     w();
@@ -616,16 +708,20 @@ async function main() {
     const surveyIds = new Set(surveyDrivers.map((d) => String(d.id)));
     const surveyMarkedAt = new Map<string, Date>();
     const nameChanges: unknown[][] = [];
-    let logsSeen = 0;
-    for (const l of logs) {
-      if (!surveyIds.has(String(l.record_id))) continue;
-      logsSeen++;
-      const o = typeof l.old_data === 'string' ? parse(l.old_data) : l.old_data;
-      const n = typeof l.new_data === 'string' ? parse(l.new_data) : l.new_data;
-      const oldSurvey = pick(o, 'surveySubmitted', 'survey_submitted');
-      const newSurvey = pick(n, 'surveySubmitted', 'survey_submitted');
+    const asObj = (v: unknown) => (typeof v === 'string' ? parse(v) : v);
+    const surveyLogs = logs.filter((l) => surveyIds.has(String(l.record_id)));
+    const logsSeen = surveyLogs.length;
+    // Pass 1: when was each driver first marked as having done the survey?
+    for (const l of surveyLogs) {
+      const oldSurvey = pick(asObj(l.old_data), 'surveySubmitted', 'survey_submitted');
+      const newSurvey = pick(asObj(l.new_data), 'surveySubmitted', 'survey_submitted');
       if (newSurvey === true && oldSurvey !== true && !surveyMarkedAt.has(String(l.record_id)))
         surveyMarkedAt.set(String(l.record_id), new Date(l.timestamp));
+    }
+    // Pass 2: label every name change relative to that date.
+    for (const l of surveyLogs) {
+      const o = asObj(l.old_data);
+      const n = asObj(l.new_data);
       const oldName = pick(o, 'name');
       const newName = pick(n, 'name');
       if (newName !== undefined && oldName !== undefined && normName(oldName) !== normName(newName)) {
@@ -758,7 +854,7 @@ async function main() {
     w('## 8. `is_van_driver`');
     w();
     w(
-      `Van approval becomes one flag on \`people\`. Today it is recorded in four places; ${people.filter((p) => p.isVanDriver === true).length} proposed people are approved everywhere they appear, and ${people.filter((p) => p.isVanDriver === 'conflict').length} are approved in some places and not others.`
+      `Van approval becomes one flag on \`people\`. Today it is recorded in four places, each defaulting to "no", so a "no" usually just means it was never set there. A person approved in any of their records is counted as approved: **${people.filter((p) => p.isVanDriver).length} proposed people**.`
     );
     w();
     table(
@@ -767,17 +863,13 @@ async function main() {
         .filter((s) => s !== 'contacts')
         .map((s) => [`\`${s}.van_approved\``, records.filter((r) => r.source === s && r.vanApproved === true).length])
     );
-    w('Undecided (sources disagree):');
+    w('Approved people, and where the approval is recorded (worth a glance: anyone here who shouldn\'t still be approved?):');
     w();
     table(
-      ['Proposed name', 'Approved in', 'Not approved in'],
+      ['Proposed name', 'Approved in'],
       people
-        .filter((p) => p.isVanDriver === 'conflict')
-        .map((p) => [
-          p.name,
-          p.members.filter((r) => r.vanApproved === true).map(ref).join(', '),
-          p.members.filter((r) => r.vanApproved === false).map(ref).join(', '),
-        ])
+        .filter((p) => p.isVanDriver)
+        .map((p) => [p.name, p.members.filter((r) => r.vanApproved === true).map(ref).join(', ')])
     );
   } finally {
     await client.query('ROLLBACK');
