@@ -16,7 +16,8 @@ import {
   todayInEastern,
 } from '../services/collections/collective-learning-auto-log';
 
-const ADMIN_ROLES = ['admin', 'super_admin', 'admin_coordinator'] as const;
+// Super admins only: the panel and its settings are hidden from everyone else.
+const ADMIN_ROLES = ['super_admin'] as const;
 
 const dateStr = z.string().refine(isValidDateStr, 'Expected YYYY-MM-DD');
 

@@ -2,7 +2,7 @@ import sgMail from '@sendgrid/mail';
 import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { db } from '../db';
 import { users, eventRequests, eventCollaborationComments } from '@shared/schema';
-import { eq, or, like, sql, inArray } from 'drizzle-orm';
+import { and, eq, or, like, sql, inArray } from 'drizzle-orm';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { logger } from '../utils/production-safe-logger';
 import { getUserMetadata } from '@shared/types';
@@ -1350,6 +1350,11 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     itemContent: string,
     itemId: number
   ): Promise<void> {
+    if (!process.env.SENDGRID_API_KEY) {
+      logger.log('SendGrid not configured - skipping Holding Zone item mention notification');
+      return;
+    }
+
     try {
       const subject = `${mentionerName} mentioned you in a Holding Zone item`;
       const itemPreview = itemContent.length > 100
@@ -1376,12 +1381,13 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         </div>
       `;
 
-      await sendEmail({
+      await sgMail.send(withUnsubscribeSettings({
         to: recipientEmail,
+        from: 'katie@thesandwichproject.org',
         subject,
         text: `${mentionerName} mentioned you in a Holding Zone item:\n\n${itemPreview}\n\nView it in the Holding Zone section.`,
         html: htmlBody,
-      });
+      }, 'operational'));
 
       logger.info('Holding Zone item mention notification sent', {
         recipientEmail,
