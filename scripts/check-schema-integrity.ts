@@ -22,10 +22,13 @@
  *                       the schema file documents how tables connect.
  *   undocumented-table  A table isn't mentioned in docs/data-model.md as
  *                       `table_name` (in backticks).
-
- * Known gap: a link column NOT named `*_id` (e.g. `approved_by` holding a user
- * id) isn't checked for a missing FK. Rule 4 in CLAUDE.md covers it; review
- * by eye until a naming check is added.
+ *   fk-name             A foreign-key column whose name doesn't end in `_id`
+ *                       (rule 4: link columns end in `_id`).
+ *   ambiguous-link-name A `*_by` column (created_by, approved_by, ...) with no
+ *                       foreign key. These usually hold a user id, i.e. a link
+ *                       that escaped the `_id` check. Make it `*_by_id` with an
+ *                       FK, name it for what it holds (`created_by_name`), or
+ *                       list it in schema-integrity-exceptions.json.
  *
  * Tables that predate these rules are listed in schema-integrity-baseline.json
  * and don't fail the build. The baseline is a debt list that only shrinks:
@@ -116,11 +119,15 @@ export function collectViolations(
       if (!cols.every((c) => covered?.has(c))) violations.push(`missing-relation :: ${label}`);
     }
 
+    for (const col of fkColumns) {
+      if (!col.endsWith('_id')) violations.push(`fk-name :: ${t}.${col}`);
+    }
+
     for (const col of cfg.columns) {
-      if (col.name === 'id' || !col.name.endsWith('_id')) continue;
-      if (fkColumns.has(col.name)) continue;
+      if (col.name === 'id' || fkColumns.has(col.name)) continue;
       if (exceptions[`${t}.${col.name}`]) continue;
-      violations.push(`missing-fk :: ${t}.${col.name}`);
+      if (col.name.endsWith('_id')) violations.push(`missing-fk :: ${t}.${col.name}`);
+      else if (col.name.endsWith('_by')) violations.push(`ambiguous-link-name :: ${t}.${col.name}`);
     }
   }
   return [...new Set(violations)].sort();
@@ -188,7 +195,8 @@ function main() {
     for (const v of added) console.error(`  ${v}`);
     console.error(
       '\nSee "Schema rules" in CLAUDE.md. An `_id` column that holds an external id (not a link to' +
-        '\nanother table) goes in scripts/schema-integrity-exceptions.json with a reason.'
+        '\nanother table) goes in scripts/schema-integrity-exceptions.json with a reason. A `_by`' +
+        '\ncolumn that stores a name rather than a link should be named for that, e.g. `created_by_name`.'
     );
   }
   if (fixed.length) {
