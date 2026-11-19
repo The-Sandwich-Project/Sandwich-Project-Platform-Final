@@ -2,7 +2,7 @@ import sgMail from '@sendgrid/mail';
 import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { db } from '../db';
 import { users, eventRequests, eventCollaborationComments } from '@shared/schema';
-import { eq, or, like, sql, inArray } from 'drizzle-orm';
+import { and, eq, or, like, sql, inArray } from 'drizzle-orm';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { logger } from '../utils/production-safe-logger';
 import { getUserMetadata } from '@shared/types';
@@ -1096,11 +1096,12 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         return false;
       }
 
-      // Fetch user details for all TSP contacts
+      // Fetch user details for all TSP contacts (deactivated users are still
+      // listed on old events, so skip them here)
       const tspUsers = await db
         .select()
         .from(users)
-        .where(inArray(users.id, uniqueContactIds));
+        .where(and(inArray(users.id, uniqueContactIds), eq(users.isActive, true)));
 
       if (tspUsers.length === 0) {
         logger.warn(`No valid TSP contact users found for event ${eventId}`);
