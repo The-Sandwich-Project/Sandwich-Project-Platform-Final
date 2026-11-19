@@ -2564,11 +2564,8 @@ export default function SandwichCollectionLog() {
       </div>
 
       <div className="px-3 sm:px-6 py-4">
-        {/* Weekly Collective Learning auto-log controls (admins only) */}
-        {user?.role &&
-          ['admin', 'super_admin', 'admin_coordinator'].includes(user.role) && (
-            <CollectiveLearningAutoLogCard />
-          )}
+        {/* Weekly Collective Learning auto-log controls (super admins only) */}
+        {user?.role === 'super_admin' && <CollectiveLearningAutoLogCard />}
 
         {/* Role-customized view indicator */}
         {user?.role && user.role !== 'super_admin' && user.role !== 'admin' && (
