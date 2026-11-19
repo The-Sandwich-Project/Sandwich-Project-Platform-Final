@@ -71,3 +71,10 @@ jobs:
       - run: sed -i 's#http://package-firewall.replit.internal/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci
       - run: npm run check:schema
+      # The baseline may only shrink: compare it with the base branch's copy.
+      - name: Baseline did not grow
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --depth=1 origin "${{ github.base_ref }}"
+          git show "FETCH_HEAD:scripts/schema-integrity-baseline.json" > /tmp/base-baseline.json 2>/dev/null || rm -f /tmp/base-baseline.json
+          npx tsx scripts/check-schema-integrity.ts --no-growth /tmp/base-baseline.json

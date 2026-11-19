@@ -36,8 +36,15 @@ function getContact(recipient: Recipient) {
   };
 }
 
-function telHref(phone: string) {
-  return `tel:${phone.replace(/[^\d+]/g, '')}`;
+/**
+ * "404-555-1234 ext. 102" → "tel:4045551234,102": the comma makes the phone
+ * pause and then dial the extension, instead of running the digits together.
+ */
+export function telHref(phone: string) {
+  const [main, ext] = phone.split(/\s*(?:ext\.?|extension|x|#)\s*/i);
+  const digits = main.replace(/[^\d+]/g, '');
+  const extDigits = (ext || '').replace(/\D/g, '');
+  return `tel:${digits}${extDigits ? `,${extDigits}` : ''}`;
 }
 
 export function RecipientDirectoryList({

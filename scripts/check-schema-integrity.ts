@@ -22,20 +22,29 @@
  *                       the schema file documents how tables connect.
  *   undocumented-table  A table isn't mentioned in docs/data-model.md as
  *                       `table_name` (in backticks).
+
+ * Known gap: a link column NOT named `*_id` (e.g. `approved_by` holding a user
+ * id) isn't checked for a missing FK. Rule 4 in CLAUDE.md covers it; review
+ * by eye until a naming check is added.
  *
  * Tables that predate these rules are listed in schema-integrity-baseline.json
  * and don't fail the build. The baseline is a debt list that only shrinks:
  *   - a NEW violation fails (fix it; don't add it to the baseline)
  *   - a baselined violation that has been FIXED also fails until the baseline
- *     is regenerated, so fixes are locked in and can't silently regress
+ *     is updated, so fixes are locked in and can't silently regress
+ *   - `--update` only REMOVES fixed entries; it refuses while any new violation
+ *     exists, so it can't be used to baseline one
+ *   - CI also runs `--no-growth <base branch's baseline>`, which fails if the
+ *     committed baseline has any entry the base branch's doesn't (a hand edit)
  *
  * Usage:
- *   npx tsx scripts/check-schema-integrity.ts            # check (CI)
- *   npx tsx scripts/check-schema-integrity.ts --update   # rewrite the baseline
+ *   npx tsx scripts/check-schema-integrity.ts                     # check (CI)
+ *   npx tsx scripts/check-schema-integrity.ts --update            # drop fixed entries
+ *   npx tsx scripts/check-schema-integrity.ts --no-growth old.json  # CI: baseline didn't grow
  *
- * Only run --update after FIXING violations. Running it to make new
- * violations pass defeats the gate; reviewers should reject a PR whose
- * baseline diff adds lines.
+ * Adding a NEW rule to this script finds new legacy violations. Those can only
+ * enter the baseline by hand, which the --no-growth job will flag on that PR:
+ * that's deliberate, so a person signs off on every addition.
  *
  * Not checked here: whether each FK also exists in the live database. The
  * migrations in /migrations are hand-written, so a PR that adds an FK must also
@@ -130,17 +139,44 @@ function main() {
   }
 
   const current = collectViolations(schema as Record<string, unknown>, docText, exceptions);
+  const baselineList = loadJson<string[]>(BASELINE, []);
+  const baseline = new Set(baselineList);
+  const currentSet = new Set(current);
+  const added = current.filter((v) => !baseline.has(v));
+  const fixed = baselineList.filter((v) => !currentSet.has(v));
 
-  if (update) {
-    writeFileSync(BASELINE, JSON.stringify(current, null, 2) + '\n');
-    console.log(`Baseline written: ${current.length} pre-existing violations.`);
+  // CI: the committed baseline may not contain anything the base branch's
+  // baseline didn't. Catches hand edits that add entries.
+  const growthIdx = process.argv.indexOf('--no-growth');
+  if (growthIdx >= 0) {
+    const basePath = process.argv[growthIdx + 1];
+    if (!basePath || !existsSync(basePath)) {
+      console.log('No base-branch baseline to compare against; skipping growth check.');
+      return;
+    }
+    const base = new Set(loadJson<string[]>(basePath, []));
+    const grown = baselineList.filter((v) => !base.has(v));
+    if (grown.length) {
+      console.error(`\nThe baseline gained ${grown.length} entr${grown.length === 1 ? 'y' : 'ies'} the base branch doesn't have.`);
+      console.error('The baseline may only shrink: fix these instead of baselining them.\n');
+      for (const v of grown) console.error(`  ${v}`);
+      process.exit(1);
+    }
+    console.log(`Baseline did not grow (${baselineList.length} entries, base has ${base.size}).`);
     return;
   }
 
-  const baseline = new Set(loadJson<string[]>(BASELINE, []));
-  const currentSet = new Set(current);
-  const added = current.filter((v) => !baseline.has(v));
-  const fixed = [...baseline].filter((v) => !currentSet.has(v));
+  if (update) {
+    if (added.length) {
+      console.error(`\nRefusing to update: ${added.length} NEW violation(s). --update only removes fixed entries.\n`);
+      for (const v of added) console.error(`  ${v}`);
+      process.exit(1);
+    }
+    const kept = baselineList.filter((v) => currentSet.has(v));
+    writeFileSync(BASELINE, JSON.stringify(kept, null, 2) + '\n');
+    console.log(`Baseline updated: removed ${fixed.length} fixed, ${kept.length} remain.`);
+    return;
+  }
 
   if (added.length === 0 && fixed.length === 0) {
     console.log(`Schema integrity OK (${baseline.size} baselined legacy violations remain).`);
