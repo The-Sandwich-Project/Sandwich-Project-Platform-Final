@@ -12,6 +12,7 @@
     "type-check": "tsc",
     "check:routes": "node scripts/check-legacy-routes.js",
     "check:schema": "tsx scripts/check-schema-integrity.ts",
+    "audit:people": "tsx scripts/audit-people-data.ts",
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx server/run-migrations.ts",
     "db:migrate-focus": "tsx scripts/migrate-focus-areas.ts",
