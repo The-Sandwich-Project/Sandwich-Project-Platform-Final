@@ -54,3 +54,20 @@ jobs:
       - run: sed -i 's#http://package-firewall.replit.internal/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci
       - run: npm run inventory:routes:check
+
+  # Fails a PR that adds a table link without a real foreign key, an explicit
+  # onDelete, or a relations() entry, or a table missing from
+  # docs/data-model.md. See "Schema rules" in CLAUDE.md. Legacy violations are
+  # baselined in scripts/schema-integrity-baseline.json, which only shrinks.
+  schema-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+      # Same Replit mirror rewrite as the jobs above.
+      - run: sed -i 's#http://package-firewall.replit.internal/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci
+      - run: npm run check:schema
