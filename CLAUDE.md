@@ -34,6 +34,21 @@ The app runs on a single port — Express serves both the API and the Vite-built
   - Neon's HTTP driver has no transactions, so a file that fails partway can leave some statements applied. Write migrations idempotently (`IF NOT EXISTS`, `IF EXISTS`, etc.).
   - Running SQL by hand in Neon's SQL editor still works, but the file will then also be executed on next boot unless it's recorded in `_migrations` — another reason to keep it idempotent.
 - `npm run db:push` pushes schema changes via Drizzle Kit (dev convenience, not used for production migrations)
+- **How tables relate is documented in `docs/data-model.md`**: read it before touching people, hosts, regions, volunteers, drivers or recipients. A people/places rebuild is planned there (section 1); don't add new person data to the legacy tables it replaces.
+
+## Schema rules (required for every schema change)
+Past schema work skipped these, which is why links between tables live only in app code and the data drifts. They are not optional, and `npm run check:schema` enforces the mechanical ones in CI.
+
+1. **Every link to another table is a real foreign key**, declared in BOTH places:
+   - in `shared/schema.ts` with `.references(() => other.id, { onDelete: ... })`, and
+   - in the migration SQL (`REFERENCES other(id) ON DELETE ...`). Migrations are hand-written, so the schema declaration alone does NOT create the constraint in the database.
+2. **Choose `onDelete` deliberately**: `restrict`, `cascade` or `set null`. Never omit it, and don't use `no action` (Drizzle silently defaults to it, so the check can't tell it from forgetting; use `restrict` instead, which behaves the same). People and anything with history: `restrict` (deactivate instead of deleting). Pure child rows that mean nothing without their parent (e.g. a person's name aliases): `cascade`. Optional links: `set null`.
+3. **Every foreign key gets a `relations()` entry** next to its table in `shared/schema.ts` (`one(...)` on the child, `many(...)` on the parent). This is how the schema documents how tables connect.
+4. **Link columns end in `_id`.** An `_id` column that is NOT a link (an external system's id, or a polymorphic id paired with a type column) goes in `scripts/schema-integrity-exceptions.json` with a one-line reason. Don't end a column in `_by` (`created_by`, `approved_by`): a link is `created_by_id` with an FK, and a stored name is `created_by_name`. The check flags bare `_by` columns.
+5. **Every new table is added to `docs/data-model.md`** in the same PR: name it in backticks, say what one row represents, and update the diagram.
+6. **Constrain fixed-value columns** (statuses, sources, roles) with a Postgres `CHECK` in the migration, plus `NOT NULL` / `UNIQUE` wherever the data requires it.
+7. **Never add to `scripts/schema-integrity-baseline.json`.** It lists legacy tables that predate these rules and may only shrink. After fixing a legacy violation, run `npx tsx scripts/check-schema-integrity.ts --update` to lock the fix in.
+8. **Data backfills are scripts with `--dry-run`, not migration files.** Migrations run automatically on every boot in production; a backfill must be run on purpose, after checking its output against a Neon branch of production.
 
 ## Key Environment Variables (in Replit Secrets)
 - `DATABASE_URL` — Production Neon connection string
