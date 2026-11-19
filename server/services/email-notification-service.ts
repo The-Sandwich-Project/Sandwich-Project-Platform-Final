@@ -1096,11 +1096,12 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         return false;
       }
 
-      // Fetch user details for all TSP contacts
+      // Fetch user details for all TSP contacts (deactivated users are still
+      // listed on old events, so skip them here)
       const tspUsers = await db
         .select()
         .from(users)
-        .where(inArray(users.id, uniqueContactIds));
+        .where(and(inArray(users.id, uniqueContactIds), eq(users.isActive, true)));
 
       if (tspUsers.length === 0) {
         logger.warn(`No valid TSP contact users found for event ${eventId}`);

@@ -483,6 +483,10 @@ async function runStandbyFollowups(result: FollowupResult): Promise<void> {
         serviceLogger.warn(`TSP contact user ${tspContactId} not found for standby event ${event.id}`);
         continue;
       }
+      if (user.isActive === false) {
+        serviceLogger.info(`Skipping standby event ${event.id} - TSP contact ${tspContactId} is deactivated`);
+        continue;
+      }
 
       const notificationResult = await sendFollowupNotification(event, user, 'standby_followup');
 

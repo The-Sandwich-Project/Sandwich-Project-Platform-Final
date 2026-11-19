@@ -134,6 +134,10 @@ export async function sendTspAssignmentNotification(
     logger.warn(`Cannot send TSP assignment notification: user ${userId} not found`);
     return false;
   }
+  if (user.isActive === false) {
+    logger.log(`Skipping TSP assignment notification: user ${userId} is deactivated`);
+    return false;
+  }
 
   const userName = user.displayName || user.firstName || 'there';
 

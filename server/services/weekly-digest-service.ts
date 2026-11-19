@@ -832,19 +832,23 @@ async function getAllActiveTspContacts(): Promise<string[]> {
 
   if (contactIds.size === 0) return [];
 
-  // Filter out users who have opted out of the weekly portfolio digest.
-  // This applies to everyone, including the auto-included admin — if the
-  // admin opts out, they stop receiving it.
+  // Keep only active users who haven't opted out of the weekly portfolio
+  // digest. Deactivated users can still be listed as a contact on old active
+  // events, so the event query alone isn't enough. The opt-out applies to
+  // everyone, including the auto-included admin.
   const ids = Array.from(contactIds);
-  const optedOut = await db
+  const eligible = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(inArray(users.id, ids), eq(users.weeklyDigestOptOut, true)));
+    .where(
+      and(
+        inArray(users.id, ids),
+        eq(users.isActive, true),
+        sql`${users.weeklyDigestOptOut} IS NOT TRUE`
+      )
+    );
 
-  if (optedOut.length === 0) return ids;
-
-  const optedOutSet = new Set(optedOut.map((u) => u.id));
-  return ids.filter((id) => !optedOutSet.has(id));
+  return eligible.map((u) => u.id);
 }
 
 /**
