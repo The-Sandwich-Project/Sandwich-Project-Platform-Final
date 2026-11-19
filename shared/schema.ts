@@ -1232,6 +1232,9 @@ export const people = pgTable(
     isDriver: boolean('is_driver').notNull().default(false),
     isVanDriver: boolean('is_van_driver').notNull().default(false),
     isHost: boolean('is_host').notNull().default(false),
+    // On the TSP team. Everyone with an app login is, apart from the odd
+    // guest. Informational only: it doesn't change what anyone can do.
+    isTeamMember: boolean('is_team_member').notNull().default(false),
     // Deactivate instead of deleting: past events and collections must
     // always resolve to a person.
     isActive: boolean('is_active').notNull().default(true),
@@ -1324,11 +1327,55 @@ export const legacyPersonIds = pgTable(
   })
 );
 
+/** Things the backfill (or a later sheet sync) couldn't settle on its own. */
+export const PERSON_REVIEW_KINDS = [
+  'contact_conflict', // sources disagree on phone or email; one was picked
+  'shared_contact', // shares an email/phone with someone of a different name
+  'multiple_people', // one old record names two people ("Stacey & Jack")
+  'abbreviated_name', // only "Sarah P." or a single name is known
+  'possible_duplicate', // close name to another person; kept separate
+] as const;
+export type PersonReviewKind = (typeof PERSON_REVIEW_KINDS)[number];
+
+// The "needs a decision" list on the People admin page.
+export const personReviewFlags = pgTable(
+  'person_review_flags',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<PersonReviewKind>().notNull(),
+    detail: text('detail').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at'),
+    resolvedByUserId: varchar('resolved_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    resolution: text('resolution'),
+  },
+  (table) => ({
+    openIdx: index('person_review_flags_open_idx').on(table.personId, table.resolvedAt),
+    kindCheck: check(
+      'person_review_flags_kind_check',
+      sql`${table.kind} IN ('contact_conflict', 'shared_contact', 'multiple_people', 'abbreviated_name', 'possible_duplicate')`
+    ),
+  })
+);
+
+export const personReviewFlagsRelations = relations(personReviewFlags, ({ one }) => ({
+  person: one(people, { fields: [personReviewFlags.personId], references: [people.id] }),
+  resolvedBy: one(users, { fields: [personReviewFlags.resolvedByUserId], references: [users.id] }),
+}));
+
+export type PersonReviewFlag = typeof personReviewFlags.$inferSelect;
+
 export const peopleRelations = relations(people, ({ one, many }) => ({
   chapter: one(regions, { fields: [people.chapterRegionId], references: [regions.id] }),
   logins: many(users),
   nameAliases: many(personNameAliases),
   legacyIds: many(legacyPersonIds),
+  reviewFlags: many(personReviewFlags),
 }));
 
 export const usersRelations = relations(users, ({ one }) => ({
