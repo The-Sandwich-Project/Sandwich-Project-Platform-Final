@@ -553,13 +553,14 @@ export function createAuthRouter() {
 
         // Use SendGrid for password setup emails
         const sgMail = (await import('@sendgrid/mail')).default;
+        const { withUnsubscribeSettings } = await import('../../utils/sendgrid-unsubscribe');
         if (!process.env.SENDGRID_API_KEY) {
           throw new Error('SendGrid API key not configured');
         }
 
         sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-        await sgMail.send({
+        await sgMail.send(withUnsubscribeSettings({
           to: email,
           from: 'katie@thesandwichproject.org',
           subject: 'Set Up Your Password - The Sandwich Project',
@@ -617,7 +618,7 @@ If you didn't expect this email, please contact support immediately.
 The Sandwich Project
 Fighting food insecurity one sandwich at a time
           `,
-        });
+        }, 'operational'));
 
         logger.log(`✅ Initial password setup email sent successfully to: ${email}`);
       } catch (emailError) {

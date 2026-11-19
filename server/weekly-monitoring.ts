@@ -1,4 +1,5 @@
 import { MailService } from '@sendgrid/mail';
+import { withUnsubscribeSettings } from './utils/sendgrid-unsubscribe';
 import { db } from './db';
 import { sandwichCollections, hosts, hostContacts } from '@shared/schema';
 import { eq, sql, and, gte, lte, like, or, isNull } from 'drizzle-orm';
@@ -644,7 +645,7 @@ Check the Collections Log in the platform for real-time updates.
   };
 
   try {
-    await mailService.send(emailContent);
+    await mailService.send(withUnsubscribeSettings(emailContent, 'operational'));
     logger.log(
       `Missing submissions email sent successfully to ${WEEKLY_MONITORING_RECIPIENT}`
     );
@@ -686,7 +687,7 @@ export async function runWeeklyMonitoring(): Promise<void> {
     // Send error notification email
     if (process.env.SENDGRID_API_KEY) {
       try {
-        await mailService.send({
+        await mailService.send(withUnsubscribeSettings({
           to: WEEKLY_MONITORING_RECIPIENT,
           from: FROM_EMAIL,
           subject: '🚨 Sandwich Monitoring System Error',
@@ -701,7 +702,7 @@ export async function runWeeklyMonitoring(): Promise<void> {
               </div>
             </div>
           `,
-        });
+        }, 'operational'));
       } catch (emailError) {
         logger.error('Failed to send error notification email:', emailError);
       }
@@ -909,14 +910,14 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       </div>
     `;
 
-    await mailService.send({
+    await mailService.send(withUnsubscribeSettings({
       to: contactEmail,
       from: FROM_EMAIL,
       bcc: WEEKLY_MONITORING_RECIPIENT, // BCC admin on all host reminder emails
       subject: emailSubject,
       text: emailText,
       html: emailHtml,
-    });
+    }, 'operational'));
 
     logger.log(
       `✅ Email reminder sent successfully to ${location} (${contactEmail})`
@@ -1081,14 +1082,14 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
         </div>
       `;
 
-      return await mailService.send({
+      return await mailService.send(withUnsubscribeSettings({
         to: contact.email!,
         from: FROM_EMAIL,
         bcc: WEEKLY_MONITORING_RECIPIENT, // BCC admin on all Dunwoody reminder emails
         subject: emailSubject,
         text: emailText,
         html: emailHtml,
-      });
+      }, 'operational'));
     });
 
     // Send emails in batch (continues even if some fail)

@@ -23,6 +23,7 @@ import { logger } from '../utils/production-safe-logger';
 import { getUserMetadata, getUserPhoneNumber } from '@shared/types';
 import { EmailNotificationService } from './email-notification-service';
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { getAppBaseUrl } from '../config/constants';
 import { isNotificationSuppressed } from '../utils/notification-suppression';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
@@ -260,7 +261,7 @@ View event: ${eventUrl}
       `.trim(),
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     serviceLogger.info(`Corporate immediate call notification sent to ${tspEmail} for event ${eventId}`);
 
     return true;
@@ -399,7 +400,7 @@ This reminder will continue daily until you log a successful contact outcome.
       `.trim(),
     };
 
-    await sgMail.send(msg);
+    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
     serviceLogger.info(`Corporate daily reminder sent to ${tspEmail} for event ${eventId} (day ${daysSinceAssigned + 1})`);
 
     return true;

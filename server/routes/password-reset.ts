@@ -3,6 +3,7 @@ import type { RouterDependencies } from '../types';
 import { z } from 'zod';
 import crypto from 'crypto';
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { authService } from '../services/auth.service';
 import { logger } from '../utils/production-safe-logger';
 import { passwordResetRateLimiter } from '../middleware/rate-limiter';
@@ -79,7 +80,7 @@ export function createPasswordResetRouter(deps: RouterDependencies) {
 
       sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-      await sgMail.send({
+      await sgMail.send(withUnsubscribeSettings({
         to: email,
         from: 'katie@thesandwichproject.org',
         subject: 'Password Reset - The Sandwich Project',
@@ -154,7 +155,7 @@ Fighting food insecurity one sandwich at a time
 This is a password reset email sent at your request. If you did not request this, please ignore it.
 To unsubscribe from system notifications, please contact us at katie@thesandwichproject.org
         `,
-      });
+      }, 'operational'));
 
       logger.log(`✅ Password reset email sent successfully to: ${email}`);
     } catch (emailError) {

@@ -1,4 +1,5 @@
 import sgMail from '@sendgrid/mail';
+import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
 import { db } from '../db';
 import { users, eventRequests, eventCollaborationComments } from '@shared/schema';
 import { eq, or, like, sql, inArray } from 'drizzle-orm';
@@ -192,7 +193,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
       };
 
       try {
-        await sgMail.send(msg);
+        await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
         logger.log(
           `Chat mention notification sent to ${notification.mentionedUserEmail}`
         );
@@ -339,7 +340,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`TSP contact assignment notification sent to ${userEmail} for event ${eventId}`);
 
       // Send SMS notification if user has opted in
@@ -500,7 +501,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`24-hour volunteer reminder sent to ${volunteerEmail} for event ${eventId}`);
       return true;
     } catch (error) {
@@ -692,7 +693,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
           `.trim(),
         };
 
-        await sgMail.send(msg);
+        await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
         logger.log(`Holding Zone assignment notification sent to ${userEmail} for item ${itemId}`);
       }
 
@@ -844,7 +845,7 @@ Note: Corporate events may use platforms like Deed or Benevity - be sure to note
         `.trim(),
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`Corporate priority notification sent for event ${eventId} (${organizationName})`);
 
       return true;
@@ -967,7 +968,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`Holding Zone comment mention notification sent to ${mentionedUserEmail}`);
       return true;
     } catch (error) {
@@ -1273,12 +1274,12 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
           } catch (smsError) {
             // If SMS fails, fall back to email
             logger.error(`Failed to send event comment SMS to user ${user.id}, falling back to email:`, smsError);
-            await sgMail.send(msg);
+            await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
             logger.log(`Event comment notification sent to ${userEmail} for event ${eventId} (SMS fallback)`);
           }
         } else {
           // Send email notification
-          await sgMail.send(msg);
+          await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
           logger.log(`Event comment notification sent to ${userEmail} for event ${eventId}`);
         }
       }
@@ -1508,7 +1509,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`Past date notification sent to ${tspContactEmail} for event ${eventId}`);
       return true;
     } catch (error) {
@@ -1613,7 +1614,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         }\n\nView event: ${eventUrl}\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`TSP follow-up reminder email sent to ${email} for ${reminderType}`);
       return true;
     } catch (error) {
@@ -1688,7 +1689,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         text: `ESCALATION NEEDED\n\nEvent: ${organizationName} (#${eventId})\nAssigned to: ${tspContactName}\n\nThis event hasn't had any activity despite automated reminders. Please review and follow up.\n\nView event: ${eventLink}\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`Escalation email sent to ${adminEmail} for event ${eventId}`);
       return true;
     } catch (error) {
@@ -1771,7 +1772,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         text: `Permission Request\n\nUser: ${request.userName} (${request.userEmail})\nRequested Action: ${request.requestedAction}\n${request.requiredPermission ? `Permission Needed: ${request.requiredPermission}\n` : ''}${request.userMessage ? `\nUser's Message: "${request.userMessage}"\n` : ''}\nManage permissions at: ${appUrl}/admin-settings?tab=permissions\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(msg);
+      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
       logger.log(`Permission request email sent to ${adminEmails.length} admin(s) for user ${request.userEmail}`);
       return true;
     } catch (error) {

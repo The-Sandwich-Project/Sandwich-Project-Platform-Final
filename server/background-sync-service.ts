@@ -127,6 +127,7 @@ export class BackgroundSyncService {
         : 'Never';
       
       await sendEmail({
+        emailStream: 'operational',
         to: adminEmail,
         from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
         subject: '🚨 CRITICAL: Event Requests Sync Service Stopped',
@@ -448,6 +449,7 @@ Action Required:
       const adminEmail = ADMIN_EMAIL;
       
       await sendEmail({
+        emailStream: 'operational',
         to: adminEmail,
         from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
         subject: '🚨 CRITICAL: Event Requests Sync Has Never Completed',
@@ -553,6 +555,7 @@ Action Required:
         : 'Never';
       
       await sendEmail({
+        emailStream: 'operational',
         to: adminEmail,
         from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
         subject: '🚨 CRITICAL: Event Requests Sync Failing',
@@ -640,6 +643,7 @@ This alert will not be sent again for ${this.ALERT_COOLDOWN_MINUTES} minutes unl
         : 'Never';
       
       await sendEmail({
+        emailStream: 'operational',
         to: adminEmail,
         from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
         subject: '⚠️ WARNING: Event Requests Sync Stale',

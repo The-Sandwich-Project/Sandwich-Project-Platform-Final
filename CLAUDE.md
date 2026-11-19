@@ -54,6 +54,7 @@ Past schema work skipped these, which is why links between tables live only in a
 - `DATABASE_URL` — Production Neon connection string
 - `DEV_DATABASE_URL` — Dev Neon branch connection string
 - `SENDGRID_API_KEY` — Email sending
+- `SENDGRID_ASM_GROUP_ID_OPERATIONAL`, `SENDGRID_ASM_GROUP_ID_NEWSLETTER` — SendGrid unsubscribe group IDs. Every send goes through `withUnsubscribeSettings()` in `server/utils/sendgrid-unsubscribe.ts`, which picks the group, adds the scanner-safe preferences link, and lets operational mail bypass global unsubscribes
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — SMS
 - `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL` — OpenAI via Replit AI Integrations (most AI features)
 - `OPENAI_API_KEY` — Direct OpenAI key (SMS collection parsing, smart-search embeddings, alert generation)

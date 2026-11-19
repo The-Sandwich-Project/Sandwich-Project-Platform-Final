@@ -514,6 +514,7 @@ export async function processAdminWeeklyDigest(): Promise<{ success: boolean; me
     const text = buildDigestEmailText(data);
 
     const emailSent = await sendEmail({
+      emailStream: 'operational',
       to: ADMIN_EMAIL,
       from: FROM_EMAIL,
       subject: `📊 TSP Weekly Digest — ${data.weekOf}`,

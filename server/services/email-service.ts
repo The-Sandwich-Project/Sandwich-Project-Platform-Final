@@ -379,6 +379,7 @@ export class EmailService {
           const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
           
           await sendGridEmail({
+            emailStream: 'operational',
             to: data.recipientEmail,
             from: 'katielong2316@gmail.com', // Your verified sender
             replyTo: replyToEmail, // Use preferred email for Reply-To

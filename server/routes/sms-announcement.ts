@@ -174,6 +174,7 @@ ${testMode ? '\n[THIS IS A TEST EMAIL - No actual announcement was sent]' : ''}
       for (const user of recipients) {
         try {
           await sendEmail({
+            emailStream: 'newsletter',
             to: user.email,
             from: fromEmail,
             subject: subject,
