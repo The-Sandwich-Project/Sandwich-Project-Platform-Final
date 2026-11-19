@@ -14,8 +14,10 @@ import {
   primaryKey,
   time,
   date,
+  check,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, relations } from 'drizzle-orm';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
@@ -1142,6 +1144,58 @@ export const driverAgreements = pgTable('driver_agreements', {
   agreementAccepted: boolean('agreement_accepted').notNull().default(false),
   submittedAt: timestamp('submitted_at').defaultNow().notNull(),
 });
+
+// Places collections are logged under: today's areas (Alpharetta, ...),
+// partner sites (Collective Learning), chapters (UGA), and historic names
+// that only appear on old collection rows. Replaces the misnamed `hosts`
+// table, which actually holds regions. See docs/data-model.md, "Collection
+// sites and regions". `sandwich_collections.host_name` keeps the text it was
+// logged with; reporting maps it to a region by name (case-insensitive).
+export const REGION_KINDS = ['region', 'site', 'chapter'] as const;
+export const REGION_STATUSES = ['active', 'historic'] as const;
+export type RegionKind = (typeof REGION_KINDS)[number];
+export type RegionStatus = (typeof REGION_STATUSES)[number];
+
+export const regions = pgTable(
+  'regions',
+  {
+    id: serial('id').primaryKey(),
+    // Exactly as it appears in sandwich_collections.host_name
+    name: text('name').notNull(),
+    kind: text('kind').$type<RegionKind>().notNull().default('region'),
+    status: text('status').$type<RegionStatus>().notNull().default('active'),
+    // Historic only: the current region whose history includes this one.
+    // Null for a retired name with no current home.
+    rollsUpIntoRegionId: integer('rolls_up_into_region_id').references(
+      (): AnyPgColumn => regions.id,
+      { onDelete: 'restrict' }
+    ),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    nameLowerUnique: uniqueIndex('regions_name_lower_unique').on(sql`lower(${table.name})`),
+    kindCheck: check('regions_kind_check', sql`${table.kind} IN ('region', 'site', 'chapter')`),
+    statusCheck: check('regions_status_check', sql`${table.status} IN ('active', 'historic')`),
+    rollupCheck: check(
+      'regions_rollup_check',
+      sql`${table.rollsUpIntoRegionId} IS NULL OR (${table.status} = 'historic' AND ${table.rollsUpIntoRegionId} <> ${table.id})`
+    ),
+  })
+);
+
+export const regionsRelations = relations(regions, ({ one, many }) => ({
+  rollsUpInto: one(regions, {
+    fields: [regions.rollsUpIntoRegionId],
+    references: [regions.id],
+    relationName: 'region_rollup',
+  }),
+  historicNames: many(regions, { relationName: 'region_rollup' }),
+}));
+
+export type Region = typeof regions.$inferSelect;
+export type InsertRegion = typeof regions.$inferInsert;
 
 export const hosts = pgTable('hosts', {
   id: serial('id').primaryKey(),
