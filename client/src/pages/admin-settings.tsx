@@ -12,7 +12,7 @@ import { TollFreeVerificationPanel } from '@/components/toll-free-verification-p
 import { SMSTestPanel } from '@/components/sms-test-panel';
 import { ChatSyncPanel } from '@/components/chat-sync-panel';
 import VolunteerSignupAdmin from '@/components/volunteer-signup-admin';
-import { adminDocuments } from '@/pages/important-documents';
+import { adminDocuments } from '@/lib/admin-documents';
 import { useAuth } from '@/hooks/useAuth';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';

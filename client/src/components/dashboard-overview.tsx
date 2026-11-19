@@ -67,7 +67,7 @@ import OperationalOverview from '@/components/operational-overview';
 import VolunteerNeedsOverview from '@/components/volunteer-needs-overview';
 import { LowVolumeAlert } from '@/components/low-volume-alert';
 import { WEEK_OFFSET_TO_SCOPE } from '@/components/event-requests/lib/eventRequestsListQuery';
-import { adminDocuments } from '@/pages/important-documents';
+import { adminDocuments } from '@/lib/admin-documents';
 
 // Dark mode toggle removed per user request
 import {
@@ -1387,11 +1387,10 @@ export default function DashboardOverview({
                 <p className="text-sm text-gray-500 mb-2">No documents configured for dashboard</p>
                 {ADMIN_ACCESS && (
                   <p className="text-xs text-gray-400">
-                    Admins can configure documents in the{' '}
-                    <a href="/important-documents" className="text-brand-primary hover:underline">
-                      Important Documents
-                    </a>{' '}
-                    page
+                    Admins can choose them in{' '}
+                    <a href="/dashboard?section=admin" className="text-brand-primary hover:underline">
+                      Admin Settings → Dashboard Config
+                    </a>
                   </p>
                 )}
               </div>

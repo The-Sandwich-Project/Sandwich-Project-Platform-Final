@@ -61,12 +61,12 @@ const HELP_TOPICS: HelpTopic[] = [
     category: 'files-resources',
     icon: FileImage,
     tourId: 'find-logos',
-    requiredPermissions: [PERMISSIONS.NAV_IMPORTANT_DOCUMENTS],
+    requiredPermissions: [PERMISSIONS.NAV_RESOURCES],
     content: {
-      summary: 'The Sandwich Project logos are available in the Logos & Branding tab of Important Documents.',
+      summary: 'The Sandwich Project logos are available in the Logos & Branding tab of Reference Materials.',
       steps: [
-        'Navigate to "Important Documents" from the main menu',
-        'Click on the "Logos & Branding" tab at the top',
+        'Open "Reference Materials" from the main menu',
+        'Click the "Logos & Branding" tab at the top',
         'Browse and download logos in various formats (PNG, JPG, transparent backgrounds)',
       ],
       tips: [
@@ -85,11 +85,10 @@ const HELP_TOPICS: HelpTopic[] = [
     tourId: 'sandwich-signin-forms',
     requiredPermissions: [PERMISSIONS.NAV_TOOLKIT],
     content: {
-      summary: 'Sign-in forms are used to track participants at sandwich collection events and are stored in the Toolkit.',
+      summary: 'Sign-in forms are used to track participants at sandwich collection events and are stored in Reference Materials.',
       steps: [
-        'Go to "Important Documents" in the navigation',
-        'Select the "Toolkit" tab',
-        'Look for "SandwichSigninNoEmail.pdf" or similar sign-in form files',
+        'Open "Reference Materials" from the main menu',
+        'Look under "Forms & Templates" for the "Sandwich Sign-In Form"',
         'Download and print the forms for your event',
       ],
       tips: [

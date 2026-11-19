@@ -40,7 +40,7 @@ const safetyDocuments: ToolkitDocument[] = [
   },
   {
     name: 'Food Safety Volunteers Guide',
-    path: '/attached_assets/20260506-TSP-Food+Safety+Volunteers.pdf',
+    path: '/documents/food-safety-volunteers.pdf',
     type: 'pdf',
     category: 'Safety Guidelines',
     description:
@@ -76,7 +76,7 @@ const safetyDocuments: ToolkitDocument[] = [
 const labelDocuments: ToolkitDocument[] = [
   {
     name: 'Deli Labels',
-    path: '/attached_assets/Deli labels_1749341916236.pdf',
+    path: '/documents/deli-labels.pdf',
     type: 'pdf',
     category: 'Labels',
     description:
@@ -84,7 +84,7 @@ const labelDocuments: ToolkitDocument[] = [
   },
   {
     name: 'PBJ Labels',
-    path: '/attached_assets/20250622-TSP-PBJ Sandwich Making 101_1749341916236.pdf',
+    path: '/documents/pbj-labels.pdf',
     type: 'pdf',
     category: 'Labels',
     description: 'Labels and guidelines for peanut butter and jelly sandwiches',
@@ -94,7 +94,7 @@ const labelDocuments: ToolkitDocument[] = [
 const sandwichMakingDocuments: ToolkitDocument[] = [
   {
     name: 'Deli Sandwich Making 101',
-    path: '/attached_assets/Deli Sandwich Making 101 03172026.pdf',
+    path: '/documents/deli-sandwich-making-101.pdf',
     type: 'pdf',
     category: 'Sandwich Making',
     description:
@@ -102,7 +102,7 @@ const sandwichMakingDocuments: ToolkitDocument[] = [
   },
   {
     name: 'PBJ Sandwich Making 101',
-    path: '/attached_assets/PBJ Sandwich Making 2 101 03172026.pdf',
+    path: '/documents/pbj-sandwich-making-101.pdf',
     type: 'pdf',
     category: 'Sandwich Making',
     description:
