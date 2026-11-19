@@ -106,7 +106,7 @@ erDiagram
 | `volunteer_profiles` | person with `is_volunteer` | Experience level, training completed, sheet-sync bookkeeping. |
 | `driver_profiles` | person with `is_driver` | Availability, cooler status, agreement signed, weekly driver. `driver_vehicles` hangs off this. Which legacy `drivers` columns carry over is decided by the data audit. |
 | `host_profiles` | person with `is_host` | Region, hours, weekly-active, former host. **Hosts are people**; their address lives on `people`. |
-| `regions` | collection grouping | What the legacy `hosts` table actually holds. Historic sub-regions stay as `historic` rows pointing at the current region they roll up into. |
+| `regions` | place collections are logged under | What the legacy `hosts` table actually holds. Has a `kind`: `region` (an area hosts belong to, e.g. Alpharetta), `site` (a partner that collects on its own, e.g. Collective Learning) or `chapter` (e.g. UGA). Historic names stay as `historic` rows, optionally pointing at the current region they roll up into. The agreed list is in "Collection sites and regions" below. |
 | `legacy_person_ids` | old row id | Maps old ids (`volunteers` 12, `drivers` 5, `host_contacts` 3, ...) to the new person. Keeps the `"volunteer-12"` style strings in `event_requests.assigned_*_ids` resolving. |
 | `recipients` | recipient organization | **Stays separate** from `people`. Recipients never volunteer, drive or host, and carry very different data. |
 
@@ -193,6 +193,49 @@ erDiagram
    and the sync report show app edits the sheet doesn't have, so a coordinator
    can update the sheet by hand.
 
+### Collection sites and regions (agreed 2026-11-19)
+
+Decided with the director from the step 2 audit of production. Every name that
+appears in `sandwich_collections.host_name` gets a `regions` row; old
+collection rows keep their original text.
+
+**Active**
+
+| Name | `kind` | Notes |
+|---|---|---|
+| Alpharetta | `region` | |
+| Dunwoody/PTC | `region` | PTC = Peachtree Corners |
+| East Cobb/Roswell | `region` | |
+| Sandy Springs/Chastain | `region` | |
+| Intown/Druid Hills/Oak Grove/Chamblee/Brookhaven/Buckhead | `region` | |
+| Flowery Branch | `region` | Active; collection numbers are often late |
+| Collective Learning | `site` | Treated like any other collection site. Auto-logs a standing weekly count (see Cron Jobs in CLAUDE.md) |
+| UGA | `chapter` | TSP chapter in Athens; also a collection site. Some app users are UGA students and need a person-to-chapter link (designed with `people`, step 4) |
+| Unassigned | `region` | Placeholder for hosts not yet given a region |
+
+**Historic, rolled up into a current region** (reports showing a region's full
+history include these)
+
+| Old name | Rolls up into |
+|---|---|
+| Sandy Springs | Sandy Springs/Chastain |
+| Buckhead, Oak Grove, Decatur, Glenwood Park | Intown/Druid Hills/Oak Grove/Chamblee/Brookhaven/Buckhead |
+| Peachtree Corners | Dunwoody/PTC |
+
+**Historic, retired** (no current home; kept under their own name): Dacula
+(closed), Snellville, Woodstock (never opened), Intown/Druid Hills,
+Lenox/Brookhaven, New Chastain, Chamblee/N Brookhaven, Lilburn, Roswell,
+College Park, Suwanee/JC/Duluth.
+
+**OG Sandwich Project**: historic, kept on its own. It's how collections were
+recorded before locations were tracked (2020–21).
+
+**Groups are not a region or site.** Group drop-offs are their own kind of
+record. One may be linked to the host/region it came through, or to nothing;
+both are valid, and the group's own data is what matters. Today they're logged
+with `host_name = 'Groups'` or under a region's `group_collections`; the
+`regions` work must not turn "Groups" into a region.
+
 ### Sheet sources
 
 | Sheet | Sets | Status |
@@ -206,8 +249,8 @@ erDiagram
 Each step is its own PR.
 
 0. Schema rules, the integrity check, and this document. ✅
-1. Recipients directory: plain list as the default view; the detailed views move to a secondary tab.
-2. Data audit (read-only): duplicates across the five people tables, conflicting phones/emails, abbreviated "First L." names, survey-driver names edited after entry, distinct region names in `sandwich_collections` (with counts and date ranges, plus a proposed historic roll-up), and a **column-usage report for `drivers`** (per column: how many rows have a value, and how recently one was set) so the `driver_profiles` columns are chosen from real data.
+1. Recipients directory: plain list as the default view; the detailed views move to a secondary tab. ✅
+2. ✅ Data audit (read-only, `npm run audit:people`): duplicates across the five people tables, conflicting phones/emails, abbreviated "First L." names, survey-driver names edited after entry, distinct region names in `sandwich_collections` (with counts and date ranges, plus a proposed historic roll-up), and a **column-usage report for `drivers`** (per column: how many rows have a value, and how recently one was set) so the `driver_profiles` columns are chosen from real data.
 3. `regions` table + historic roll-up mapping.
 4. `people`, `person_name_aliases`, `legacy_person_ids` (additive only).
 5. Backfill script with `--dry-run`. **A script, not a migration**: migrations run automatically on every boot, including production. Tested against a Neon branch of production.
@@ -281,6 +324,5 @@ In the target design it is one flag: `people.is_van_driver`.
 Resolved:
 
 - **Sheet vs app on conflicts:** three-way comparison; see rule 8 in section 1.
-- **Historic regions:** the current regions are known and will be supplied
-  directly; historic ones are reconstructed from the collections log in step 2
-  (see rule 6).
+- **Historic regions:** decided from the step 2 audit; see "Collection sites
+  and regions" in section 1.
