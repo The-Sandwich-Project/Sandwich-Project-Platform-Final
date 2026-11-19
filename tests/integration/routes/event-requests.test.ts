@@ -7,6 +7,15 @@
 import request from 'supertest';
 import { createTestServer } from '../../setup/test-server';
 import type { Express } from 'express';
+import { createAuthenticatedAgent } from '../../setup/test-server';
+import { storage } from '../../../server/storage-wrapper';
+import { AuditLogger } from '../../../server/audit-logger';
+import { PERMISSIONS } from '../../../shared/auth-utils';
+import { autoCompletePassedEvents } from '../../../server/services/cron-jobs';
+
+jest.mock('../../../server/services/cron-jobs', () => ({
+  autoCompletePassedEvents: jest.fn(),
+}));
 
 describe('Event Requests Routes', () => {
   let app: Express;
@@ -374,6 +383,130 @@ describe('Event Requests Routes', () => {
         // originalScheduledDate should be set
         expect(response.body.originalScheduledDate).toBeTruthy();
       }
+    });
+  });
+
+  describe('Lifecycle routes regression coverage', () => {
+    let editorAgent: request.SuperAgentTest;
+    let basicAgent: request.SuperAgentTest;
+    let adminAgent: request.SuperAgentTest;
+    let eventRequestId: number;
+
+    const buildEventRequestPayload = () => ({
+      organizationName: `Lifecycle Test Org ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      department: 'Community Partnerships',
+      contactName: 'Integration Tester',
+      contactEmail: `lifecycle-${Date.now()}@example.com`,
+      contactPhone: '555-1000',
+      desiredEventDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      estimatedAttendees: 40,
+      status: 'new',
+    });
+
+    beforeAll(async () => {
+      editorAgent = await createAuthenticatedAgent(app, {
+        role: 'volunteer',
+        permissions: [PERMISSIONS.EVENT_REQUESTS_EDIT, PERMISSIONS.EVENT_REQUESTS_VIEW],
+      });
+
+      basicAgent = await createAuthenticatedAgent(app, {
+        role: 'volunteer',
+        permissions: [PERMISSIONS.EVENT_REQUESTS_VIEW],
+      });
+
+      adminAgent = await createAuthenticatedAgent(app, {
+        role: 'volunteer',
+        permissions: [PERMISSIONS.ADMIN_ACCESS],
+      });
+    });
+
+    beforeEach(async () => {
+      jest.spyOn(AuditLogger, 'logEventRequestChange').mockResolvedValue(undefined);
+      (autoCompletePassedEvents as jest.Mock).mockResolvedValue({
+        eventsCompleted: 3,
+        errors: [],
+        timestamp: new Date().toISOString(),
+      });
+
+      eventRequestId = await storage.createEventRequest(buildEventRequestPayload());
+    });
+
+    afterEach(async () => {
+      jest.restoreAllMocks();
+      if (eventRequestId) {
+        await storage.deleteEventRequest(eventRequestId);
+      }
+    });
+
+    it('PATCH /api/event-requests/:id/schedule-call should enforce auth and permissions', async () => {
+      const unauthenticated = await request(app)
+        .patch(`/api/event-requests/${eventRequestId}/schedule-call`)
+        .send({ scheduledCallDate: new Date().toISOString() });
+      expect([401, 403]).toContain(unauthenticated.status);
+
+      const missingPermission = await basicAgent
+        .patch(`/api/event-requests/${eventRequestId}/schedule-call`)
+        .send({ scheduledCallDate: new Date().toISOString() });
+      expect(missingPermission.status).toBe(403);
+    });
+
+    it('PATCH /api/event-requests/:id/schedule-call should return updated shape and emit audit log call', async () => {
+      const scheduledCallDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      const response = await editorAgent
+        .patch(`/api/event-requests/${eventRequestId}/schedule-call`)
+        .send({ scheduledCallDate });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('id', eventRequestId);
+      expect(response.body).toHaveProperty('scheduledCallDate');
+      expect(response.body).toHaveProperty('callScheduledAt');
+      expect(response.body).toHaveProperty('scheduledBy');
+      expect(AuditLogger.logEventRequestChange).toHaveBeenCalledTimes(1);
+    });
+
+    it('PATCH /api/event-requests/:id/mlk-day should enforce auth and permissions', async () => {
+      const unauthenticated = await request(app)
+        .patch(`/api/event-requests/${eventRequestId}/mlk-day`)
+        .send({ isMlkDayEvent: true });
+      expect([401, 403]).toContain(unauthenticated.status);
+
+      const missingPermission = await basicAgent
+        .patch(`/api/event-requests/${eventRequestId}/mlk-day`)
+        .send({ isMlkDayEvent: true });
+      expect(missingPermission.status).toBe(403);
+    });
+
+    it('PATCH /api/event-requests/:id/mlk-day should return updated shape and emit audit log call', async () => {
+      const response = await editorAgent
+        .patch(`/api/event-requests/${eventRequestId}/mlk-day`)
+        .send({ isMlkDayEvent: true });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('id', eventRequestId);
+      expect(response.body).toHaveProperty('isMlkDayEvent', true);
+      expect(response.body).toHaveProperty('mlkDayMarkedAt');
+      expect(response.body).toHaveProperty('mlkDayMarkedBy');
+      expect(AuditLogger.logEventRequestChange).toHaveBeenCalledTimes(1);
+    });
+
+    it('POST /api/event-requests/admin/auto-complete-passed should enforce auth and admin permission', async () => {
+      const unauthenticated = await request(app).post('/api/event-requests/admin/auto-complete-passed');
+      expect([401, 403]).toContain(unauthenticated.status);
+
+      const missingPermission = await basicAgent.post('/api/event-requests/admin/auto-complete-passed');
+      expect(missingPermission.status).toBe(403);
+    });
+
+    it('POST /api/event-requests/admin/auto-complete-passed should return expected response shape for admins', async () => {
+      const response = await adminAgent.post('/api/event-requests/admin/auto-complete-passed');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('message');
+      expect(response.body).toHaveProperty('eventsCompleted', 3);
+      expect(response.body).toHaveProperty('errors');
+      expect(response.body).toHaveProperty('timestamp');
+      expect(autoCompletePassedEvents).toHaveBeenCalledTimes(1);
     });
   });
 });
