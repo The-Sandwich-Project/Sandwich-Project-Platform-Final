@@ -246,9 +246,9 @@ export default function PeopleAdmin() {
               No people yet. They appear here once the people backfill has been run.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-md border">
+            <div className="max-h-[70vh] overflow-auto rounded-md border">
               <table className="w-full min-w-[960px] text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase text-slate-500 shadow-[0_1px_0_0_rgb(226,232,240)]">
                   <tr>
                     <th className="p-2">Name</th>
                     <th className="p-2">Contact</th>
