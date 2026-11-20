@@ -17,6 +17,7 @@
     "people:backfill": "tsx scripts/backfill-people.ts",
     "people:repair-flags": "tsx scripts/repair-people-flags.ts",
     "db:compare": "tsx scripts/compare-db-schemas.ts",
+    "db:sync-dev": "tsx scripts/sync-dev-schema.ts",
     "db:push": "drizzle-kit push",
     "db:migrate": "tsx server/run-migrations.ts",
     "db:migrate-focus": "tsx scripts/migrate-focus-areas.ts",
