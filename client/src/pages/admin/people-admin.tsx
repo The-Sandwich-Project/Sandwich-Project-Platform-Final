@@ -34,13 +34,16 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 const API = '/api/people-admin';
 const ALLOWED_ROLES = ['super_admin', 'admin'];
 
-type RoleKey = 'isVolunteer' | 'isDriver' | 'isVanDriver' | 'isHost' | 'isTeamMember';
+type RoleKey = 'isVolunteer' | 'isDriver' | 'isVanDriver' | 'isHost' | 'isTeamMember' | 'isBoardMember' | 'isAdvisoryBoardMember' | 'isIntakeTeam';
 const ROLES: { key: RoleKey; label: string }[] = [
   { key: 'isVolunteer', label: 'Volunteer' },
   { key: 'isDriver', label: 'Driver' },
   { key: 'isVanDriver', label: 'Van driver' },
   { key: 'isHost', label: 'Host' },
   { key: 'isTeamMember', label: 'Team member' },
+  { key: 'isIntakeTeam', label: 'Intake team' },
+  { key: 'isBoardMember', label: 'Board' },
+  { key: 'isAdvisoryBoardMember', label: 'Advisory board' },
 ];
 
 interface PersonRow {
@@ -54,6 +57,9 @@ interface PersonRow {
   isVanDriver: boolean;
   isHost: boolean;
   isTeamMember: boolean;
+  isBoardMember: boolean;
+  isAdvisoryBoardMember: boolean;
+  isIntakeTeam: boolean;
   isActive: boolean;
   chapterRegionId: number | null;
   openFlags: number;
@@ -241,7 +247,7 @@ export default function PeopleAdmin() {
             </div>
           ) : (
             <div className="overflow-x-auto rounded-md border">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[960px] text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                   <tr>
                     <th className="p-2">Name</th>

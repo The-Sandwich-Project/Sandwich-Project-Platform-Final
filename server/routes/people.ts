@@ -46,6 +46,9 @@ const editSchema = z
     isVanDriver: z.boolean().optional(),
     isHost: z.boolean().optional(),
     isTeamMember: z.boolean().optional(),
+    isBoardMember: z.boolean().optional(),
+    isAdvisoryBoardMember: z.boolean().optional(),
+    isIntakeTeam: z.boolean().optional(),
     isActive: z.boolean().optional(),
   })
   .strict();
