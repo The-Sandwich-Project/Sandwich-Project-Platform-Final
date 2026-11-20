@@ -82,7 +82,7 @@ export async function checkSchemaDrift(): Promise<void> {
 
     if (missingTables.length > 0) {
       logger.error(
-        `SCHEMA DRIFT: ${missingTables.length} table(s) defined in schema but missing from database: ${missingTables.join(', ')}. Run migrations or db:push to fix.`
+        `SCHEMA DRIFT: ${missingTables.length} table(s) defined in schema but missing from database: ${missingTables.join(', ')}. Add a migration file in migrations/ (it runs on the next deploy). Never run db:push against production: it drops tables that aren't in the schema.`
       );
     }
 
@@ -94,7 +94,7 @@ export async function checkSchemaDrift(): Promise<void> {
         logger.error(`  - ${table}.${column}`);
       }
       logger.error(
-        'Create a migration in migrations/ or run npm run db:push to add these columns.'
+        'Add a migration file in migrations/ to create these columns (it runs on the next deploy). Never run db:push against production: it drops tables and data that aren\'t in the schema.'
       );
     }
 
