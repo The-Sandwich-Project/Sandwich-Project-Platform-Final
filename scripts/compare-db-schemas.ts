@@ -101,8 +101,20 @@ async function main() {
     const lostTables = new Set(lost.filter((k) => k.startsWith('table ')).map(tableOf));
     return lost.filter((k) => k.startsWith('table ') || !lostTables.has(tableOf(k))).sort();
   };
+  // Postgres 16 (dev) and 17 (production) print some rules with the type
+  // casts and brackets in different places. Ignore those when comparing rules,
+  // so the same rule written two ways doesn't show up as a difference.
+  const sameRule = (a: string, b: string) => {
+    const norm = (d: string) => d.replace(/::[a-z ]+(\[\])?/gi, '').replace(/[()\s]/g, '');
+    return norm(a) === norm(b);
+  };
   const differs = [...prod.items.keys()]
-    .filter((k) => dev.items.has(k) && prod.items.get(k) !== dev.items.get(k))
+    .filter((k) => {
+      if (!dev.items.has(k)) return false;
+      const a = prod.items.get(k)!;
+      const b = dev.items.get(k)!;
+      return a !== b && !(k.startsWith('rule ') && sameRule(a, b));
+    })
     .sort();
 
   const danger = missingFrom(prod, dev);
@@ -129,8 +141,7 @@ async function main() {
   } else if (differs.length) {
     console.log(
       'NOT READY: a publish would change production to dev\'s version of the items above.\n' +
-        'Run: npm run db:sync-dev -- --apply   then check again. (A rule whose two versions say\n' +
-        'the same thing in different words, like the van_needed_for check, is fine to leave.)'
+        'Run: npm run db:sync-dev -- --apply   then check again.'
     );
   } else {
     console.log('Safe to publish: dev has everything production has.');
