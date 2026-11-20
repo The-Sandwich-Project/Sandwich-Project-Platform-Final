@@ -105,7 +105,7 @@ export function splitName(name: string): { firstName: string; lastName: string }
   return { firstName: parts[0] || name.trim(), lastName: parts.slice(1).join(' ') };
 }
 
-interface Person {
+export interface Person {
   members: Rec[];
   firstName: string;
   lastName: string;
@@ -127,7 +127,7 @@ interface Person {
   flags: { kind: ReviewKind; detail: string }[];
 }
 
-const ref = (r: Rec) => `${r.source}#${r.key}`;
+export const ref = (r: Rec) => `${r.source}#${r.key}`;
 const byPriority = (a: Rec, b: Rec) =>
   Number(!!b.surveySubmitted) - Number(!!a.surveySubmitted) ||
   SOURCE_PRIORITY.indexOf(a.source) - SOURCE_PRIORITY.indexOf(b.source);
@@ -336,6 +336,131 @@ export function buildPerson(rs: Rec[]): Person {
   };
 }
 
+type Query = (text: string, params?: unknown[]) => Promise<any[]>;
+
+/** Read every old person record. Shared with repair-people-flags.ts. */
+export async function loadRecords(q: Query): Promise<Rec[]> {
+  const records: Rec[] = [];
+  const emailsOf = (...xs: (string | null)[]) => [...new Set(xs.map(realEmail).filter(Boolean))];
+  for (const u of await q(
+    `SELECT id, email, preferred_email, first_name, last_name, display_name, phone_number, address,
+            latitude, longitude, geocoded_at, is_active, van_approved FROM users`
+  )) {
+    records.push({
+      source: 'users',
+      key: String(u.id),
+      name: [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.display_name || '',
+      emails: emailsOf(u.email, u.preferred_email),
+      phoneRaw: u.phone_number || '',
+      phone: realPhone(u.phone_number),
+      address: u.address,
+      latitude: u.latitude,
+      longitude: u.longitude,
+      geocodedAt: u.geocoded_at,
+      active: u.is_active !== false,
+      vanApproved: u.van_approved === true,
+    });
+  }
+  for (const v of await q(
+    `SELECT id, name, email, phone, address, latitude, longitude, geocoded_at, is_active, van_approved, host_contact_id
+       FROM volunteers`
+  )) {
+    records.push({
+      source: 'volunteers',
+      key: String(v.id),
+      name: v.name || '',
+      emails: emailsOf(v.email),
+      phoneRaw: v.phone || '',
+      phone: realPhone(v.phone),
+      address: v.address,
+      latitude: v.latitude,
+      longitude: v.longitude,
+      geocodedAt: v.geocoded_at,
+      active: v.is_active !== false,
+      vanApproved: v.van_approved === true,
+      hostContactCopy: v.host_contact_id != null,
+    });
+  }
+  for (const d of await q(
+    `SELECT id, name, email, phone, address, latitude, longitude, geocoded_at, is_active, van_approved, survey_submitted
+       FROM drivers`
+  )) {
+    records.push({
+      source: 'drivers',
+      key: String(d.id),
+      name: d.name || '',
+      emails: emailsOf(d.email),
+      phoneRaw: d.phone || '',
+      phone: realPhone(d.phone),
+      address: d.address,
+      latitude: d.latitude,
+      longitude: d.longitude,
+      geocodedAt: d.geocoded_at,
+      active: d.is_active !== false,
+      vanApproved: d.van_approved === true,
+      surveySubmitted: d.survey_submitted === true,
+    });
+  }
+  for (const h of await q(
+    `SELECT id, name, email, phone, address, latitude, longitude, geocoded_at, is_former_host, van_approved, is_volunteer
+       FROM host_contacts`
+  )) {
+    records.push({
+      source: 'host_contacts',
+      key: String(h.id),
+      name: h.name || '',
+      emails: emailsOf(h.email),
+      phoneRaw: h.phone || '',
+      phone: realPhone(h.phone),
+      address: h.address,
+      latitude: h.latitude,
+      longitude: h.longitude,
+      geocodedAt: h.geocoded_at,
+      active: h.is_former_host !== true,
+      vanApproved: h.van_approved === true,
+      hostVolunteer: h.is_volunteer === true,
+    });
+  }
+  for (const c of await q(`SELECT id, name, email, phone, address, is_active FROM contacts`)) {
+    records.push({
+      source: 'contacts',
+      key: String(c.id),
+      name: c.name || '',
+      emails: emailsOf(c.email),
+      phoneRaw: c.phone || '',
+      phone: realPhone(c.phone),
+      address: c.address,
+      latitude: null,
+      longitude: null,
+      geocodedAt: null,
+      active: c.is_active !== false,
+      vanApproved: false,
+    });
+  }
+  return records;
+}
+
+/** Group records into people, with their review flags. Shared with repair-people-flags.ts. */
+export function planPeople(records: Rec[]): Person[] {
+  const { groups, shared, nearMisses } = groupRecords(records);
+  const people = groups.map(buildPerson);
+  const personOf = new Map<Rec, Person>();
+  people.forEach((p) => p.members.forEach((r) => personOf.set(r, p)));
+  for (const s of shared) {
+    const pa = personOf.get(s.a)!;
+    const pb = personOf.get(s.b)!;
+    pa.flags.push({ kind: 'shared_contact', detail: `Shares ${s.key} with ${pb.display}. Same person under another name, or two people?` });
+    pb.flags.push({ kind: 'shared_contact', detail: `Shares ${s.key} with ${pa.display}. Same person under another name, or two people?` });
+  }
+  for (const m of nearMisses) {
+    const pa = personOf.get(m.a[0])!;
+    const pb = personOf.get(m.b[0])!;
+    pa.flags.push({ kind: 'possible_duplicate', detail: `${m.why}: ${pb.display}. Kept separate; merge if they're the same person.` });
+    pb.flags.push({ kind: 'possible_duplicate', detail: `${m.why}: ${pa.display}. Kept separate; merge if they're the same person.` });
+  }
+  return people;
+}
+
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : undefined;
@@ -381,122 +506,8 @@ async function main() {
       throw new Error(`people already has ${existing} rows. This backfill is one-shot and won't run twice.`);
     }
 
-    // ---- load ----
-    const records: Rec[] = [];
-    const emailsOf = (...xs: (string | null)[]) => [...new Set(xs.map(realEmail).filter(Boolean))];
-    for (const u of await q(
-      `SELECT id, email, preferred_email, first_name, last_name, display_name, phone_number, address,
-              latitude, longitude, geocoded_at, is_active, van_approved FROM users`
-    )) {
-      records.push({
-        source: 'users',
-        key: String(u.id),
-        name: [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.display_name || '',
-        emails: emailsOf(u.email, u.preferred_email),
-        phoneRaw: u.phone_number || '',
-        phone: realPhone(u.phone_number),
-        address: u.address,
-        latitude: u.latitude,
-        longitude: u.longitude,
-        geocodedAt: u.geocoded_at,
-        active: u.is_active !== false,
-        vanApproved: u.van_approved === true,
-      });
-    }
-    for (const v of await q(
-      `SELECT id, name, email, phone, address, latitude, longitude, geocoded_at, is_active, van_approved, host_contact_id
-         FROM volunteers`
-    )) {
-      records.push({
-        source: 'volunteers',
-        key: String(v.id),
-        name: v.name || '',
-        emails: emailsOf(v.email),
-        phoneRaw: v.phone || '',
-        phone: realPhone(v.phone),
-        address: v.address,
-        latitude: v.latitude,
-        longitude: v.longitude,
-        geocodedAt: v.geocoded_at,
-        active: v.is_active !== false,
-        vanApproved: v.van_approved === true,
-        hostContactCopy: v.host_contact_id != null,
-      });
-    }
-    for (const d of await q(
-      `SELECT id, name, email, phone, address, latitude, longitude, geocoded_at, is_active, van_approved, survey_submitted
-         FROM drivers`
-    )) {
-      records.push({
-        source: 'drivers',
-        key: String(d.id),
-        name: d.name || '',
-        emails: emailsOf(d.email),
-        phoneRaw: d.phone || '',
-        phone: realPhone(d.phone),
-        address: d.address,
-        latitude: d.latitude,
-        longitude: d.longitude,
-        geocodedAt: d.geocoded_at,
-        active: d.is_active !== false,
-        vanApproved: d.van_approved === true,
-        surveySubmitted: d.survey_submitted === true,
-      });
-    }
-    for (const h of await q(
-      `SELECT id, name, email, phone, address, latitude, longitude, geocoded_at, is_former_host, van_approved, is_volunteer
-         FROM host_contacts`
-    )) {
-      records.push({
-        source: 'host_contacts',
-        key: String(h.id),
-        name: h.name || '',
-        emails: emailsOf(h.email),
-        phoneRaw: h.phone || '',
-        phone: realPhone(h.phone),
-        address: h.address,
-        latitude: h.latitude,
-        longitude: h.longitude,
-        geocodedAt: h.geocoded_at,
-        active: h.is_former_host !== true,
-        vanApproved: h.van_approved === true,
-        hostVolunteer: h.is_volunteer === true,
-      });
-    }
-    for (const c of await q(`SELECT id, name, email, phone, address, is_active FROM contacts`)) {
-      records.push({
-        source: 'contacts',
-        key: String(c.id),
-        name: c.name || '',
-        emails: emailsOf(c.email),
-        phoneRaw: c.phone || '',
-        phone: realPhone(c.phone),
-        address: c.address,
-        latitude: null,
-        longitude: null,
-        geocodedAt: null,
-        active: c.is_active !== false,
-        vanApproved: false,
-      });
-    }
-
-    // ---- group and build ----
-    const { groups, shared, nearMisses } = groupRecords(records);
-    const people = groups.map(buildPerson);
-    const personOf = new Map<Rec, Person>();
-    people.forEach((p) => p.members.forEach((r) => personOf.set(r, p)));
-    for (const s of shared) {
-      const pa = personOf.get(s.a)!;
-      const pb = personOf.get(s.b)!;
-      pa.flags.push({ kind: 'shared_contact', detail: `Shares ${s.key} with ${pb.display}. Same person under another name, or two people?` });
-      pb.flags.push({ kind: 'shared_contact', detail: `Shares ${s.key} with ${pa.display}. Same person under another name, or two people?` });
-    }
-    for (const m of nearMisses) {
-      const pa = personOf.get(m.a[0])!;
-      const pb = personOf.get(m.b[0])!;
-      pa.flags.push({ kind: 'possible_duplicate', detail: `${m.why}: ${pb.display}. Kept separate; merge if they're the same person.` });
-      pb.flags.push({ kind: 'possible_duplicate', detail: `${m.why}: ${pa.display}. Kept separate; merge if they're the same person.` });
-    }
+    const records = await loadRecords(q);
+    const people = planPeople(records);
 
     // ---- write (inside the transaction, even for --dry-run) ----
     let aliasCount = 0;
