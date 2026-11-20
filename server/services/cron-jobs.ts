@@ -26,6 +26,7 @@ import { ALERT_TYPES } from '@shared/alert-catalog';
 import { getEffectivePrefs } from './notifications/preferences';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
 import { runCollectiveLearningAutoLog } from './collections/collective-learning-auto-log';
+import { runScheduledVolunteerSheetSync } from './people/volunteer-sheet-sync';
 import { runDatabaseBackup } from './db-backup-service';
 
 const cronLogger = createServiceLogger('cron');
@@ -1640,6 +1641,33 @@ export function initializeCronJobs() {
     timezone: 'America/New_York',
   });
 
+  // Volunteer sheet sync - daily at 5:40 AM (people/places rebuild, step 7)
+  // Reads the volunteer Google Sheet into people / volunteer_profiles. Does
+  // nothing until the first sync has been run and checked by hand
+  // (npm run volunteers:sync, or "Sync now" on the People page).
+  // PRODUCTION ONLY: dev instances use the "Sync now" button.
+  const volunteerSheetSyncJob = cron.schedule('40 5 * * *', async () => {
+    if (!isProduction) {
+      cronLogger.info('Skipping volunteer sheet sync - not production environment');
+      return;
+    }
+    try {
+      const result = await runScheduledVolunteerSheetSync();
+      cronLogger.info('Volunteer sheet sync finished', result);
+    } catch (error) {
+      logError(error as Error, 'Error running volunteer sheet sync cron job', undefined, {
+        jobType: 'volunteer-sheet-sync',
+      });
+    }
+  }, {
+    timezone: 'America/New_York',
+  });
+
+  cronLogger.info('Volunteer sheet sync job scheduled successfully', {
+    schedule: 'Daily at 5:40 AM',
+    timezone: 'America/New_York',
+  });
+
   // Weekly database backup to Google Drive - Sundays at 2:00 AM ET
   // Exports every public table as gzipped CSV, uploads one .tar.gz to the
   // Shared Drive folder in BACKUP_DRIVE_FOLDER_ID, prunes backups > 10 weeks.
@@ -1690,6 +1718,7 @@ export function initializeCronJobs() {
     integrationHealthJob,
     errorDigestJob,
     collectiveLearningAutoLogJob,
+    volunteerSheetSyncJob,
     dbBackupJob,
   };
 }
@@ -1717,6 +1746,7 @@ export function stopAllCronJobs(jobs: ReturnType<typeof initializeCronJobs>) {
   jobs.integrationHealthJob.stop();
   jobs.errorDigestJob.stop();
   jobs.collectiveLearningAutoLogJob.stop();
+  jobs.volunteerSheetSyncJob.stop();
   jobs.dbBackupJob.stop();
   cronLogger.info('All cron jobs stopped successfully');
 }

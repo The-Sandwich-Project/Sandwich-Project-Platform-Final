@@ -111,4 +111,4 @@ export async function executeRawSql<T extends Record<string, unknown>>(
   return sqlClient(compiled.sql, compiled.params) as Promise<T[]>;
 }
 
-export { db };
+export { db, sqlClient };
