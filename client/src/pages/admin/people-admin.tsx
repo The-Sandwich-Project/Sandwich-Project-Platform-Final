@@ -92,6 +92,7 @@ const KIND_LABELS: Record<string, string> = {
 const NAME_SOURCE_LABELS: Record<string, string> = {
   self_verified: 'confirmed by the person',
   self_reported: 'from their own survey',
+  admin_entered: 'typed in by an admin',
   sheet: 'from a sheet',
   legacy_import: 'from old records',
 };
@@ -169,7 +170,7 @@ export default function PeopleAdmin() {
               keeps all their details, so ticking it again restores everything.
             </CardDescription>
           </div>
-          <Button onClick={() => setAdding(true)} className="shrink-0">
+          <Button onClick={() => setAdding(true)} className="shrink-0" disabled={(data?.people.length ?? 0) === 0}>
             <Plus className="mr-1 h-4 w-4" /> Add person
           </Button>
         </CardHeader>
@@ -625,9 +626,10 @@ function MergeDialog({
         <DialogHeader>
           <DialogTitle>Merge into {fullName(keep)}</DialogTitle>
           <DialogDescription>
-            The other person's roles, old records, logins and open questions move to {fullName(keep)}, their name is
-            kept as another spelling, and their record is removed. {fullName(keep)}'s name and contact details stay;
-            blanks are filled from the other record.
+            The other person's roles, old records, logins and open questions move to {fullName(keep)}, and their record
+            is removed. The better-confirmed name is kept and the other becomes another spelling. {fullName(keep)}'s
+            contact details and address stay; blanks are filled from the other record. Any "same person?" questions
+            between the two are marked resolved.
           </DialogDescription>
         </DialogHeader>
         {!chosen ? (

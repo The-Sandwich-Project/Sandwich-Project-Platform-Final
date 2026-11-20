@@ -148,9 +148,10 @@ export function createPeopleRouter() {
     guard,
     handle(async (req, res) => {
       const { keepId, dropId } = mergeSchema.parse(req.body);
-      const { kept, dropped } = await mergePeople(keepId, dropId);
-      await AuditLogger.logUpdate('people', String(keepId), { mergedFrom: dropped }, kept, auditContext(req));
-      await AuditLogger.logDelete('people', String(dropId), dropped, auditContext(req));
+      const ctx = auditContext(req);
+      const { kept, dropped } = await mergePeople(keepId, dropId, ctx.userId ?? null);
+      await AuditLogger.logUpdate('people', String(keepId), { mergedFrom: dropped }, kept, ctx);
+      await AuditLogger.logDelete('people', String(dropId), dropped, ctx);
       res.json(kept);
     })
   );

@@ -142,52 +142,128 @@ export async function updatePerson(id: number, edit: PersonEdit): Promise<{ befo
   const nameChanged =
     (fields.firstName !== undefined && fields.firstName !== before.firstName) ||
     (fields.lastName !== undefined && fields.lastName !== before.lastName);
+  // Record honestly where the name now comes from: the person confirmed it,
+  // or an admin typed it (a respelling no longer carries the old source).
   if (nameConfirmed) set.nameSource = 'self_verified';
-  // An edited spelling is the admin's call; keep the old one as an alias.
+  else if (nameChanged) set.nameSource = 'admin_entered';
+  // Keep the replaced spelling as an alias.
   if (nameChanged) await addAlias(id, fullName(before));
 
   const [after] = await db.update(people).set(set).where(eq(people.id, id)).returning();
   return { before, after };
 }
 
+/** The backfill (step 5) has run once old records have been linked. */
+async function backfillHasRun(): Promise<boolean> {
+  const [row] = await db.select({ id: legacyPersonIds.id }).from(legacyPersonIds).limit(1);
+  return !!row;
+}
+
 export async function createPerson(input: PersonEdit & { firstName: string }): Promise<Person> {
+  // The backfill is one-shot and refuses to run once `people` has rows, so a
+  // person added by hand first would block it for good.
+  if (!(await backfillHasRun())) {
+    throw new PeopleAdminError(
+      'Run the people backfill (npm run people:backfill) before adding people by hand.',
+      409
+    );
+  }
   await assertChapter(input.chapterRegionId);
   const { nameConfirmed, ...fields } = input;
   const [created] = await db
     .insert(people)
-    .values({ lastName: '', ...fields, nameSource: nameConfirmed ? 'self_verified' : 'legacy_import' })
+    .values({ lastName: '', ...fields, nameSource: nameConfirmed ? 'self_verified' : 'admin_entered' })
     .returning();
   return created;
 }
 
+const NAME_RANK = ['self_verified', 'self_reported', 'admin_entered', 'sheet', 'legacy_import'];
+const DECIDED_BY_MERGE = ['possible_duplicate', 'shared_contact'];
+
 /**
- * Merge `dropId` into `keepId`. Keeps keepId's name and contact details,
- * fills blanks from the other record, combines roles (on in either = on),
- * and moves every alias, old-record link, login and flag across. The other
- * name becomes an alias. The emptied record is then deleted.
+ * Merge `dropId` into `keepId`:
+ *   - name: the better-sourced name wins (names are never downgraded); the
+ *     other spelling becomes an alias
+ *   - address + map position move as one unit: the kept record's if it has
+ *     an address, otherwise the other record's
+ *   - email, phone, chapter: the kept record's, blanks filled from the other
+ *   - roles combined (on in either = on); notes appended once
+ *   - aliases, old-record links, logins and flags move across, and the
+ *     duplicate / shared-contact questions between the two are resolved as
+ *     "merged"
+ *   - the emptied record is deleted
  *
- * Neon's HTTP driver has no transactions, so the order matters: everything
- * that points at dropId is moved first; the delete runs last and the
- * database refuses it (RESTRICT) if anything was missed.
+ * Neon's HTTP driver has no transactions, so the order is chosen to make a
+ * failed merge safe to retry: everything pointing at dropId moves first
+ * (each step is idempotent), the kept row is updated next, and the delete
+ * runs last; the database refuses it (RESTRICT) if anything was missed.
  */
-export async function mergePeople(keepId: number, dropId: number) {
+export async function mergePeople(keepId: number, dropId: number, userId: string | null = null) {
   if (keepId === dropId) throw new PeopleAdminError('Choose two different people');
   const [keep] = await db.select().from(people).where(eq(people.id, keepId)).limit(1);
   const [drop] = await db.select().from(people).where(eq(people.id, dropId)).limit(1);
   if (!keep || !drop) throw new PeopleAdminError('Person not found', 404);
 
+  const dropWinsName = NAME_RANK.indexOf(drop.nameSource) < NAME_RANK.indexOf(keep.nameSource);
+  const winner = dropWinsName ? drop : keep;
+  const loser = dropWinsName ? keep : drop;
+
+  // Questions the two records had about each other, settled by this merge.
+  const mentions = (detail: string, p: Person) => detail.toLowerCase().includes(fullName(p).toLowerCase());
+  const openFlags = await db
+    .select()
+    .from(personReviewFlags)
+    .where(
+      and(
+        sql`${personReviewFlags.personId} IN (${keepId}, ${dropId})`,
+        isNull(personReviewFlags.resolvedAt)
+      )
+    );
+  const settled = openFlags
+    .filter((f) => DECIDED_BY_MERGE.includes(f.kind))
+    .filter((f) => (f.personId === keepId ? mentions(f.detail, drop) : mentions(f.detail, keep)))
+    .map((f) => f.id);
+
+  // 1. Move everything that points at dropId (each step safe to repeat)
+  const dropAliases = await db.select().from(personNameAliases).where(eq(personNameAliases.personId, dropId));
+  for (const a of dropAliases) {
+    await db
+      .insert(personNameAliases)
+      .values({ personId: keepId, alias: a.alias, source: a.source, firstSeen: a.firstSeen })
+      .onConflictDoNothing();
+  }
+  if (fullName(loser).toLowerCase() !== fullName(winner).toLowerCase()) await addAlias(keepId, fullName(loser));
+  await db.update(legacyPersonIds).set({ personId: keepId }).where(eq(legacyPersonIds.personId, dropId));
+  await db.update(users).set({ personId: keepId }).where(eq(users.personId, dropId));
+  await db.update(personReviewFlags).set({ personId: keepId }).where(eq(personReviewFlags.personId, dropId));
+  for (const flagId of settled) {
+    await db
+      .update(personReviewFlags)
+      .set({ resolvedAt: new Date(), resolvedByUserId: userId, resolution: 'Same person: merged' })
+      .where(and(eq(personReviewFlags.id, flagId), isNull(personReviewFlags.resolvedAt)));
+  }
+
+  // 2. Update the kept row
   const fill = <K extends keyof Person>(k: K) => (keep[k] == null || keep[k] === '' ? drop[k] : keep[k]);
+  const place = keep.address && keep.address.trim() ? keep : drop;
+  const notes =
+    drop.notes && !(keep.notes ?? '').includes(drop.notes)
+      ? [keep.notes, drop.notes].filter(Boolean).join('\n')
+      : keep.notes;
   await db
     .update(people)
     .set({
+      firstName: winner.firstName,
+      lastName: winner.lastName,
+      nameSource: winner.nameSource,
       email: fill('email'),
       phone: fill('phone'),
-      address: fill('address'),
-      latitude: fill('latitude'),
-      longitude: fill('longitude'),
-      geocodedAt: fill('geocodedAt'),
+      address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      geocodedAt: place.geocodedAt,
       chapterRegionId: fill('chapterRegionId'),
-      notes: [keep.notes, drop.notes].filter(Boolean).join('\n') || null,
+      notes,
       isVolunteer: keep.isVolunteer || drop.isVolunteer,
       isDriver: keep.isDriver || drop.isDriver,
       isVanDriver: keep.isVanDriver || drop.isVanDriver,
@@ -198,24 +274,10 @@ export async function mergePeople(keepId: number, dropId: number) {
     })
     .where(eq(people.id, keepId));
 
-  // The kept record's name (and its name_source) stays. Aliases: copy over
-  // (skipping ones keep already has), plus the other record's name.
-  const dropAliases = await db.select().from(personNameAliases).where(eq(personNameAliases.personId, dropId));
-  for (const a of dropAliases) {
-    await db
-      .insert(personNameAliases)
-      .values({ personId: keepId, alias: a.alias, source: a.source, firstSeen: a.firstSeen })
-      .onConflictDoNothing();
-  }
-  if (fullName(drop).toLowerCase() !== fullName(keep).toLowerCase()) await addAlias(keepId, fullName(drop));
-
-  await db.update(legacyPersonIds).set({ personId: keepId }).where(eq(legacyPersonIds.personId, dropId));
-  await db.update(users).set({ personId: keepId }).where(eq(users.personId, dropId));
-  await db.update(personReviewFlags).set({ personId: keepId }).where(eq(personReviewFlags.personId, dropId));
-
-  await db.delete(people).where(eq(people.id, dropId)); // aliases cascade
+  // 3. Delete the emptied record (its aliases cascade)
+  await db.delete(people).where(eq(people.id, dropId));
   const [after] = await db.select().from(people).where(eq(people.id, keepId)).limit(1);
-  return { kept: after, dropped: drop };
+  return { kept: after, dropped: drop, resolvedFlags: settled.length };
 }
 
 export async function resolveFlag(flagId: number, userId: string | null, resolution: string) {

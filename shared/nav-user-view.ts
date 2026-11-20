@@ -10,6 +10,7 @@ export const NAV_USER_VIEW_DEFAULT_HIDDEN_IDS = [
   'user-management',
   'historical-import',
   'organizations-merge',
+  'people-admin',
   'smart-search-admin',
   'generate-service-hours',
   'document-management',
