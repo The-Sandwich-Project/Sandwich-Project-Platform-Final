@@ -16,6 +16,7 @@
     "regions:seed": "tsx scripts/seed-regions.ts",
     "people:backfill": "tsx scripts/backfill-people.ts",
     "people:repair-flags": "tsx scripts/repair-people-flags.ts",
+    "volunteers:sync": "tsx scripts/sync-volunteer-sheet.ts",
     "db:compare": "tsx scripts/compare-db-schemas.ts",
     "db:sync-dev": "tsx scripts/sync-dev-schema.ts",
     "db:push": "drizzle-kit push",
