@@ -37,7 +37,7 @@ human once and gives them roles.
 
 ```mermaid
 erDiagram
-    people ||--o| users : "may have a login"
+    people ||--o{ users : "may have logins"
     people ||--o{ person_name_aliases : "known spellings"
     people ||--o| volunteer_profiles : "if is_volunteer"
     people ||--o| driver_profiles : "if is_driver"
@@ -46,10 +46,13 @@ erDiagram
     regions ||--o{ host_profiles : groups
     regions ||--o{ regions : "historic rolls up into"
     people ||--o{ legacy_person_ids : "old ids map here"
+    regions ||--o{ people : "chapter members (UGA)"
+    people ||--o{ person_review_flags : "needs a decision"
 
     people {
         int id PK
-        text name "canonical display name"
+        text first_name
+        text last_name "'' when unknown"
         text name_source "self_verified > self_reported > sheet > legacy_import"
         text email
         text phone
@@ -58,7 +61,9 @@ erDiagram
         bool is_driver
         bool is_van_driver
         bool is_host
+        bool is_team_member "has an app login, minus guests"
         bool is_active
+        int chapter_region_id FK "regions, kind = chapter"
     }
     users {
         varchar id PK
@@ -72,7 +77,7 @@ erDiagram
         int id PK
         int person_id FK
         text alias
-        text source "which sheet/table it came from"
+        text source "legacy table, volunteer_sheet, driver_sheet or manual"
         timestamp first_seen
     }
     host_profiles {
@@ -90,8 +95,8 @@ erDiagram
         int rolls_up_into_region_id FK
     }
     legacy_person_ids {
-        text source_table "volunteers | drivers | host_contacts | users"
-        text source_id
+        text source_table "users | volunteers | drivers | host_contacts | contacts"
+        text source_key "the old row's id, as text"
         int person_id FK
     }
 ```
@@ -100,14 +105,15 @@ erDiagram
 
 | Table | One row per | Notes |
 |---|---|---|
-| `people` | human TSP knows | Identity + role flags. Replaces the person data in `volunteers`, `drivers`, `host_contacts`, `contacts`, and the non-login parts of `users`. |
-| `users` (slimmed) | login account | Login only: email, password, role, permissions, `person_id`. Van approval, address, phone and willingness fields move off `users`. |
+| `people` | human TSP knows | Identity + role flags. Replaces the person data in `volunteers`, `drivers`, `host_contacts`, `contacts`, and the non-login parts of `users`. First and last name are stored separately (matching compares last names and first-name nicknames); the display name is the two joined. `email` is not unique: couples share one. `chapter_region_id` links chapter members (UGA students) to their chapter. **Built (step 4); empty until the step 5 backfill.** |
+| `users` (slimmed) | login account | Login only: email, password, role, permissions, `person_id`. Van approval, address, phone and willingness fields move off `users`. `person_id` exists (step 4) and is null until the backfill; several logins may point at one person (some staff have two). |
 | `person_name_aliases` | spelling of a person's name | Every spelling seen in any sheet or legacy table. Used for matching and for the name-verification worklist. |
 | `volunteer_profiles` | person with `is_volunteer` | Experience level, training completed, sheet-sync bookkeeping. |
 | `driver_profiles` | person with `is_driver` | Availability, cooler status, agreement signed, weekly driver. `driver_vehicles` hangs off this. Which legacy `drivers` columns carry over is decided by the data audit. |
 | `host_profiles` | person with `is_host` | Region, hours, weekly-active, former host. **Hosts are people**; their address lives on `people`. |
 | `regions` | place collections are logged under | What the legacy `hosts` table actually holds. Has a `kind`: `region` (an area hosts belong to, e.g. Alpharetta), `site` (a partner that collects on its own, e.g. Collective Learning) or `chapter` (e.g. UGA). Historic names stay as `historic` rows, optionally pointing at the current region they roll up into. The agreed list is in "Collection sites and regions" below. |
-| `legacy_person_ids` | old row id | Maps old ids (`volunteers` 12, `drivers` 5, `host_contacts` 3, ...) to the new person. Keeps the `"volunteer-12"` style strings in `event_requests.assigned_*_ids` resolving. |
+| `person_review_flags` | open question about a person | Things the backfill (or a later sheet sync) couldn't settle: contact conflict, shared contact, one record naming two people, abbreviated name, possible duplicate. `resolved_at` / `resolved_by_user_id` / `resolution` record the decision. The "needs a decision" list on the People admin page. |
+| `legacy_person_ids` | old row id | Maps old ids (`volunteers` 12, `drivers` 5, `host_contacts` 3, ...) to the new person: `source_table` + `source_key` (text, since `users` ids are strings), unique together. Keeps the `"volunteer-12"` style strings in `event_requests.assigned_*_ids` resolving. |
 | `recipients` | recipient organization | **Stays separate** from `people`. Recipients never volunteer, drive or host, and carry very different data. |
 
 ### Rules
@@ -236,6 +242,18 @@ both are valid, and the group's own data is what matters. Today they're logged
 with `host_name = 'Groups'` or under a region's `group_collections`; the
 `regions` work must not turn "Groups" into a region.
 
+### Roles (agreed 2026-11-19)
+
+| Flag | Set by the backfill from | Notes |
+|---|---|---|
+| `is_driver` | an active `drivers` row | Later owned by the driver roster sync |
+| `is_host` | a `host_contacts` row not marked former host | |
+| `is_volunteer` | an active `volunteers` row (not a host's machine copy), or a host marked "Also a volunteer" | Low until the volunteer sheet sync (step 7); the sheet is the real list |
+| `is_van_driver` | `van_approved` true in any record | |
+| `is_team_member` | an active app login | Everyone with a login is on the team, apart from the odd guest (switched off by hand). Informational only |
+
+Speaker is a retired role and isn't modeled. Committees aren't modeled.
+
 ### Sheet sources
 
 | Sheet | Sets | Status |
@@ -252,13 +270,14 @@ Each step is its own PR.
 1. Recipients directory: plain list as the default view; the detailed views move to a secondary tab. ✅
 2. ✅ Data audit (read-only, `npm run audit:people`): duplicates across the five people tables, conflicting phones/emails, abbreviated "First L." names, survey-driver names edited after entry, distinct region names in `sandwich_collections` (with counts and date ranges, plus a proposed historic roll-up), and a **column-usage report for `drivers`** (per column: how many rows have a value, and how recently one was set) so the `driver_profiles` columns are chosen from real data.
 3. `regions` table + historic roll-up mapping. The table is created by `migrations/20261120_create_regions.sql`; its rows come from `npm run regions:seed -- --dry-run` / `--apply` (`scripts/seed-regions.ts`, which holds the agreed list below and reports any collection-log name still without a row). Nothing in the app reads `regions` yet.
-4. `people`, `person_name_aliases`, `legacy_person_ids` (additive only).
-5. Backfill script with `--dry-run`. **A script, not a migration**: migrations run automatically on every boot, including production. Tested against a Neon branch of production.
-6. Volunteer directory reads from `people`; volunteer sheet sync.
-7. Host directory reads from `people` + `host_profiles`.
-8. Recipient sheet sync.
-9. Driver roster sync (after the driver coordinator's sheet is cleaned up).
-10. Retire the legacy people tables: read-only first, removed later.
+4. `people`, `person_name_aliases`, `legacy_person_ids`, `users.person_id` (additive only): `migrations/20261121_create_people.sql`. Empty until step 5.
+5. Backfill script with `--dry-run` (`npm run people:backfill -- --dry-run` / `--apply`, `scripts/backfill-people.ts`). One-shot; applies the matching rules above and the roles listed under "Roles" below; writes `person_review_flags` for anything it can't settle. **A script, not a migration**: migrations run automatically on every boot, including production. Tested against a Neon branch of production.
+6. **People admin page** (super admin): everyone in `people` with search and filters, a checkbox per role, the active switch, each person's full record (contact, other spellings, old records, chapter), and the "needs a decision" list from `person_review_flags` with buttons to resolve them.
+7. Volunteer directory reads from `people`; volunteer sheet sync.
+8. Host directory reads from `people` + `host_profiles`.
+9. Recipient sheet sync.
+10. Driver roster sync (after the driver coordinator's sheet is cleaned up).
+11. Retire the legacy people tables: read-only first, removed later.
 
 ---
 

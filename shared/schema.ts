@@ -51,6 +51,11 @@ export const migrations = pgTable('_migrations', {
 // the normalization we do in app code via shared/email-utils.ts.
 export const users = pgTable('users', {
   id: varchar('id').primaryKey().notNull(),
+  // The person this login belongs to (people/places rebuild). Null until the
+  // backfill links it. Several logins may point at one person.
+  personId: integer('person_id').references((): AnyPgColumn => people.id, {
+    onDelete: 'restrict',
+  }),
   email: varchar('email'),
   password: varchar('password'), // For custom auth system
   firstName: varchar('first_name'),
@@ -1192,10 +1197,203 @@ export const regionsRelations = relations(regions, ({ one, many }) => ({
     relationName: 'region_rollup',
   }),
   historicNames: many(regions, { relationName: 'region_rollup' }),
+  chapterMembers: many(people),
 }));
 
 export type Region = typeof regions.$inferSelect;
 export type InsertRegion = typeof regions.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// People (people/places rebuild, step 4). One row per human TSP knows; roles
+// are flags. See docs/data-model.md section 1, including its Rules (the flag
+// is the switch, people are deactivated not deleted, names only upgrade).
+// Nothing reads these tables yet; the backfill script fills them.
+// ---------------------------------------------------------------------------
+
+/** Where a person's canonical name came from, most trusted first. */
+export const NAME_SOURCES = ['self_verified', 'self_reported', 'sheet', 'legacy_import'] as const;
+export type NameSource = (typeof NAME_SOURCES)[number];
+
+export const people = pgTable(
+  'people',
+  {
+    id: serial('id').primaryKey(),
+    firstName: text('first_name').notNull(),
+    // Empty string when only one name is known
+    lastName: text('last_name').notNull().default(''),
+    nameSource: text('name_source').$type<NameSource>().notNull().default('legacy_import'),
+    email: text('email'),
+    phone: text('phone'),
+    address: text('address'),
+    latitude: decimal('latitude'),
+    longitude: decimal('longitude'),
+    geocodedAt: timestamp('geocoded_at'),
+    isVolunteer: boolean('is_volunteer').notNull().default(false),
+    isDriver: boolean('is_driver').notNull().default(false),
+    isVanDriver: boolean('is_van_driver').notNull().default(false),
+    isHost: boolean('is_host').notNull().default(false),
+    // On the TSP team. Everyone with an app login is, apart from the odd
+    // guest. Informational only: it doesn't change what anyone can do.
+    isTeamMember: boolean('is_team_member').notNull().default(false),
+    // Deactivate instead of deleting: past events and collections must
+    // always resolve to a person.
+    isActive: boolean('is_active').notNull().default(true),
+    // Chapter membership (e.g. UGA students). Must point at a regions row
+    // with kind = 'chapter'; enforced by the app, not the database.
+    chapterRegionId: integer('chapter_region_id').references(() => regions.id, {
+      onDelete: 'set null',
+    }),
+    notes: text('notes'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    nameSourceCheck: check(
+      'people_name_source_check',
+      sql`${table.nameSource} IN ('self_verified', 'self_reported', 'sheet', 'legacy_import')`
+    ),
+    // Matching looks people up by email and by name; neither is unique
+    // (couples share emails, families share last names).
+    emailLowerIdx: index('people_email_lower_idx').on(sql`lower(${table.email})`),
+    nameLowerIdx: index('people_name_lower_idx').on(
+      sql`lower(${table.lastName})`,
+      sql`lower(${table.firstName})`
+    ),
+  })
+);
+
+/** Where a spelling was seen: a legacy table, a sheet, or typed by hand. */
+export const ALIAS_SOURCES = [
+  'users',
+  'volunteers',
+  'drivers',
+  'host_contacts',
+  'contacts',
+  'volunteer_sheet',
+  'driver_sheet',
+  'manual',
+] as const;
+export type AliasSource = (typeof ALIAS_SOURCES)[number];
+
+export const personNameAliases = pgTable(
+  'person_name_aliases',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, { onDelete: 'cascade' }),
+    alias: text('alias').notNull(),
+    source: text('source').$type<AliasSource>().notNull(),
+    firstSeen: timestamp('first_seen').defaultNow().notNull(),
+  },
+  (table) => ({
+    personAliasUnique: uniqueIndex('person_name_aliases_person_alias_unique').on(
+      table.personId,
+      sql`lower(${table.alias})`
+    ),
+    aliasLowerIdx: index('person_name_aliases_alias_lower_idx').on(sql`lower(${table.alias})`),
+    sourceCheck: check(
+      'person_name_aliases_source_check',
+      sql`${table.source} IN ('users', 'volunteers', 'drivers', 'host_contacts', 'contacts', 'volunteer_sheet', 'driver_sheet', 'manual')`
+    ),
+  })
+);
+
+/** Legacy tables whose rows map to a person. */
+export const LEGACY_PERSON_TABLES = ['users', 'volunteers', 'drivers', 'host_contacts', 'contacts'] as const;
+export type LegacyPersonTable = (typeof LEGACY_PERSON_TABLES)[number];
+
+// Maps an old row (e.g. drivers #5) to its person, so the "driver-5" style
+// strings in event_requests.assigned_*_ids keep resolving after the legacy
+// tables are retired. source_key is text because users ids are varchar.
+export const legacyPersonIds = pgTable(
+  'legacy_person_ids',
+  {
+    id: serial('id').primaryKey(),
+    sourceTable: text('source_table').$type<LegacyPersonTable>().notNull(),
+    sourceKey: text('source_key').notNull(),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    sourceUnique: uniqueIndex('legacy_person_ids_source_unique').on(table.sourceTable, table.sourceKey),
+    personIdx: index('legacy_person_ids_person_idx').on(table.personId),
+    sourceTableCheck: check(
+      'legacy_person_ids_source_table_check',
+      sql`${table.sourceTable} IN ('users', 'volunteers', 'drivers', 'host_contacts', 'contacts')`
+    ),
+  })
+);
+
+/** Things the backfill (or a later sheet sync) couldn't settle on its own. */
+export const PERSON_REVIEW_KINDS = [
+  'contact_conflict', // sources disagree on phone or email; one was picked
+  'shared_contact', // shares an email/phone with someone of a different name
+  'multiple_people', // one old record names two people ("Stacey & Jack")
+  'abbreviated_name', // only "Sarah P." or a single name is known
+  'possible_duplicate', // close name to another person; kept separate
+] as const;
+export type PersonReviewKind = (typeof PERSON_REVIEW_KINDS)[number];
+
+// The "needs a decision" list on the People admin page.
+export const personReviewFlags = pgTable(
+  'person_review_flags',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<PersonReviewKind>().notNull(),
+    detail: text('detail').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at'),
+    resolvedByUserId: varchar('resolved_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    resolution: text('resolution'),
+  },
+  (table) => ({
+    openIdx: index('person_review_flags_open_idx').on(table.personId, table.resolvedAt),
+    kindCheck: check(
+      'person_review_flags_kind_check',
+      sql`${table.kind} IN ('contact_conflict', 'shared_contact', 'multiple_people', 'abbreviated_name', 'possible_duplicate')`
+    ),
+  })
+);
+
+export const personReviewFlagsRelations = relations(personReviewFlags, ({ one }) => ({
+  person: one(people, { fields: [personReviewFlags.personId], references: [people.id] }),
+  resolvedBy: one(users, { fields: [personReviewFlags.resolvedByUserId], references: [users.id] }),
+}));
+
+export type PersonReviewFlag = typeof personReviewFlags.$inferSelect;
+
+export const peopleRelations = relations(people, ({ one, many }) => ({
+  chapter: one(regions, { fields: [people.chapterRegionId], references: [regions.id] }),
+  logins: many(users),
+  nameAliases: many(personNameAliases),
+  legacyIds: many(legacyPersonIds),
+  reviewFlags: many(personReviewFlags),
+}));
+
+export const usersRelations = relations(users, ({ one }) => ({
+  person: one(people, { fields: [users.personId], references: [people.id] }),
+}));
+
+export const personNameAliasesRelations = relations(personNameAliases, ({ one }) => ({
+  person: one(people, { fields: [personNameAliases.personId], references: [people.id] }),
+}));
+
+export const legacyPersonIdsRelations = relations(legacyPersonIds, ({ one }) => ({
+  person: one(people, { fields: [legacyPersonIds.personId], references: [people.id] }),
+}));
+
+export type Person = typeof people.$inferSelect;
+export type InsertPerson = typeof people.$inferInsert;
+export type PersonNameAlias = typeof personNameAliases.$inferSelect;
+export type LegacyPersonId = typeof legacyPersonIds.$inferSelect;
 
 export const hosts = pgTable('hosts', {
   id: serial('id').primaryKey(),
