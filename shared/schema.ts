@@ -1236,6 +1236,12 @@ export const people = pgTable(
     // On the TSP team. Everyone with an app login is, apart from the odd
     // guest. Informational only: it doesn't change what anyone can do.
     isTeamMember: boolean('is_team_member').notNull().default(false),
+    // On TSP's board. Set by hand on the People page.
+    isBoardMember: boolean('is_board_member').notNull().default(false),
+    isAdvisoryBoardMember: boolean('is_advisory_board_member').notNull().default(false),
+    // On the event intake team (works event requests). Informational only;
+    // what someone can do in the app is still set by their login's permissions.
+    isIntakeTeam: boolean('is_intake_team').notNull().default(false),
     // Deactivate instead of deleting: past events and collections must
     // always resolve to a person.
     isActive: boolean('is_active').notNull().default(true),

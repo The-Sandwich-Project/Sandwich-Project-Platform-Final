@@ -46,15 +46,20 @@ async function snapshot(url: string): Promise<Snapshot> {
     )) {
       items.set(`table ${r.table_name}`, '');
     }
+    // Type (with length), NOT NULL and default: a publish copies all three.
     for (const r of await q(
-      `SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name IN (SELECT table_name FROM information_schema.tables
-                              WHERE table_schema = 'public' AND table_type = 'BASE TABLE')`
+      `SELECT c.relname AS table_name, a.attname AS column_name,
+              format_type(a.atttypid, a.atttypmod) AS type, a.attnotnull AS not_null,
+              pg_get_expr(d.adbin, d.adrelid) AS def
+         FROM pg_attribute a
+         JOIN pg_class c ON c.oid = a.attrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+        WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped`
     )) {
       items.set(
         `column ${r.table_name}.${r.column_name}`,
-        `${r.data_type}${r.is_nullable === 'NO' ? ', not null' : ''}`
+        `${r.type}${r.not_null ? ', not null' : ''}${r.def != null ? `, default ${r.def}` : ''}`
       );
     }
     for (const r of await q(
@@ -96,8 +101,20 @@ async function main() {
     const lostTables = new Set(lost.filter((k) => k.startsWith('table ')).map(tableOf));
     return lost.filter((k) => k.startsWith('table ') || !lostTables.has(tableOf(k))).sort();
   };
+  // Postgres 16 (dev) and 17 (production) print some rules with the type
+  // casts and brackets in different places. Ignore those when comparing rules,
+  // so the same rule written two ways doesn't show up as a difference.
+  const sameRule = (a: string, b: string) => {
+    const norm = (d: string) => d.replace(/::[a-z ]+(\[\])?/gi, '').replace(/[()\s]/g, '');
+    return norm(a) === norm(b);
+  };
   const differs = [...prod.items.keys()]
-    .filter((k) => dev.items.has(k) && prod.items.get(k) !== dev.items.get(k))
+    .filter((k) => {
+      if (!dev.items.has(k)) return false;
+      const a = prod.items.get(k)!;
+      const b = dev.items.get(k)!;
+      return a !== b && !(k.startsWith('rule ') && sameRule(a, b));
+    })
     .sort();
 
   const danger = missingFrom(prod, dev);
@@ -122,7 +139,10 @@ async function main() {
     console.log('NOT SAFE TO PUBLISH: production would lose the items listed at the top.\nFix dev with: npm run db:sync-dev -- --dry-run   (then --apply)');
     process.exitCode = 2;
   } else if (differs.length) {
-    console.log('Check the differences above before publishing.');
+    console.log(
+      'NOT READY: a publish would change production to dev\'s version of the items above.\n' +
+        'Run: npm run db:sync-dev -- --apply   then check again.'
+    );
   } else {
     console.log('Safe to publish: dev has everything production has.');
   }
