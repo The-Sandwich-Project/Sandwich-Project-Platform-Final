@@ -96,6 +96,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   'user-management': UserCog,
   'historical-import': FileSpreadsheet,
   'organizations-merge': GitMerge,
+  'people-admin': UserCog,
   'document-management': FileText,
   'smart-search-admin': Sparkles,
   help: HelpCircle,

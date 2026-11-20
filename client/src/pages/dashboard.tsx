@@ -172,6 +172,7 @@ const AdminSettings = lazyWithRetry(() => import('@/pages/admin-settings'));
 const DesignSystemShowcase = lazyWithRetry(() => import('@/pages/design-system-showcase'));
 const SmartSearchAdmin = lazyWithRetry(() => import('@/pages/smart-search-admin'));
 const OrganizationsMerge = lazyWithRetry(() => import('@/pages/admin/organizations-merge'));
+const PeopleAdmin = lazyWithRetry(() => import('@/pages/admin/people-admin'));
 const GenerateServiceHours = lazyWithRetry(() => import('@/pages/generate-service-hours'));
 const TSPNetwork = lazyWithRetry(() => import('@/pages/tsp-network'));
 const EventImpactReports = lazyWithRetry(() => import('@/pages/event-impact-reports'));
@@ -985,6 +986,8 @@ export default function Dashboard({
         return <SmartSearchAdmin />;
       case 'organizations-merge':
         return <OrganizationsMerge />;
+      case 'people-admin':
+        return <PeopleAdmin />;
       case 'generate-service-hours':
         return <GenerateServiceHours />;
       default:

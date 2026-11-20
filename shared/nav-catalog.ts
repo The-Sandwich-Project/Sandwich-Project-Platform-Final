@@ -504,6 +504,17 @@ export const NAV_CATALOG: NavCatalogItem[] = [
     group: 'admin',
   },
   {
+    // Super admins and admins (the page and its API check the role).
+    // MANAGE_DIRECTORY: by default only those two roles hold it, so the menu
+    // item doesn't show for roles (e.g. reviewer) the page would turn away.
+    id: 'people-admin',
+    label: 'People',
+    href: 'people-admin',
+    permissionKey: PERMISSIONS.MANAGE_DIRECTORY,
+    group: 'admin',
+    permissionLabel: 'Manage Directory',
+  },
+  {
     id: 'organizations-merge',
     label: 'Merge Organizations',
     href: 'organizations-merge',

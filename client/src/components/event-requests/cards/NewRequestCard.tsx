@@ -25,7 +25,6 @@ import {
   Users,
   MapPin,
   UserPlus,
-  Building,
   AlertTriangle,
   CalendarCheck,
   Edit2,
@@ -101,7 +100,6 @@ interface NewRequestCardProps {
   onAddNextAction?: () => void;
   onEditNextAction?: () => void;
   onCompleteNextAction?: () => void;
-  onToggleCorporatePriority?: (isCorporatePriority: boolean) => void;
   canEdit?: boolean;
   canDelete?: boolean;
   // Inline editing props
@@ -512,25 +510,6 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 </TooltipContent>
               </Tooltip>
             )}
-            {/* Corporate Priority Badge - Display only (toggle via edit form) */}
-            {(request as any).isCorporatePriority && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    className="px-2.5 py-1 text-sm font-medium shadow-sm inline-flex items-center whitespace-nowrap bg-gradient-to-br from-[#B8860B] to-[#DAA520] text-white"
-                  >
-                    <Building className="w-3 h-3 mr-1" />
-                    Corporate
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <div className="space-y-1">
-                    <p className="font-medium">This is a Corporate Event</p>
-                    <p className="text-sm">Requires immediate contact and core team member attendance.</p>
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            )}
             {/* Traffic conflict (e.g. World Cup matches). Prefer the scheduled
                 date once set so a rescheduled event doesn't keep a stale badge
                 from its original desiredEventDate. */}
@@ -892,7 +871,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
   onAddNextAction,
   onEditNextAction,
   onCompleteNextAction,
-  onToggleCorporatePriority,
   canEdit = true,
   canDelete = true,
   // Inline editing props

@@ -1211,7 +1211,8 @@ export type InsertRegion = typeof regions.$inferInsert;
 // ---------------------------------------------------------------------------
 
 /** Where a person's canonical name came from, most trusted first. */
-export const NAME_SOURCES = ['self_verified', 'self_reported', 'sheet', 'legacy_import'] as const;
+// admin_entered: typed or corrected by an admin on the People page.
+export const NAME_SOURCES = ['self_verified', 'self_reported', 'admin_entered', 'sheet', 'legacy_import'] as const;
 export type NameSource = (typeof NAME_SOURCES)[number];
 
 export const people = pgTable(
@@ -1250,7 +1251,7 @@ export const people = pgTable(
   (table) => ({
     nameSourceCheck: check(
       'people_name_source_check',
-      sql`${table.nameSource} IN ('self_verified', 'self_reported', 'sheet', 'legacy_import')`
+      sql`${table.nameSource} IN ('self_verified', 'self_reported', 'admin_entered', 'sheet', 'legacy_import')`
     ),
     // Matching looks people up by email and by name; neither is unique
     // (couples share emails, families share last names).
@@ -2929,7 +2930,8 @@ export const eventRequests = pgTable(
     mlkDayMarkedAt: timestamp('mlk_day_marked_at'), // When it was marked as MLK Day event
     mlkDayMarkedBy: varchar('mlk_day_marked_by'), // User ID who marked it as MLK Day event
 
-    // Corporate priority tracking - manually assigned, triggers strict follow-up protocol
+    // RETIRED: corporate priority was removed from the app. These columns (through
+    // corporateFollowUpProtocol) are kept for history only; nothing reads or writes them.
     isCorporatePriority: boolean('is_corporate_priority').default(false), // Whether this is a corporate priority event requiring immediate attention
     corporatePriorityMarkedAt: timestamp('corporate_priority_marked_at'), // When it was marked as corporate priority
     corporatePriorityMarkedBy: varchar('corporate_priority_marked_by'), // User ID who marked it as corporate priority

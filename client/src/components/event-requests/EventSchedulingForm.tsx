@@ -219,7 +219,6 @@ function buildFormDataFromEventRequest(
     toolkitSent: eventRequest?.toolkitSent || false,
     toolkitSentDate: eventRequest?.toolkitSentDate ? formatDateForInput(eventRequest.toolkitSentDate) : '',
     toolkitStatus: eventRequest?.toolkitStatus || 'not_sent',
-    isCorporatePriority: (eventRequest as any)?.isCorporatePriority || false,
     standbyExpectedDate: (eventRequest as any)?.standbyExpectedDate ? formatDateForInput((eventRequest as any).standbyExpectedDate) : '',
     socialMediaPostRequested: (eventRequest as any)?.socialMediaPostRequested || false,
     socialMediaPostRequestedDate: (eventRequest as any)?.socialMediaPostRequestedDate ? formatDateForInput((eventRequest as any).socialMediaPostRequestedDate) : '',
@@ -317,7 +316,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     backupContactFirstName: '', backupContactLastName: '', backupContactEmail: '',
     backupContactPhone: '', backupContactRole: '', previouslyHosted: 'i_dont_know',
     deliveryTimeWindow: '',
-    deliveryParkingAccess: '', isCorporatePriority: false, standbyExpectedDate: '',
+    deliveryParkingAccess: '', standbyExpectedDate: '',
     cancelledReason: '', cancelledNotes: '', declinedReason: '', declinedNotes: '',
     dateFlexible: null as boolean | null,
   });
@@ -393,15 +392,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   // Create mode has no record to load, so it is never "loading".
   const isFormLoading = !!eventRequest && !formInitialized;
 
-
-  const canRemoveCorporatePriority = useMemo(() => {
-    const allowedEmails = [
-      'admin@sandwich.project', 'katielong2316@gmail.com',
-      'katie@thesandwichproject.org', 'christine@thesandwichproject.org',
-    ];
-    const userEmail = currentUser?.email?.toLowerCase();
-    return userEmail && allowedEmails.includes(userEmail);
-  }, [currentUser?.email]);
 
   // ── Date Formatting ────────────────────────────────────────────────
 
@@ -1476,7 +1466,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 formData={formData as EventFormData}
                 setFormData={setFormData}
                 eventRequest={eventRequest}
-                canRemoveCorporatePriority={!!canRemoveCorporatePriority}
                 onStatusChange={handleStatusChange}
               />
 

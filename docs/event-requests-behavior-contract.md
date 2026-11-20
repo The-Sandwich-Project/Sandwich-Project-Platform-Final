@@ -99,8 +99,6 @@ needsDriver => status=scheduled&needsDriver=true
 
 needsVan => status=scheduled&needsVan=true
 
-corporatePriority => status=new,in_process,scheduled&corporatePriority=true 
-
 7) Query key/cache contract (pre-filled)
 Canonical key: ['/api/event-requests/list', filterParams, quickFilter, 'v3']. 
 
@@ -136,8 +134,6 @@ reschedule event (+ undo)
 assign recipients
 
 assign TSP contact
-
-toggle corporate priority 
 
 Notable behavior details
 Update includes optimistic version check via _expectedVersion unless _skipVersionCheck. 

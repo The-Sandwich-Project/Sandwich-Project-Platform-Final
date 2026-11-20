@@ -25,7 +25,6 @@ import {
   Clock,
   Package,
   MapPin,
-  Building,
   Building2,
   Edit2,
   Save,
@@ -1227,15 +1226,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             </Badge>
 
             {request.isMlkDayEvent && <MlkDayBadge />}
-
-            {/* Corporate Badge */}
-            {(request as any).isCorporatePriority && (
-              <Badge className="bg-gradient-to-br from-[#B8860B] to-[#DAA520] text-white text-xs sm:text-sm font-medium flex items-center gap-1">
-                <Building className="w-3 h-3" />
-                <span className="hidden sm:inline">Corporate</span>
-                <span className="sm:hidden">Corp</span>
-              </Badge>
-            )}
 
             <RefrigerationWarningBadge
               sandwichTypes={request.sandwichTypes}

@@ -90,6 +90,7 @@ import { aiAnalystRouter } from './ai-analyst';
 import { createAlertRequestsRouter, createAIAlertRouter } from './alert-requests';
 import { createAppSettingsRouter } from './app-settings';
 import { createCollectiveLearningAutoLogRouter } from './collective-learning-auto-log';
+import { createPeopleRouter } from './people';
 import { createDbBackupRouter } from './db-backup';
 import { createNavUserViewRouter } from './nav-user-view';
 import { createCollectionFavoritesRouter } from './collection-favorites';
@@ -1091,6 +1092,11 @@ export function createMainRoutes(deps: RouterDependencies) {
     '/api/collective-learning-auto-log',
     createErrorHandler('collective-learning-auto-log')
   );
+
+  // People admin (people/places rebuild): super admins and admins only.
+  // Not /api/people: that prefix is the app-wide search (people-search.ts).
+  router.use('/api/people-admin', deps.isAuthenticated, ...createStandardMiddleware(), createPeopleRouter());
+  router.use('/api/people-admin', createErrorHandler('people-admin'));
 
   // Admin-only manual trigger for the weekly Google Drive DB backup
   router.use(
