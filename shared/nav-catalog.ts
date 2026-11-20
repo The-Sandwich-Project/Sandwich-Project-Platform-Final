@@ -504,6 +504,15 @@ export const NAV_CATALOG: NavCatalogItem[] = [
     group: 'admin',
   },
   {
+    // Super admins and admins (the page and its API check the role).
+    id: 'people-admin',
+    label: 'People',
+    href: 'people-admin',
+    permissionKey: PERMISSIONS.ADMIN_PANEL_ACCESS,
+    group: 'admin',
+    permissionLabel: 'Admin Panel',
+  },
+  {
     id: 'organizations-merge',
     label: 'Merge Organizations',
     href: 'organizations-merge',
