@@ -1,4 +1,7 @@
 import {
+  draftFromFields,
+  resolveDraft,
+  parseAmountText,
   estimateStateFromFields,
   formatEstimate,
   normalizeEstimate,
@@ -42,7 +45,7 @@ describe('the agreed cases (what you enter -> what the card shows)', () => {
 
   it('Deli 150 + PBJ 50, no total -> total worked out', () => {
     const { f, text } = show({ sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 50 }] });
-    expect(text).toBe('200 (150 Deli, 50 PBJ)');
+    expect(text).toBe('200 (150 Deli, 50 PB&J)');
     expect(f.estimatedSandwichCount).toBe(200);
   });
 
@@ -53,7 +56,7 @@ describe('the agreed cases (what you enter -> what the card shows)', () => {
         { type: 'pbj', min: 200, max: 250 },
       ],
     });
-    expect(text).toBe('300–400 (100–150 Deli, 200–250 PBJ)');
+    expect(text).toBe('300–400 (100–150 Deli, 200–250 PB&J)');
     expect(f).toMatchObject({ estimatedSandwichCountMin: 300, estimatedSandwichCountMax: 400, estimatedSandwichCount: 350, estimatedSandwichRangeType: null });
   });
 
@@ -63,7 +66,7 @@ describe('the agreed cases (what you enter -> what the card shows)', () => {
       estimatedSandwichCountMax: 400,
       sandwichTypes: [{ type: 'deli' }, { type: 'pbj' }],
     });
-    expect(text).toBe('300–400, Deli & PBJ (split TBD)');
+    expect(text).toBe('300–400, Deli & PB&J (split TBD)');
     expect(f.sandwichTypes).toEqual([
       { type: 'deli', quantity: 0 },
       { type: 'pbj', quantity: 0 },
@@ -135,25 +138,25 @@ describe('rules', () => {
 describe('screens that send only part of the estimate', () => {
   it('a count-only edit on a one-type event keeps the type (spreadsheet / intake)', () => {
     const existing = { ...NONE, estimatedSandwichCount: 200, sandwichTypes: [{ type: 'pbj', quantity: 200 }] };
-    expect(formatEstimate(resolveEstimatePatch(existing, { estimatedSandwichCount: 300 }))).toBe('300 PBJ');
+    expect(formatEstimate(resolveEstimatePatch(existing, { estimatedSandwichCount: 300 }))).toBe('300 PB&J');
   });
 
   it('a count-only edit on a split event keeps the types, drops amounts that no longer add up', () => {
     const existing = { ...NONE, estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 50 }] };
-    expect(formatEstimate(resolveEstimatePatch(existing, { estimatedSandwichCount: 300 }))).toBe('300, Deli & PBJ (split TBD)');
+    expect(formatEstimate(resolveEstimatePatch(existing, { estimatedSandwichCount: 300 }))).toBe('300, Deli & PB&J (split TBD)');
   });
 
   it('a types-only edit with amounts sets the total; without amounts keeps it', () => {
     const existing = { ...NONE, estimatedSandwichCount: 200 };
     expect(formatEstimate(resolveEstimatePatch(existing, { sandwichTypes: [{ type: 'deli', quantity: 120 }, { type: 'pbj', quantity: 120 }] }))).toBe(
-      '240 (120 Deli, 120 PBJ)'
+      '240 (120 Deli, 120 PB&J)'
     );
-    expect(formatEstimate(resolveEstimatePatch(existing, { sandwichTypes: [{ type: 'deli' }, { type: 'pbj' }] }))).toBe('200, Deli & PBJ (split TBD)');
+    expect(formatEstimate(resolveEstimatePatch(existing, { sandwichTypes: [{ type: 'deli' }, { type: 'pbj' }] }))).toBe('200, Deli & PB&J (split TBD)');
   });
 
   it('a range-type-only edit names the one line', () => {
     const existing = { ...NONE, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300 };
-    expect(formatEstimate(resolveEstimatePatch(existing, { estimatedSandwichRangeType: 'pbj' }))).toBe('200–300 PBJ');
+    expect(formatEstimate(resolveEstimatePatch(existing, { estimatedSandwichRangeType: 'pbj' }))).toBe('200–300 PB&J');
   });
 
   it('a count-only save clears a stale range (intake "500" over a 490-506 range)', () => {
@@ -181,7 +184,7 @@ describe('audit bugs the server now prevents', () => {
     };
     const f = resolveEstimatePatch(existing, { estimatedSandwichCountMin: 400, estimatedSandwichCountMax: 600 });
     expect(f).toMatchObject({ estimatedSandwichCount: 500, estimatedSandwichCountMin: 400, estimatedSandwichCountMax: 600, estimatedSandwichRangeType: 'pbj' });
-    expect(formatEstimate(f)).toBe('400–600 PBJ');
+    expect(formatEstimate(f)).toBe('400–600 PB&J');
   });
 
   it('B9: a one-sided range becomes that number instead of an orphan', () => {
@@ -383,5 +386,69 @@ describe('Copilot review round 5: an untyped remainder', () => {
     // Read back and saved again unchanged: Deli is NOT given the whole total.
     const again = resolveEstimatePatch(first, { estimatedSandwichCount: 100 });
     expect(again.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'unknown', quantity: 0 }]);
+  });
+});
+
+describe('estimate editor draft', () => {
+  it('reads "300", "200-300", "200 to 300" and blank', () => {
+    expect(parseAmountText('300').amount).toEqual({ min: 300, max: 300 });
+    expect(parseAmountText('200-300').amount).toEqual({ min: 200, max: 300 });
+    expect(parseAmountText('200 to 300').amount).toEqual({ min: 200, max: 300 });
+    expect(parseAmountText('1,000').amount).toEqual({ min: 1000, max: 1000 });
+    expect(parseAmountText('').amount).toBeNull();
+    expect(parseAmountText('lots').error).toMatch(/isn't a number/);
+  });
+
+  it('all the shapes the team uses save as expected', () => {
+    // exact + one type
+    expect(resolveDraft({ total: '300', lines: [{ type: 'pbj', amount: '' }] }).preview).toBe('300 PB&J');
+    // range of one type
+    expect(resolveDraft({ total: '200-300', lines: [{ type: 'deli_turkey', amount: '' }] }).fields)
+      .toMatchObject({ estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, estimatedSandwichRangeType: 'deli_turkey' });
+    // per-type ranges, no total
+    const perType = resolveDraft({ total: '', lines: [{ type: 'deli', amount: '100-150' }, { type: 'pbj', amount: '200-250' }] });
+    expect(perType.preview).toBe('300–400 (100–150 Deli, 200–250 PB&J)');
+    expect(perType.notes[0]).toMatch(/worked out/);
+    // a total range with the split unknown
+    expect(resolveDraft({ total: '300-400', lines: [{ type: 'deli', amount: '' }, { type: 'pbj', amount: '' }] }).preview)
+      .toBe('300–400, Deli & PB&J (split TBD)');
+    // a number only, group hasn't decided
+    expect(resolveDraft({ total: '250', lines: [] }).preview).toBe('250, type TBD');
+    // partial split
+    expect(resolveDraft({ total: '300', lines: [{ type: 'deli', amount: '150' }, { type: 'pbj', amount: '' }] }).preview)
+      .toBe('300 (150 Deli, PB&J TBD)');
+  });
+
+  it('flags unreadable text and a total the types overrule', () => {
+    expect(resolveDraft({ total: 'abc', lines: [] }).errors).toHaveLength(1);
+    const over = resolveDraft({ total: '100', lines: [{ type: 'deli', amount: '150' }, { type: 'pbj', amount: '50' }] });
+    expect(over.fields.estimatedSandwichCount).toBe(200);
+    expect(over.notes[0]).toMatch(/add up to 200/);
+  });
+
+  it('round-trips: stored fields -> draft -> the same fields', () => {
+    const cases = [
+      { estimatedSandwichCount: 300, sandwichTypes: [{ type: 'pbj', quantity: 300 }] },
+      { estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, estimatedSandwichRangeType: 'deli_turkey' },
+      { estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 0 }] },
+      { estimatedSandwichCount: 350, estimatedSandwichCountMin: 300, estimatedSandwichCountMax: 400,
+        sandwichTypes: [{ type: 'deli', quantity: 125, min: 100, max: 150 }, { type: 'pbj', quantity: 225, min: 200, max: 250 }] },
+      { estimatedSandwichCount: 200 },
+    ];
+    for (const f of cases) {
+      const normalized = resolveEstimatePatch(null, f);
+      expect(resolveDraft(draftFromFields(f)).fields).toEqual(normalized);
+    }
+  });
+});
+
+describe('formatEstimate with unknown rows', () => {
+  it('shows an untyped amount and an untyped rest', () => {
+    expect(formatEstimate({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 50 }] }))
+      .toBe('200 (150 Deli, 50 type TBD)');
+    expect(formatEstimate({ estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 0 }] }))
+      .toBe('300 (150 Deli, rest type TBD)');
+    expect(formatEstimate({ estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'unknown', quantity: 0 }] }))
+      .toBe('300 (Deli, rest type TBD)');
   });
 });
