@@ -274,12 +274,15 @@ Each step is its own PR.
 3. `regions` table + historic roll-up mapping. The table is created by `migrations/20261120_create_regions.sql`; its rows come from `npm run regions:seed -- --dry-run` / `--apply` (`scripts/seed-regions.ts`, which holds the agreed list below and reports any collection-log name still without a row). Nothing in the app reads `regions` yet.
 4. `people`, `person_name_aliases`, `legacy_person_ids`, `users.person_id` (additive only): `migrations/20261121_create_people.sql`. Empty until step 5.
 5. Backfill script with `--dry-run` (`npm run people:backfill -- --dry-run` / `--apply`, `scripts/backfill-people.ts`). One-shot; applies the matching rules above and the roles listed under "Roles" below; writes `person_review_flags` for anything it can't settle. **A script, not a migration**: migrations run automatically on every boot, including production. Tested against a Neon branch of production.
-6. **People admin page** (super admin): everyone in `people` with search and filters, a checkbox per role, the active switch, each person's full record (contact, other spellings, old records, chapter), and the "needs a decision" list from `person_review_flags` with buttons to resolve them.
+6. ✅ **People admin page** (super admin and admin): everyone in `people` with search and filters, a checkbox per role, the active switch, each person's full record (contact, other spellings, old records, chapter), and the "needs a decision" list from `person_review_flags` with buttons to resolve them.
 7. Volunteer directory reads from `people`; volunteer sheet sync.
 8. Host directory reads from `people` + `host_profiles`.
 9. Recipient sheet sync.
 10. Driver roster sync (after the driver coordinator's sheet is cleaned up).
 11. Retire the legacy people tables: read-only first, removed later.
+12. Move the database off Replit's built-in database to our own Neon account. Replit bills by how long the database is active (about $60/month); Neon directly should cost much less. It also ends the publish screen's schema syncing (see below), because dev and production become two Neon branches that our migrations keep in step. To plan: copy production into the new Neon project and check row counts table by table; point `DATABASE_URL` (production) and `DEV_DATABASE_URL` (a Neon dev branch) at it, keeping `server/db-url.ts` the only place that decides; a short write freeze during the switch; keep the old database untouched for a few weeks as a fallback.
+
+**Before every publish (until step 12):** run `npm run db:compare`. Replit's publish screen makes production's structure match the dev database, deleting anything dev lacks. If it says NOT SAFE or NOT READY, run `npm run db:sync-dev -- --apply` first. This removed `person_review_flags` and `people.is_team_member` from production on 2026-11-19, and `recurring_collection_overrides` in October.
 
 ---
 
