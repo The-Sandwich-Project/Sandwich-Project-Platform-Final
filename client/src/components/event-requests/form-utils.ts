@@ -233,9 +233,6 @@ export function buildEventDataForServer(
     }),
     toolkitSentDate: serializeDateToISO(formData.toolkitSentDate),
 
-    // Corporate priority
-    isCorporatePriority: formData.isCorporatePriority || false,
-
     // Standby
     standbyExpectedDate: (() => {
       // Respect an EXPLICIT null/empty override (the "No reminder" choice in

@@ -22,8 +22,8 @@ interface EventRequestContextType {
   eventRequests: EventRequest[];
   isLoading: boolean;
   isPlaceholderData?: boolean;
-  quickFilter: 'week' | 'today' | 'needsDriver' | 'needsVan' | 'corporatePriority' | null;
-  setQuickFilter: (filter: 'week' | 'today' | 'needsDriver' | 'needsVan' | 'corporatePriority' | null) => void;
+  quickFilter: 'week' | 'today' | 'needsDriver' | 'needsVan' | null;
+  setQuickFilter: (filter: 'week' | 'today' | 'needsDriver' | 'needsVan' | null) => void;
   weekScope: EventRequestsWeekScope;
   setWeekScope: (scope: EventRequestsWeekScope) => void;
 
@@ -134,7 +134,7 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
   }, [user?.role, user?.id]);
 
   // Quick filter state for special date ranges (This Week, Today, etc.)
-  const [quickFilter, setQuickFilter] = useState<'week' | 'today' | 'needsDriver' | 'needsVan' | 'corporatePriority' | null>(null);
+  const [quickFilter, setQuickFilter] = useState<'week' | 'today' | 'needsDriver' | 'needsVan' | null>(null);
   const [weekScope, setWeekScope] = useState<EventRequestsWeekScope>(null);
 
   // View state - use role-based defaults if no initialTab provided
@@ -526,7 +526,7 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
         };
         sessionStorage.removeItem('eventRequests.pendingFilter');
         const validTabs = ['all', 'new', 'in_process', 'scheduled', 'rescheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments'];
-        const validFilters = ['week', 'today', 'needsDriver', 'needsVan', 'corporatePriority'];
+        const validFilters = ['week', 'today', 'needsDriver', 'needsVan'];
         const validWeekScopes: EventRequestsWeekScope[] = ['current', 'next', '+2', '+3'];
         if (parsed.tab && validTabs.includes(parsed.tab)) setActiveTab(parsed.tab);
         if (parsed.weekScope && validWeekScopes.includes(parsed.weekScope)) {

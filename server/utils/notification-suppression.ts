@@ -9,7 +9,7 @@
  *   - Comments on their events
  *
  * All other event alerts (follow-up reminders, escalations, weekly digests,
- * approaching-event warnings, corporate protocols, etc.) are suppressed.
+ * approaching-event warnings, etc.) are suppressed.
  */
 
 /**

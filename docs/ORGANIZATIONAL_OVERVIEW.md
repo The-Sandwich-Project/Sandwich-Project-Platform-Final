@@ -78,8 +78,8 @@ There's a full intake-and-follow-up machine around **group events**:
   sign-off — scheduling conflicts, out-of-area events, sub-200-sandwich events, van
   needs, refrigeration exemptions, or young children making PB&J.
 - Behind the scenes, **scheduled jobs** chase events with tiered reminders: toolkit not
-  sent within 24 hours, no activity in 7 days, escalations to admin, a strict daily
-  protocol for corporate-priority events, plus 24-hour and 1-hour volunteer reminders
+  sent within 24 hours, no activity in 7 days, escalations to admin, plus 24-hour and
+  1-hour volunteer reminders
   before each event.
 
 ---
@@ -159,9 +159,8 @@ A few things you can only learn by reading between the lines of the rules:
 - **An org maturing out of spreadsheets.** The Google Sheets history, the reference Excel
   sheet "until August 2025," and the migration into this platform paint a picture of a
   grassroots effort that outgrew manual tracking and is professionalizing.
-- **Corporate engagement is a growth lever.** A dedicated, aggressive corporate-event
-  follow-up protocol and speaker coordination for big builds make corporate groups both
-  an impact channel and a funding/relationship pipeline.
+- **Corporate engagement is a growth lever.** Speaker coordination for big builds makes
+  corporate groups both an impact channel and a funding/relationship pipeline.
 
 ---
 
