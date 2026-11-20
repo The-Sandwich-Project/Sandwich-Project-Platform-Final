@@ -841,7 +841,6 @@ const EventRequestsManagementContent: React.FC = () => {
                   : quickFilter === 'needsVan' ? 'Needs Van'
                   : quickFilter === 'week' ? 'This Week'
                   : quickFilter === 'today' ? 'Today'
-                  : quickFilter === 'corporatePriority' ? 'Corporate'
                   : 'Filters'
                   : 'Filters'}
                 <ChevronDown className="w-3.5 h-3.5 ml-1" />
@@ -872,12 +871,6 @@ const EventRequestsManagementContent: React.FC = () => {
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'today' ? 'bg-[#007E8C] text-white' : 'hover:bg-gray-100 text-gray-700'}`}
                 >
                   <Calendar className="w-4 h-4" /> Today
-                </button>
-                <button
-                  onClick={() => { setSearchQuery(''); setWeekScope(null); setQuickFilter(quickFilter === 'corporatePriority' ? null : 'corporatePriority'); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${quickFilter === 'corporatePriority' ? 'bg-amber-600 text-white' : 'hover:bg-gray-100 text-amber-700'}`}
-                >
-                  <Shield className="w-4 h-4" /> Corporate Priority
                 </button>
                 {(quickFilter || weekScope) && (
                   <>

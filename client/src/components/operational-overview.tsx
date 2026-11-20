@@ -59,7 +59,6 @@ interface MyAssignmentItem {
   vanDriverNeeded: boolean;
   vanNeededLikely: boolean;
   isLargeEvent: boolean;
-  isCorporatePriority: boolean;
 }
 
 interface MyAssignments {
@@ -331,11 +330,6 @@ function AssignmentEventRow({
             {event.isLargeEvent && (
               <Badge className="text-[10px] font-semibold border-0 bg-purple-600 text-white shadow-sm">
                 Large event (500+)
-              </Badge>
-            )}
-            {event.isCorporatePriority && (
-              <Badge className="text-[10px] font-semibold border-0 bg-[#A31C41] text-white shadow-sm">
-                Corporate priority
               </Badge>
             )}
           </div>

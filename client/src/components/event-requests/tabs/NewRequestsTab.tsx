@@ -18,7 +18,7 @@ export const NewRequestsTab: React.FC = () => {
   const isMobile = useIsMobile();
   const { confirm, ConfirmationDialogComponent } = useConfirmation();
   const { filterRequestsByStatus } = useEventFilters();
-  const { deleteEventRequestMutation, updateEventRequestMutation, toggleCorporatePriorityMutation, createEventRequestMutation } = useEventMutations();
+  const { deleteEventRequestMutation, updateEventRequestMutation, createEventRequestMutation } = useEventMutations();
   const { handleStatusChange } = useEventAssignments();
 
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
@@ -292,12 +292,6 @@ export const NewRequestsTab: React.FC = () => {
                 setNextActionEventRequest(request);
                 setNextActionMode('complete');
                 openDialog('nextAction');
-              }}
-              onToggleCorporatePriority={(isCorporatePriority) => {
-                toggleCorporatePriorityMutation.mutate({
-                  id: request.id,
-                  isCorporatePriority
-                });
               }}
               // Inline editing props
               startEditing={(field, value) => startEditing(request.id, field, value)}
