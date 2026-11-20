@@ -9,7 +9,7 @@
  * pre-existing, non-fatal type errors.
  *
  * This gate runs `tsc --noEmit`, keeps only the runtime-fatal "name doesn't
- * exist" diagnostics in code that ships to the client, and fails when a NEW one
+ * exist" diagnostics in code that ships or runs (client, shared, server), and fails when a NEW one
  * appears — either a brand-new offender or an additional occurrence of an
  * already-baselined one. It deliberately does NOT try to fix the pre-existing
  * type-error noise.
@@ -36,11 +36,13 @@ const BASELINE = path.join(__dirname, 'undefined-refs-baseline.json');
 //   TS2724 '...' has no exported member named 'X'
 const FATAL_CODES = new Set(['TS2304', 'TS2552', 'TS2305', 'TS2724']);
 
-// Code that gets bundled into the client crashes users: client/src plus the
-// shared modules it imports via the @shared alias (a missing ref in a shared
-// util ships to the browser too). Skip tests.
+// Code that runs in production: client/src and the shared modules it imports
+// via the @shared alias (these crash users' browsers), plus server/ (tsx and
+// esbuild don't typecheck either, so a missing name there throws inside a
+// route, cron job or email send and is usually caught and logged, so the
+// feature fails silently). Skip tests.
 const isShipped = (p) =>
-  (p.startsWith('client/src/') || p.startsWith('shared/')) &&
+  (p.startsWith('client/src/') || p.startsWith('shared/') || p.startsWith('server/')) &&
   !/\.(test|spec)\.|\/__tests__\/|\/test\//.test(p);
 
 // Canonicalize so the baseline survives environment differences. TS reports the

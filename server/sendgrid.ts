@@ -189,7 +189,11 @@ export async function sendEmailWithResult(params: EmailParams): Promise<SendEmai
           
           logger.log(`Processed attachment: ${filename} (${contentType})`);
         } catch (attachmentError) {
-          logger.error(`Failed to process attachment ${filePath}:`, attachmentError);
+          const label =
+            typeof attachment === 'string'
+              ? attachment
+              : (attachment as EmailAttachment)?.filePath ?? 'unknown';
+          logger.error(`Failed to process attachment ${label}:`, attachmentError);
           // Continue processing other attachments even if one fails
         }
       }

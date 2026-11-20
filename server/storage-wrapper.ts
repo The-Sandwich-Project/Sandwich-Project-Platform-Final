@@ -12,6 +12,7 @@ import type {
   InsertEventRequest,
   InsertEmailTemplateSection,
   UpdateEmailTemplateSection,
+  InsertUserActivityLog,
 } from '@shared/schema';
 
 class StorageWrapper implements IStorage {

@@ -4,7 +4,7 @@ import { eventCheckInReminders, eventReminderSnoozes, eventRequests, REMINDER_RU
 import { eq, and } from 'drizzle-orm';
 import { logger } from '../utils/production-safe-logger';
 import { calculateNextDue, ReminderFrequency } from '../utils/reminder-scheduling';
-import { processCheckInReminders } from '../services/check-in-reminder-service';
+import { processCheckInReminders, isConditionBasedRule } from '../services/check-in-reminder-service';
 
 const router = express.Router();
 

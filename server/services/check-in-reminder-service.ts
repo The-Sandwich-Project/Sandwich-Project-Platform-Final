@@ -254,7 +254,7 @@ function friendlyStatus(status: string): string {
 }
 
 
-function isConditionBasedRule(ruleType: string): boolean {
+export function isConditionBasedRule(ruleType: string): boolean {
   return ruleType !== REMINDER_RULE_TYPES.GENERAL_CHECKIN;
 }
 

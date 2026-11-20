@@ -69,7 +69,7 @@ router.get('/context/:contextType/:contextId', isAuthenticated, async (req: Auth
     res.json({ messages });
   } catch (error) {
     logger.error('[Messaging API] Error fetching context messages:', error);
-    logger.error(`[Messaging API] Context details - Type: ${contextType}, ID: ${contextId}`);
+    logger.error(`[Messaging API] Context details - Type: ${req.params.contextType}, ID: ${req.params.contextId}`);
     res.status(500).json({ message: 'DATABASE_ERROR', error: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
