@@ -62,6 +62,7 @@ erDiagram
         bool is_van_driver
         bool is_host
         bool is_team_member "has an app login, minus guests"
+        bool is_board_member
         bool is_active
         int chapter_region_id FK "regions, kind = chapter"
     }
@@ -253,6 +254,7 @@ with `host_name = 'Groups'` or under a region's `group_collections`; the
 | `is_volunteer` | an active `volunteers` row (not a host's machine copy), or a host marked "Also a volunteer" | Low until the volunteer sheet sync (step 7); the sheet is the real list |
 | `is_van_driver` | `van_approved` true in any record | |
 | `is_team_member` | an active app login | Everyone with a login is on the team, apart from the odd guest (switched off by hand). Informational only |
+| `is_board_member` | nothing (added 2026-11-20) | Ticked by hand on the People page. Informational only |
 
 Speaker is a retired role and isn't modeled. Committees aren't modeled.
 

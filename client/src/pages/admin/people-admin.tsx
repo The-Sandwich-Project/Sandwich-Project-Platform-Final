@@ -34,13 +34,14 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 const API = '/api/people-admin';
 const ALLOWED_ROLES = ['super_admin', 'admin'];
 
-type RoleKey = 'isVolunteer' | 'isDriver' | 'isVanDriver' | 'isHost' | 'isTeamMember';
+type RoleKey = 'isVolunteer' | 'isDriver' | 'isVanDriver' | 'isHost' | 'isTeamMember' | 'isBoardMember';
 const ROLES: { key: RoleKey; label: string }[] = [
   { key: 'isVolunteer', label: 'Volunteer' },
   { key: 'isDriver', label: 'Driver' },
   { key: 'isVanDriver', label: 'Van driver' },
   { key: 'isHost', label: 'Host' },
   { key: 'isTeamMember', label: 'Team member' },
+  { key: 'isBoardMember', label: 'Board member' },
 ];
 
 interface PersonRow {
@@ -54,6 +55,7 @@ interface PersonRow {
   isVanDriver: boolean;
   isHost: boolean;
   isTeamMember: boolean;
+  isBoardMember: boolean;
   isActive: boolean;
   chapterRegionId: number | null;
   openFlags: number;
