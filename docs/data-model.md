@@ -63,6 +63,8 @@ erDiagram
         bool is_host
         bool is_team_member "has an app login, minus guests"
         bool is_board_member
+        bool is_advisory_board_member
+        bool is_intake_team
         bool is_active
         int chapter_region_id FK "regions, kind = chapter"
     }
@@ -255,6 +257,8 @@ with `host_name = 'Groups'` or under a region's `group_collections`; the
 | `is_van_driver` | `van_approved` true in any record | |
 | `is_team_member` | an active app login | Everyone with a login is on the team, apart from the odd guest (switched off by hand). Informational only |
 | `is_board_member` | nothing (added 2026-11-20) | Ticked by hand on the People page. Informational only |
+| `is_advisory_board_member` | nothing (added 2026-11-20) | Ticked by hand. Informational only |
+| `is_intake_team` | nothing (added 2026-11-20) | Event intake team. Ticked by hand. Informational only: app access still comes from the login's permissions |
 
 Speaker is a retired role and isn't modeled. Committees aren't modeled.
 

@@ -19,7 +19,7 @@ import {
   type Person,
 } from '@shared/schema';
 
-export const ROLE_FIELDS = ['isVolunteer', 'isDriver', 'isVanDriver', 'isHost', 'isTeamMember', 'isBoardMember'] as const;
+export const ROLE_FIELDS = ['isVolunteer', 'isDriver', 'isVanDriver', 'isHost', 'isTeamMember', 'isBoardMember', 'isAdvisoryBoardMember', 'isIntakeTeam'] as const;
 
 export interface PersonListItem {
   id: number;
@@ -33,6 +33,8 @@ export interface PersonListItem {
   isHost: boolean;
   isTeamMember: boolean;
   isBoardMember: boolean;
+  isAdvisoryBoardMember: boolean;
+  isIntakeTeam: boolean;
   isActive: boolean;
   chapterRegionId: number | null;
   openFlags: number;
@@ -53,6 +55,8 @@ export async function listPeople(): Promise<PersonListItem[]> {
       isHost: people.isHost,
       isTeamMember: people.isTeamMember,
       isBoardMember: people.isBoardMember,
+      isAdvisoryBoardMember: people.isAdvisoryBoardMember,
+      isIntakeTeam: people.isIntakeTeam,
       isActive: people.isActive,
       chapterRegionId: people.chapterRegionId,
       // Fully qualified on purpose: Drizzle renders column references in a
@@ -132,6 +136,8 @@ export interface PersonEdit {
   isHost?: boolean;
   isTeamMember?: boolean;
   isBoardMember?: boolean;
+  isAdvisoryBoardMember?: boolean;
+  isIntakeTeam?: boolean;
   isActive?: boolean;
 }
 
@@ -273,6 +279,8 @@ export async function mergePeople(keepId: number, dropId: number, userId: string
       isHost: keep.isHost || drop.isHost,
       isTeamMember: keep.isTeamMember || drop.isTeamMember,
       isBoardMember: keep.isBoardMember || drop.isBoardMember,
+      isAdvisoryBoardMember: keep.isAdvisoryBoardMember || drop.isAdvisoryBoardMember,
+      isIntakeTeam: keep.isIntakeTeam || drop.isIntakeTeam,
       isActive: keep.isActive || drop.isActive,
       updatedAt: new Date(),
     })
