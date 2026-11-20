@@ -17,7 +17,7 @@
  *      except for the name (db:push names them *_unique / *_fk; hand-written
  *      migrations got Postgres's *_key / *_fkey)
  *   3. adds production's missing constraints (foreign keys last) and indexes
- *   4. matches production's NOT NULL settings
+ *   4. matches production's column types, NOT NULL settings and defaults
  *   5. records production's applied migration files in dev's _migrations,
  *      so dev doesn't re-run them (their structure arrives through 1-4)
  * Each statement runs on its own; one that fails is reported and the rest
@@ -180,7 +180,18 @@ async function main() {
         if (dev.tables.has(p.table)) otherDiffs.push(`column ${p.table}.${p.name} is missing in dev (add it with a migration)`);
         continue;
       }
-      if (d.type !== p.type) otherDiffs.push(`column ${p.table}.${p.name}: production ${p.type}, dev ${d.type}`);
+      if (d.type !== p.type) {
+        steps.push({
+          why: `match production's type (${p.type})`,
+          sql: `ALTER TABLE ${ident(p.table)} ALTER COLUMN ${ident(p.name)} TYPE ${p.type}`,
+        });
+      }
+      if (!p.identity && !p.generated && !d.identity && !d.generated && (d.def ?? null) !== (p.def ?? null)) {
+        steps.push({
+          why: `match production's default`,
+          sql: `ALTER TABLE ${ident(p.table)} ALTER COLUMN ${ident(p.name)} ${p.def != null ? `SET DEFAULT ${p.def}` : 'DROP DEFAULT'}`,
+        });
+      }
       if (d.notNull !== p.notNull) {
         steps.push({
           why: `match production's NOT NULL`,
