@@ -119,7 +119,7 @@ async function main() {
   section('Database updates recorded in dev but not production (they run on the next publish)', migDevOnly);
 
   if (danger.length) {
-    console.log('NOT SAFE TO PUBLISH: fix dev first, or production loses the items listed at the top.');
+    console.log('NOT SAFE TO PUBLISH: production would lose the items listed at the top.\nFix dev with: npm run db:sync-dev -- --dry-run   (then --apply)');
     process.exitCode = 2;
   } else if (differs.length) {
     console.log('Check the differences above before publishing.');
