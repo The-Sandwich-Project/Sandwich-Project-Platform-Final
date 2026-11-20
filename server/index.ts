@@ -580,6 +580,20 @@ async function bootstrap() {
             serverLogger.error('Database initialization failed:', error);
           }
 
+          // Development only: keep the dev database's migrations current while
+          // the server keeps running (e.g. after a git pull), so Replit's publish
+          // step never sees production tables "missing" from dev and offers to
+          // drop them. No-op in production.
+          try {
+            const { watchForNewMigrationsInDev } = await import('./dev-migration-watcher');
+            const { runMigrationsAutomatically } = await import('./migrate');
+            if (watchForNewMigrationsInDev({ run: runMigrationsAutomatically })) {
+              serverLogger.info('👀 Watching migrations/ for new files (development only)');
+            }
+          } catch (error) {
+            serverLogger.error('Failed to start dev migration watcher:', error);
+          }
+
           // SMS provider
           try {
             const { SMSProviderFactory } = await import(

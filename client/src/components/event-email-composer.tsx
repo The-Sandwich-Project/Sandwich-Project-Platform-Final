@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import DOMPurify from 'dompurify';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +41,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
+import { EditableEmailPreview } from '@/components/editable-email-preview';
 
 interface EventRequest {
   id: number;
@@ -1375,9 +1375,11 @@ ${userEmail}`;
     // Skip if no content exists yet
     if (!content) return;
 
-    // Always regenerate when checkboxes change (force=true to bypass manual edits check)
+    // Keep the sender's edits. The panel tells them their custom content is
+    // preserved and to use "Reset to Template" to apply the new options.
+    if (hasManualEdits) return;
+
     regenerateEmailContent(includeSchedulingLink, requestPhoneCall);
-    setHasManualEdits(false);
   }, [includeSchedulingLink, requestPhoneCall]);
 
   // Initialize with comprehensive template when component opens
@@ -1560,6 +1562,14 @@ ${userEmail}`;
         : [...prev, fileUrl]
     );
   };
+
+  // Switching format or template style rebuilds the email from the template.
+  // Ask first when that would throw away the sender's edits.
+  const confirmDiscardEdits = () =>
+    !hasManualEdits ||
+    window.confirm(
+      'This will replace your edits with the template. Continue?'
+    );
 
   // Handle content changes to track manual edits
   const handleContentChange = (newContent: string) => {
@@ -1832,9 +1842,11 @@ ${userEmail}`;
             <RadioGroup
               value={emailFormat}
               onValueChange={(value: 'html' | 'plaintext') => {
+                if (!confirmDiscardEdits()) return;
                 setEmailFormat(value);
                 // Regenerate content in the new format (pass value directly to avoid race condition)
                 regenerateEmailContent(includeSchedulingLink, requestPhoneCall, undefined, value);
+                setHasManualEdits(false);
               }}
               className="flex gap-4"
             >
@@ -1873,9 +1885,11 @@ ${userEmail}`;
                 <RadioGroup
                   value={templateStyle}
                   onValueChange={(value: 'classic' | 'optimized') => {
+                    if (!confirmDiscardEdits()) return;
                     setTemplateStyle(value);
                     // Regenerate content with new template style (pass value directly to avoid race condition)
                     regenerateEmailContent(includeSchedulingLink, requestPhoneCall, value);
+                    setHasManualEdits(false);
                   }}
                   className="flex gap-4"
                 >
@@ -1915,7 +1929,7 @@ ${userEmail}`;
             )}
 
             <div className="mt-4">
-              {emailFormat === 'plaintext' && hasManualEdits && (
+              {hasManualEdits && (
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
                     <AlertTriangle className="w-3 h-3" />
@@ -1945,11 +1959,12 @@ ${userEmail}`;
               {emailFormat === 'html' ? (
                 <div className="border rounded-lg overflow-hidden bg-white">
                   <div className="bg-gray-100 px-3 py-2 text-xs text-gray-600 border-b">
-                    Email Preview (this is how the recipient will see it)
+                    <strong>Click any text below to edit it.</strong> This is
+                    how the recipient will see it.
                   </div>
-                  <div
-                    className="p-4 max-h-[400px] overflow-y-auto"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
+                  <EditableEmailPreview
+                    html={content}
+                    onChange={handleContentChange}
                     data-testid="email-preview"
                   />
                 </div>
