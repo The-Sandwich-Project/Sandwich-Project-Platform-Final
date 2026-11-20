@@ -1341,6 +1341,8 @@ export const PERSON_REVIEW_KINDS = [
   'multiple_people', // one old record names two people ("Stacey & Jack")
   'abbreviated_name', // only "Sarah P." or a single name is known
   'possible_duplicate', // close name to another person; kept separate
+  'not_on_sheet', // was on a coordinator's sheet, now missing from it
+  'new_from_sheet', // added from a sheet row that matched nobody; check it isn't a duplicate
 ] as const;
 export type PersonReviewKind = (typeof PERSON_REVIEW_KINDS)[number];
 
@@ -1365,7 +1367,7 @@ export const personReviewFlags = pgTable(
     openIdx: index('person_review_flags_open_idx').on(table.personId, table.resolvedAt),
     kindCheck: check(
       'person_review_flags_kind_check',
-      sql`${table.kind} IN ('contact_conflict', 'shared_contact', 'multiple_people', 'abbreviated_name', 'possible_duplicate')`
+      sql`${table.kind} IN ('contact_conflict', 'shared_contact', 'multiple_people', 'abbreviated_name', 'possible_duplicate', 'not_on_sheet', 'new_from_sheet')`
     ),
   })
 );
@@ -1377,12 +1379,169 @@ export const personReviewFlagsRelations = relations(personReviewFlags, ({ one })
 
 export type PersonReviewFlag = typeof personReviewFlags.$inferSelect;
 
+// ---- Volunteers and sheet sync (people/places rebuild, step 7) ----
+
+export const VOLUNTEER_AVAILABILITY = ['active', 'temporarily_unavailable', 'inactive'] as const;
+export type VolunteerAvailability = (typeof VOLUNTEER_AVAILABILITY)[number];
+
+// Volunteer details for a person. The is_volunteer flag on people is the
+// switch; this row is just details and is kept when the role is turned off.
+// availability_status, on_recruitment_list, location and sheet_notes come from
+// the volunteer sheet and are read-only in the app (the sheet owns them).
+// experience_level and training_completed are app-owned.
+export const volunteerProfiles = pgTable(
+  'volunteer_profiles',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id')
+      .notNull()
+      .unique()
+      .references(() => people.id, { onDelete: 'cascade' }),
+    // Sheet "Status": active, temporarily unavailable (coming back), inactive.
+    availabilityStatus: text('availability_status').$type<VolunteerAvailability>().notNull().default('active'),
+    // Sheet "Event Volunteer Email List": false = never on recruitment emails
+    // (they can still be asked one-to-one). Recruitment emails go to people
+    // who are on the list AND active.
+    onRecruitmentList: boolean('on_recruitment_list').notNull().default(true),
+    location: text('location'), // free text from the sheet
+    sheetNotes: text('sheet_notes'),
+    experienceLevel: text('experience_level').$type<'new' | 'experienced'>().notNull().default('new'),
+    trainingCompleted: boolean('training_completed').notNull().default(false),
+    onSheet: boolean('on_sheet').notNull().default(false),
+    lastSeenOnSheetAt: timestamp('last_seen_on_sheet_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    availabilityCheck: check(
+      'volunteer_profiles_availability_status_check',
+      sql`${table.availabilityStatus} IN ('active', 'temporarily_unavailable', 'inactive')`
+    ),
+    experienceCheck: check(
+      'volunteer_profiles_experience_level_check',
+      sql`${table.experienceLevel} IN ('new', 'experienced')`
+    ),
+  })
+);
+
+export const volunteerProfilesRelations = relations(volunteerProfiles, ({ one }) => ({
+  person: one(people, { fields: [volunteerProfiles.personId], references: [people.id] }),
+}));
+
+export type VolunteerProfile = typeof volunteerProfiles.$inferSelect;
+
+export const SYNCED_SHEETS = ['volunteer'] as const;
+export type SyncedSheet = (typeof SYNCED_SHEETS)[number];
+// People fields a sheet shares with the app. These follow the three-way rule
+// (docs/data-model.md rule 8); sheet-only fields live on the profile instead.
+export const SHEET_SHARED_FIELDS = ['name', 'email', 'phone'] as const;
+export type SheetSharedField = (typeof SHEET_SHARED_FIELDS)[number];
+
+// One run of a sheet sync, with its report.
+export const sheetSyncRuns = pgTable(
+  'sheet_sync_runs',
+  {
+    id: serial('id').primaryKey(),
+    sheet: text('sheet').$type<SyncedSheet>().notNull(),
+    trigger: text('trigger').$type<'scheduled' | 'manual' | 'script'>().notNull(),
+    triggeredByUserId: varchar('triggered_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    status: text('status').$type<'running' | 'succeeded' | 'failed'>().notNull().default('running'),
+    startedAt: timestamp('started_at').defaultNow().notNull(),
+    finishedAt: timestamp('finished_at'),
+    summary: jsonb('summary'),
+    error: text('error'),
+  },
+  (table) => ({
+    sheetCheck: check('sheet_sync_runs_sheet_check', sql`${table.sheet} IN ('volunteer')`),
+    triggerCheck: check('sheet_sync_runs_trigger_check', sql`${table.trigger} IN ('scheduled', 'manual', 'script')`),
+    statusCheck: check('sheet_sync_runs_status_check', sql`${table.status} IN ('running', 'succeeded', 'failed')`),
+  })
+);
+
+export const sheetSyncRunsRelations = relations(sheetSyncRuns, ({ one, many }) => ({
+  triggeredBy: one(users, { fields: [sheetSyncRuns.triggeredByUserId], references: [users.id] }),
+  conflicts: many(sheetFieldConflicts),
+}));
+
+// The value a sheet last gave for a shared field of a person: the "last
+// synced value" in the three-way comparison.
+export const sheetSyncValues = pgTable(
+  'sheet_sync_values',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, { onDelete: 'cascade' }),
+    sheet: text('sheet').$type<SyncedSheet>().notNull(),
+    field: text('field').$type<SheetSharedField>().notNull(),
+    lastSyncedValue: text('last_synced_value'),
+    syncedAt: timestamp('synced_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    onePerField: unique('sheet_sync_values_person_sheet_field_unique').on(table.personId, table.sheet, table.field),
+    sheetCheck: check('sheet_sync_values_sheet_check', sql`${table.sheet} IN ('volunteer')`),
+    fieldCheck: check('sheet_sync_values_field_check', sql`${table.field} IN ('name', 'email', 'phone')`),
+  })
+);
+
+export const sheetSyncValuesRelations = relations(sheetSyncValues, ({ one }) => ({
+  person: one(people, { fields: [sheetSyncValues.personId], references: [people.id] }),
+}));
+
+export const SHEET_CONFLICT_KINDS = ['conflict', 'invalid_sheet_value', 'possible_typo'] as const;
+export type SheetConflictKind = (typeof SHEET_CONFLICT_KINDS)[number];
+
+// A field where the sheet and the app disagree and a person has to choose.
+export const sheetFieldConflicts = pgTable(
+  'sheet_field_conflicts',
+  {
+    id: serial('id').primaryKey(),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id, { onDelete: 'cascade' }),
+    sheet: text('sheet').$type<SyncedSheet>().notNull(),
+    field: text('field').$type<SheetSharedField>().notNull(),
+    kind: text('kind').$type<SheetConflictKind>().notNull(),
+    sheetValue: text('sheet_value'),
+    appValue: text('app_value'),
+    syncRunId: integer('sync_run_id').references(() => sheetSyncRuns.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at'),
+    resolvedByUserId: varchar('resolved_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    resolution: text('resolution').$type<'used_sheet' | 'kept_app' | 'dismissed'>(),
+  },
+  (table) => ({
+    openIdx: index('sheet_field_conflicts_open_idx').on(table.personId, table.resolvedAt),
+    sheetCheck: check('sheet_field_conflicts_sheet_check', sql`${table.sheet} IN ('volunteer')`),
+    fieldCheck: check('sheet_field_conflicts_field_check', sql`${table.field} IN ('name', 'email', 'phone')`),
+    kindCheck: check(
+      'sheet_field_conflicts_kind_check',
+      sql`${table.kind} IN ('conflict', 'invalid_sheet_value', 'possible_typo')`
+    ),
+    resolutionCheck: check(
+      'sheet_field_conflicts_resolution_check',
+      sql`${table.resolution} IS NULL OR ${table.resolution} IN ('used_sheet', 'kept_app', 'dismissed')`
+    ),
+  })
+);
+
+export const sheetFieldConflictsRelations = relations(sheetFieldConflicts, ({ one }) => ({
+  person: one(people, { fields: [sheetFieldConflicts.personId], references: [people.id] }),
+  syncRun: one(sheetSyncRuns, { fields: [sheetFieldConflicts.syncRunId], references: [sheetSyncRuns.id] }),
+  resolvedBy: one(users, { fields: [sheetFieldConflicts.resolvedByUserId], references: [users.id] }),
+}));
+
+export type SheetFieldConflict = typeof sheetFieldConflicts.$inferSelect;
+
 export const peopleRelations = relations(people, ({ one, many }) => ({
   chapter: one(regions, { fields: [people.chapterRegionId], references: [regions.id] }),
   logins: many(users),
   nameAliases: many(personNameAliases),
   legacyIds: many(legacyPersonIds),
   reviewFlags: many(personReviewFlags),
+  volunteerProfile: one(volunteerProfiles),
+  sheetSyncValues: many(sheetSyncValues),
+  sheetFieldConflicts: many(sheetFieldConflicts),
 }));
 
 export const usersRelations = relations(users, ({ one }) => ({
