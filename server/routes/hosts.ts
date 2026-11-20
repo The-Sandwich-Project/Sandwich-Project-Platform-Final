@@ -74,10 +74,11 @@ export function createHostsRouter(deps: RouterDependencies) {
         'Host ID',
         'Host Name',
         'Host Address',
-        'Host Status',
+        'Location Status',
         'Host Notes',
         'Contact ID',
         'Contact Name',
+        'Contact Status',
         'Contact Role',
         'Contact Phone',
         'Contact Email',
@@ -103,7 +104,7 @@ export function createHostsRouter(deps: RouterDependencies) {
             host.address || '',
             host.status || '',
             host.notes || '',
-            '', '', '', '', '', '', '', '', '', '', '',
+            '', '', '', '', '', '', '', '', '', '', '', '',
             host.createdAt ? new Date(host.createdAt).toISOString().split('T')[0] : '',
           ]);
         } else {
@@ -116,6 +117,9 @@ export function createHostsRouter(deps: RouterDependencies) {
               host.notes || '',
               String(contact.id),
               contact.name || '',
+              // The contact's own status. "Location Status" above is the
+              // host location's (e.g. Alpharetta is active), not the person's.
+              contact.isFormerHost ? 'Former host' : 'Active',
               contact.role || '',
               contact.phone || '',
               contact.email || '',
