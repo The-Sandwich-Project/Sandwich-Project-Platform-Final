@@ -27,7 +27,7 @@ router.post('/sandwich-range-fields', requirePermission('ADMIN_ACCESS'), async (
     logger.log('🔄 Running sandwich range fields migration...');
 
     // Connect to database using Neon HTTP
-    const sql = neon(databaseUrl);
+    const sql = neon(DATABASE_URL);
 
     // Read the migration SQL
     const migrationPath = path.join(__dirname, '..', 'migrations', 'add_sandwich_range_fields.sql');

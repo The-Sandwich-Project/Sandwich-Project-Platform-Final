@@ -14,6 +14,17 @@ import historicalImportRouter from './historical-import';
 import { logger } from '../../utils/production-safe-logger';
 import { onboardingService } from '../../services/onboarding-service';
 import { getSocketInstance } from '../../socket-chat';
+import { AuditLogger, type AuditContext } from '../../audit-logger';
+
+// Who made a change, for the audit log (same fields hosts.ts records).
+function auditContext(req: any): AuditContext {
+  return {
+    userId: req.user?.id || req.session?.user?.id,
+    ipAddress: req.ip,
+    userAgent: req.get?.('user-agent'),
+    sessionId: req.sessionID,
+  };
+}
 
 const collectionsRouter = Router();
 
@@ -1317,11 +1328,11 @@ collectionsRouter.delete(
       // Invalidate cache when collection is deleted
       QueryOptimizer.invalidateCache('sandwich-collections');
 
-      await logActivity(
-        req,
-        res,
-        'COLLECTIONS_DELETE',
-        `Deleted sandwich collection: ${id}`
+      await AuditLogger.logDelete(
+        'sandwich_collections',
+        String(id),
+        { id, deleted: false },
+        auditContext(req)
       );
 
       res.status(204).send();
@@ -1359,11 +1370,12 @@ collectionsRouter.post(
       // Invalidate cache when collection is restored
       QueryOptimizer.invalidateCache('sandwich-collections');
 
-      await logActivity(
-        req,
-        res,
-        'COLLECTIONS_RESTORE',
-        `Restored sandwich collection: ${id}`
+      await AuditLogger.logUpdate(
+        'sandwich_collections',
+        String(id),
+        { id, deleted: true },
+        { id, deleted: false },
+        auditContext(req)
       );
 
       // Get the restored collection

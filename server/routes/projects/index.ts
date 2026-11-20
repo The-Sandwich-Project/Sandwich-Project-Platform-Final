@@ -205,7 +205,7 @@ export default function createProjectRoutes(options: {
         logger.info(`[PATCH /api/projects/${id}] Successfully updated`);
         res.json(updatedProject);
       } catch (error) {
-        logger.error(`[PATCH /api/projects/${id}] Failed to update project`, error);
+        logger.error(`[PATCH /api/projects/${req.params.id}] Failed to update project`, error);
 
         const message =
           error instanceof Error ? error.message : 'Failed to update project';
