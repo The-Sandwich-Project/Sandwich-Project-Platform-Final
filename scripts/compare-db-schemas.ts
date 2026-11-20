@@ -46,15 +46,20 @@ async function snapshot(url: string): Promise<Snapshot> {
     )) {
       items.set(`table ${r.table_name}`, '');
     }
+    // Type (with length), NOT NULL and default: a publish copies all three.
     for (const r of await q(
-      `SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name IN (SELECT table_name FROM information_schema.tables
-                              WHERE table_schema = 'public' AND table_type = 'BASE TABLE')`
+      `SELECT c.relname AS table_name, a.attname AS column_name,
+              format_type(a.atttypid, a.atttypmod) AS type, a.attnotnull AS not_null,
+              pg_get_expr(d.adbin, d.adrelid) AS def
+         FROM pg_attribute a
+         JOIN pg_class c ON c.oid = a.attrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+        WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped`
     )) {
       items.set(
         `column ${r.table_name}.${r.column_name}`,
-        `${r.data_type}${r.is_nullable === 'NO' ? ', not null' : ''}`
+        `${r.type}${r.not_null ? ', not null' : ''}${r.def != null ? `, default ${r.def}` : ''}`
       );
     }
     for (const r of await q(
@@ -122,7 +127,11 @@ async function main() {
     console.log('NOT SAFE TO PUBLISH: production would lose the items listed at the top.\nFix dev with: npm run db:sync-dev -- --dry-run   (then --apply)');
     process.exitCode = 2;
   } else if (differs.length) {
-    console.log('Check the differences above before publishing.');
+    console.log(
+      'NOT READY: a publish would change production to dev\'s version of the items above.\n' +
+        'Run: npm run db:sync-dev -- --apply   then check again. (A rule whose two versions say\n' +
+        'the same thing in different words, like the van_needed_for check, is fine to leave.)'
+    );
   } else {
     console.log('Safe to publish: dev has everything production has.');
   }
