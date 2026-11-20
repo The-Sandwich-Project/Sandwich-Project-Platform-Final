@@ -53,7 +53,7 @@ erDiagram
         int id PK
         text first_name
         text last_name "'' when unknown"
-        text name_source "self_verified > self_reported > sheet > legacy_import"
+        text name_source "self_verified > self_reported > admin_entered > sheet > legacy_import"
         text email
         text phone
         text address
@@ -132,8 +132,10 @@ erDiagram
    2. `self_reported`: they typed it themselves. Every legacy driver with
       `surveySubmitted = true` qualifies: the name was entered by hand from
       their survey response.
-   3. `sheet`: from a coordinator's Google Sheet
-   4. `legacy_import`: from an old table
+   3. `admin_entered`: typed or corrected by an admin on the People page
+      (without ticking "this person confirmed this spelling")
+   4. `sheet`: from a coordinator's Google Sheet
+   5. `legacy_import`: from an old table
 
    A lower-ranked source never overwrites a higher-ranked name. The new
    spelling is stored in `person_name_aliases` instead of being thrown away.
