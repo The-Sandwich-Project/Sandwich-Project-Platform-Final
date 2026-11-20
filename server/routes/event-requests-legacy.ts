@@ -5165,10 +5165,14 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     const emailBodyText = content + EMAIL_FOOTER_TEXT;
     const emailBodyHtml = content + EMAIL_FOOTER_HTML;
 
-    // Determine from and reply-to addresses
-    // Must be a verified SendGrid sender; the old gmail fallback was rejected.
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || FROM_EMAIL;
-    const replyToEmail = req.user?.preferredEmail || req.user?.email || fromEmail;
+    // From: the sender's own address when it's on our SendGrid-authenticated
+    // domain, otherwise the org address shown as "<Name> via The Sandwich
+    // Project". Reply-To is the sender, who also gets a BCC copy.
+    // See server/utils/user-sender.ts.
+    const { buildUserSender } = await import('../utils/user-sender');
+    const sender = buildUserSender(req.user);
+    const replyToEmail =
+      sender.replyTo || process.env.SENDGRID_FROM_EMAIL || FROM_EMAIL;
 
     // Resolve attachments (incl. /objects/ storage paths) up front; refuse to
     // send if any selected file can't be loaded instead of dropping it.
@@ -5186,8 +5190,9 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     const emailSent = await sendEmail({
       emailStream: 'operational',
       to: recipientEmail,
-      from: fromEmail,
+      from: sender.from,
       replyTo: replyToEmail,
+      ...(sender.senderCopyBcc ? { bcc: sender.senderCopyBcc } : {}),
       subject,
       text: emailBodyText,
       html: emailBodyHtml, // Use the styled HTML as-is, no wrapping
