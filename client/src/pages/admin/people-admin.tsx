@@ -3,12 +3,14 @@
  *
  * Everyone in `people` with a checkbox per role, an active switch, each
  * person's full record, and the "needs a decision" list the backfill left.
+ * Also: the volunteer sheet sync (step 7) — last run, "Sync now", and the
+ * sheet-vs-app questions — and each person's volunteer details.
  * Rules (docs/data-model.md): unticking a role never deletes anything;
  * people are deactivated, not deleted; a changed name is kept as an alias.
  */
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, GitMerge, Loader2, Plus, Search, UserCog } from 'lucide-react';
+import { AlertTriangle, GitMerge, Loader2, Plus, RefreshCw, Search, Sheet as SheetIcon, UserCog } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,7 +87,73 @@ interface PersonDetail {
   legacy: { id: number; sourceTable: string; sourceKey: string }[];
   logins: { id: string; role: string; isActive: boolean | null }[];
   flags: Flag[];
+  volunteerProfile: VolunteerProfile | null;
+  sheetConflicts: SheetConflict[];
 }
+
+interface VolunteerProfile {
+  availabilityStatus: 'active' | 'temporarily_unavailable' | 'inactive';
+  onRecruitmentList: boolean;
+  location: string | null;
+  sheetNotes: string | null;
+  onSheet: boolean;
+  lastSeenOnSheetAt: string | null;
+  experienceLevel: string;
+  trainingCompleted: boolean;
+}
+
+interface SheetConflict {
+  id: number;
+  personId: number;
+  personName?: string;
+  field: 'name' | 'email' | 'phone';
+  kind: 'conflict' | 'invalid_sheet_value' | 'possible_typo';
+  sheetValue: string | null;
+  appValue: string | null;
+}
+
+interface SyncSummary {
+  rowsRead: number;
+  matched: number;
+  changed: number;
+  added: number;
+  missing: number;
+  conflicts: number;
+  problems: number | string[];
+}
+
+interface SyncStatus {
+  lastRun: {
+    id: number;
+    trigger: string;
+    status: 'running' | 'succeeded' | 'failed';
+    startedAt: string;
+    finishedAt: string | null;
+    summary: (SyncSummary & { problems: string[] }) | null;
+    error: string | null;
+  } | null;
+  conflicts: SheetConflict[];
+}
+
+const SYNC_API = `${API}/volunteer-sync`;
+
+const AVAILABILITY_LABELS: Record<string, string> = {
+  active: 'Active',
+  temporarily_unavailable: 'Temporarily unavailable',
+  inactive: 'Inactive',
+};
+
+const CONFLICT_KIND_LABELS: Record<string, string> = {
+  conflict: 'The sheet and the app both changed',
+  invalid_sheet_value: "The sheet's value looks wrong",
+  possible_typo: 'Phone numbers one digit apart (possible typo)',
+};
+
+const FIELD_LABELS: Record<string, string> = { name: 'Name', email: 'Email', phone: 'Phone' };
+
+const formatPhone = (v: string | null) =>
+  v && /^\d{10}$/.test(v) ? `(${v.slice(0, 3)}) ${v.slice(3, 6)}-${v.slice(6)}` : v ?? '';
+const showValue = (field: string, v: string | null) => (v ? (field === 'phone' ? formatPhone(v) : v) : '(blank)');
 
 const KIND_LABELS: Record<string, string> = {
   contact_conflict: 'Contact details disagree',
@@ -117,6 +185,7 @@ const fullName = (p: { firstName: string; lastName: string }) => `${p.firstName}
 
 function invalidate(id?: number) {
   queryClient.invalidateQueries({ queryKey: [API] });
+  queryClient.invalidateQueries({ queryKey: [SYNC_API] });
   if (id) queryClient.invalidateQueries({ queryKey: [`${API}/${id}`] });
 }
 
@@ -167,6 +236,8 @@ export default function PeopleAdmin() {
 
   return (
     <div className="space-y-4 p-3 sm:p-6">
+      <VolunteerSheetCard onOpenPerson={(id) => setOpenId(id)} />
+
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -419,6 +490,17 @@ function PersonPanel({
                 ))}
               </section>
             )}
+
+            {(data?.sheetConflicts ?? []).length > 0 && (
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold text-amber-900">Sheet vs app</h3>
+                {data!.sheetConflicts.map((c) => (
+                  <ConflictCard key={c.id} conflict={c} />
+                ))}
+              </section>
+            )}
+
+            {data?.volunteerProfile && <VolunteerSection profile={data.volunteerProfile} />}
 
             <section className="space-y-3">
               <h3 className="text-sm font-semibold">Details</h3>
@@ -728,4 +810,192 @@ function AddPersonDialog({ open, onClose, onCreated }: { open: boolean; onClose:
       </DialogContent>
     </Dialog>
   );
+}
+
+/** Volunteer details from the sheet. Read-only here: the sheet owns them. */
+function VolunteerSection({ profile }: { profile: VolunteerProfile }) {
+  const getsEmails = profile.onRecruitmentList && profile.availabilityStatus === 'active';
+  return (
+    <section className="space-y-2 text-sm">
+      <h3 className="font-semibold">Volunteer</h3>
+      <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1">
+        <dt className="text-slate-500">Status</dt>
+        <dd>{AVAILABILITY_LABELS[profile.availabilityStatus] ?? profile.availabilityStatus}</dd>
+        <dt className="text-slate-500">Email list</dt>
+        <dd>{profile.onRecruitmentList ? 'Yes' : 'No (ask one-to-one only)'}</dd>
+        <dt className="text-slate-500">Gets recruitment emails</dt>
+        <dd>
+          {getsEmails
+            ? 'Yes'
+            : profile.onRecruitmentList
+              ? 'Not right now (paused while not Active)'
+              : 'No'}
+        </dd>
+        {profile.location && (
+          <>
+            <dt className="text-slate-500">Location</dt>
+            <dd>{profile.location}</dd>
+          </>
+        )}
+        {profile.sheetNotes && (
+          <>
+            <dt className="text-slate-500">Sheet notes</dt>
+            <dd className="whitespace-pre-wrap">{profile.sheetNotes}</dd>
+          </>
+        )}
+        <dt className="text-slate-500">On the sheet</dt>
+        <dd>{profile.onSheet ? 'Yes' : 'No longer'}</dd>
+      </dl>
+      <p className="text-xs text-slate-500">
+        These come from the volunteer sheet. To change them, edit the sheet; the app picks it up on the next sync.
+      </p>
+    </section>
+  );
+}
+
+/** One sheet-vs-app question with its two choices. */
+function ConflictCard({ conflict: c, onOpenPerson }: { conflict: SheetConflict; onOpenPerson?: (id: number) => void }) {
+  const { toast } = useToast();
+  const resolve = useMutation({
+    mutationFn: (choice: 'use_sheet' | 'keep_app') => apiRequest('POST', `${API}/sheet-conflicts/${c.id}/resolve`, { choice }),
+    onSuccess: () => invalidate(c.personId),
+    onError: (e: Error) => toast({ title: "Couldn't save", description: e.message, variant: 'destructive' }),
+  });
+  const invalid = c.kind === 'invalid_sheet_value';
+  return (
+    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+      <div className="font-medium">
+        {c.personName && onOpenPerson ? (
+          <button type="button" className="underline" onClick={() => onOpenPerson(c.personId)}>
+            {c.personName}
+          </button>
+        ) : null}
+        {c.personName && onOpenPerson ? ' · ' : ''}
+        {FIELD_LABELS[c.field] ?? c.field}: {CONFLICT_KIND_LABELS[c.kind] ?? c.kind}
+      </div>
+      <div className="mt-1 grid grid-cols-[auto,1fr] gap-x-3 text-slate-700">
+        <span className="text-slate-500">Sheet</span>
+        <span className="break-all">{showValue(c.field, c.sheetValue)}</span>
+        <span className="text-slate-500">App</span>
+        <span className="break-all">{showValue(c.field, c.appValue)}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {!invalid && (
+          <Button size="sm" variant="outline" disabled={resolve.isPending} onClick={() => resolve.mutate('use_sheet')}>
+            Use the sheet's
+          </Button>
+        )}
+        <Button size="sm" variant="outline" disabled={resolve.isPending} onClick={() => resolve.mutate('keep_app')}>
+          {invalid ? "Keep the app's (fix the sheet later)" : "Keep the app's"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Volunteer sheet: last sync, Preview / Sync now, and the open questions. */
+function VolunteerSheetCard({ onOpenPerson }: { onOpenPerson: (id: number) => void }) {
+  const { toast } = useToast();
+  const { data } = useQuery<SyncStatus>({ queryKey: [SYNC_API] });
+  const [preview, setPreview] = useState<{ summary: SyncSummary; problems: string[] } | null>(null);
+  const [manyMissing, setManyMissing] = useState<string | null>(null);
+
+  const run = useMutation({
+    mutationFn: (opts: { dryRun?: boolean; allowManyMissing?: boolean }) => apiRequest('POST', SYNC_API, opts),
+    onSuccess: (result: any, opts) => {
+      setManyMissing(null);
+      if (opts.dryRun) {
+        setPreview({ summary: result.summary, problems: result.problems ?? [] });
+        return;
+      }
+      setPreview(null);
+      invalidate();
+      toast({ title: 'Volunteer sheet synced', description: describe(result.summary) });
+    },
+    onError: (e: Error) => {
+      if (/marked as missing/.test(e.message)) setManyMissing(e.message);
+      else toast({ title: "Couldn't sync", description: e.message, variant: 'destructive' });
+    },
+  });
+
+  const last = data?.lastRun;
+  const conflicts = data?.conflicts ?? [];
+  const lastProblems = last?.summary && Array.isArray(last.summary.problems) ? last.summary.problems : [];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <SheetIcon className="h-5 w-5" /> Volunteer sheet
+          </CardTitle>
+          <CardDescription>
+            {last
+              ? `Last sync ${new Date(last.startedAt).toLocaleString()} (${last.trigger}): ${
+                  last.status === 'succeeded' && last.summary ? describe(last.summary) : last.status === 'failed' ? `failed — ${last.error}` : 'running'
+                }`
+              : 'Not synced yet. Preview first, then Sync now. After the first sync it also runs every morning.'}
+          </CardDescription>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" disabled={run.isPending} onClick={() => run.mutate({ dryRun: true })}>
+            Preview
+          </Button>
+          <Button disabled={run.isPending} onClick={() => run.mutate({})}>
+            {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
+            Sync now
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {manyMissing && (
+          <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+            <p>{manyMissing}</p>
+            <Button className="mt-2" size="sm" variant="destructive" disabled={run.isPending} onClick={() => run.mutate({ allowManyMissing: true })}>
+              The sheet is right: sync anyway
+            </Button>
+          </div>
+        )}
+        {preview && (
+          <div className="rounded-md border bg-slate-50 p-3 text-sm">
+            <p className="font-medium">Preview (nothing saved): {describe(preview.summary)}</p>
+            {preview.problems.length > 0 && <ProblemList problems={preview.problems} />}
+          </div>
+        )}
+        {!preview && lastProblems.length > 0 && <ProblemList problems={lastProblems} />}
+        {conflicts.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-amber-900">
+              Sheet vs app: {conflicts.length} to decide
+            </h3>
+            {conflicts.map((c) => (
+              <ConflictCard key={c.id} conflict={c} onOpenPerson={onOpenPerson} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProblemList({ problems }: { problems: string[] }) {
+  return (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-slate-700">
+        {problems.length} row{problems.length === 1 ? '' : 's'} or value{problems.length === 1 ? '' : 's'} on the sheet couldn't be used
+      </summary>
+      <ul className="mt-1 list-disc pl-5 text-slate-600">
+        {problems.map((p, i) => (
+          <li key={i}>{p}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function describe(s: SyncSummary) {
+  const parts = [`${s.rowsRead} rows`, `${s.changed} updated`, `${s.added} new`];
+  if (s.missing) parts.push(`${s.missing} no longer on the sheet`);
+  if (s.conflicts) parts.push(`${s.conflicts} to decide`);
+  return parts.join(', ');
 }
