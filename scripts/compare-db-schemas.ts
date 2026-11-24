@@ -15,6 +15,8 @@
  *   production: --prod <url>, or AUDIT_DATABASE_URL
  *   dev:        --dev <url>,  or DATABASE_URL (the Replit workspace's dev database)
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import pg from 'pg';
 
 function arg(name: string): string | undefined {
@@ -135,13 +137,36 @@ async function main() {
   section('Database updates recorded in production but not dev', migProdOnly);
   section('Database updates recorded in dev but not production (they run on the next publish)', migDevOnly);
 
+  // A difference a pending database update (a migration file dev has run and
+  // production hasn't) makes on purpose is expected: the publish carries it.
+  // Copying production's version into dev would undo the update, so never
+  // suggest db:sync-dev for those.
+  const pendingText = migDevOnly
+    .map((m) => {
+      try {
+        return fs.readFileSync(path.join('migrations', m), 'utf8');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+  const nameOf = (k: string) => k.split(' ')[1].split('.').pop()!;
+  const fromPending = (k: string) => pendingText.includes(nameOf(k));
+  const unexplained = differs.filter((k) => !fromPending(k));
+
   if (danger.length) {
     console.log('NOT SAFE TO PUBLISH: production would lose the items listed at the top.\nFix dev with: npm run db:sync-dev -- --dry-run   (then --apply)');
     process.exitCode = 2;
+  } else if (unexplained.length) {
+    console.log(
+      "NOT READY: a publish would change production to dev's version of:\n" +
+        unexplained.map((k) => `  ${k}`).join('\n') +
+        '\nNo pending database update explains these. Run: npm run db:sync-dev -- --apply   then check again.'
+    );
   } else if (differs.length) {
     console.log(
-      'NOT READY: a publish would change production to dev\'s version of the items above.\n' +
-        'Run: npm run db:sync-dev -- --apply   then check again.'
+      'Safe to publish. The differences above come from the pending database update(s) listed, which the publish carries.\n' +
+        'Do NOT run db:sync-dev for them: it would undo the update in dev.'
     );
   } else {
     console.log('Safe to publish: dev has everything production has.');
