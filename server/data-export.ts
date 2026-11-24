@@ -8,6 +8,7 @@ import {
   messages,
   meetingMinutes,
   hostContacts,
+  contacts,
 } from '@shared/schema';
 import { eq, gte, lte, desc, sql, and, isNull } from 'drizzle-orm';
 import { logger } from './utils/production-safe-logger';

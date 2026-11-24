@@ -462,6 +462,7 @@ function generateInsights(
   const typicalInterval = metrics.typicalEventInterval;
   const daysOverdue = metrics.daysOverdue;
   const overduePercent = metrics.overduePercent;
+  const wasRegular = wasRegularContributor(metrics);
 
   // Use actual frequency pattern for better insights
   const patternLabel = getFrequencyPatternLabel(pattern);
