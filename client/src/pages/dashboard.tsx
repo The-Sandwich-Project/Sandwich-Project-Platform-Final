@@ -104,7 +104,9 @@ const DashboardOverview = lazyWithRetry(() => import('@/components/dashboard-ove
 const SandwichCollectionLog = lazyWithRetry(() => import('@/components/sandwich-collection-log'));
 const RecipientsManagement = lazyWithRetry(() => import('@/components/recipients-management'));
 const DriversManagement = lazyWithRetry(() => import('@/components/drivers-management-simple'));
-const VolunteerManagement = lazyWithRetry(() => import('@/components/volunteer-management'));
+// Volunteers Directory now reads the people list (step 7c-1); the old list
+// (components/volunteer-management) is one click away inside it.
+const VolunteerDirectory = lazyWithRetry(() => import('@/components/volunteers/volunteer-directory'));
 const HostsManagement = lazyWithRetry(() => import('@/components/hosts-management-consolidated'));
 const DocumentManagement = lazyWithRetry(() => import('@/components/document-management'));
 const ImportantDocuments = lazyWithRetry(() => import('@/pages/important-documents'));
@@ -744,7 +746,7 @@ export default function Dashboard({
       case 'drivers':
         return <DriversManagement />;
       case 'volunteers':
-        return <VolunteerManagement />;
+        return <VolunteerDirectory />;
       case 'directory':
         return <Directory />;
       case 'event-requests':

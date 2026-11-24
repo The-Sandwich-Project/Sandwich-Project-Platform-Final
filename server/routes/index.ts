@@ -91,6 +91,7 @@ import { createAlertRequestsRouter, createAIAlertRouter } from './alert-requests
 import { createAppSettingsRouter } from './app-settings';
 import { createCollectiveLearningAutoLogRouter } from './collective-learning-auto-log';
 import { createPeopleRouter } from './people';
+import { createVolunteerDirectoryRouter } from './volunteer-directory';
 import { createDbBackupRouter } from './db-backup';
 import { createNavUserViewRouter } from './nav-user-view';
 import { createCollectionFavoritesRouter } from './collection-favorites';
@@ -1097,6 +1098,11 @@ export function createMainRoutes(deps: RouterDependencies) {
   // Not /api/people: that prefix is the app-wide search (people-search.ts).
   router.use('/api/people-admin', deps.isAuthenticated, ...createStandardMiddleware(), createPeopleRouter());
   router.use('/api/people-admin', createErrorHandler('people-admin'));
+
+  // Volunteers directory from `people` (step 7c-1). Same access as the old
+  // Volunteers Directory; read-only.
+  router.use('/api/volunteer-directory', deps.isAuthenticated, ...createStandardMiddleware(), createVolunteerDirectoryRouter());
+  router.use('/api/volunteer-directory', createErrorHandler('volunteer-directory'));
 
   // Admin-only manual trigger for the weekly Google Drive DB backup
   router.use(
