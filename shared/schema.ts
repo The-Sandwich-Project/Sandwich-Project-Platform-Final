@@ -1509,6 +1509,10 @@ export const sheetFieldConflicts = pgTable(
     resolvedAt: timestamp('resolved_at'),
     resolvedByUserId: varchar('resolved_by_user_id').references(() => users.id, { onDelete: 'set null' }),
     resolution: text('resolution').$type<'used_sheet' | 'kept_app' | 'dismissed'>(),
+    // "Keep both, ask later": still open, set aside until someone clarifies.
+    onHoldAt: timestamp('on_hold_at'),
+    onHoldNote: text('on_hold_note'),
+    onHoldByUserId: varchar('on_hold_by_user_id').references(() => users.id, { onDelete: 'set null' }),
   },
   (table) => ({
     openIdx: index('sheet_field_conflicts_open_idx').on(table.personId, table.resolvedAt),
@@ -1529,6 +1533,7 @@ export const sheetFieldConflictsRelations = relations(sheetFieldConflicts, ({ on
   person: one(people, { fields: [sheetFieldConflicts.personId], references: [people.id] }),
   syncRun: one(sheetSyncRuns, { fields: [sheetFieldConflicts.syncRunId], references: [sheetSyncRuns.id] }),
   resolvedBy: one(users, { fields: [sheetFieldConflicts.resolvedByUserId], references: [users.id] }),
+  onHoldBy: one(users, { fields: [sheetFieldConflicts.onHoldByUserId], references: [users.id] }),
 }));
 
 export type SheetFieldConflict = typeof sheetFieldConflicts.$inferSelect;
