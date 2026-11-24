@@ -19,6 +19,12 @@ import {
   searchPeople,
   PeopleAdminError,
 } from '../services/people/people-admin';
+import {
+  getVolunteerSyncStatus,
+  runManualVolunteerSheetSync,
+  resolveSheetConflict,
+  VolunteerSyncError,
+} from '../services/people/volunteer-sheet-sync';
 
 const PEOPLE_ADMIN_ROLES = ['super_admin', 'admin'] as const;
 
@@ -56,6 +62,8 @@ const editSchema = z
 const createSchema = editSchema.extend({ firstName: z.string().trim().min(1).max(100) });
 const mergeSchema = z.object({ keepId: z.number().int().positive(), dropId: z.number().int().positive() }).strict();
 const resolveSchema = z.object({ resolution: z.string().trim().min(1).max(1000) }).strict();
+const syncSchema = z.object({ dryRun: z.boolean().optional(), allowManyMissing: z.boolean().optional() }).strict();
+const conflictSchema = z.object({ choice: z.enum(['use_sheet', 'keep_app']) }).strict();
 
 function auditContext(req: Request) {
   const user = (req as any).user || (req as any).session?.user;
@@ -82,6 +90,8 @@ function handle(fn: (req: Request, res: Response) => Promise<void>) {
         res.status(400).json({ error: 'Invalid input', details: error.flatten() });
       } else if (error instanceof PeopleAdminError) {
         res.status(error.status).json({ error: error.message });
+      } else if (error instanceof VolunteerSyncError) {
+        res.status(409).json({ error: error.message });
       } else {
         logger.error('People admin error:', error);
         res.status(500).json({ error: 'Something went wrong' });
@@ -110,6 +120,41 @@ export function createPeopleRouter() {
       const term = String(req.query.q ?? '');
       const except = Number(req.query.except ?? 0);
       res.json(term.trim().length < 2 ? [] : await searchPeople(term, except));
+    })
+  );
+
+  // Volunteer sheet sync (step 7): status + open sheet-vs-app questions.
+  router.get(
+    '/volunteer-sync',
+    guard,
+    handle(async (_req, res) => {
+      res.json(await getVolunteerSyncStatus());
+    })
+  );
+
+  router.post(
+    '/volunteer-sync',
+    guard,
+    handle(async (req, res) => {
+      const opts = syncSchema.parse(req.body ?? {});
+      const ctx = auditContext(req);
+      const result = await runManualVolunteerSheetSync(ctx.userId ?? null, opts);
+      if (!result.dryRun) {
+        await AuditLogger.logCreate('sheet_sync_runs', String(result.runId), result.summary, ctx);
+      }
+      res.json({ runId: result.runId, dryRun: result.dryRun, summary: result.summary, problems: result.plan.problems });
+    })
+  );
+
+  router.post(
+    '/sheet-conflicts/:id/resolve',
+    guard,
+    handle(async (req, res) => {
+      const { choice } = conflictSchema.parse(req.body);
+      const ctx = auditContext(req);
+      const after = await resolveSheetConflict(idParam(req), choice, ctx.userId ?? null);
+      await AuditLogger.logUpdate('sheet_field_conflicts', String(after.id), null, after, ctx);
+      res.json(after);
     })
   );
 

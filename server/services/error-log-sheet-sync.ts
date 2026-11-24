@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 import { logger } from '../utils/production-safe-logger';
 import { assertSheetWriteAllowed } from '../sheets-write-guard';
+import { normalizePrivateKey } from '../utils/google-private-key';
 
 export type ErrorLogSheetType =
   | 'user_report'
@@ -71,29 +72,6 @@ function truncate(value: string | null | undefined, max = 4000): string {
   return value.length > max ? `${value.slice(0, max)}…` : value;
 }
 
-function normalizePrivateKey(raw: string): string {
-  let key = raw;
-  if (key.includes('\\n')) {
-    key = key.replace(/\\n/g, '\n');
-  }
-  key = key
-    .replace(/\\r\\n/g, '\n')
-    .replace(/\\r/g, '\n')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n');
-
-  if (!key.includes('\n') && key.includes('-----BEGIN PRIVATE KEY-----')) {
-    const begin = '-----BEGIN PRIVATE KEY-----';
-    const end = '-----END PRIVATE KEY-----';
-    const beginIdx = key.indexOf(begin);
-    const endIdx = key.indexOf(end);
-    if (beginIdx !== -1 && endIdx !== -1) {
-      const body = key.slice(beginIdx + begin.length, endIdx).replace(/\s+/g, '');
-      key = `${begin}\n${body.match(/.{1,64}/g)?.join('\n') || body}\n${end}\n`;
-    }
-  }
-  return key;
-}
 
 async function ensureSheetsClient(): Promise<boolean> {
   if (sheetsClient) return true;

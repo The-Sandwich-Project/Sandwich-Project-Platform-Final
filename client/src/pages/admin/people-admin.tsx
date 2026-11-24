@@ -93,6 +93,8 @@ const KIND_LABELS: Record<string, string> = {
   multiple_people: 'May be two people',
   abbreviated_name: 'Name incomplete',
   possible_duplicate: 'Possible duplicate',
+  not_on_sheet: 'No longer on the volunteer sheet',
+  new_from_sheet: 'New from the volunteer sheet',
 };
 
 const NAME_SOURCE_LABELS: Record<string, string> = {

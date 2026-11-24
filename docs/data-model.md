@@ -48,6 +48,9 @@ erDiagram
     people ||--o{ legacy_person_ids : "old ids map here"
     regions ||--o{ people : "chapter members (UGA)"
     people ||--o{ person_review_flags : "needs a decision"
+    people ||--o{ sheet_sync_values : "last value each sheet gave"
+    people ||--o{ sheet_field_conflicts : "sheet vs app, to decide"
+    sheet_sync_runs ||--o{ sheet_field_conflicts : "found by"
 
     people {
         int id PK
@@ -111,11 +114,14 @@ erDiagram
 | `people` | human TSP knows | Identity + role flags. Replaces the person data in `volunteers`, `drivers`, `host_contacts`, `contacts`, and the non-login parts of `users`. First and last name are stored separately (matching compares last names and first-name nicknames); the display name is the two joined. `email` is not unique: couples share one. `chapter_region_id` links chapter members (UGA students) to their chapter. **Built (step 4); empty until the step 5 backfill.** |
 | `users` (slimmed) | login account | Login only: email, password, role, permissions, `person_id`. Van approval, address, phone and willingness fields move off `users`. `person_id` exists (step 4) and is null until the backfill; several logins may point at one person (some staff have two). |
 | `person_name_aliases` | spelling of a person's name | Every spelling seen in any sheet or legacy table. Used for matching and for the name-verification worklist. |
-| `volunteer_profiles` | person with `is_volunteer` | Experience level, training completed, sheet-sync bookkeeping. |
+| `volunteer_profiles` | person who is or was a volunteer | **Built (step 7).** From the volunteer sheet (read-only in the app): `availability_status` (`active`, `temporarily_unavailable` = away but coming back, `inactive`), `on_recruitment_list` (sheet "Event Volunteer Email List"; false = never on recruitment emails but can be asked one-to-one), `location` (free text), `sheet_notes`, `on_sheet`, `last_seen_on_sheet_at`. App-owned: `experience_level`, `training_completed`. **Recruitment emails go to people who are on the list and `active`.** |
+| `sheet_sync_runs` | one run of a sheet sync | Which sheet, scheduled or manual (and by whom), status, and the report (`summary`: added / updated / flagged / missing). |
+| `sheet_sync_values` | shared field of a person, per sheet | The value the sheet last gave for `name`, `email` or `phone`: the "last synced value" in rule 8. |
+| `sheet_field_conflicts` | field where the sheet and app disagree | Rule 8's review list: a real conflict, a malformed sheet value, or a possible one-digit phone typo. Resolved by choosing the sheet's value or keeping the app's. |
 | `driver_profiles` | person with `is_driver` | Availability, cooler status, agreement signed, weekly driver. `driver_vehicles` hangs off this. Which legacy `drivers` columns carry over is decided by the data audit. |
 | `host_profiles` | person with `is_host` | Region, hours, weekly-active, former host. **Hosts are people**; their address lives on `people`. |
 | `regions` | place collections are logged under | What the legacy `hosts` table actually holds. Has a `kind`: `region` (an area hosts belong to, e.g. Alpharetta), `site` (a partner that collects on its own, e.g. Collective Learning) or `chapter` (e.g. UGA). Historic names stay as `historic` rows, optionally pointing at the current region they roll up into. The agreed list is in "Collection sites and regions" below. |
-| `person_review_flags` | open question about a person | Things the backfill (or a later sheet sync) couldn't settle: contact conflict, shared contact, one record naming two people, abbreviated name, possible duplicate. `resolved_at` / `resolved_by_user_id` / `resolution` record the decision. The "needs a decision" list on the People admin page. |
+| `person_review_flags` | open question about a person | Things the backfill (or a later sheet sync) couldn't settle: contact conflict, shared contact, one record naming two people, abbreviated name, possible duplicate, no longer on a sheet (`not_on_sheet`), added from a sheet row that matched nobody (`new_from_sheet`). `resolved_at` / `resolved_by_user_id` / `resolution` record the decision. The "needs a decision" list on the People admin page. |
 | `legacy_person_ids` | old row id | Maps old ids (`volunteers` 12, `drivers` 5, `host_contacts` 3, ...) to the new person: `source_table` + `source_key` (text, since `users` ids are strings), unique together. Keeps the `"volunteer-12"` style strings in `event_requests.assigned_*_ids` resolving. |
 | `recipients` | recipient organization | **Stays separate** from `people`. Recipients never volunteer, drive or host, and carry very different data. |
 
@@ -153,8 +159,9 @@ erDiagram
    | Email or phone matches, name doesn't | auto-match, record the alias |
    | Nothing matches | "possible new person" in the sync report |
 
-   Once a sheet row is matched, the app writes the person id back into a hidden
-   sheet column so later syncs match exactly.
+   The app only reads sheets (Viewer access), so it doesn't write an id back.
+   A matched row is recognized next time by the email or name it last synced
+   (`sheet_sync_values`), then by the rules above.
 5. **Full names are visible** to everyone with app access. The
    first-name/last-initial convention belongs to the separate host-finder app
    and will be handled if and when that app is connected.
@@ -266,7 +273,7 @@ Speaker is a retired role and isn't modeled. Committees aren't modeled.
 
 | Sheet | Sets | Status |
 |---|---|---|
-| Volunteer sheet | `is_volunteer` + `volunteer_profiles` | ready to build after `people` exists |
+| Volunteer sheet ("All Volunteers" tab; columns Name, Email, Phone, Status, Event Volunteer Email List, Source, Location, Notes) | `is_volunteer` + `volunteer_profiles`; name/email/phone on `people` by rule 8 | **step 7**, agreed 2026-11-20: read daily plus a "Sync now" button; Status must be Active, Temporarily unavailable or Inactive (anything else is flagged, not guessed); `is_volunteer` is on unless Status is Inactive; rows missing from the sheet are flagged `not_on_sheet`, never changed; unmatched rows become new people flagged `new_from_sheet`; the Source column is ignored |
 | Recipient sheet | `recipients` | independent of `people`; can be built any time |
 | Driver roster (driver coordinator's sheet) | `is_driver` / weekly driver | **blocked**: sheet needs cleanup to one row per person first |
 
@@ -281,7 +288,7 @@ Each step is its own PR.
 4. `people`, `person_name_aliases`, `legacy_person_ids`, `users.person_id` (additive only): `migrations/20261121_create_people.sql`. Empty until step 5.
 5. Backfill script with `--dry-run` (`npm run people:backfill -- --dry-run` / `--apply`, `scripts/backfill-people.ts`). One-shot; applies the matching rules above and the roles listed under "Roles" below; writes `person_review_flags` for anything it can't settle. **A script, not a migration**: migrations run automatically on every boot, including production. Tested against a Neon branch of production.
 6. ✅ **People admin page** (super admin and admin): everyone in `people` with search and filters, a checkbox per role, the active switch, each person's full record (contact, other spellings, old records, chapter), and the "needs a decision" list from `person_review_flags` with buttons to resolve them.
-7. Volunteer directory reads from `people`; volunteer sheet sync.
+7. Volunteer sheet sync and volunteer directory. **7a (sync) built:** `npm run volunteers:sync -- --dry-run` / `--apply`, a daily job (after the first hand-run sync), and `/api/people-admin/volunteer-sync` for the People page's "Sync now". 7b: People page shows volunteer details, "Sync now" and the sheet-vs-app questions. 7c: the Volunteers directory reads from `people`.
 8. Host directory reads from `people` + `host_profiles`.
 9. Recipient sheet sync.
 10. Driver roster sync (after the driver coordinator's sheet is cleaned up).

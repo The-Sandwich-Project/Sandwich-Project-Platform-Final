@@ -16,6 +16,9 @@ import {
   personReviewFlags,
   regions,
   users,
+  volunteerProfiles,
+  sheetSyncValues,
+  sheetFieldConflicts,
   type Person,
 } from '@shared/schema';
 
@@ -91,7 +94,12 @@ export async function getPerson(id: number) {
       .where(eq(users.personId, id)),
     db.select().from(personReviewFlags).where(eq(personReviewFlags.personId, id)).orderBy(asc(personReviewFlags.createdAt)),
   ]);
-  return { person, aliases, legacy, logins, flags };
+  const [volunteerProfile] = await db.select().from(volunteerProfiles).where(eq(volunteerProfiles.personId, id));
+  const sheetConflicts = await db
+    .select()
+    .from(sheetFieldConflicts)
+    .where(and(eq(sheetFieldConflicts.personId, id), isNull(sheetFieldConflicts.resolvedAt)));
+  return { person, aliases, legacy, logins, flags, volunteerProfile: volunteerProfile ?? null, sheetConflicts };
 }
 
 export class PeopleAdminError extends Error {
@@ -245,6 +253,21 @@ export async function mergePeople(keepId: number, dropId: number, userId: string
   await db.update(legacyPersonIds).set({ personId: keepId }).where(eq(legacyPersonIds.personId, dropId));
   await db.update(users).set({ personId: keepId }).where(eq(users.personId, dropId));
   await db.update(personReviewFlags).set({ personId: keepId }).where(eq(personReviewFlags.personId, dropId));
+  // Volunteer details: the kept person's profile wins; otherwise the dropped
+  // one's moves across. Sheet bookkeeping moves where the kept person has none
+  // for that sheet field, so the next sync still recognises the row.
+  const [keepProfile] = await db.select({ id: volunteerProfiles.id }).from(volunteerProfiles).where(eq(volunteerProfiles.personId, keepId));
+  if (!keepProfile) {
+    await db.update(volunteerProfiles).set({ personId: keepId }).where(eq(volunteerProfiles.personId, dropId));
+  }
+  const keepValues = await db.select().from(sheetSyncValues).where(eq(sheetSyncValues.personId, keepId));
+  const dropValues = await db.select().from(sheetSyncValues).where(eq(sheetSyncValues.personId, dropId));
+  for (const v of dropValues) {
+    if (!keepValues.some((k) => k.sheet === v.sheet && k.field === v.field)) {
+      await db.update(sheetSyncValues).set({ personId: keepId }).where(eq(sheetSyncValues.id, v.id));
+    }
+  }
+  await db.update(sheetFieldConflicts).set({ personId: keepId }).where(eq(sheetFieldConflicts.personId, dropId));
   for (const flagId of settled) {
     await db
       .update(personReviewFlags)
@@ -286,7 +309,8 @@ export async function mergePeople(keepId: number, dropId: number, userId: string
     })
     .where(eq(people.id, keepId));
 
-  // 3. Delete the emptied record (its aliases cascade)
+  // 3. Delete the emptied record (its aliases, and a volunteer profile or
+  //    sheet values the kept person already had, cascade)
   await db.delete(people).where(eq(people.id, dropId));
   const [after] = await db.select().from(people).where(eq(people.id, keepId)).limit(1);
   return { kept: after, dropped: drop, resolvedFlags: settled.length };
