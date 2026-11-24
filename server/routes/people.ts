@@ -23,6 +23,7 @@ import {
   getVolunteerSyncStatus,
   runManualVolunteerSheetSync,
   resolveSheetConflict,
+  holdSheetConflict,
   VolunteerSyncError,
 } from '../services/people/volunteer-sheet-sync';
 
@@ -64,6 +65,7 @@ const mergeSchema = z.object({ keepId: z.number().int().positive(), dropId: z.nu
 const resolveSchema = z.object({ resolution: z.string().trim().min(1).max(1000) }).strict();
 const syncSchema = z.object({ dryRun: z.boolean().optional(), allowManyMissing: z.boolean().optional() }).strict();
 const conflictSchema = z.object({ choice: z.enum(['use_sheet', 'keep_app']) }).strict();
+const holdSchema = z.object({ note: optText(1000) }).strict();
 
 function auditContext(req: Request) {
   const user = (req as any).user || (req as any).session?.user;
@@ -153,6 +155,18 @@ export function createPeopleRouter() {
       const { choice } = conflictSchema.parse(req.body);
       const ctx = auditContext(req);
       const after = await resolveSheetConflict(idParam(req), choice, ctx.userId ?? null);
+      await AuditLogger.logUpdate('sheet_field_conflicts', String(after.id), null, after, ctx);
+      res.json(after);
+    })
+  );
+
+  router.post(
+    '/sheet-conflicts/:id/hold',
+    guard,
+    handle(async (req, res) => {
+      const { note } = holdSchema.parse(req.body ?? {});
+      const ctx = auditContext(req);
+      const after = await holdSheetConflict(idParam(req), note ?? null, ctx.userId ?? null);
       await AuditLogger.logUpdate('sheet_field_conflicts', String(after.id), null, after, ctx);
       res.json(after);
     })

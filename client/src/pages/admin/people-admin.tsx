@@ -110,6 +110,8 @@ interface SheetConflict {
   kind: 'conflict' | 'invalid_sheet_value' | 'possible_typo';
   sheetValue: string | null;
   appValue: string | null;
+  onHoldAt?: string | null;
+  onHoldNote?: string | null;
 }
 
 interface SyncSummary {
@@ -853,17 +855,33 @@ function VolunteerSection({ profile }: { profile: VolunteerProfile }) {
   );
 }
 
-/** One sheet-vs-app question with its two choices. */
+/**
+ * One sheet-vs-app question: use the sheet's value, keep the app's, or keep
+ * both and ask later (set aside with a note; the app keeps its own value
+ * meanwhile and it can still be decided either way).
+ */
 function ConflictCard({ conflict: c, onOpenPerson }: { conflict: SheetConflict; onOpenPerson?: (id: number) => void }) {
   const { toast } = useToast();
+  const [holding, setHolding] = useState(false);
+  const [note, setNote] = useState(c.onHoldNote ?? '');
   const resolve = useMutation({
     mutationFn: (choice: 'use_sheet' | 'keep_app') => apiRequest('POST', `${API}/sheet-conflicts/${c.id}/resolve`, { choice }),
     onSuccess: () => invalidate(c.personId),
     onError: (e: Error) => toast({ title: "Couldn't save", description: e.message, variant: 'destructive' }),
   });
+  const hold = useMutation({
+    mutationFn: () => apiRequest('POST', `${API}/sheet-conflicts/${c.id}/hold`, { note }),
+    onSuccess: () => {
+      setHolding(false);
+      invalidate(c.personId);
+    },
+    onError: (e: Error) => toast({ title: "Couldn't save", description: e.message, variant: 'destructive' }),
+  });
   const invalid = c.kind === 'invalid_sheet_value';
+  const onHold = !!c.onHoldAt;
+  const busy = resolve.isPending || hold.isPending;
   return (
-    <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+    <div className={`rounded-md border p-3 text-sm ${onHold ? 'border-slate-300 bg-slate-50' : 'border-amber-300 bg-amber-50'}`}>
       <div className="font-medium">
         {c.personName && onOpenPerson ? (
           <button type="button" className="underline" onClick={() => onOpenPerson(c.personId)}>
@@ -877,18 +895,45 @@ function ConflictCard({ conflict: c, onOpenPerson }: { conflict: SheetConflict; 
         <span className="text-slate-500">Sheet</span>
         <span className="break-all">{showValue(c.field, c.sheetValue)}</span>
         <span className="text-slate-500">App</span>
-        <span className="break-all">{showValue(c.field, c.appValue)}</span>
+        <span className="break-all">
+          {showValue(c.field, c.appValue)}
+          {onHold && <span className="text-slate-500"> (in use for now)</span>}
+        </span>
       </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {!invalid && (
-          <Button size="sm" variant="outline" disabled={resolve.isPending} onClick={() => resolve.mutate('use_sheet')}>
-            Use the sheet's
+      {onHold && (
+        <p className="mt-2 text-slate-600">
+          Waiting for clarification since {new Date(c.onHoldAt!).toLocaleDateString()}
+          {c.onHoldNote ? `: ${c.onHoldNote}` : ''}
+        </p>
+      )}
+      {holding ? (
+        <div className="mt-2 space-y-2">
+          <Label htmlFor={`hold-${c.id}`}>What needs clarifying, or who to ask (optional)</Label>
+          <Textarea id={`hold-${c.id}`} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" disabled={busy} onClick={() => hold.mutate()}>
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setHolding(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {!invalid && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => resolve.mutate('use_sheet')}>
+              Use the sheet's
+            </Button>
+          )}
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => resolve.mutate('keep_app')}>
+            {invalid ? "Keep the app's (fix the sheet later)" : "Keep the app's"}
           </Button>
-        )}
-        <Button size="sm" variant="outline" disabled={resolve.isPending} onClick={() => resolve.mutate('keep_app')}>
-          {invalid ? "Keep the app's (fix the sheet later)" : "Keep the app's"}
-        </Button>
-      </div>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => setHolding(true)}>
+            {onHold ? 'Edit note' : 'Keep both, ask later'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -919,7 +964,8 @@ function VolunteerSheetCard({ onOpenPerson }: { onOpenPerson: (id: number) => vo
   });
 
   const last = data?.lastRun;
-  const conflicts = data?.conflicts ?? [];
+  const conflicts = (data?.conflicts ?? []).filter((c) => !c.onHoldAt);
+  const waiting = (data?.conflicts ?? []).filter((c) => c.onHoldAt);
   const lastProblems = last?.summary && Array.isArray(last.summary.problems) ? last.summary.problems : [];
 
   return (
@@ -972,6 +1018,18 @@ function VolunteerSheetCard({ onOpenPerson }: { onOpenPerson: (id: number) => vo
               <ConflictCard key={c.id} conflict={c} onOpenPerson={onOpenPerson} />
             ))}
           </div>
+        )}
+        {waiting.length > 0 && (
+          <details className="space-y-2">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+              Waiting for clarification: {waiting.length}
+            </summary>
+            <div className="mt-2 space-y-2">
+              {waiting.map((c) => (
+                <ConflictCard key={c.id} conflict={c} onOpenPerson={onOpenPerson} />
+              ))}
+            </div>
+          </details>
         )}
       </CardContent>
     </Card>

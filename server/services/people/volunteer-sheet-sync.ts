@@ -336,7 +336,7 @@ export async function getVolunteerSyncStatus() {
   );
   const conflicts = await q(
     `SELECT c.id, c.person_id, c.field, c.kind, c.sheet_value, c.app_value, c.created_at,
-            p.first_name, p.last_name
+            c.on_hold_at, c.on_hold_note, p.first_name, p.last_name
        FROM sheet_field_conflicts c JOIN people p ON p.id = c.person_id
       WHERE c.sheet = $1 AND c.resolved_at IS NULL
       ORDER BY p.last_name, p.first_name, c.field`,
@@ -363,8 +363,29 @@ export async function getVolunteerSyncStatus() {
       sheetValue: c.sheet_value,
       appValue: c.app_value,
       createdAt: c.created_at,
+      onHoldAt: c.on_hold_at,
+      onHoldNote: c.on_hold_note,
     })),
   };
+}
+
+/**
+ * "Keep both, ask later": set a question aside until someone clarifies. It
+ * stays open (both values stay on the row, the app keeps its own value) and
+ * can still be decided either way. Calling it again updates the note.
+ */
+export async function holdSheetConflict(id: number, note: string | null, userId: string | null) {
+  const q = await appQuery();
+  const [c] = await q(`SELECT id, resolved_at FROM sheet_field_conflicts WHERE id = $1`, [id]);
+  if (!c) throw new VolunteerSyncError('That question no longer exists.');
+  if (c.resolved_at) throw new VolunteerSyncError('That question has already been decided.');
+  const [after] = await q(
+    `UPDATE sheet_field_conflicts
+        SET on_hold_at = COALESCE(on_hold_at, NOW()), on_hold_note = $2, on_hold_by_user_id = $3
+      WHERE id = $1 RETURNING *`,
+    [id, note, userId]
+  );
+  return after;
 }
 
 /**
