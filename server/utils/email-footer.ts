@@ -1,6 +1,7 @@
 /**
- * SendGrid Compliance: Centralized email footer with required opt-out text
- * All emails MUST include unsubscribe information for SendGrid compliance
+ * Compliance: centralized email footer with opt-out text.
+ * The email helper also adds a per-recipient "Manage email preferences /
+ * unsubscribe" link to every email (server/services/email/preferences.ts).
  */
 
 export const EMAIL_FOOTER_TEXT = `

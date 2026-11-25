@@ -247,8 +247,10 @@ PRODUCTION_DATABASE_URL=postgresql://user:pass@host.neon.tech/dbname?sslmode=req
 # Session
 SESSION_SECRET=<long-random-string-min-32-chars>
 
-# Email (SendGrid)
-SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Email (Twilio Email; separate from the SMS Twilio credentials)
+TWILIO_EMAIL_API_KEY=SKxxxxx
+TWILIO_EMAIL_API_SECRET=xxxxx
+EMAIL_FROM_ADDRESS=sender@yourdomain.org
 NOTIFICATION_FROM_EMAIL=noreply@yourdomain.com
 
 # SMS (Twilio)
@@ -473,7 +475,7 @@ Test key user journeys:
 - Real-time messaging
 
 **3. External Integrations:**
-- SendGrid (send test email)
+- Twilio Email (`npm run email:test -- you@example.com`)
 - Twilio (send test SMS)
 - Google Sheets (sync test)
 

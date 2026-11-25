@@ -630,7 +630,7 @@ async function deliverNotification(notification: any, channel: string): Promise<
     // Use the smart delivery service to deliver the notification
     // This integrates with:
     // - WebSocket for in_app notifications
-    // - SendGrid for email notifications
+    // - Twilio Email for email notifications
     // - Twilio for SMS notifications
     // - FCM/APNS for push notifications
     await smartDeliveryService.deliverNotificationNow(notification, channel);

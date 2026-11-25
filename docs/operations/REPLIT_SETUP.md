@@ -23,7 +23,7 @@ The application features a React 18 frontend with TypeScript, Vite, TanStack Que
 **Technical Implementations & Feature Specifications:**
 - **Authentication & Permissions**: Role-based access control, granular permissions, session management, password security, and active user enforcement.
 - **Data Management**: Comprehensive management of collections, hosts, recipients, users, and audit logs with Zod validation, timezone-safe date handling, and soft deletes. `sandwich_collections` table is the operational source of truth.
-- **Messaging & Notifications**: Email (SendGrid), Socket.IO chat, SMS via Twilio, and dashboard notifications. All outgoing emails are BCC'd to `katie@thesandwichproject.org`.
+- **Messaging & Notifications**: Email (Twilio Email, via `server/services/email`), Socket.IO chat, SMS via Twilio, and dashboard notifications. Most outgoing emails also send a separate monitoring copy to `katie@thesandwichproject.org`.
 - **Operational Tools**: Project, meeting, and work log management, user feedback, analytics dashboards, and a permissions-based Collection Walkthrough Tool.
 - **Event Requests Management System**: Tracks requests, handles duplicate detection, manages statuses, integrates with Google Sheets, calculates van driver staffing, supports multi-recipient assignment, performs comprehensive intake validation, and features interactive Leaflet maps with AI Intake and Scheduling Assistants, including van conflict detection.
 - **Real-Time Collaboration System**: Multi-user collaboration for event editing and other resources with Socket.IO synchronization, including presence tracking, field-level locking, threaded comments, and edit revision history. All real-time communication is consolidated onto a single Socket.IO instance to prevent connection issues.
@@ -59,7 +59,7 @@ The application features a React 18 frontend with TypeScript, Vite, TanStack Que
 - **Web Framework**: `express`
 - **UI/Styling**: `@radix-ui`, `tailwindcss`, `lucide-react`, `class-variance-authority`, `shadcn/ui`
 - **Data Fetching/State**: `@tanstack/react-query`, `react-hook-form`, `zod`
-- **Email**: `@sendgrid/mail`
+- **Email**: Twilio Email API (plain `fetch`, no SDK)
 - **Real-time Communication**: `socket.io`, `socket.io-client`
 - **PDF Generation**: `pdfkit`
 - **Authentication**: `connect-pg-simple`

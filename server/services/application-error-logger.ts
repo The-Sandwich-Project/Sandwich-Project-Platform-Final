@@ -65,7 +65,7 @@ async function sendAdminNotification(
   logId: number
 ): Promise<boolean> {
   try {
-    const { sendEmail } = await import('./sendgrid');
+    const { sendEmailOrThrow: sendEmail } = await import('./email');
     const severity = input.severity || 'error';
     const detailsJson = input.details
       ? JSON.stringify(input.details, null, 2)
@@ -233,7 +233,7 @@ export async function sendDailyErrorDigest(): Promise<{
     .join('');
 
   try {
-    const { sendEmailWithResult } = await import('../sendgrid');
+    const { sendEmailWithResult } = await import('./email');
     const sendResult = await sendEmailWithResult({
       emailStream: 'operational',
       to: ADMIN_EMAIL,
@@ -265,7 +265,7 @@ export async function sendDailyErrorDigest(): Promise<{
         </div>
       `,
     });
-    // sendEmail resolves false (not throws) on a missing key or SendGrid
+    // sendEmail resolves false (not throws) on a missing key or a Twilio Email
     // rejection, so check the result explicitly — otherwise a failed delivery
     // would be recorded as a successful digest and that 24h window lost.
     if (!sendResult.success) {

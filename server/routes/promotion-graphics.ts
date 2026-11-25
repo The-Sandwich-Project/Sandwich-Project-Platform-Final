@@ -10,7 +10,7 @@ import {
   users
 } from '../../shared/schema';
 import { logger } from '../middleware/logger';
-import { sendEmail } from '../sendgrid';
+import { sendEmail } from '../services/email';
 import { requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { promotionGraphicsUpload } from '../middleware/uploads';
@@ -565,7 +565,6 @@ async function sendNotificationEmail(graphic: PromotionGraphic, uploader: any) {
         await sendEmail({
           emailStream: 'newsletter',
           to: recipientEmail,
-          from: 'katielong2316@gmail.com',
           subject: `New Social Media Graphic Available: ${graphic.title}`,
           text: `Hello ${recipientName},
 

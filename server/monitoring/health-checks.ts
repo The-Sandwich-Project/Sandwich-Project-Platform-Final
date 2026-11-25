@@ -178,7 +178,10 @@ function checkWebSocketHealth(io?: any, wss?: any): ComponentHealth {
  */
 async function checkExternalServicesHealth(): Promise<ComponentHealth> {
   const services = {
-    email: !!process.env.SENDGRID_API_KEY,
+    email:
+      !!process.env.TWILIO_EMAIL_API_KEY &&
+      !!process.env.TWILIO_EMAIL_API_SECRET &&
+      !!process.env.EMAIL_FROM_ADDRESS,
     sms: !!process.env.TWILIO_ACCOUNT_SID,
     googleSheets: !!process.env.GOOGLE_SHEETS_CREDENTIALS,
     googleCalendar: !!process.env.GOOGLE_CALENDAR_CREDENTIALS,

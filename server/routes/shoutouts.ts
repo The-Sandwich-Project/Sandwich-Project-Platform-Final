@@ -3,72 +3,45 @@ import { z } from 'zod';
 import { isAuthenticated } from '../auth';
 import { requirePermission } from '../middleware/auth';
 import { storage } from '../storage-wrapper';
-import { sendEmail } from '../services/sendgrid';
+import {
+  sendEmailOrThrow as sendEmail,
+  sendEmailWithResult,
+  defaultFromAddress,
+  isEmailConfigured,
+  missingEmailConfig,
+} from '../services/email';
 import { logger } from '../utils/production-safe-logger';
 
 const router = Router();
 
-// Test SendGrid configuration endpoint
+// Test email configuration endpoint: sends one test email to the current user
 router.post(
   '/test',
   isAuthenticated,
   requirePermission('USERS_EDIT'),
   async (req, res) => {
-    try {
-      logger.log('🧪 Testing SendGrid configuration...');
-
-      // Test with user's email
-      const testEmail = req.user?.email || 'admin@sandwich.project';
-
-      // Try different "from" addresses to identify the issue
-      const fromAddresses = [
-        'katielong2316@gmail.com',
-        'no-reply@thesandwichproject.org',
-        'alerts@thesandwichproject.org',
-        'admin@thesandwichproject.org',
-      ];
-
-      const results = [];
-
-      for (const fromAddress of fromAddresses) {
-        try {
-          logger.log(`Testing from address: ${fromAddress}`);
-          await sendEmail({
-            emailStream: 'newsletter',
-            to: testEmail,
-            from: fromAddress,
-            subject: 'SendGrid Test - TSP Platform',
-            text: `This is a test email from ${fromAddress} to verify SendGrid configuration.`,
-            html: `<p>This is a test email from <strong>${fromAddress}</strong> to verify SendGrid configuration.</p>`,
-          });
-          results.push({ from: fromAddress, status: 'success' });
-          logger.log(`✅ Success with ${fromAddress}`);
-        } catch (error) {
-          results.push({
-            from: fromAddress,
-            status: 'failed',
-            error: error.message,
-            details: error.response?.body,
-          });
-          logger.log(`❌ Failed with ${fromAddress}: ${error.message}`);
-        }
-      }
-
-      res.json({
-        success: true,
-        message: 'SendGrid test completed',
-        results,
-        apiKeyConfigured: !!process.env.SENDGRID_API_KEY,
-        testRecipient: testEmail,
-      });
-    } catch (error) {
-      logger.error('SendGrid test error:', error);
-      res.status(500).json({
-        error: 'SendGrid test failed',
-        message: error.message,
-        apiKeyConfigured: !!process.env.SENDGRID_API_KEY,
-      });
+    const testEmail = req.user?.preferredEmail || req.user?.email;
+    if (!testEmail) {
+      return res.status(400).json({ error: 'Your account has no email address' });
     }
+    logger.log('🧪 Testing Twilio Email configuration...');
+    const result = await sendEmailWithResult({
+      emailStream: 'operational',
+      adminCopy: false,
+      to: testEmail,
+      subject: 'Email Test - TSP Platform',
+      text: `This is a test email from ${defaultFromAddress()} to verify the Twilio Email configuration.`,
+      html: `<p>This is a test email from <strong>${defaultFromAddress()}</strong> to verify the Twilio Email configuration.</p>`,
+    });
+    res.status(result.success ? 200 : 500).json({
+      success: result.success,
+      message: result.success ? 'Test email accepted by Twilio Email' : 'Test email failed',
+      error: result.error,
+      operationIds: result.operationIds,
+      emailConfigured: isEmailConfigured(),
+      missing: missingEmailConfig(),
+      testRecipient: testEmail,
+    });
   }
 );
 
@@ -162,84 +135,34 @@ router.post(
       let failureCount = 0;
       const errors = [];
 
-      // Try different verified sender addresses (prioritize Katie's verified email)
-      const verifiedSenders = [
-        'katielong2316@gmail.com',
-        'no-reply@thesandwichproject.org',
-        'alerts@thesandwichproject.org',
-        'admin@thesandwichproject.org',
-      ];
-
-      let workingSender = null;
-
-      // Test first recipient to find working sender
-      if (validRecipients.length > 0) {
-        for (const sender of verifiedSenders) {
-          try {
-            await sendEmail({
-              emailStream: 'newsletter',
-              to: validRecipients[0].email,
-              from: sender,
-              subject: subject,
-              text: message,
-              html: message.replace(/\n/g, '<br>'),
-            });
-            workingSender = sender;
-            successCount++;
-            logger.log(`✅ Found working sender: ${sender}`);
-            break;
-          } catch (error) {
-            logger.log(`❌ Failed with sender ${sender}: ${error.message}`);
-            if (error.response?.body) {
-              logger.error(
-                'SendGrid error details:',
-                JSON.stringify(error.response.body, null, 2)
-              );
-              errors.push(
-                `Failed to send to ${validRecipients[0].email}: ${
-                  error.message
-                } (Details: ${JSON.stringify(error.response.body)})`
-              );
-            } else {
-              errors.push(
-                `Failed to send to ${validRecipients[0].email}: ${error.message}`
-              );
-            }
-          }
-        }
-      }
-
-      if (!workingSender) {
-        return res.status(500).json({
-          error: 'Failed to send shoutout to any recipients',
-          details: [
-            'No verified sender address is working with SendGrid. Please check SendGrid configuration and sender verification.',
-          ],
-          debugInfo: errors,
-        });
-      }
-
-      // Send to remaining recipients using working sender
-      for (let i = 1; i < validRecipients.length; i++) {
-        const recipient = validRecipients[i];
+      // Each recipient gets their own email from EMAIL_FROM_ADDRESS. People
+      // who unsubscribed from newsletter mail are skipped, not counted as failures.
+      let skippedCount = 0;
+      for (const recipient of validRecipients) {
         try {
-          await sendEmail({
+          const result = await sendEmail({
             emailStream: 'newsletter',
             to: recipient.email,
-            from: workingSender,
             subject: subject,
             text: message,
             html: message.replace(/\n/g, '<br>'),
           });
-          successCount++;
+          if (result.suppressed) {
+            skippedCount++;
+          } else {
+            successCount++;
+          }
         } catch (error) {
           failureCount++;
-          errors.push(`Failed to send to ${recipient.email}: ${error.message}`);
+          errors.push(`Failed to send to ${recipient.email}: ${(error as Error).message}`);
           logger.error(
             `Failed to send shoutout to ${recipient.email}:`,
             error
           );
         }
+      }
+      if (skippedCount > 0) {
+        logger.log(`Shoutout: skipped ${skippedCount} recipient(s) who unsubscribed from newsletters`);
       }
 
       // Log the shoutout for history

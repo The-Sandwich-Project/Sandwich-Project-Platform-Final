@@ -2,7 +2,7 @@
 
 This document catalogs all incomplete features and TODO items in the codebase, organized by priority and module.
 
-**Notification Infrastructure:** This app uses **SendGrid** (email) and **Twilio** (SMS) for notifications. There is no Firebase/FCM integration.
+**Notification Infrastructure:** This app uses **Twilio Email** (email) and **Twilio** (SMS) for notifications. There is no Firebase/FCM integration.
 
 ---
 

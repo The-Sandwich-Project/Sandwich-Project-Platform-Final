@@ -681,8 +681,7 @@ router.post('/test-email', async (req, res) => {
     }
 
     // Import required modules
-    const mailService = (await import('@sendgrid/mail')).default;
-    const { withUnsubscribeSettings } = await import('../utils/sendgrid-unsubscribe');
+    const { sendEmailOrThrow } = await import('../services/email');
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
     
     const previousWednesday = new Date();
@@ -750,13 +749,14 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       </div>
     `;
 
-    await mailService.send(withUnsubscribeSettings({
+    await sendEmailOrThrow({
       to: emailAddress,
       from: 'katie@thesandwichproject.org',
       subject: emailSubject,
       text: emailText,
       html: emailHtml,
-    }, 'operational'));
+      emailStream: 'operational',
+    });
 
     res.json({
       success: true,
@@ -771,7 +771,7 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
 /**
  * Send one location's weekly email reminder and report what actually happened.
  * sendEmailReminder never throws; it returns success: false with a reason
- * (no contact on file, no email address, SendGrid not configured, send
+ * (no contact on file, no email address, Twilio Email not configured, send
  * failed). Those used to come back as HTTP 200, so the dashboard treated a
  * reminder that never went out as sent. Now they're a 422 with the reason.
  */

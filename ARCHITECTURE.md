@@ -121,7 +121,7 @@ The Sandwich Project Platform is a **full-stack TypeScript web application** bui
 │                    EXTERNAL INTEGRATIONS                              │
 │                                                                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │  SendGrid    │  │   Twilio     │  │  Google      │              │
+│  │ Twilio Email │  │   Twilio     │  │  Google      │              │
 │  │  (Email)     │  │   (SMS)      │  │  (Sheets/    │              │
 │  │              │  │              │  │   Calendar)  │              │
 │  └──────────────┘  └──────────────┘  └──────────────┘              │
@@ -178,7 +178,7 @@ The Sandwich Project Platform is a **full-stack TypeScript web application** bui
 |---------|---------|
 | **Replit** | Hosting & deployment |
 | **Neon** | Serverless PostgreSQL |
-| **SendGrid** | Transactional email |
+| **Twilio Email** | Transactional email (`server/services/email`) |
 | **Twilio** | SMS messaging |
 | **Sentry** | Error monitoring |
 | **Google Cloud** | File storage, Sheets sync |
@@ -665,7 +665,7 @@ run = "NODE_ENV=production node dist/index.js"
 - `PRODUCTION_DATABASE_URL` - Neon PostgreSQL connection
 - `SESSION_SECRET` - Session encryption key
 - `SENTRY_DSN` - Error tracking
-- `SENDGRID_API_KEY` - Email service
+- `TWILIO_EMAIL_API_KEY`, `TWILIO_EMAIL_API_SECRET`, `EMAIL_FROM_ADDRESS` - Email service (separate from the SMS Twilio credentials)
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` - SMS service
 - `REPLIT_DOMAIN` - Application domain
 
@@ -708,24 +708,22 @@ GET /monitoring/health/live    # Liveness probe
 
 ## Integration Points
 
-### Email (SendGrid)
+### Email (Twilio Email)
 
-**Location:** `server/services/notifications/sendgrid-email-provider.ts`
+**Location:** `server/services/email/`
 
 ```typescript
-import sgMail from '@sendgrid/mail';
+import { sendEmail } from '../services/email';
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
-
-export async function sendEmail(to: string, subject: string, body: string) {
-  await sgMail.send({
-    to,
-    from: process.env.NOTIFICATION_FROM_EMAIL!,
-    subject,
-    html: body,
-  });
-}
+await sendEmail({
+  emailStream: 'operational', // or 'newsletter'
+  to: 'user@example.com',
+  subject: 'Welcome!',
+  html: '<h1>Welcome to The Sandwich Project</h1>',
+});
 ```
+
+Posts to `https://comms.twilio.com/v1/Emails` with Basic auth (`TWILIO_EMAIL_API_KEY:TWILIO_EMAIL_API_SECRET`). Checks `email_suppressions` first and adds a per-recipient email-preferences link.
 
 ### SMS (Twilio)
 

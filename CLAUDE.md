@@ -8,7 +8,7 @@ A full-stack management platform for The Sandwich Project, an Atlanta-based nonp
 - **Backend**: Express.js + TypeScript, Drizzle ORM, WebSockets (Socket.IO)
 - **Database**: PostgreSQL on Neon (branched: dev + production)
 - **Hosting**: Replit
-- **Email**: SendGrid (`katie@thesandwichproject.org` as sender)
+- **Email**: Twilio Email API (`POST https://comms.twilio.com/v1/Emails`, `katie@thesandwichproject.org` as default sender). Replaced SendGrid; `@sendgrid/mail` is gone
 - **SMS**: Twilio
 - **AI**: Mostly **OpenAI** (gpt-5 / gpt-5-mini) — AI chat, AI analyst, intake assistance, date suggestions, categorization, impact reports, predictions, receipt processing, smart-search embeddings. **Claude** (Anthropic SDK) is used in exactly one place: sign-in sheet photo parsing (`server/services/signin-sheet-parser.ts`).
 
@@ -55,9 +55,10 @@ Past schema work skipped these, which is why links between tables live only in a
 ## Key Environment Variables (in Replit Secrets)
 - `DATABASE_URL` — Production Neon connection string
 - `DEV_DATABASE_URL` — Dev Neon branch connection string
-- `SENDGRID_API_KEY` — Email sending
-- `SENDGRID_ASM_GROUP_ID_OPERATIONAL`, `SENDGRID_ASM_GROUP_ID_NEWSLETTER` — SendGrid unsubscribe group IDs. Every send goes through `withUnsubscribeSettings()` in `server/utils/sendgrid-unsubscribe.ts`, which picks the group, adds the scanner-safe preferences link, and lets operational mail bypass global unsubscribes
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — SMS
+- `TWILIO_EMAIL_API_KEY`, `TWILIO_EMAIL_API_SECRET` — Email only (restricted Twilio API key: Comms → Emails Read + Create). Never reuse the SMS credentials for email or vice versa
+- `EMAIL_FROM_ADDRESS` — Default From address (`katie@thesandwichproject.org`). Must be on the domain verified in Twilio (Email → Domains)
+- `EMAIL_TOOLKIT_BCC` — Optional extra copy of toolkit/event emails (defaults to the admin address)
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — SMS only (plus the Replit Twilio connector)
 - `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL` — OpenAI via Replit AI Integrations (most AI features)
 - `OPENAI_API_KEY` — Direct OpenAI key (SMS collection parsing, smart-search embeddings, alert generation)
 - `ANTHROPIC_API_KEY` — Claude, used only for sign-in sheet photo parsing
@@ -80,7 +81,7 @@ server/
     volunteer-event-hub.ts  # Volunteer signup system
   services/          # ~44 service files
     cron-jobs.ts     # All scheduled jobs (auto-complete, reminders, digests)
-    email-service.ts # SendGrid integration
+    email/           # THE email helper (Twilio Email): sending, suppressions, unsubscribe page
     organizations/   # Returning org detection, merge service
 
 client/src/
@@ -143,6 +144,14 @@ All in `server/services/cron-jobs.ts` (node-cron, `America/New_York`). Key jobs:
 - **Disabled jobs** (volunteer reminders, TSP/corporate follow-ups, event-approaching, etc.) are log-only stubs. Note: they pass `{ scheduled: false }`, but node-cron 4.x ignores that option and starts them anyway — if you restore a real body, it will run on schedule immediately.
 
 Separately, `server/background-sync-service.ts` reads the Event Requests Google Sheet into the DB every 30 minutes.
+
+### Sending Email
+Every email goes through `server/services/email` (`sendEmail` / `sendEmailWithResult` / `sendEmailOrThrow`). Never call Twilio or any email API directly.
+- Every send passes `emailStream: 'operational' | 'newsletter'`. Operational = assignments, reminders, resets, alerts; newsletter = announcements, shout-outs
+- `sendEmail`/`sendEmailWithResult` also send a monitoring copy to the admin (`adminCopy: false` to skip); `sendEmailOrThrow` doesn't unless `adminCopy: true`
+- Twilio Email has **no CC, BCC or Reply-To**. The helper sends each CC/BCC/admin copy as its own request, and turns a `replyTo` that differs from From into a "To reply, email …" line at the top of the body. For emails a team member writes, use `buildUserSender()` (`server/utils/user-sender.ts`): it sends FROM their own @thesandwichproject.org address when they have one, so plain Reply works
+- Before sending, the helper checks `email_suppressions` (bounces, spam reports, unsubscribes; SendGrid's history was imported) and adds a per-recipient "Manage email preferences / unsubscribe" link to `/api/email-preferences` (public; GET only shows the page, POST changes it, so link scanners can't unsubscribe anyone). Newsletter mail also gets one-click `List-Unsubscribe` headers
+- `npm run email:test -- you@example.com` sends one real test email
 
 ### Onboarding System
 `client/src/hooks/useOnboarding.ts` — localStorage-based step tracking. Add new steps to the `OnboardingStep` type and `onboardingContent` map. Wrap UI elements with `<OnboardingTooltip>` from `client/src/components/ui/onboarding-tooltip.tsx`.

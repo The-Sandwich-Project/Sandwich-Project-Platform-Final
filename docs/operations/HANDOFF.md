@@ -95,7 +95,7 @@ The Sandwich Project Platform is a comprehensive management system for **The San
 3. **Collections Tracking** - Log sandwich pickups and distributions
 4. **Project Management** - Coordinate initiatives and campaigns
 5. **Real-time Messaging** - Chat system for volunteer coordination
-6. **Notifications** - Email (SendGrid) and SMS (Twilio) alerts
+6. **Notifications** - Email (Twilio Email) and SMS (Twilio) alerts
 7. **Analytics Dashboard** - Track impact, donations, and volunteer hours
 8. **Meeting Management** - Agendas, minutes, and documentation
 
@@ -151,7 +151,9 @@ SENTRY_DSN=https://...
 SENTRY_RELEASE=<git-sha>
 
 # Email
-SENDGRID_API_KEY=SG...
+TWILIO_EMAIL_API_KEY=SK...
+TWILIO_EMAIL_API_SECRET=...
+EMAIL_FROM_ADDRESS=katie@thesandwichproject.org
 NOTIFICATION_FROM_EMAIL=noreply@...
 
 # SMS
@@ -223,7 +225,7 @@ SESSION_SECRET=<random-string>
 ### Day 5: Integration Points
 
 - [ ] Review external integrations:
-  - SendGrid (email)
+  - Twilio Email (email)
   - Twilio (SMS)
   - Google Sheets (sync)
   - Sentry (errors)
@@ -330,7 +332,7 @@ SESSION_SECRET=<random-string>
 |---------|---------|-------------|---------|
 | **Replit** | Hosting | [URL] | https://replit.com/support |
 | **Neon** | Database | [URL] | https://neon.tech/docs |
-| **SendGrid** | Email | [URL] | https://support.sendgrid.com |
+| **Twilio Email** | Email | [URL] | https://help.twilio.com |
 | **Twilio** | SMS | [URL] | https://support.twilio.com |
 | **Sentry** | Error Tracking | [URL] | https://sentry.io/support |
 | **Google Cloud** | Storage, Sheets | [URL] | https://cloud.google.com/support |
@@ -549,7 +551,7 @@ npm run test:all  # CRITICAL!
    - Implement preventive measures
    - Update security practices
 
-### SendGrid or Twilio Outage
+### Twilio Email or Twilio SMS Outage
 
 1. **Verify outage:**
    - Check service status pages

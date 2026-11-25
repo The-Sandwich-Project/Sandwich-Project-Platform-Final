@@ -143,7 +143,7 @@ router.post('/admin/send-announcement', isAuthenticated, async (req: any, res) =
       return res.status(403).json({ message: 'Admin access required' });
     }
 
-    const { sendEmail } = await import('../sendgrid');
+    const { sendEmail } = await import('../services/email');
     const { users } = await import('@shared/schema');
     const { eq } = await import('drizzle-orm');
     const { db } = await import('../db');

@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { missingEmailConfig } from './email';
 import Twilio from 'twilio';
 import { validateSMSConfig } from '../sms-service';
 import { SMSProviderFactory } from '../sms-providers/provider-factory';
@@ -85,65 +86,28 @@ async function checkOpenAIForSmsParser(
   );
 }
 
-async function checkSendGrid(liveCheck: boolean): Promise<IntegrationCheckResult> {
-  const configured = !!process.env.SENDGRID_API_KEY;
-
-  if (!configured) {
+/**
+ * Twilio Email (email only; SMS has its own check). Configuration check only:
+ * the restricted email key has Emails Read + Create but no List permission, so
+ * there is no read-only endpoint to call safely. `npm run email:test` sends a
+ * real test email.
+ */
+async function checkTwilioEmail(_liveCheck: boolean): Promise<IntegrationCheckResult> {
+  const missing = missingEmailConfig();
+  if (missing.length > 0) {
     return {
-      name: 'SendGrid (email)',
+      name: 'Twilio Email',
       configured: false,
       healthy: false,
-      message: 'SENDGRID_API_KEY is not set',
+      message: `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not set`,
     };
   }
-
-  if (!liveCheck) {
-    return {
-      name: 'SendGrid (email)',
-      configured: true,
-      healthy: null,
-      message: 'API key present (run live check to verify)',
-    };
-  }
-
-  try {
-    const start = Date.now();
-    const response = await fetch('https://api.sendgrid.com/v3/user/profile', {
-      headers: {
-        Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      return {
-        name: 'SendGrid (email)',
-        configured: true,
-        healthy: false,
-        message: `API rejected key (${response.status})${body ? `: ${body.slice(0, 120)}` : ''}`,
-        latencyMs: Date.now() - start,
-      };
-    }
-
-    const profile = (await response.json()) as { username?: string; email?: string };
-    const label = profile.username || profile.email || 'account verified';
-
-    return {
-      name: 'SendGrid (email)',
-      configured: true,
-      healthy: true,
-      message: `API key valid (${label})`,
-      latencyMs: Date.now() - start,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      name: 'SendGrid (email)',
-      configured: true,
-      healthy: false,
-      message: `API call failed: ${message}`,
-    };
-  }
+  return {
+    name: 'Twilio Email',
+    configured: true,
+    healthy: null,
+    message: `Configured; sending from ${process.env.EMAIL_FROM_ADDRESS}. Run "npm run email:test -- you@example.com" to send a real test.`,
+  };
 }
 
 async function checkTwilio(liveCheck: boolean): Promise<IntegrationCheckResult> {
@@ -359,7 +323,7 @@ export async function runIntegrationHealthCheck(options?: {
 
   const integrations = await Promise.all([
     checkOpenAIForSmsParser(liveCheck),
-    checkSendGrid(liveCheck),
+    checkTwilioEmail(liveCheck),
     checkTwilio(liveCheck),
     Promise.resolve(checkSentry()),
     checkAnthropicIntegrations(liveCheck),

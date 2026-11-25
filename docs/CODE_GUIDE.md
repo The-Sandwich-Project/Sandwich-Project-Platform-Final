@@ -647,17 +647,18 @@ if (hasPermission(req.user, 'projects:update', 'projects:delete')) {
 
 ## Integration Patterns
 
-### SendGrid Email
+### Email (Twilio Email)
 
-**Location:** `server/services/notifications/sendgrid-email-provider.ts`
+**Location:** `server/services/email/`
 
 ```typescript
-import { sendEmail } from './services/notifications/sendgrid-email-provider';
+import { sendEmail } from '../services/email';
 
 await sendEmail({
+  emailStream: 'operational', // 'newsletter' for announcements
   to: 'user@example.com',
   subject: 'Welcome!',
-  body: '<h1>Welcome to The Sandwich Project</h1>',
+  html: '<h1>Welcome to The Sandwich Project</h1>',
 });
 ```
 

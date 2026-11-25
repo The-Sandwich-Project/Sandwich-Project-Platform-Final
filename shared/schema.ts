@@ -5770,3 +5770,71 @@ export const recurringCollectionOverrides = pgTable(
 
 export type RecurringCollectionOverride =
   typeof recurringCollectionOverrides.$inferSelect;
+
+// ============================================================================
+// EMAIL SUPPRESSIONS
+// ============================================================================
+// Addresses the app must not email. Checked by the email helper
+// (server/services/email/) before every send. Keyed by address, not by person,
+// because most recipients (event contacts, volunteers without logins) have no
+// row in users/people. Twilio Email keeps its own bounce/spam/unsubscribe list
+// too, but it can't be imported into and has no unsubscribe link, so this
+// table holds the SendGrid history plus everything our unsubscribe page records.
+export const EMAIL_SUPPRESSION_SCOPES = ['newsletter', 'operational', 'all'] as const;
+export const EMAIL_SUPPRESSION_REASONS = [
+  'unsubscribe',
+  'bounce',
+  'spam_report',
+  'invalid',
+  'manual',
+] as const;
+export const EMAIL_SUPPRESSION_SOURCES = [
+  'sendgrid_import',
+  'unsubscribe_link',
+  'one_click',
+  'admin',
+] as const;
+export type EmailSuppressionScope = (typeof EMAIL_SUPPRESSION_SCOPES)[number];
+export type EmailSuppressionReason = (typeof EMAIL_SUPPRESSION_REASONS)[number];
+export type EmailSuppressionSource = (typeof EMAIL_SUPPRESSION_SOURCES)[number];
+
+export const emailSuppressions = pgTable(
+  'email_suppressions',
+  {
+    id: serial('id').primaryKey(),
+    // Always stored trimmed and lowercased.
+    email: text('email').notNull(),
+    // newsletter: no newsletter/announcement mail. operational: no operational
+    // mail. all: nothing at all (bounces, spam reports, "unsubscribe from all").
+    scope: text('scope').notNull(),
+    reason: text('reason').notNull(),
+    source: text('source').notNull(),
+    note: text('note'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    emailScopeIdx: uniqueIndex('email_suppressions_email_scope_unique').on(
+      table.email,
+      table.scope
+    ),
+    emailLowerCheck: check(
+      'email_suppressions_email_lower_check',
+      sql`${table.email} = lower(btrim(${table.email})) AND ${table.email} <> ''`
+    ),
+    scopeCheck: check(
+      'email_suppressions_scope_check',
+      sql`${table.scope} IN ('newsletter', 'operational', 'all')`
+    ),
+    reasonCheck: check(
+      'email_suppressions_reason_check',
+      sql`${table.reason} IN ('unsubscribe', 'bounce', 'spam_report', 'invalid', 'manual')`
+    ),
+    sourceCheck: check(
+      'email_suppressions_source_check',
+      sql`${table.source} IN ('sendgrid_import', 'unsubscribe_link', 'one_click', 'admin')`
+    ),
+  })
+);
+
+export type EmailSuppression = typeof emailSuppressions.$inferSelect;
+export type InsertEmailSuppression = typeof emailSuppressions.$inferInsert;

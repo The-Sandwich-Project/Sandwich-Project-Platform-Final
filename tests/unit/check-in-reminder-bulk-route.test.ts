@@ -37,7 +37,10 @@ jest.mock('../../server/db', () => {
   };
 });
 jest.mock('../../server/sms-service', () => ({}));
-jest.mock('@sendgrid/mail', () => ({ __esModule: true, default: { send: jest.fn(), setApiKey: jest.fn() } }));
+jest.mock('../../server/services/email', () => ({
+  ...jest.requireActual('../../server/services/email'),
+  sendEmailOrThrow: jest.fn().mockResolvedValue({ success: true }),
+}));
 jest.mock('../../server/utils/production-safe-logger', () => ({
   logger: { log: jest.fn(), warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));

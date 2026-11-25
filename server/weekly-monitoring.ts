@@ -1,5 +1,4 @@
-import { MailService } from '@sendgrid/mail';
-import { withUnsubscribeSettings } from './utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from './services/email';
 import { db } from './db';
 import { sandwichCollections, hosts, hostContacts } from '@shared/schema';
 import { eq, sql, and, gte, lte, like, or, isNull } from 'drizzle-orm';
@@ -7,15 +6,10 @@ import { logger } from './utils/production-safe-logger';
 import { batchSendEmails } from './utils/batch-operations';
 import { FROM_EMAIL } from './config/organization';
 
-if (!process.env.SENDGRID_API_KEY) {
+if (!isEmailConfigured()) {
   logger.error(
-    'SENDGRID_API_KEY environment variable must be set for email notifications'
+    'Twilio Email is not configured (TWILIO_EMAIL_API_KEY / TWILIO_EMAIL_API_SECRET / EMAIL_FROM_ADDRESS) - weekly monitoring emails will not send'
   );
-}
-
-const mailService = new MailService();
-if (process.env.SENDGRID_API_KEY) {
-  mailService.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
 // Expected host locations that should submit weekly
@@ -507,9 +501,9 @@ export async function sendMissingSubmissionsEmail(
   isTest = false,
   weekLabel?: string
 ): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) {
+  if (!isEmailConfigured()) {
     logger.log(
-      'SendGrid not configured - would send email about missing submissions:',
+      'Twilio Email not configured - would send email about missing submissions:',
       missingSubmissions.map((s) => s.location)
     );
     return false;
@@ -645,7 +639,7 @@ Check the Collections Log in the platform for real-time updates.
   };
 
   try {
-    await mailService.send(withUnsubscribeSettings(emailContent, 'operational'));
+    await sendEmailOrThrow({ ...emailContent, emailStream: 'operational' });
     logger.log(
       `Missing submissions email sent successfully to ${WEEKLY_MONITORING_RECIPIENT}`
     );
@@ -685,9 +679,9 @@ export async function runWeeklyMonitoring(): Promise<void> {
     logger.error('Error in weekly monitoring:', error);
 
     // Send error notification email
-    if (process.env.SENDGRID_API_KEY) {
+    if (isEmailConfigured()) {
       try {
-        await mailService.send(withUnsubscribeSettings({
+        await sendEmailOrThrow({
           to: WEEKLY_MONITORING_RECIPIENT,
           from: FROM_EMAIL,
           subject: '🚨 Sandwich Monitoring System Error',
@@ -702,7 +696,8 @@ export async function runWeeklyMonitoring(): Promise<void> {
               </div>
             </div>
           `,
-        }, 'operational'));
+          emailStream: 'operational',
+        });
       } catch (emailError) {
         logger.error('Failed to send error notification email:', emailError);
       }
@@ -747,10 +742,10 @@ export async function sendEmailReminder(
   location: string,
   appUrl?: string
 ): Promise<{ success: boolean; message: string }> {
-  if (!process.env.SENDGRID_API_KEY) {
+  if (!isEmailConfigured()) {
     return {
       success: false,
-      message: 'Email service not configured (SENDGRID_API_KEY missing)',
+      message: 'Email service not configured (Twilio Email env vars missing)',
     };
   }
 
@@ -910,14 +905,15 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       </div>
     `;
 
-    await mailService.send(withUnsubscribeSettings({
+    await sendEmailOrThrow({
       to: contactEmail,
       from: FROM_EMAIL,
       bcc: WEEKLY_MONITORING_RECIPIENT, // BCC admin on all host reminder emails
       subject: emailSubject,
       text: emailText,
       html: emailHtml,
-    }, 'operational'));
+      emailStream: 'operational',
+    });
 
     logger.log(
       `✅ Email reminder sent successfully to ${location} (${contactEmail})`
@@ -947,10 +943,10 @@ async function sendDunwoodyTargetedEmail(
   targetGroups: string[],
   appUrl?: string
 ): Promise<{ success: boolean; message: string }> {
-  if (!process.env.SENDGRID_API_KEY) {
+  if (!isEmailConfigured()) {
     return {
       success: false,
-      message: 'Email service not configured (SENDGRID_API_KEY missing)',
+      message: 'Email service not configured (Twilio Email env vars missing)',
     };
   }
 
@@ -1082,14 +1078,15 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
         </div>
       `;
 
-      return await mailService.send(withUnsubscribeSettings({
+      return await sendEmailOrThrow({
         to: contact.email!,
         from: FROM_EMAIL,
         bcc: WEEKLY_MONITORING_RECIPIENT, // BCC admin on all Dunwoody reminder emails
         subject: emailSubject,
         text: emailText,
         html: emailHtml,
-      }, 'operational'));
+        emailStream: 'operational',
+      });
     });
 
     // Send emails in batch (continues even if some fail)

@@ -119,7 +119,7 @@ export class BackgroundSyncService {
    */
   private async sendServiceStoppedAlert() {
     try {
-      const { sendEmail } = await import('./sendgrid');
+      const { sendEmail } = await import('./services/email');
       const adminEmail = ADMIN_EMAIL;
       
       const lastSuccessTime = this.lastSuccessfulSync 
@@ -129,7 +129,7 @@ export class BackgroundSyncService {
       await sendEmail({
         emailStream: 'operational',
         to: adminEmail,
-        from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
+        from: process.env.EMAIL_FROM_ADDRESS || 'katie@thesandwichproject.org',
         subject: '🚨 CRITICAL: Event Requests Sync Service Stopped',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -445,13 +445,13 @@ Action Required:
    */
   private async sendNoSyncEverAlert(minutesSinceStart: number) {
     try {
-      const { sendEmail } = await import('./sendgrid');
+      const { sendEmail } = await import('./services/email');
       const adminEmail = ADMIN_EMAIL;
       
       await sendEmail({
         emailStream: 'operational',
         to: adminEmail,
-        from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
+        from: process.env.EMAIL_FROM_ADDRESS || 'katie@thesandwichproject.org',
         subject: '🚨 CRITICAL: Event Requests Sync Has Never Completed',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -547,7 +547,7 @@ Action Required:
     }
 
     try {
-      const { sendEmail } = await import('./sendgrid');
+      const { sendEmail } = await import('./services/email');
       const adminEmail = ADMIN_EMAIL;
       
       const lastSuccessTime = this.lastSuccessfulSync 
@@ -557,7 +557,7 @@ Action Required:
       await sendEmail({
         emailStream: 'operational',
         to: adminEmail,
-        from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
+        from: process.env.EMAIL_FROM_ADDRESS || 'katie@thesandwichproject.org',
         subject: '🚨 CRITICAL: Event Requests Sync Failing',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -635,7 +635,7 @@ This alert will not be sent again for ${this.ALERT_COOLDOWN_MINUTES} minutes unl
    */
   private async sendStaleSyncAlert(minutesSinceLastSuccess: number) {
     try {
-      const { sendEmail } = await import('./sendgrid');
+      const { sendEmail } = await import('./services/email');
       const adminEmail = ADMIN_EMAIL;
       
       const lastSuccessTime = this.lastSuccessfulSync 
@@ -645,7 +645,7 @@ This alert will not be sent again for ${this.ALERT_COOLDOWN_MINUTES} minutes unl
       await sendEmail({
         emailStream: 'operational',
         to: adminEmail,
-        from: process.env.SENDGRID_FROM_EMAIL || 'katie@thesandwichproject.org',
+        from: process.env.EMAIL_FROM_ADDRESS || 'katie@thesandwichproject.org',
         subject: '⚠️ WARNING: Event Requests Sync Stale',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

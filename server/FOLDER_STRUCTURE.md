@@ -71,7 +71,6 @@ This document outlines the new organized folder structure for routes and service
 - email-notification-service.ts
 - email-service.ts
 - messaging-service.ts
-- sendgrid.ts
 
 ## Migration Strategy
 

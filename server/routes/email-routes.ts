@@ -595,8 +595,8 @@ export function createEmailRouter(deps: RouterDependencies) {
       });
     }
 
-    // For actual emails, send directly via SendGrid without wrapper
-    const { sendEmailWithResult } = await import('../sendgrid');
+    // For actual emails, send through the email helper (Twilio Email)
+    const { sendEmailWithResult, isEmailConfigured } = await import('../services/email');
 
     // Check if content is already full HTML (starts with <!DOCTYPE html>)
     const isFullHtml = content.trim().startsWith('<!DOCTYPE html>');
@@ -626,7 +626,7 @@ export function createEmailRouter(deps: RouterDependencies) {
     // paths, legacy hashes, local files) into base64 up front. If any can't be
     // loaded, refuse to send rather than silently emailing without it.
     const { resolveEmailAttachments, describeFailedAttachments } = await import('../utils/email-attachments');
-    const { resolved: attachmentsForSendgrid, failed: failedAttachments } =
+    const { resolved: resolvedAttachments, failed: failedAttachments } =
       await resolveEmailAttachments(attachments, { user: fullUserData || user });
 
     if (failedAttachments.length > 0) {
@@ -640,7 +640,7 @@ export function createEmailRouter(deps: RouterDependencies) {
       });
     }
 
-    // Send clean professional email via SendGrid
+    // Send clean professional email
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
 
     // For full HTML documents, inject footer before closing tags
@@ -662,29 +662,29 @@ export function createEmailRouter(deps: RouterDependencies) {
       `;
     }
 
-    // From: the sender's own address when it's on our SendGrid-authenticated
+    // From: the sender's own address when it's on our Twilio-verified
     // domain, otherwise the org address shown as "<Name> via The Sandwich
-    // Project". Reply-To is the sender. See server/utils/user-sender.ts.
+    // Project" with a "To reply, email ..." line. See server/utils/user-sender.ts.
     const { buildUserSender } = await import('../utils/user-sender');
     const sender = buildUserSender(fullUserData || user);
     const replyTo = sender.replyTo || replyToEmail;
-    const orgBcc = process.env.SENDGRID_TOOLKIT_BCC || FROM_EMAIL;
+    const orgBcc = process.env.EMAIL_TOOLKIT_BCC || process.env.SENDGRID_TOOLKIT_BCC || FROM_EMAIL;
 
     const emailPayload: {
       to: string;
       from: { email: string; name?: string };
-      replyTo: string;
+      replyTo: string | { email: string; name?: string };
       subject: string;
       text?: string;
       html: string;
       bcc?: string[];
-      attachments?: typeof attachmentsForSendgrid;
+      attachments?: typeof resolvedAttachments;
       emailStream: 'operational';
     } = {
       emailStream: 'operational',
       to: recipientEmail,
       from: sender.from,
-      replyTo,
+      replyTo: sender.replyToName ? { email: replyTo, name: sender.replyToName } : replyTo,
       subject,
       html: finalHtml,
     };
@@ -695,7 +695,7 @@ export function createEmailRouter(deps: RouterDependencies) {
     }
 
     // BCC the org inbox and the sender (so they keep a copy). Skip anything
-    // matching the recipient to avoid SendGrid's duplicate-address error;
+    // matching the recipient (each copy is sent separately);
     // sendEmailWithResult also de-duplicates.
     const bccList = [orgBcc, sender.senderCopyBcc].filter(
       (addr): addr is string =>
@@ -705,31 +705,31 @@ export function createEmailRouter(deps: RouterDependencies) {
       emailPayload.bcc = bccList;
     }
 
-    if (attachmentsForSendgrid.length > 0) {
-      emailPayload.attachments = attachmentsForSendgrid;
+    if (resolvedAttachments.length > 0) {
+      emailPayload.attachments = resolvedAttachments;
     }
 
-    logger.log('[Event Email API] Sending email via SendGrid:', {
+    logger.log('[Event Email API] Sending email:', {
       to: recipientEmail,
       from: sender.from.email,
       replyTo,
       bcc: emailPayload.bcc,
       subject,
-      attachmentsCount: attachmentsForSendgrid.length,
+      attachmentsCount: resolvedAttachments.length,
       isFullHtml,
-      hasApiKey: !!process.env.SENDGRID_API_KEY,
+      emailConfigured: isEmailConfigured(),
     });
 
     const sendResult = await sendEmailWithResult(emailPayload);
 
     if (!sendResult.success) {
-      // Report the ACTUAL SendGrid rejection reason (e.g. sender-identity not
-      // verified) carried back with this specific send, instead of a misleading
+      // Report the ACTUAL Twilio Email rejection reason (e.g. from address not
+      // on a verified domain) carried back with this specific send, instead of a misleading
       // generic "check API key configuration".
       logger.error(
-        `[Event Email API] SendGrid send failed - email not sent. Reason: ${sendResult.error || 'unknown'}`
+        `[Event Email API] Send failed - email not sent. Reason: ${sendResult.error || 'unknown'}`
       );
-      throw new Error(sendResult.error || 'SendGrid rejected the email. Please try again or contact support.');
+      throw new Error(sendResult.error || 'The email could not be sent. Please try again or contact support.');
     }
 
     // Save a record in internal email system (without sending duplicate)

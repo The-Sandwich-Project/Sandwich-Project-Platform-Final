@@ -1,13 +1,13 @@
 /**
  * Holding Zone item mentions used to call an undefined `sendEmail`, so the
  * email always threw a ReferenceError (logged and swallowed) and nobody was
- * notified. These tests drive the real mention path with SendGrid mocked.
+ * notified. These tests drive the real mention path with the email helper mocked.
  */
 
-const mockSend = jest.fn().mockResolvedValue([{ statusCode: 202 }]);
-jest.mock('@sendgrid/mail', () => ({
-  __esModule: true,
-  default: { send: (...args: unknown[]) => mockSend(...args), setApiKey: jest.fn() },
+const mockSend = jest.fn().mockResolvedValue({ success: true, operationIds: ['op_test'] });
+jest.mock('../../server/services/email', () => ({
+  ...jest.requireActual('../../server/services/email'),
+  sendEmailOrThrow: (...args: unknown[]) => mockSend(...args),
 }));
 jest.mock('../../server/db', () => ({ db: {} }));
 jest.mock('../../server/sms-service', () => ({
@@ -35,17 +35,18 @@ const mentioned = (id: string, email: string, firstName: string) => ({
 });
 
 describe('Holding Zone item mention email', () => {
-  const savedKey = process.env.SENDGRID_API_KEY;
+  const saved = { ...process.env };
 
   beforeEach(() => {
-    process.env.SENDGRID_API_KEY = 'SG.test';
-    process.env.SENDGRID_ASM_GROUP_ID_OPERATIONAL = '101';
+    process.env.TWILIO_EMAIL_API_KEY = 'SKtest';
+    process.env.TWILIO_EMAIL_API_SECRET = 'test-secret';
+    process.env.EMAIL_FROM_ADDRESS = 'katie@thesandwichproject.org';
     mockSend.mockClear();
     mockGetEffectivePrefs.mockReset().mockResolvedValue({ emailEnabled: true });
   });
 
   afterAll(() => {
-    process.env.SENDGRID_API_KEY = savedKey;
+    process.env = saved;
   });
 
   it('emails each mentioned user (not the creator) as an operational message', async () => {
@@ -73,10 +74,8 @@ describe('Holding Zone item mention email', () => {
     expect(first.subject).toBe('Cy mentioned you in a Holding Zone item');
     expect(first.html).toContain('Hi Ana');
     expect(first.text).toContain('Cy mentioned you in a Holding Zone item');
-    // Goes through the shared unsubscribe handling
-    expect(first.asm).toEqual({ groupId: 101, groupsToDisplay: [101] });
-    expect(first.mailSettings).toEqual({ bypassUnsubscribeManagement: { enable: true } });
-    expect(first.trackingSettings).toEqual({ subscriptionTracking: { enable: false } });
+    // Sent as operational mail (newsletter unsubscribes don't apply)
+    expect(first.emailStream).toBe('operational');
   });
 
   it('respects users who turned off Holding Zone mention emails', async () => {
@@ -90,8 +89,8 @@ describe('Holding Zone item mention email', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it('skips sending when SendGrid is not configured', async () => {
-    delete process.env.SENDGRID_API_KEY;
+  it('skips sending when Twilio Email is not configured', async () => {
+    delete process.env.TWILIO_EMAIL_API_KEY;
     jest
       .spyOn(EmailNotificationService, 'findMentionedUsers')
       .mockResolvedValue([mentioned('u1', 'ana@example.org', 'Ana')]);

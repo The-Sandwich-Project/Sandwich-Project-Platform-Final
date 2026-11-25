@@ -11,8 +11,7 @@
  *   - general_checkin: General periodic check-in (legacy)
  */
 
-import sgMail from '@sendgrid/mail';
-import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from './email';
 import { db } from '../db';
 import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, notifications, REMINDER_RULE_TYPES } from '@shared/schema';
 import { and, eq, inArray, lte, or, sql } from 'drizzle-orm';
@@ -30,10 +29,6 @@ import {
   ReminderFrequency,
   CONDITION_CHECK_FREQUENCY,
 } from '../utils/reminder-scheduling';
-
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
 
 // Rule type display labels and descriptions for emails
 /**
@@ -357,18 +352,19 @@ async function sendReminderEmail(
   event: ReminderEvent,
   msg: ReminderMessage,
 ): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) return false;
+  if (!isEmailConfigured()) return false;
 
   const baseUrl = getAppBaseUrl();
 
   try {
-    await sgMail.send(withUnsubscribeSettings({
+    await sendEmailOrThrow({
       to: email,
       from: 'katie@thesandwichproject.org',
       subject: msg.subject,
       headers: reminderUnsubscribeHeaders(baseUrl),
       html: renderReminderEmailHtml(userName, event, msg, baseUrl),
-    }, 'operational'));
+      emailStream: 'operational',
+    });
     return true;
   } catch (error) {
     logger.error(`Failed to send reminder email to ${email}:`, error);
@@ -600,13 +596,13 @@ async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: Ru
 
     const prefs = getCheckInReminderPreferences(user);
     const email = user.preferredEmail || user.email;
-    if (process.env.SENDGRID_API_KEY && email && (prefs.defaultChannel === 'email' || prefs.defaultChannel === 'both')) {
+    if (isEmailConfigured() && email && (prefs.defaultChannel === 'email' || prefs.defaultChannel === 'both')) {
       const userName = user.displayName || user.firstName || 'there';
       const list = items
         .map(i => `<li style="margin-bottom:8px;"><a href="${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${i.id}" style="color:#007E8C;font-weight:600;">${escapeHtml(i.orgName)}</a><br/><span style="font-size:13px;color:#6b7280;">${i.labels.join(', ')}</span></li>`)
         .join('');
       try {
-        await sgMail.send(withUnsubscribeSettings({
+        await sendEmailOrThrow({
           to: email,
           from: 'katie@thesandwichproject.org',
           subject: title,
@@ -635,7 +631,8 @@ async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: Ru
               ${EMAIL_FOOTER_HTML}
             </div>
           `,
-        }, 'operational'));
+          emailStream: 'operational',
+        });
       } catch (error) {
         logger.error(`[CheckInReminders] Failed to send backlog summary email to user ${user.id}:`, error);
       }

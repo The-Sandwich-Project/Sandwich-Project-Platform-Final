@@ -1507,7 +1507,7 @@ ${userEmail}`;
 
       // ApiError exposes the parsed server body on `.data` (not `.response.data`).
       // The event-email route returns { message, error } where `error` holds the
-      // specific SendGrid rejection reason — prefer that so the operator sees an
+      // specific Twilio Email rejection reason — prefer that so the operator sees an
       // actionable message instead of a generic one.
       const errorMessage =
         error?.data?.error ||

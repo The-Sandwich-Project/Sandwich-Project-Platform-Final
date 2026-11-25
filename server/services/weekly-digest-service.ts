@@ -7,8 +7,7 @@
  * - Last 5 completed events for historical context
  */
 
-import sgMail from '@sendgrid/mail';
-import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from './email';
 import { db } from '../db';
 import { eventRequests, users } from '@shared/schema';
 import { eq, and, or, inArray, desc, gte, lte, sql } from 'drizzle-orm';
@@ -25,11 +24,6 @@ import {
   ContactAttemptLogEntry,
 } from './notification-tiers';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
-
-// Initialize SendGrid if available
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
 
 // ============================================================================
 // DIGEST DATA GATHERING
@@ -761,8 +755,8 @@ export function buildDigestEmailText(data: WeeklyDigestData): string {
  * Send weekly digest email to a single TSP contact
  */
 export async function sendWeeklyDigestEmail(data: WeeklyDigestData): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) {
-    logger.warn('SendGrid not configured - skipping weekly digest email');
+  if (!isEmailConfigured()) {
+    logger.warn('Twilio Email not configured - skipping weekly digest email');
     return false;
   }
 
@@ -775,7 +769,7 @@ export async function sendWeeklyDigestEmail(data: WeeklyDigestData): Promise<boo
       text: buildDigestEmailText(data),
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     logger.log(`Weekly digest sent to ${data.tspContactEmail} (${data.stats.totalActive} active, ${data.stats.needsUrgentAttention} urgent)`);
     return true;
   } catch (error) {

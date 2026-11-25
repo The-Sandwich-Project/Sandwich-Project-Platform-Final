@@ -7,8 +7,7 @@
  * Includes the AI-generated recommendations so they're actionable.
  */
 
-import sgMail from '@sendgrid/mail';
-import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from './email';
 import { predictMonthlySandwichNeeds, type PredictionResult } from './ai-predictions';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getAppBaseUrl } from '../config/constants';
@@ -79,8 +78,8 @@ async function sendPredictionAlertEmail(
   prediction: PredictionResult,
   monthLabel: string,
 ): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) {
-    log.warn('SENDGRID_API_KEY not set — skipping prediction alert email');
+  if (!isEmailConfigured()) {
+    log.warn('Twilio Email not configured — skipping prediction alert email');
     return false;
   }
 
@@ -196,13 +195,14 @@ To unsubscribe, contact katie@thesandwichproject.org.
   `.trim();
 
   try {
-    await sgMail.send(withUnsubscribeSettings({
+    await sendEmailOrThrow({
       to: ALERT_RECIPIENT,
       from: 'katie@thesandwichproject.org',
       subject,
       html,
       text,
-    }, 'operational'));
+      emailStream: 'operational',
+    });
     log.info(`Prediction alert email sent to ${ALERT_RECIPIENT} for ${monthLabel}`);
     return true;
   } catch (error) {

@@ -14,7 +14,7 @@ export async function notifyAdminOfSMS(params: {
   errorMessage?: string;
 }): Promise<void> {
   try {
-    const { sendEmail } = await import('../sendgrid');
+    const { sendEmail } = await import('../services/email');
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('./email-footer');
     
     const timestamp = new Date().toLocaleString('en-US', {
