@@ -16,6 +16,7 @@ Sections:
 2. [People & places: current tables](#2-people--places-current-tables-legacy) *(what exists today)*
 3. [Conventions](#3-conventions)
 4. [Open decisions](#4-open-decisions)
+5. [Email](#5-email)
 
 ---
 
@@ -363,3 +364,26 @@ Resolved:
 - **Sheet vs app on conflicts:** three-way comparison; see rule 8 in section 1.
 - **Historic regions:** decided from the step 2 audit; see "Collection sites
   and regions" in section 1.
+
+---
+
+## 5. Email
+
+```mermaid
+erDiagram
+    email_suppressions {
+        serial id PK
+        text email "lowercased; UNIQUE with scope"
+        text scope "newsletter | operational | all"
+        text reason "unsubscribe | bounce | spam_report | invalid | manual"
+        text source "sendgrid_import | unsubscribe_link | one_click | admin"
+    }
+```
+
+| Table | One row is | Notes |
+|---|---|---|
+| `email_suppressions` | One address the app must not send a kind of email to | Keyed by address, not by person, on purpose: most recipients (event contacts, volunteers without logins) have no `users`/`people` row, so there is no FK. The email helper (`server/services/email/`) checks it before every send. Filled by the public email preferences page, one-click List-Unsubscribe, and the one-off `scripts/import-sendgrid-suppressions.ts`. |
+
+Scopes: `newsletter` blocks newsletter/announcement mail, `operational` blocks
+operational mail, `all` blocks everything. The admin monitoring copy is never
+suppressed.

@@ -4948,8 +4948,8 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
       return res.status(404).json({ error: 'Event request not found' });
     }
 
-    // Import SendGrid service and email footer
-    const { sendEmail } = await import('../sendgrid');
+    // Import the email helper and email footer
+    const { sendEmail } = await import('../services/email');
     const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
     const { FROM_EMAIL } = await import('../config/organization');
 
@@ -4958,14 +4958,14 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     const emailBodyText = content + EMAIL_FOOTER_TEXT;
     const emailBodyHtml = content + EMAIL_FOOTER_HTML;
 
-    // From: the sender's own address when it's on our SendGrid-authenticated
-    // domain, otherwise the org address shown as "<Name> via The Sandwich
-    // Project". Reply-To is the sender, who also gets a BCC copy.
-    // See server/utils/user-sender.ts.
+    // From: the sender's own address when it's on our Twilio-verified domain
+    // (replies go straight to them), otherwise the org address shown as
+    // "<Name> via The Sandwich Project" plus a "To reply, email ..." line.
+    // The sender also gets a copy. See server/utils/user-sender.ts.
     const { buildUserSender } = await import('../utils/user-sender');
     const sender = buildUserSender(req.user);
     const replyToEmail =
-      sender.replyTo || process.env.SENDGRID_FROM_EMAIL || FROM_EMAIL;
+      sender.replyTo || process.env.EMAIL_FROM_ADDRESS || FROM_EMAIL;
 
     // Resolve attachments (incl. /objects/ storage paths) up front; refuse to
     // send if any selected file can't be loaded instead of dropping it.
@@ -4979,12 +4979,12 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
       });
     }
 
-    // Send email via SendGrid with actual file attachments
+    // Send the email (with actual file attachments)
     const emailSent = await sendEmail({
       emailStream: 'operational',
       to: recipientEmail,
       from: sender.from,
-      replyTo: replyToEmail,
+      replyTo: sender.replyToName ? { email: replyToEmail, name: sender.replyToName } : replyToEmail,
       ...(sender.senderCopyBcc ? { bcc: sender.senderCopyBcc } : {}),
       subject,
       text: emailBodyText,
@@ -4993,7 +4993,7 @@ router.post('/:id/send-email', isAuthenticated, async (req, res) => {
     });
 
     if (!emailSent) {
-      return res.status(500).json({ error: 'Failed to send email via SendGrid' });
+      return res.status(500).json({ error: 'Failed to send email' });
     }
 
     // Log activity

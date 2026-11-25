@@ -1,5 +1,4 @@
-import sgMail from '@sendgrid/mail';
-import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from './email';
 import { db } from '../db';
 import { users, eventRequests, eventCollaborationComments } from '@shared/schema';
 import { and, eq, or, like, sql, inArray } from 'drizzle-orm';
@@ -12,13 +11,10 @@ import { ALERT_TYPES } from '@shared/alert-catalog';
 import { getEffectivePrefs } from './notifications/preferences';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
 
-// Initialize SendGrid
-if (!process.env.SENDGRID_API_KEY) {
+if (!isEmailConfigured()) {
   logger.warn(
-    'SENDGRID_API_KEY not found - email notifications will be disabled'
+    'Twilio Email is not configured (TWILIO_EMAIL_API_KEY / TWILIO_EMAIL_API_SECRET / EMAIL_FROM_ADDRESS) - email notifications will be disabled'
   );
-} else {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
 export interface ChatMentionNotification {
@@ -116,9 +112,9 @@ export class EmailNotificationService {
       return false;
     }
 
-    const shouldSendEmail = prefs.emailEnabled && !!process.env.SENDGRID_API_KEY;
-    if (prefs.emailEnabled && !process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping chat mention email');
+    const shouldSendEmail = prefs.emailEnabled && !!isEmailConfigured();
+    if (prefs.emailEnabled && !isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping chat mention email');
     }
 
     let anySent = false;
@@ -193,7 +189,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
       };
 
       try {
-        await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+        await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
         logger.log(
           `Chat mention notification sent to ${notification.mentionedUserEmail}`
         );
@@ -247,8 +243,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     organizationName: string,
     eventDate: Date | string | null
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping TSP contact assignment notification');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping TSP contact assignment notification');
       return false;
     }
 
@@ -340,7 +336,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       logger.log(`TSP contact assignment notification sent to ${userEmail} for event ${eventId}`);
 
       // Send SMS notification if user has opted in
@@ -381,8 +377,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     role: string,
     instructions?: string | null
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping volunteer reminder notification');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping volunteer reminder notification');
       return false;
     }
 
@@ -501,7 +497,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       logger.log(`24-hour volunteer reminder sent to ${volunteerEmail} for event ${eventId}`);
       return true;
     } catch (error) {
@@ -576,8 +572,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     itemType: string,
     assignedBy: string
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping Holding Zone assignment notification');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping Holding Zone assignment notification');
       return false;
     }
 
@@ -693,7 +689,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
           `.trim(),
         };
 
-        await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+        await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
         logger.log(`Holding Zone assignment notification sent to ${userEmail} for item ${itemId}`);
       }
 
@@ -763,8 +759,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     itemContent: string,
     commentContent: string
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping Holding Zone comment mention notification');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping Holding Zone comment mention notification');
       return false;
     }
 
@@ -848,7 +844,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       logger.log(`Holding Zone comment mention notification sent to ${mentionedUserEmail}`);
       return true;
     } catch (error) {
@@ -919,8 +915,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     commentCreatedAt: Date,
     parentCommentId?: number
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping event comment notification');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping event comment notification');
       return false;
     }
 
@@ -1155,12 +1151,12 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
           } catch (smsError) {
             // If SMS fails, fall back to email
             logger.error(`Failed to send event comment SMS to user ${user.id}, falling back to email:`, smsError);
-            await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+            await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
             logger.log(`Event comment notification sent to ${userEmail} for event ${eventId} (SMS fallback)`);
           }
         } else {
           // Send email notification
-          await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+          await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
           logger.log(`Event comment notification sent to ${userEmail} for event ${eventId}`);
         }
       }
@@ -1231,8 +1227,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     itemContent: string,
     itemId: number
   ): Promise<void> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping Holding Zone item mention notification');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping Holding Zone item mention notification');
       return;
     }
 
@@ -1262,13 +1258,14 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         </div>
       `;
 
-      await sgMail.send(withUnsubscribeSettings({
+      await sendEmailOrThrow({
         to: recipientEmail,
         from: 'katie@thesandwichproject.org',
         subject,
         text: `${mentionerName} mentioned you in a Holding Zone item:\n\n${itemPreview}\n\nView it in the Holding Zone section.`,
         html: htmlBody,
-      }, 'operational'));
+        emailStream: 'operational',
+      });
 
       logger.info('Holding Zone item mention notification sent', {
         recipientEmail,
@@ -1290,8 +1287,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     organizationName: string,
     eventDate: Date | string
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping past date notification');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping past date notification');
       return false;
     }
 
@@ -1396,7 +1393,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         `.trim(),
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       logger.log(`Past date notification sent to ${tspContactEmail} for event ${eventId}`);
       return true;
     } catch (error) {
@@ -1417,8 +1414,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     eventDate: Date | null,
     eventId: number
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping TSP follow-up reminder email');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping TSP follow-up reminder email');
       return false;
     }
 
@@ -1501,7 +1498,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         }\n\nView event: ${eventUrl}\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       logger.log(`TSP follow-up reminder email sent to ${email} for ${reminderType}`);
       return true;
     } catch (error) {
@@ -1521,8 +1518,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
     eventId: number,
     eventLink: string
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping escalation email');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping escalation email');
       return false;
     }
 
@@ -1576,7 +1573,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         text: `ESCALATION NEEDED\n\nEvent: ${organizationName} (#${eventId})\nAssigned to: ${tspContactName}\n\nThis event hasn't had any activity despite automated reminders. Please review and follow up.\n\nView event: ${eventLink}\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       logger.log(`Escalation email sent to ${adminEmail} for event ${eventId}`);
       return true;
     } catch (error) {
@@ -1598,8 +1595,8 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
       userMessage?: string;
     }
   ): Promise<boolean> {
-    if (!process.env.SENDGRID_API_KEY) {
-      logger.log('SendGrid not configured - skipping permission request email');
+    if (!isEmailConfigured()) {
+      logger.log('Twilio Email not configured - skipping permission request email');
       return false;
     }
 
@@ -1659,7 +1656,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
         text: `Permission Request\n\nUser: ${request.userName} (${request.userEmail})\nRequested Action: ${request.requestedAction}\n${request.requiredPermission ? `Permission Needed: ${request.requiredPermission}\n` : ''}${request.userMessage ? `\nUser's Message: "${request.userMessage}"\n` : ''}\nManage permissions at: ${appUrl}/admin-settings?tab=permissions\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       logger.log(`Permission request email sent to ${adminEmails.length} admin(s) for user ${request.userEmail}`);
       return true;
     } catch (error) {

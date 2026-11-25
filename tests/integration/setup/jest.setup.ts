@@ -14,7 +14,7 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://test:t
 
 // Mock external services if needed
 // beforeAll(() => {
-//   // Mock SendGrid email service if needed
+//   // Mock the email service (server/services/email) if needed
 //   // Mock Google services if needed
 // });
 

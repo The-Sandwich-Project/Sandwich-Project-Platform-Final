@@ -207,7 +207,7 @@ export function SystemHealthPanel() {
               <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900">
                 <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <p>
-                  Live checks passed for OpenAI, SendGrid, SMS, and Replit AI.
+                  Live checks passed for OpenAI, Twilio Email, SMS, and Replit AI.
                   Sentry is optional and only checks whether a DSN is configured.
                 </p>
               </div>

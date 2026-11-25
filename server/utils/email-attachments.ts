@@ -12,11 +12,11 @@ import { hasPermission } from '@shared/unified-auth-utils';
 import { PERMISSIONS } from '@shared/auth-utils';
 
 /**
- * Resolves email attachment references into base64 attachments SendGrid can
+ * Resolves email attachment references into base64 attachments the email helper can
  * send directly.
  *
- * Why this exists: the SendGrid helper only reads local disk and silently
- * skips anything missing. Document records that live in object storage
+ * Why this exists: reading only from local disk silently skipped anything
+ * missing. Document records that live in object storage
  * (`/objects/uploads/...`) were being dropped, so toolkit emails could go out
  * without the PDFs the sender selected. Callers should refuse to send when
  * `failed` is non-empty.

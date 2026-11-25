@@ -5,8 +5,7 @@
  * Routes notifications through the appropriate channel based on urgency tier.
  */
 
-import sgMail from '@sendgrid/mail';
-import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from './email';
 import { db } from '../db';
 import { eventRequests, users } from '@shared/schema';
 import { eq, and, or, inArray, lt, lte, gte, isNull, sql } from 'drizzle-orm';
@@ -28,11 +27,6 @@ import {
   ContactAttemptLogEntry,
 } from './notification-tiers';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
-
-// Initialize SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
 
 // ============================================================================
 // SMS SENDING (URGENT TIER)
@@ -200,7 +194,7 @@ async function sendTspAssignmentEmail(
   dateStr: string,
   eventUrl: string
 ): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) return false;
+  if (!isEmailConfigured()) return false;
 
   try {
     const subject = `🎯 New Event Assignment: ${organizationName}`;
@@ -249,7 +243,7 @@ async function sendTspAssignmentEmail(
       text: `Hi ${userName}!\n\nYou've been assigned to ${organizationName} (${dateStr}).\n\nView details: ${eventUrl}`,
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     return true;
   } catch (error) {
     logger.error('Error sending TSP assignment email:', error);
@@ -291,7 +285,7 @@ async function sendEventApproachingEmail(
   eventDate: Date | string,
   daysUntil: number
 ): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) return false;
+  if (!isEmailConfigured()) return false;
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user?.email) return false;
@@ -341,7 +335,7 @@ async function sendEventApproachingEmail(
       text: `URGENT: ${organizationName} event in ${daysUntil} days (${dateStr}) but NOT scheduled yet!\n\nPlease finalize immediately: ${eventUrl}`,
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     return true;
   } catch (error) {
     logger.error('Error sending event approaching email:', error);
@@ -363,7 +357,7 @@ export async function sendEventChangedNotification(
   changedBy: string,
   changes: { field: string; oldValue: string; newValue: string }[]
 ): Promise<number> {
-  if (!process.env.SENDGRID_API_KEY || changes.length === 0) return 0;
+  if (!isEmailConfigured() || changes.length === 0) return 0;
 
   const baseUrl = getAppBaseUrl();
   const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
@@ -444,7 +438,7 @@ export async function sendEventChangedNotification(
         text: `Hi ${userName},\n\n${changedBy} made changes to ${organizationName}:\n\n${changes.map((c) => `${c.field}: "${c.oldValue}" → "${c.newValue}"`).join('\n')}\n\nView details: ${eventUrl}`,
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       sentCount++;
     } catch (error) {
       logger.error(`Error sending event changed notification to ${user.email}:`, error);
@@ -464,7 +458,7 @@ export async function sendWeeklyContactReminderEmail(
   daysSinceContact: number,
   eventDate: Date | string | null
 ): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) return false;
+  if (!isEmailConfigured()) return false;
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user?.email) return false;
@@ -521,7 +515,7 @@ export async function sendWeeklyContactReminderEmail(
       text: `Hi ${userName},\n\nIt's been ${daysSinceContact} days since the last contact with ${organizationName} (${dateStr}).\n\nConsider following up to keep momentum.\n\nView event: ${eventUrl}`,
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     logger.log(`Weekly contact reminder sent to ${user.email} for ${organizationName}`);
     return true;
   } catch (error) {
@@ -539,7 +533,7 @@ export async function sendStandbyFollowupEmail(
   organizationName: string,
   daysSinceLastContact: number | null
 ): Promise<boolean> {
-  if (!process.env.SENDGRID_API_KEY) return false;
+  if (!isEmailConfigured()) return false;
 
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user?.email) return false;
@@ -587,7 +581,7 @@ export async function sendStandbyFollowupEmail(
       text: `Hi ${userName},\n\n${organizationName} is on standby${daysSinceLastContact ? ` (last contact ${daysSinceLastContact} days ago)` : ''}.\n\nCheck in about their timeline: ${eventUrl}`,
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     return true;
   } catch (error) {
     logger.error(`Error sending standby followup email:`, error);
@@ -611,7 +605,7 @@ export async function sendStaleEventEscalation(
   organizationName: string,
   daysSinceContact: number
 ): Promise<number> {
-  if (!process.env.SENDGRID_API_KEY) return 0;
+  if (!isEmailConfigured()) return 0;
 
   const baseUrl = getAppBaseUrl();
   const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${eventId}`;
@@ -673,7 +667,7 @@ export async function sendStaleEventEscalation(
         text: `ESCALATION: ${organizationName}\n\nAssigned to: ${tspContactName} (${tspContactEmail})\nNo contact in ${daysSinceContact} days.\n\nPlease review: ${eventUrl}`,
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       sentCount++;
       logger.log(`Escalation sent to admin ${admin.email} for ${organizationName}`);
     } catch (error) {
@@ -704,7 +698,7 @@ export async function sendBatchedStaleEventEscalation(
   adminUserIds: string[],
   staleEvents: StaleEventInfo[]
 ): Promise<number> {
-  if (!process.env.SENDGRID_API_KEY || staleEvents.length === 0) return 0;
+  if (!isEmailConfigured() || staleEvents.length === 0) return 0;
 
   const baseUrl = getAppBaseUrl();
 
@@ -804,7 +798,7 @@ export async function sendBatchedStaleEventEscalation(
         text: `Weekly Stalled Events Summary\n\nHi ${adminName}!\n\n${staleEvents.length} event(s) have had no contact logged for 2+ weeks:\n${eventsText}\n\nPlease review and follow up with the assigned contacts.\n\n---\nThe Sandwich Project`,
       };
 
-      await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+      await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
       sentCount++;
       logger.log(`Batched escalation summary sent to admin ${admin.email} for ${staleEvents.length} events`);
     } catch (error) {

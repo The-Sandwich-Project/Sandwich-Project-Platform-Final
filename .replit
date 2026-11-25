@@ -67,7 +67,7 @@ task = "shell.exec"
 args = "npm run dev"
 
 [agent]
-integrations = ["javascript_sendgrid:1.0.0", "javascript_database:1.0.0", "twilio:1.0.0", "javascript_openai_ai_integrations:1.0.0", "javascript_object_storage:2.0.0"]
+integrations = ["javascript_database:1.0.0", "twilio:1.0.0", "javascript_openai_ai_integrations:1.0.0", "javascript_object_storage:2.0.0"]
 
 [userenv]
 

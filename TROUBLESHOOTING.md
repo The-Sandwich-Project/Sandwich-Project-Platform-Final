@@ -681,38 +681,23 @@ socket.on('connect_error', (error) => console.error('Connection error:', error))
 
 ## Email/SMS Delivery Failures
 
-### SendGrid Email Not Sending
-
-**Error message:**
-```
-Error: Forbidden
-Error: 401 Unauthorized
-```
+### Email Not Sending (Twilio Email)
 
 **Diagnosis:**
 
 ```bash
-# Test SendGrid API key
-curl -i --request POST \
-  --url https://api.sendgrid.com/v3/mail/send \
-  --header "Authorization: Bearer $SENDGRID_API_KEY" \
-  --header 'Content-Type: application/json' \
-  --data '{"personalizations":[{"to":[{"email":"test@example.com"}]}],"from":{"email":"noreply@example.com"},"subject":"Test","content":[{"type":"text/plain","value":"Test"}]}'
+npm run email:test -- you@example.com
 ```
+
+It prints Twilio's HTTP status and response body (never the key). The app logs the same for every failed send (`[email] Twilio Email rejected the request: HTTP ...`), and the admin error log records it under category `twilio-email`.
 
 **Solutions:**
 
-1. **Invalid API key:**
-   - Regenerate key in SendGrid dashboard
-   - Update `SENDGRID_API_KEY` environment variable
-
-2. **Sender not verified:**
-   - Verify sender email in SendGrid
-   - Or use verified domain
-
-3. **Rate limit exceeded:**
-   - Check SendGrid dashboard for quota
-   - Implement email queue with retry logic
+1. **"Email is not configured":** set `TWILIO_EMAIL_API_KEY`, `TWILIO_EMAIL_API_SECRET` and `EMAIL_FROM_ADDRESS` in Replit Secrets (email only; the SMS `TWILIO_*` credentials are separate).
+2. **401 / 403:** the API key or secret is wrong, or the key lacks Comms → Emails Create permission.
+3. **From address rejected:** the From address must be on the domain verified in the Twilio Console (Email → Domains) and plain ASCII.
+4. **"... unsubscribed from ... emails":** the address is in `email_suppressions`. The person can resubscribe from the preferences link in any email; bounces and spam reports can only be removed in the database.
+5. **Accepted (202) but never arrived:** check the Twilio Console's email logs for that operation id, and the recipient's spam folder.
 
 ### Twilio SMS Not Sending
 

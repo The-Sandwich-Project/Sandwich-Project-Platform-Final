@@ -223,7 +223,7 @@ export class EmailService {
 
   /**
    * Send a new email
-   * Always saves internal message, attempts SendGrid notification but doesn't fail if it's unavailable
+   * Always saves internal message, attempts an email notification but doesn't fail if it's unavailable
    */
   async sendEmail(data: {
     senderId: string;
@@ -273,14 +273,21 @@ export class EmailService {
         })
         .returning();
 
-      // Then try to send SendGrid notification (but don't fail if it doesn't work)
+      // Then try to send an email notification (but don't fail if it doesn't work)
       if (!data.isDraft) {
         try {
-          const { sendEmail: sendGridEmail } = await import('../sendgrid');
+          const { sendEmail: sendNotificationEmail } = await import('./email');
           const { documents } = await import('@shared/schema');
           
-          // Use preferred email for Reply-To, fallback to sender email
-          const replyToEmail = data.senderPreferredEmail || data.senderEmail;
+          // From the sender's own TSP address when they have one (replies go
+          // straight to them); otherwise from the org address with a
+          // "To reply, email ..." line. See server/utils/user-sender.ts.
+          const { buildUserSender } = await import('../utils/user-sender');
+          const sender = buildUserSender({
+            firstName: data.senderName,
+            email: data.senderEmail,
+            preferredEmail: data.senderPreferredEmail,
+          });
           
           // Create email signature
           const createSignature = () => {
@@ -375,14 +382,16 @@ export class EmailService {
             }
           }
           
-          // Import SendGrid compliance footer
+          // Import compliance footer
           const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
           
-          await sendGridEmail({
+          await sendNotificationEmail({
             emailStream: 'operational',
             to: data.recipientEmail,
-            from: 'katielong2316@gmail.com', // Your verified sender
-            replyTo: replyToEmail, // Use preferred email for Reply-To
+            from: sender.from,
+            ...(sender.replyTo
+              ? { replyTo: { email: sender.replyTo, name: sender.replyToName } }
+              : {}),
             subject: `New message: ${data.subject}`,
             text: `You have a new message from ${data.senderName}.\n\nSubject: ${data.subject}\n\n${contentWithSignature}\n\nPlease log in to your account to view and respond to this message.${EMAIL_FOOTER_TEXT}`,
             html: `
@@ -403,11 +412,11 @@ export class EmailService {
             attachments: processedAttachments,
           });
           logger.log(
-            `[Email Service] SendGrid notification sent successfully to ${data.recipientEmail}`
+            `[Email Service] Email notification sent successfully to ${data.recipientEmail}`
           );
         } catch (emailError) {
           logger.warn(
-            `[Email Service] SendGrid notification failed (but internal message saved): ${
+            `[Email Service] Email notification failed (but internal message saved): ${
               emailError?.message || 'Unknown error'
             }`
           );

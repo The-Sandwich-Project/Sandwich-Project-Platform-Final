@@ -72,6 +72,7 @@ import { createSandwichDistributionsRouter } from './sandwich-distributions';
 import { createImportEventsRouter } from './import-events';
 import { createDataManagementRouter } from './data-management';
 import { createPasswordResetRouter } from './password-reset';
+import { createEmailPreferencesRouter } from '../services/email/preferences';
 import { createMessageNotificationsRouter } from './message-notifications';
 import { createAnnouncementsRouter } from './announcements';
 import { createPerformanceRouter } from './performance';
@@ -231,6 +232,13 @@ export function createMainRoutes(deps: RouterDependencies) {
     ...createPublicMiddleware(),
     passwordResetRouter
   );
+
+  // ========================================================================
+  // EMAIL PREFERENCES / UNSUBSCRIBE - public (linked from every email).
+  // GET only shows the page; changes need a POST, so link scanners can't
+  // unsubscribe anyone. See server/services/email/preferences.ts.
+  // ========================================================================
+  router.use('/api', ...createPublicMiddleware(), createEmailPreferencesRouter());
 
   // ========================================================================
   // API KEY AUTHENTICATION - Extract API key from Authorization header
@@ -1453,7 +1461,7 @@ export function createMainRoutes(deps: RouterDependencies) {
 
       // Send admin email with full context
       try {
-        const { sendEmail } = await import('../services/sendgrid');
+        const { sendEmailOrThrow: sendEmail } = await import('../services/email');
 
         const userLine = userId
           ? `${escapeHtml(userName || userEmail || userId)}${userEmail ? ` &lt;${escapeHtml(userEmail)}&gt;` : ''}${userRole ? ` · ${escapeHtml(userRole)}` : ''}`
@@ -1613,7 +1621,7 @@ export function createMainRoutes(deps: RouterDependencies) {
     }
   );
 
-  // Admin-only: integration health check (OpenAI, Twilio, SendGrid, etc.)
+  // Admin-only: integration health check (OpenAI, Twilio SMS, Twilio Email, etc.)
   router.get(
     '/api/admin/system-health',
     deps.isAuthenticated,

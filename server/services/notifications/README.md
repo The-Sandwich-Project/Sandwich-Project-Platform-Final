@@ -6,23 +6,25 @@ This directory contains the smart notification delivery system that handles mult
 
 The notification system includes **actual integrations** for:
 
-- **Email**: SendGrid integration ✅ Implemented
+- **Email**: Twilio Email (`server/services/email`) ✅ Implemented
 - **SMS**: Twilio integration ✅ Implemented
 - **In-App**: WebSocket delivery ✅ Implemented
 
 ## Configuration
 
-### 1. Email Notifications (SendGrid)
+### 1. Email Notifications (Twilio Email)
 
 **Status**: Fully Implemented
 
 **Setup Steps**:
 
-1. Sign up for a SendGrid account at https://sendgrid.com
-2. Create an API key in your SendGrid dashboard
-3. Add to your `.env` file:
+1. In the Twilio Console, verify your sending domain (Email -> Domains)
+2. Create a restricted API key with Comms -> Emails: Read + Create
+3. Add to your `.env` file (email only; SMS uses its own Twilio credentials):
    ```bash
-   SENDGRID_API_KEY=your_sendgrid_api_key_here
+   TWILIO_EMAIL_API_KEY=your_twilio_email_api_key_sid
+   TWILIO_EMAIL_API_SECRET=your_twilio_email_api_key_secret
+   EMAIL_FROM_ADDRESS=katie@thesandwichproject.org
    NOTIFICATION_FROM_EMAIL=noreply@thesandwichproject.org
    ```
 
@@ -163,7 +165,7 @@ server/services/notifications/
 └── notification-triggers.ts    # Event-based triggers
 
 server/services/
-├── sendgrid.ts                 # SendGrid email service ✅ INTEGRATED
+├── email/                      # Twilio Email helper ✅ INTEGRATED
 
 server/sms-providers/
 ├── provider-factory.ts         # SMS provider factory ✅ INTEGRATED
@@ -176,7 +178,7 @@ server/sms-providers/
 The smart delivery service (`smart-delivery.ts`) includes:
 
 1. **Email Integration**
-   - Direct SendGrid integration
+   - Sends through the shared email helper (Twilio Email)
    - HTML email templates
    - Configuration checking
    - Error handling
@@ -233,7 +235,7 @@ grep "smart-delivery" logs/combined.log
 To complete the notification system:
 
 1. **For Email** (Ready to use):
-   - Add `SENDGRID_API_KEY` to your `.env` file
+   - Add `TWILIO_EMAIL_API_KEY`, `TWILIO_EMAIL_API_SECRET` and `EMAIL_FROM_ADDRESS`
    - Test with `forceChannel: 'email'`
 
 2. **For SMS** (Ready to use):
@@ -261,7 +263,7 @@ For issues or questions:
 
 | Feature | Status | Configuration Required |
 |---------|--------|----------------------|
-| Email (SendGrid) | ✅ Fully Implemented | `SENDGRID_API_KEY` |
+| Email (Twilio Email) | ✅ Fully Implemented | `TWILIO_EMAIL_API_KEY`, `TWILIO_EMAIL_API_SECRET`, `EMAIL_FROM_ADDRESS` |
 | SMS (Twilio) | ✅ Fully Implemented | Twilio credentials |
 | In-App (WebSocket) | ✅ Fully Implemented | None (automatic) |
 | ML Scoring | ✅ Implemented | None |

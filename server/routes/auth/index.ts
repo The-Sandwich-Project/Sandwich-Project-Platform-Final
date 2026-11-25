@@ -551,16 +551,12 @@ export function createAuthRouter() {
         const baseUrl = getAppBaseUrl(req);
         const setupLink = `${baseUrl}/set-password?token=${setupToken}`;
 
-        // Use SendGrid for password setup emails
-        const sgMail = (await import('@sendgrid/mail')).default;
-        const { withUnsubscribeSettings } = await import('../../utils/sendgrid-unsubscribe');
-        if (!process.env.SENDGRID_API_KEY) {
-          throw new Error('SendGrid API key not configured');
+        const { sendEmailOrThrow, isEmailConfigured } = await import('../../services/email');
+        if (!isEmailConfigured()) {
+          throw new Error('Twilio Email is not configured');
         }
 
-        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-        await sgMail.send(withUnsubscribeSettings({
+        await sendEmailOrThrow({
           to: email,
           from: 'katie@thesandwichproject.org',
           subject: 'Set Up Your Password - The Sandwich Project',
@@ -618,7 +614,8 @@ If you didn't expect this email, please contact support immediately.
 The Sandwich Project
 Fighting food insecurity one sandwich at a time
           `,
-        }, 'operational'));
+          emailStream: 'operational',
+        });
 
         logger.log(`✅ Initial password setup email sent successfully to: ${email}`);
       } catch (emailError) {

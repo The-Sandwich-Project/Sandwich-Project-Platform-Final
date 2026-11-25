@@ -19,7 +19,7 @@
 import { db } from '../db';
 import { eventRequests, yearlyCalendarItems, trackedCalendarItems, users } from '@shared/schema';
 import { eq, and, gte, lte, sql, inArray, desc, count } from 'drizzle-orm';
-import { sendEmail } from '../sendgrid';
+import { sendEmail } from './email';
 import { sendTSPFollowupReminderSMS } from '../sms-service';
 import { getUserPhoneNumber } from '@shared/types';
 import { logger } from '../utils/production-safe-logger';

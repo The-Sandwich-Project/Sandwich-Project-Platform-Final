@@ -383,7 +383,7 @@ Healthchecks.io will alert if:
 
 ```typescript
 // server/monitoring/alerts.ts
-import { sendEmail } from '../services/notifications/sendgrid-email-provider';
+import { sendEmail } from '../services/email'; // pass emailStream: 'operational'
 
 export async function sendAlert(
   severity: 'info' | 'warning' | 'critical',

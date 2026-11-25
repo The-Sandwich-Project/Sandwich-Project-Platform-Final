@@ -46,7 +46,16 @@ describe('buildUserSender', () => {
       ORG
     );
     expect(sender.from.email).toBe('pat@thesandwichproject.org');
-    expect(sender.replyTo).toBe('pat.lee@gmail.com');
+    // Twilio Email has no Reply-To: replies go to the From address (their TSP
+    // address), so replyTo matches it and no "To reply" line is added.
+    expect(sender.replyTo).toBe('pat@thesandwichproject.org');
+    // They still keep a copy at their preferred address.
+    expect(sender.senderCopyBcc).toBe('pat.lee@gmail.com');
+  });
+
+  it('gives the name for the "To reply" line when sending as the org', () => {
+    const sender = buildUserSender({ firstName: 'Pat', lastName: 'Lee', email: 'pat.lee@gmail.com' }, ORG);
+    expect(sender.replyToName).toBe('Pat Lee');
   });
 
   it('does not treat look-alike domains as ours', () => {

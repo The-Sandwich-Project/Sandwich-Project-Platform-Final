@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { isAuthenticated } from '../auth';
 import { requirePermission } from '../middleware/auth';
-import { sendEmail } from '../sendgrid';
+import { sendEmail } from '../services/email';
 import { storage } from '../storage';
 import { z } from 'zod';
 import { logger } from '../utils/production-safe-logger';

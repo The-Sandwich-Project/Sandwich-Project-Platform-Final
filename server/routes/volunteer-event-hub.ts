@@ -23,8 +23,7 @@ import { logger } from '../utils/production-safe-logger';
 import type { AuthenticatedRequest } from '../types/express';
 import { EmailNotificationService } from '../services/email-notification-service';
 import { getAppBaseUrl } from '../config/constants';
-import sgMail from '@sendgrid/mail';
-import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from '../services/email';
 import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getUnfilledCounts, getVolunteerCount, getTotalDriverCount } from '../utils/assignment-utils';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
@@ -84,8 +83,8 @@ async function sendVolunteerSignupNotification(
   roles: string[],
   notes: string | null
 ): Promise<void> {
-  if (!process.env.SENDGRID_API_KEY) {
-    logger.warn('SendGrid not configured - skipping volunteer signup notification');
+  if (!isEmailConfigured()) {
+    logger.warn('Twilio Email not configured - skipping volunteer signup notification');
     return;
   }
 
@@ -190,7 +189,7 @@ The Sandwich Project - Fighting food insecurity one sandwich at a time
       `.trim(),
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     logger.info(`Volunteer signup notification sent to coordinators for event ${eventId}`);
   } catch (error) {
     logger.error('Error sending volunteer signup notification:', error);
@@ -210,7 +209,7 @@ async function sendVolunteerSignupConfirmationEmail(
   eventAddress: string | null,
   roles: string[]
 ): Promise<void> {
-  if (!process.env.SENDGRID_API_KEY || !volunteerEmail) {
+  if (!isEmailConfigured() || !volunteerEmail) {
     return;
   }
 
@@ -298,7 +297,7 @@ The Sandwich Project - Fighting food insecurity one sandwich at a time
       `.trim(),
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     logger.info(`Volunteer signup confirmation email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending volunteer signup confirmation email:', error);
@@ -577,7 +576,7 @@ async function sendVolunteerApprovalEmail(
   event: EventForEmail,
   role: string | null
 ): Promise<void> {
-  if (!process.env.SENDGRID_API_KEY || !volunteerEmail) {
+  if (!isEmailConfigured() || !volunteerEmail) {
     return;
   }
 
@@ -716,7 +715,7 @@ Thank you for making a difference with The Sandwich Project!
       `.trim(),
     };
 
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     logger.info(`Volunteer approval email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending volunteer approval email:', error);
@@ -734,7 +733,7 @@ async function sendVolunteerRoleChangeEmail(
   newRole: string | null,
   reason: string | null
 ): Promise<void> {
-  if (!process.env.SENDGRID_API_KEY || !volunteerEmail) return;
+  if (!isEmailConfigured() || !volunteerEmail) return;
   try {
     const { formatted: formattedDate } = eventDisplayDate(event);
     const orgName = event.organizationName || 'The Sandwich Project Event';
@@ -808,7 +807,7 @@ If this change doesn't work for you, please reply to this email.
 Thank you!
       `.trim(),
     };
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     logger.info(`Role-change email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending role change email:', error);
@@ -825,7 +824,7 @@ async function sendVolunteerRemovalEmail(
   role: string | null,
   reason: string | null
 ): Promise<void> {
-  if (!process.env.SENDGRID_API_KEY || !volunteerEmail) return;
+  if (!isEmailConfigured() || !volunteerEmail) return;
   try {
     const { formatted: formattedDate } = eventDisplayDate(event);
     const orgName = event.organizationName || 'The Sandwich Project Event';
@@ -883,7 +882,7 @@ You're welcome to sign up again any time. If you have questions, please reply to
 Thanks!
       `.trim(),
     };
-    await sgMail.send(withUnsubscribeSettings(msg, 'operational'));
+    await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
     logger.info(`Removal email sent to ${volunteerEmail}`);
   } catch (error) {
     logger.error('Error sending removal email:', error);

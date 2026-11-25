@@ -1,5 +1,4 @@
-import sgMail from '@sendgrid/mail';
-import { withUnsubscribeSettings } from '../utils/sendgrid-unsubscribe';
+import { sendEmailOrThrow, isEmailConfigured } from '../services/email';
 
 export interface EmailTemplate {
   id: string;
@@ -312,14 +311,12 @@ View full dashboard: {{dashboardLink}}
 
   static async sendEmail(notification: EmailNotification): Promise<boolean> {
     try {
-      if (!process.env.SENDGRID_API_KEY) {
+      if (!isEmailConfigured()) {
         console.warn(
-          'SendGrid API key not configured. Email notification skipped.'
+          'Twilio Email not configured. Email notification skipped.'
         );
         return false;
       }
-
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
       const template = this.templates.get(notification.template);
       if (!template) {
@@ -336,7 +333,7 @@ View full dashboard: {{dashboardLink}}
       const htmlContent = this.processTemplate(template.htmlContent, variables);
       const textContent = this.processTemplate(template.textContent, variables);
 
-      // Import SendGrid compliance footer
+      // Import compliance footer
       const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
 
       const emailData = {
@@ -346,7 +343,6 @@ View full dashboard: {{dashboardLink}}
         html: htmlContent + EMAIL_FOOTER_HTML,
         text: textContent + EMAIL_FOOTER_TEXT,
         attachments: notification.attachments,
-        priority: notification.priority || 'normal',
       };
 
       if (notification.scheduledFor && notification.scheduledFor > new Date()) {
@@ -355,8 +351,8 @@ View full dashboard: {{dashboardLink}}
         return true;
       }
 
-      const result = await sgMail.send(withUnsubscribeSettings(emailData, 'newsletter'));
-      console.log('Email sent successfully:', result[0].statusCode);
+      const result = await sendEmailOrThrow({ ...emailData, emailStream: 'newsletter' });
+      console.log('Email sent:', result.suppressed ? 'skipped (unsubscribed)' : result.operationIds);
       return true;
     } catch (error) {
       console.error('Failed to send email:', error);

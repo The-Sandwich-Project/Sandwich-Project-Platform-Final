@@ -20,7 +20,7 @@ import { eq, and, gte, lte } from 'drizzle-orm';
 import { mlEngine } from './ml-engine';
 import logger from '../../utils/logger';
 import { Server as SocketIOServer } from 'socket.io';
-import { sendEmail } from '../sendgrid';
+import { sendEmailOrThrow as sendEmail, isEmailConfigured } from '../email';
 import { SMSProviderFactory } from '../../sms-providers/provider-factory';
 
 const deliveryLogger = logger.child({ service: 'smart-delivery' });
@@ -326,13 +326,13 @@ export class SmartDeliveryService {
         throw new Error('User email not found');
       }
 
-      // Check if SendGrid is configured
-      if (!process.env.SENDGRID_API_KEY) {
-        deliveryLogger.warn('SendGrid not configured, email notification not sent', {
+      // Check if Twilio Email is configured
+      if (!isEmailConfigured()) {
+        deliveryLogger.warn('Twilio Email not configured, email notification not sent', {
           notificationId: notification.id,
           email: user[0].email
         });
-        throw new Error('Email service not configured - SENDGRID_API_KEY missing');
+        throw new Error('Email service not configured - TWILIO_EMAIL_API_KEY / TWILIO_EMAIL_API_SECRET / EMAIL_FROM_ADDRESS missing');
       }
 
       // Get sender email from environment or use default
@@ -381,7 +381,7 @@ export class SmartDeliveryService {
         </html>
       `;
 
-      // Send email using SendGrid
+      // Send the email
       await sendEmail({
         emailStream: 'operational',
         to: user[0].email,

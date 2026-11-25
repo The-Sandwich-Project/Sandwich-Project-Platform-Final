@@ -287,7 +287,7 @@ The system uses several database tables for smart notifications:
 - User-specific notification channels
 
 ### Email & SMS Integration
-- Ready for integration with SendGrid, Twilio, etc.
+- Email goes through `server/services/email` (Twilio Email); SMS through Twilio
 - Template-based email notifications
 - SMS delivery with length optimization
 

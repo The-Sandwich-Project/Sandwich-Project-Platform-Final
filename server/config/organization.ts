@@ -7,7 +7,7 @@
 export const ORG_EMAIL = process.env.ADMIN_EMAIL || 'katie@thesandwichproject.org';
 export const FROM_EMAIL = ORG_EMAIL;
 export const ADMIN_EMAIL = ORG_EMAIL;
-// Domain authenticated in SendGrid: any address on it may be a From address.
+// Domain authenticated in Twilio Email (Email -> Domains): any address on it may be a From address.
 export const SENDER_DOMAIN = 'thesandwichproject.org';
 
 // Organization info

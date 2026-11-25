@@ -2,13 +2,13 @@
  * Replies to event-request comments used to throw a ReferenceError (drizzle's
  * `and` was never imported), which was caught and swallowed, so TSP contacts
  * were never notified of replies. These tests drive the real
- * sendEventCommentNotification path with the db and SendGrid mocked.
+ * sendEventCommentNotification path with the db and the email helper mocked.
  */
 
-const mockSend = jest.fn().mockResolvedValue([{ statusCode: 202 }]);
-jest.mock('@sendgrid/mail', () => ({
-  __esModule: true,
-  default: { send: (...args: unknown[]) => mockSend(...args), setApiKey: jest.fn() },
+const mockSend = jest.fn().mockResolvedValue({ success: true, operationIds: ['op_test'] });
+jest.mock('../../server/services/email', () => ({
+  ...jest.requireActual('../../server/services/email'),
+  sendEmailOrThrow: (...args: unknown[]) => mockSend(...args),
 }));
 
 // Each db.select() chain resolves to the next queued result, whether the query
@@ -70,7 +70,9 @@ const contact = {
 
 describe('event comment notifications', () => {
   beforeEach(() => {
-    process.env.SENDGRID_API_KEY = 'SG.test';
+    process.env.TWILIO_EMAIL_API_KEY = 'SKtest';
+    process.env.TWILIO_EMAIL_API_SECRET = 'test-secret';
+    process.env.EMAIL_FROM_ADDRESS = 'katie@thesandwichproject.org';
     mockQueue.length = 0;
     mockSend.mockClear();
     mockCommentSMS.mockClear();

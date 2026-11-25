@@ -47,7 +47,7 @@ The Sandwich Project Platform helps nonprofits manage:
 - **Event Requests** - Handle distribution event intake and scheduling
 - **Project Management** - Organize initiatives and campaigns
 - **Real-time Messaging** - Coordinate teams via built-in chat
-- **Notifications** - Email and SMS alerts via SendGrid and Twilio
+- **Notifications** - Email and SMS alerts via Twilio Email and Twilio SMS
 - **Analytics** - Track impact, donations, and volunteer hours
 - **Meeting Management** - Create agendas, take notes, generate PDF minutes
 
@@ -77,7 +77,7 @@ The Sandwich Project Platform helps nonprofits manage:
 ### Infrastructure
 - **Replit** - Hosting and deployment
 - **Neon** - Serverless PostgreSQL
-- **SendGrid** - Transactional email
+- **Twilio Email** - Transactional email (`server/services/email`)
 - **Twilio** - SMS messaging
 - **Google Cloud** - File storage, Sheets integration
 
@@ -440,8 +440,10 @@ DATABASE_URL=postgresql://... (or use SQLite locally)
 # Session
 SESSION_SECRET=your-secret-key-min-32-chars
 
-# Email (SendGrid)
-SENDGRID_API_KEY=SG.xxxxx
+# Email (Twilio Email; separate from the SMS Twilio credentials)
+TWILIO_EMAIL_API_KEY=SKxxxxx
+TWILIO_EMAIL_API_SECRET=xxxxx
+EMAIL_FROM_ADDRESS=sender@yourdomain.org
 NOTIFICATION_FROM_EMAIL=noreply@yourdomain.com
 
 # SMS (Twilio)
@@ -575,10 +577,12 @@ Interactive step-by-step tours for new users covering all major features. Tours 
   - Opt-in/consent is stored on the user (`metadata.smsConsent`) and checked before use
   - Keep the webhook URL in Twilio console synced with deployment URL (`https://<host>/api/sms/webhook`)
 
-### SendGrid Email
+### Twilio Email
 
-- All outgoing emails are BCC'd to `katie@thesandwichproject.org`
-- Configured via Replit integration
+- All sending goes through `server/services/email` (POST https://comms.twilio.com/v1/Emails)
+- Most emails also send a separate monitoring copy to `katie@thesandwichproject.org` (Twilio Email has no BCC)
+- Unsubscribes and bounces live in `email_suppressions`; every email links to `/api/email-preferences`
+- `npm run email:test -- you@example.com` sends a real test email
 
 ### Google Sheets
 

@@ -8,7 +8,7 @@ A full-stack management platform for The Sandwich Project, an Atlanta-based nonp
 - **Backend**: Express.js + TypeScript, Drizzle ORM, WebSockets (Socket.IO)
 - **Database**: PostgreSQL on Neon (branched: dev + production)
 - **Hosting**: Replit
-- **Email**: SendGrid (`katie@thesandwichproject.org` as sender)
+- **Email**: Twilio Email API (`katie@thesandwichproject.org` as default sender); all sending goes through `server/services/email`
 - **SMS**: Twilio
 - **AI**: Codex API for chat insights, intake assistance, event categorization
 
@@ -33,7 +33,7 @@ The app runs on a single port — Express serves both the API and the Vite-built
 ## Key Environment Variables (in Replit Secrets)
 - `DATABASE_URL` — Production Neon connection string
 - `DEV_DATABASE_URL` — Dev Neon branch connection string
-- `SENDGRID_API_KEY` — Email sending
+- `TWILIO_EMAIL_API_KEY`, `TWILIO_EMAIL_API_SECRET`, `EMAIL_FROM_ADDRESS` — Email (Twilio Email; separate from the SMS Twilio credentials)
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — SMS
 - `ANTHROPIC_API_KEY` — Codex AI features
 - `SESSION_SECRET` — Express session signing
@@ -55,7 +55,7 @@ server/
     volunteer-event-hub.ts  # Volunteer signup system
   services/          # ~44 service files
     cron-jobs.ts     # All scheduled jobs (auto-complete, reminders, digests)
-    email-service.ts # SendGrid integration
+    email/           # Email helper (Twilio Email), suppressions, unsubscribe page
     organizations/   # Returning org detection, merge service
 
 client/src/

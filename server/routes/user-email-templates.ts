@@ -6,7 +6,7 @@ import { eq, desc, isNull } from 'drizzle-orm';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { logger } from '../utils/production-safe-logger';
-import { sendEmail } from '../sendgrid';
+import { sendEmail } from '../services/email';
 import { buildUserSender } from '../utils/user-sender';
 import type { AuthenticatedRequest } from '../types/express';
 
@@ -306,17 +306,20 @@ export function createEventEmailRouter(): Router {
       // Import email footer
       const { EMAIL_FOOTER_TEXT, EMAIL_FOOTER_HTML } = await import('../utils/email-footer');
 
-      // From: the sender's own address when it's on our SendGrid-authenticated
+      // From: the sender's own address when it's on our Twilio-verified
       // domain, otherwise the org address (a verified sender) shown as
       // "<Name> via The Sandwich Project". See server/utils/user-sender.ts.
       const sender = buildUserSender(senderUser || user);
 
-      // Build the SendGrid payload with replyTo and BCC
+      // Build the email: replyTo (becomes a "To reply" line only when From
+      // isn't the sender's own address) and a copy to the sender
       const emailPayload: any = {
         emailStream: 'operational',
         to: recipientEmail,
         from: sender.from,
-        replyTo: tspContactEmail,
+        replyTo: sender.replyTo
+          ? { email: sender.replyTo, name: sender.replyToName }
+          : tspContactEmail,
         subject: processedSubject,
         text: `${processedBody}\n\n${EMAIL_FOOTER_TEXT}`,
         html: `
@@ -334,11 +337,11 @@ export function createEventEmailRouter(): Router {
         emailPayload.bcc = tspContactEmail;
       }
 
-      // Send via SendGrid
+      // Send it
       const sendResult = await sendEmail(emailPayload);
 
       if (!sendResult) {
-        return res.status(500).json({ error: 'Failed to send email - check SendGrid configuration' });
+        return res.status(500).json({ error: 'Failed to send email - check the email (Twilio) configuration' });
       }
 
       // Log to email_logs table
