@@ -749,7 +749,7 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       </div>
     `;
 
-    await sendEmailOrThrow({
+    const sendResult = await sendEmailOrThrow({
       to: emailAddress,
       from: 'katie@thesandwichproject.org',
       subject: emailSubject,
@@ -757,6 +757,10 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       html: emailHtml,
       emailStream: 'operational',
     });
+    if (!sendResult.success) {
+      // Recipient is on email_suppressions; nothing was sent.
+      return res.status(409).json({ error: 'Test email not sent', details: sendResult.error });
+    }
 
     res.json({
       success: true,

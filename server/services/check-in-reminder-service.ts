@@ -357,7 +357,7 @@ async function sendReminderEmail(
   const baseUrl = getAppBaseUrl();
 
   try {
-    await sendEmailOrThrow({
+    const result = await sendEmailOrThrow({
       to: email,
       from: 'katie@thesandwichproject.org',
       subject: msg.subject,
@@ -365,7 +365,8 @@ async function sendReminderEmail(
       html: renderReminderEmailHtml(userName, event, msg, baseUrl),
       emailStream: 'operational',
     });
-    return true;
+    // false when the recipient unsubscribed (nothing was sent)
+    return result.success;
   } catch (error) {
     logger.error(`Failed to send reminder email to ${email}:`, error);
     return false;

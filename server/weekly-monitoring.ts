@@ -905,7 +905,7 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       </div>
     `;
 
-    await sendEmailOrThrow({
+    const sendResult = await sendEmailOrThrow({
       to: contactEmail,
       from: FROM_EMAIL,
       bcc: WEEKLY_MONITORING_RECIPIENT, // BCC admin on all host reminder emails
@@ -914,6 +914,16 @@ P.S. If you've already submitted or have any questions, feel free to reach out t
       html: emailHtml,
       emailStream: 'operational',
     });
+
+    // sendEmailOrThrow doesn't throw when the recipient has unsubscribed; it
+    // resolves with suppressed: true and nothing is sent. Report that.
+    if (!sendResult.success) {
+      logger.warn(`Email reminder to ${location} not sent: ${sendResult.error}`);
+      return {
+        success: false,
+        message: `Email reminder not sent: ${sendResult.error}`,
+      };
+    }
 
     logger.log(
       `✅ Email reminder sent successfully to ${location} (${contactEmail})`

@@ -103,7 +103,8 @@ async function sgList(pathname: string): Promise<Array<{ email: string; created?
 
 interface RawLists {
   global_unsubscribes: Array<{ email: string; created?: number }>;
-  groups: Array<{ id: number; name: string; emails: string[] }>;
+  /** stream is set for CSV files, whose name already says which stream they are. */
+  groups: Array<{ id: number; name: string; emails: string[]; stream?: 'operational' | 'newsletter' }>;
   bounces: Array<{ email: string; created?: number; reason?: string }>;
   spam_reports: Array<{ email: string; created?: number }>;
   invalid_emails: Array<{ email: string; created?: number; reason?: string }>;
@@ -179,8 +180,18 @@ function readFromCsv(dir: string, opGroup?: number, nlGroup?: number): RawLists 
   return {
     global_unsubscribes: f('global_unsubscribes.csv'),
     groups: [
-      { id: opGroup ?? -1, name: 'operational (CSV)', emails: f('group_operational.csv').map((r) => r.email) },
-      { id: nlGroup ?? -2, name: 'newsletter (CSV)', emails: f('group_newsletter.csv').map((r) => r.email) },
+      {
+        id: opGroup ?? -1,
+        name: 'operational (CSV)',
+        stream: 'operational',
+        emails: f('group_operational.csv').map((r) => r.email),
+      },
+      {
+        id: nlGroup ?? -2,
+        name: 'newsletter (CSV)',
+        stream: 'newsletter',
+        emails: f('group_newsletter.csv').map((r) => r.email),
+      },
     ],
     bounces: f('bounces.csv'),
     spam_reports: f('spam_reports.csv'),
@@ -200,7 +211,8 @@ function toRows(raw: RawLists, opGroup?: number, nlGroup?: number): Row[] {
     add(r.email, 'newsletter', 'unsubscribe', `SendGrid global unsubscribe, ${day(r.created)}`);
   }
   for (const g of raw.groups) {
-    const scope: Scope = g.id === opGroup ? 'operational' : 'newsletter';
+    // CSV files say their stream by name; API groups are matched by id.
+    const scope: Scope = g.stream ?? (g.id === opGroup ? 'operational' : 'newsletter');
     for (const email of g.emails) add(email, scope, 'unsubscribe', `SendGrid group "${g.name}" (${g.id})`);
   }
   for (const r of raw.bounces) add(r.email, 'all', 'bounce', `SendGrid bounce, ${day(r.created)}`);
@@ -239,13 +251,13 @@ async function main() {
   const num = (v?: string) => (v && Number.isInteger(Number(v)) ? Number(v) : undefined);
   const opGroup = num(arg('--operational-group') || process.env.SENDGRID_ASM_GROUP_ID_OPERATIONAL);
   const nlGroup = num(arg('--newsletter-group') || process.env.SENDGRID_ASM_GROUP_ID_NEWSLETTER);
-  if (opGroup === undefined) {
+  const csvDir = arg('--from-csv');
+  if (opGroup === undefined && !csvDir) {
     console.warn(
       'No operational group id (SENDGRID_ASM_GROUP_ID_OPERATIONAL / --operational-group): every group will be imported as newsletter.'
     );
   }
 
-  const csvDir = arg('--from-csv');
   const raw = csvDir ? readFromCsv(csvDir, opGroup, nlGroup) : await readFromApi();
 
   const outDir = path.join(process.cwd(), 'audit-output');
@@ -258,7 +270,7 @@ async function main() {
   console.log('Read from SendGrid:');
   console.log(`  Global unsubscribes:  ${raw.global_unsubscribes.length}`);
   for (const g of raw.groups) {
-    const label = g.id === opGroup ? 'operational' : g.id === nlGroup ? 'newsletter' : 'other -> newsletter';
+    const label = g.stream ?? (g.id === opGroup ? 'operational' : g.id === nlGroup ? 'newsletter' : 'other -> newsletter');
     console.log(`  Group "${g.name}" (${g.id}, ${label}): ${g.emails.length}`);
   }
   console.log(`  Bounces:              ${raw.bounces.length}`);
@@ -277,15 +289,24 @@ async function main() {
         'email_suppressions does not exist on this database yet. Deploy (or restart the server) so migrations/20261128_email_suppressions.sql runs first.'
       );
     }
-    const existing = await client.query(`SELECT email, scope FROM email_suppressions`);
-    const have = new Set(existing.rows.map((r: any) => `${r.email}|${r.scope}`));
+    // An existing row is upgraded when it's only an unsubscribe and SendGrid
+    // says the address bounced / reported spam / is invalid: otherwise a later
+    // "resubscribe" (which deletes unsubscribes) would leave it unblocked.
+    const existing = await client.query(`SELECT email, scope, reason FROM email_suppressions`);
+    const have = new Map<string, string>(existing.rows.map((r: any) => [`${r.email}|${r.scope}`, r.reason]));
     const fresh = rows.filter((r) => !have.has(`${r.email}|${r.scope}`));
-    console.log(`Already present: ${rows.length - fresh.length}. New: ${fresh.length}.`);
+    const upgrades = rows.filter(
+      (r) => have.get(`${r.email}|${r.scope}`) === 'unsubscribe' && r.reason !== 'unsubscribe'
+    );
+    const toWrite = [...fresh, ...upgrades];
+    console.log(
+      `Already present: ${rows.length - fresh.length} (of which ${upgrades.length} will be upgraded from unsubscribe to bounce/spam/invalid). New: ${fresh.length}.`
+    );
 
-    if (apply && fresh.length > 0) {
+    if (apply && toWrite.length > 0) {
       await client.query('BEGIN');
-      for (let i = 0; i < fresh.length; i += 500) {
-        const chunk = fresh.slice(i, i + 500);
+      for (let i = 0; i < toWrite.length; i += 500) {
+        const chunk = toWrite.slice(i, i + 500);
         const values: string[] = [];
         const params: string[] = [];
         chunk.forEach((r, j) => {
@@ -295,12 +316,14 @@ async function main() {
         });
         await client.query(
           `INSERT INTO email_suppressions (email, scope, reason, source, note) VALUES ${values.join(', ')}
-           ON CONFLICT (email, scope) DO NOTHING`,
+           ON CONFLICT (email, scope) DO UPDATE
+             SET reason = EXCLUDED.reason, source = EXCLUDED.source, note = EXCLUDED.note
+             WHERE email_suppressions.reason = 'unsubscribe' AND EXCLUDED.reason <> 'unsubscribe'`,
           params
         );
       }
       await client.query('COMMIT');
-      console.log(`✅ Imported ${fresh.length} row(s).`);
+      console.log(`✅ Imported ${fresh.length} new row(s), upgraded ${upgrades.length}.`);
     } else if (dryRun) {
       console.log('Nothing saved. Re-run with --apply to import.');
     }
