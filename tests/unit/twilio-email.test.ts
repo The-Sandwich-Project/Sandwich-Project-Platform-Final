@@ -189,6 +189,32 @@ describe('request to Twilio', () => {
   });
 });
 
+describe('Liquid templating', () => {
+  // Twilio rejects any email with an undeclared {{ variable }} (HTTP 400).
+  it('sends {{ and {% as literal text, not Liquid tags', async () => {
+    await sendEmailWithResult({
+      emailStream: 'operational',
+      adminCopy: false,
+      to: 'a@example.org',
+      subject: 'Hi {{firstName}}',
+      html: '<p>Dear {{ firstName }}, {% if x %}</p>',
+      text: 'Dear {{ firstName }}, {% if x %}',
+    });
+    const { content } = bodies()[0];
+    for (const value of [content.subject, content.html, content.text]) {
+      expect(value).not.toMatch(/\{\{|\{%/);
+    }
+    expect(content.html).toContain('<p>Dear &#123;{ firstName }}, &#123;% if x %}</p>');
+    expect(content.text).toContain('Dear {\u200B{ firstName }}, {\u200B% if x %}');
+    expect(content.subject).toBe('Hi {\u200B{firstName}}');
+  });
+
+  it('leaves single braces (CSS, JSON) alone', async () => {
+    await sendEmailWithResult({ emailStream: 'operational', adminCopy: false, to: 'a@example.org', subject: 's', html: '<style>p{color:red}</style><p>{x}</p>' });
+    expect(bodies()[0].content.html).toContain('<style>p{color:red}</style><p>{x}</p>');
+  });
+});
+
 describe('copies instead of CC/BCC', () => {
   it('sends the admin copy, CC and BCC as separate requests, de-duplicated', async () => {
     const result = await sendEmailWithResult({

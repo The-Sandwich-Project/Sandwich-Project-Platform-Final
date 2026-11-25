@@ -151,6 +151,7 @@ Every email goes through `server/services/email` (`sendEmail` / `sendEmailWithRe
 - `sendEmail`/`sendEmailWithResult` also send a monitoring copy to the admin (`adminCopy: false` to skip); `sendEmailOrThrow` doesn't unless `adminCopy: true`
 - Twilio Email has **no CC, BCC or Reply-To**. The helper sends each CC/BCC/admin copy as its own request, and turns a `replyTo` that differs from From into a "To reply, email …" line at the top of the body. For emails a team member writes, use `buildUserSender()` (`server/utils/user-sender.ts`): it sends FROM their own @thesandwichproject.org address when they have one, so plain Reply works
 - Before sending, the helper checks `email_suppressions` (bounces, spam reports, unsubscribes; SendGrid's history was imported) and adds a per-recipient "Manage email preferences / unsubscribe" link to `/api/email-preferences` (public; GET only shows the page, POST changes it, so link scanners can't unsubscribe anyone). Newsletter mail also gets one-click `List-Unsubscribe` headers
+- Twilio runs Liquid templating over subject/html/text and **rejects the email (HTTP 400) if it contains `{{ variable }}` with no default**. The helper escapes every `{{` / `{%` so they send as literal text; don't try to use Liquid through it
 - `npm run email:test -- you@example.com` sends one real test email
 
 ### Onboarding System
