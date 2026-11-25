@@ -9,10 +9,10 @@
  * Prints whether Twilio accepted it (202 + operation id) or the status code
  * and response body it returned. Never prints the key or secret.
  *
- * The email also checks whether Twilio runs Liquid templating over our
- * content: it contains a literal {{ liquid_check }}. If that line arrives
- * blank instead of showing the braces, tell the developer: email bodies that
- * contain {{ or {% would need escaping.
+ * The email also checks that literal {{ ... }} text survives: Twilio runs
+ * Liquid templating over every email and rejects undeclared {{ variables }},
+ * so the helper escapes them. The "Liquid check" line should arrive showing
+ * {{ liquid_check }} with its braces.
  */
 import { sendEmailWithResult, missingEmailConfig } from '../server/services/email';
 

@@ -174,6 +174,24 @@ export function addReplyToLine(
   };
 }
 
+/**
+ * Twilio Email runs Liquid templating over the subject, html and text, and
+ * REJECTS the whole email (HTTP 400 "Template validation failed") when it sees
+ * `{{ something }}` without a default. We never use Liquid, so any `{{` or `{%`
+ * in our content is literal text (a stray merge tag, a code sample) and must
+ * not be read as a tag:
+ *  - html: the first brace becomes the entity `&#123;`, which displays as `{`.
+ *  - subject / text: a zero-width space goes between the two characters, so it
+ *    still reads as `{{` but is no longer a Liquid opener.
+ */
+const ZERO_WIDTH_SPACE = '\u200B';
+export function neutralizeLiquidHtml(html: string): string {
+  return html.replace(/\{(?=[{%])/g, '&#123;');
+}
+export function neutralizeLiquidText(text: string): string {
+  return text.replace(/\{(?=[{%])/g, `{${ZERO_WIDTH_SPACE}`);
+}
+
 const CONTENT_TYPES: Record<string, string> = {
   '.pdf': 'application/pdf',
   '.doc': 'application/msword',
@@ -352,9 +370,9 @@ function buildRequest(
     from: { address: from.address, name: from.name || ORG_NAME },
     to: [{ address: delivery.mailbox.address, ...(delivery.mailbox.name ? { name: delivery.mailbox.name } : {}) }],
     content: {
-      subject: params.subject,
-      html: content.html,
-      ...(content.text ? { text: content.text } : {}),
+      subject: neutralizeLiquidText(params.subject),
+      html: neutralizeLiquidHtml(content.html),
+      ...(content.text ? { text: neutralizeLiquidText(content.text) } : {}),
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(headers ? { headers } : {}),
     },
