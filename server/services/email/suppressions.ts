@@ -7,7 +7,6 @@
  * own preferences page records, and the email helper checks it before sending.
  */
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '../../db';
 import {
   emailSuppressions,
   type EmailSuppressionReason,
@@ -15,6 +14,12 @@ import {
   type EmailSuppressionSource,
 } from '@shared/schema';
 import type { EmailStream } from './types';
+
+// Loaded on first use, not at import: the email helper is imported all over the
+// server (and by tests) and shouldn't need a database connection just to load.
+async function getDb() {
+  return (await import('../../db')).db;
+}
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -28,6 +33,7 @@ export async function getSuppressionScopes(emails: string[]): Promise<Suppressio
   const map: SuppressionMap = new Map();
   if (normalized.length === 0) return map;
 
+  const db = await getDb();
   const rows = await db
     .select({ email: emailSuppressions.email, scope: emailSuppressions.scope })
     .from(emailSuppressions)
@@ -57,6 +63,7 @@ export async function addSuppression(input: {
 }): Promise<void> {
   const email = normalizeEmail(input.email);
   if (!email) return;
+  const db = await getDb();
   await db
     .insert(emailSuppressions)
     .values({ ...input, email })
@@ -70,6 +77,7 @@ export async function addSuppression(input: {
  */
 export async function removeUnsubscribes(email: string): Promise<number> {
   const normalized = normalizeEmail(email);
+  const db = await getDb();
   const deleted = await db
     .delete(emailSuppressions)
     .where(
