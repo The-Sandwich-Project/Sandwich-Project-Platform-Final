@@ -125,6 +125,9 @@ export function EventEmailComposer({
 
   // Smart regeneration state management
   const [hasManualEdits, setHasManualEdits] = useState(false);
+  // True while "Write with AI" is rewriting the email: the subject, body and
+  // anything that would regenerate them are locked so edits can't be lost.
+  const [aiBusy, setAiBusy] = useState(false);
   const [isResettingToTemplate, setIsResettingToTemplate] = useState(false);
   const lastGeneratedContentRef = useRef<string>('');
   const isInitialLoad = useRef(true);
@@ -1833,6 +1836,7 @@ ${userEmail}`;
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Enter email subject"
               className="w-full"
+              disabled={aiBusy}
             />
           </div>
 
@@ -1841,6 +1845,7 @@ ${userEmail}`;
             <Label className="text-sm font-medium">Message Format</Label>
 
             <RadioGroup
+              disabled={aiBusy}
               value={emailFormat}
               onValueChange={(value: 'html' | 'plaintext') => {
                 if (!confirmDiscardEdits()) return;
@@ -1884,6 +1889,7 @@ ${userEmail}`;
               <div className="mt-4">
                 <Label className="text-sm font-medium mb-2 block">Template Style</Label>
                 <RadioGroup
+                  disabled={aiBusy}
                   value={templateStyle}
                   onValueChange={(value: 'classic' | 'optimized') => {
                     if (!confirmDiscardEdits()) return;
@@ -1942,10 +1948,22 @@ ${userEmail}`;
                   // and shows "Reset to Template".
                   setHasManualEdits(true);
                 }}
+                onBusyChange={setAiBusy}
               />
             </div>
 
-            <div className="mt-4">
+            <div className="mt-4 relative" aria-busy={aiBusy}>
+              {aiBusy && (
+                <div
+                  className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[1px]"
+                  data-testid="ai-writing-overlay"
+                >
+                  <div className="flex items-center gap-2 rounded-full border border-purple-200 bg-white px-4 py-2 text-sm text-purple-800 shadow-sm">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    AI is rewriting your email…
+                  </div>
+                </div>
+              )}
               {hasManualEdits && (
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
@@ -1956,6 +1974,7 @@ ${userEmail}`;
                     variant="outline"
                     size="sm"
                     onClick={resetToTemplate}
+                    disabled={aiBusy}
                     className="text-xs h-7 bg-brand-primary-lighter border-brand-primary-border-strong text-brand-primary hover:bg-brand-primary-light"
                     data-testid="button-reset-template"
                   >
@@ -1982,6 +2001,7 @@ ${userEmail}`;
                   <EditableEmailPreview
                     html={content}
                     onChange={handleContentChange}
+                    readOnly={aiBusy}
                     data-testid="email-preview"
                   />
                 </div>
@@ -1990,6 +2010,7 @@ ${userEmail}`;
                   id="content"
                   value={content}
                   onChange={(e) => handleContentChange(e.target.value)}
+                  readOnly={aiBusy}
                   placeholder="Write your message here..."
                   className="min-h-[300px] w-full resize-none"
                   data-testid="textarea-email-content"
@@ -2141,7 +2162,7 @@ ${userEmail}`;
             <Button
               variant="outline"
               onClick={() => handleSend(true)}
-              disabled={sendEmailMutation.isPending}
+              disabled={sendEmailMutation.isPending || aiBusy}
               className="flex items-center gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
             >
               <Clock className="w-4 h-4" />
@@ -2154,6 +2175,7 @@ ${userEmail}`;
               onClick={() => handleSend(false)}
               disabled={
                 sendEmailMutation.isPending ||
+                aiBusy ||
                 !subject.trim() ||
                 !content.trim()
               }

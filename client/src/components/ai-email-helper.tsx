@@ -32,6 +32,8 @@ interface AiEmailHelperProps {
   subject: string;
   content: string;
   onApply: (next: { subject: string; content: string }) => void;
+  /** Tells the composer to lock the email while the AI is writing. */
+  onBusyChange?: (busy: boolean) => void;
 }
 
 interface AiEmailResponse {
@@ -46,6 +48,7 @@ export function AiEmailHelper({
   subject,
   content,
   onApply,
+  onBusyChange,
 }: AiEmailHelperProps) {
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState('');
@@ -127,6 +130,12 @@ export function AiEmailHelper({
       });
     },
   });
+
+  useEffect(() => {
+    onBusyChange?.(mutation.isPending);
+  }, [mutation.isPending]);
+  // Never leave the composer locked if this panel goes away mid-request.
+  useEffect(() => () => onBusyChange?.(false), []);
 
   const run = (prompt: string) => {
     const trimmed = prompt.trim();
