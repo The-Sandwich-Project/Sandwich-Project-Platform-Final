@@ -17,6 +17,7 @@
     "people:backfill": "tsx scripts/backfill-people.ts",
     "people:repair-flags": "tsx scripts/repair-people-flags.ts",
     "volunteers:sync": "tsx scripts/sync-volunteer-sheet.ts",
+    "alerts:backfill": "tsx scripts/backfill-last-human-update.ts",
     "email:test": "tsx scripts/send-test-email.ts",
     "email:import-sendgrid-suppressions": "tsx scripts/import-sendgrid-suppressions.ts",
     "db:compare": "tsx scripts/compare-db-schemas.ts",

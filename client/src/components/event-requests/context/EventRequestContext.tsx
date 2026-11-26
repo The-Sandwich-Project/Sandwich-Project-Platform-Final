@@ -9,6 +9,7 @@ import { buildEventRequestsListQuery, EVENT_REQUEST_LIST_FRESHNESS, type EventRe
 import { EventDialogProvider, useEventDialogState } from './EventDialogContext';
 import { useIssueReport } from '@/contexts/issue-report-context';
 import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
+import { readEventDeepLink, clearEventDeepLinkAction } from '../lib/eventDeepLink';
 import { EMPTY_IN_PROCESS_FILTERS, type InProcessFilters } from '../lib/inProcessFilters';
 import {
   computeUnviewedNewCount,
@@ -601,17 +602,53 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
     }
   }, [initialEventId, lastHandledEventId]);
 
+  // Open a linked event, honoring the email deep-link action (see lib/eventDeepLink.ts):
+  // log a contact attempt, mark the toolkit sent, edit details, or just open it.
+  // Snooze links are handled by <AlertSnoozeFromLink /> (it asks to confirm first),
+  // so they don't open the details dialog here.
+  const openFromLink = useCallback((event: EventRequest) => {
+    const link = readEventDeepLink();
+    const action = link?.eventId === event.id ? link.action : null;
+    if (action === 'snooze') return;
+    if (action === 'log-contact') {
+      dialog.setLogContactEventRequest(event);
+      dialog.openDialog('logContact');
+    } else if (action === 'toolkit') {
+      dialog.setSelectedEventRequest(event);
+      dialog.setToolkitEventRequest(event);
+      dialog.openDialog('toolkitSent');
+    } else {
+      dialog.openEventDetails(event, { isEditing: action === 'edit' });
+    }
+    if (action) clearEventDeepLinkAction();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Handle initial event ID - auto-open event details if specified
   useEffect(() => {
     if (initialTab && ['new', 'in_process', 'scheduled', 'rescheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments', 'admin_overview'].includes(initialTab)) {
       setActiveTab(initialTab);
     }
 
-    if (initialEventId && eventRequests.length > 0 && !hasHandledInitialEvent) {
-      const targetEvent = eventRequests.find(req => req.id === initialEventId);
-      if (targetEvent) {
-        // Open the details dialog via the new EventDialogContext helper.
-        dialog.openEventDetails(targetEvent, { isEditing: false });
+    if (initialEventId && !hasHandledInitialEvent && (eventRequests.length > 0 || !isLoading)) {
+      const loaded = eventRequests.find(req => req.id === initialEventId);
+      if (!loaded) {
+        // Not in the current page/tab of results (e.g. a link from the daily
+        // alert email to an older event): fetch it directly instead of
+        // silently doing nothing.
+        setHasHandledInitialEvent(true);
+        setLastHandledEventId(initialEventId);
+        fetch(`/api/event-requests/${initialEventId}`, { credentials: 'include' })
+          .then(r => (r.ok ? r.json() : null))
+          .then((ev: EventRequest | null) => {
+            if (ev?.id) openFromLink(ev);
+          })
+          .catch(err => logger.warn('[EventRequestContext] Could not load linked event', err));
+        return;
+      }
+      const targetEvent = loaded;
+      {
+        openFromLink(targetEvent);
         setHasHandledInitialEvent(true); // Mark as handled to prevent reopening
         setLastHandledEventId(initialEventId); // Track which event was handled
 
@@ -636,7 +673,7 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
-  }, [initialTab, initialEventId, eventRequests, hasHandledInitialEvent]);
+  }, [initialTab, initialEventId, eventRequests, hasHandledInitialEvent, isLoading, openFromLink]);
 
   // Memoize context value. This context now owns ONLY data / view / pagination
   // state — dialog and inline-editing state lives on EventDialogContext and is

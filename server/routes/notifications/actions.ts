@@ -15,6 +15,7 @@ import { createStandardMiddleware } from '../../middleware';
 import { logger } from '../../utils/production-safe-logger';
 import { getSocketInstance } from '../../socket-chat';
 import { getLinkedUserIds } from '../../lib/linked-accounts';
+import { markEventHumanUpdated } from '../../services/event-alerts/human-update';
 
 const actionsRouter = Router();
 
@@ -96,6 +97,10 @@ async function handleEventRequestAction(
     default:
       throw new Error(`Unknown action type: ${actionType}`);
   }
+
+  // A person acted on this event from a notification: counts as an update
+  // for the "no updates" event alert.
+  markEventHumanUpdated(eventId);
 
   return {
     success: true,

@@ -25,6 +25,8 @@ import { Link } from 'wouter';
 import { AlertCircle, Clock, LogIn, Eye, EyeOff } from 'lucide-react';
 import tspLogo from '@assets/CMYK_PRINT_TSP-01_1749585167435.png';
 import { AuthPageLayout } from '@/components/layout/responsive-page-layout';
+import { safeReturnTo } from '@/lib/safe-return-to';
+
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -64,7 +66,7 @@ export default function LoginPage() {
       });
 
       if (response.ok || response.redirected) {
-        window.location.href = '/';
+        window.location.href = safeReturnTo(window.location.search);
         return;
       }
 

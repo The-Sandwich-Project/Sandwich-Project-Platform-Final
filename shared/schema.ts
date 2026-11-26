@@ -1549,8 +1549,9 @@ export const peopleRelations = relations(people, ({ one, many }) => ({
   sheetFieldConflicts: many(sheetFieldConflicts),
 }));
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   person: one(people, { fields: [users.personId], references: [people.id] }),
+  eventAlertDigestSends: many(eventAlertDigestSends),
 }));
 
 export const personNameAliasesRelations = relations(personNameAliases, ({ one }) => ({
@@ -2840,6 +2841,14 @@ export const eventRequests = pgTable(
     // System tracking
     status: varchar('status').notNull().default('new'), // 'new', 'in_process', 'scheduled', 'rescheduled', 'completed', 'declined', 'cancelled', 'non_event', 'standby', 'stalled'
     statusChangedAt: timestamp('status_changed_at'), // When the status was last changed (used for follow-up badge logic)
+    // Last time a signed-in person changed this event through the app (any
+    // successful write to /api/event-requests/:id...). Unlike updatedAt, the
+    // Google Sheet sync and cron jobs never touch it, so it's what the
+    // "no updates" event alert measures. Stamped in server/routes/event-requests/index.ts.
+    // New rows default to now(), so a brand-new event counts from its creation.
+    // Rows that existed before the column are filled by
+    // scripts/backfill-last-human-update.ts (run deliberately; see CLAUDE.md).
+    lastHumanUpdateAt: timestamp('last_human_update_at').defaultNow(),
     assignedTo: varchar('assigned_to'), // User ID of person handling this request
     nextAction: text('next_action'), // What needs to happen next for this event (intake tracking)
     nextActionUpdatedAt: timestamp('next_action_updated_at'), // When nextAction was last updated
@@ -3348,6 +3357,10 @@ export const eventCheckInReminders = pgTable(
     frequency: varchar('frequency').notNull().default('weekly'), // 'daily', 'every_3_days', 'weekly', 'biweekly' (how often to re-check/re-notify)
     channel: varchar('channel').notNull().default('email'), // 'email', 'sms', 'both'
     lastSentAt: timestamp('last_sent_at'), // When the last reminder was sent
+    // Which occurrence was last sent, for alerts that fire at set points rather
+    // than on a repeat interval. "Requested date coming up": '<date>:<days out>'
+    // (e.g. '2026-12-06:7'), so a new checkpoint or a changed date fires again.
+    lastSentKey: text('last_sent_key'),
     nextDueAt: timestamp('next_due_at'), // Pre-calculated next send time
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -3387,7 +3400,8 @@ export const REMINDER_RULE_TYPES = {
 export type ReminderRuleType = typeof REMINDER_RULE_TYPES[keyof typeof REMINDER_RULE_TYPES];
 
 // Event reminder snooze / pause state
-// When a snooze is active, ALL check-in reminders for that event+user are suppressed.
+// A snooze silences one alert (rule_type set) or every alert (rule_type NULL)
+// for that event+user until it ends.
 // Snooze types:
 //   'timed'         — paused for a set number of days from now
 //   'until_date'    — paused until a specific calendar date
@@ -3399,6 +3413,10 @@ export const eventReminderSnoozes = pgTable(
     eventRequestId: integer('event_request_id').notNull(),
     userId: varchar('user_id').notNull(),
     snoozeType: varchar('snooze_type').notNull(), // 'timed', 'until_date', 'until_contact'
+    // Which alert this snooze silences ("remind me again in N days" on one
+    // alert in the daily email). NULL = every alert for the event (legacy).
+    // CHECK: NULL or an active rule type (migrations/20261129_event_alert_digest.sql).
+    ruleType: varchar('rule_type'),
     snoozedUntil: timestamp('snoozed_until'), // null for 'until_contact' (open-ended)
     reason: text('reason'), // optional note ("waiting for org to respond", etc.)
     active: boolean('active').notNull().default(true),
@@ -3408,14 +3426,38 @@ export const eventReminderSnoozes = pgTable(
   (table) => ({
     // Only one *active* snooze per event+user at a time.
     // Inactive (cancelled/expired) rows are kept as history and are not constrained.
-    activeEventUserIdx: uniqueIndex('idx_reminder_snoozes_active_event_user')
-      .on(table.eventRequestId, table.userId)
+    // One active snooze per event + person + alert (NULL alert = whole event).
+    activeEventUserRuleIdx: uniqueIndex('idx_reminder_snoozes_active_event_user_rule')
+      .on(table.eventRequestId, table.userId, sql`(coalesce(rule_type, ''))`)
       .where(sql`active = true`),
     activeIdx: index('idx_reminder_snoozes_active').on(table.active),
   }),
 );
 
 export type EventReminderSnooze = typeof eventReminderSnoozes.$inferSelect;
+
+// Event alerts: one row per person per Eastern day a daily digest went out.
+// The once-a-day limit: a run claims today by inserting this row (the primary
+// key makes a second claim fail), and gives it back by deleting it if nothing
+// was delivered. Kept out of users.metadata on purpose: settings saves rewrite
+// that whole blob and could erase a claim mid-send.
+export const eventAlertDigestSends = pgTable(
+  'event_alert_digest_sends',
+  {
+    userId: varchar('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sentOn: date('sent_on').notNull(), // Eastern calendar date
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.sentOn] }),
+  }),
+);
+
+export const eventAlertDigestSendsRelations = relations(eventAlertDigestSends, ({ one }) => ({
+  user: one(users, { fields: [eventAlertDigestSends.userId], references: [users.id] }),
+}));
 
 // Event collaboration comments table for team discussion on event planning
 export const eventCollaborationComments = pgTable(

@@ -54,6 +54,7 @@ import { VanConflictsButton } from '@/components/event-requests/VanConflictsButt
 import { PlanningSheetImportDialog } from '@/components/event-requests/PlanningSheetImportDialog';
 import { PlanningSheetGapsDialog } from '@/components/event-requests/PlanningSheetGapsDialog';
 import { ReminderSettingsButton } from '@/components/event-requests/ReminderSettingsButton';
+import { AlertSnoozeFromLink } from '@/components/event-requests/AlertSnoozeFromLink';
 import { applyInProcessFilters, hasActiveInProcessFilters } from '@/components/event-requests/lib/inProcessFilters';
 import EventSchedulingForm from '@/components/event-requests/EventSchedulingForm';
 import EventCollectionLog from '@/components/event-requests/EventCollectionLog';
@@ -1837,6 +1838,8 @@ export default function EventRequestsManagementV2({
       initialEventId={initialEventId}
     >
       <EventRequestsManagementContent />
+      {/* "Remind me again in N days" links from the daily alert email */}
+      <AlertSnoozeFromLink />
     </EventRequestProvider>
   );
 }

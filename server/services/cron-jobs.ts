@@ -1123,7 +1123,7 @@ export function initializeCronJobs() {
   // Cron format: minute hour day-of-month month day-of-week
   // '0 9,15 * * *' = At 9:00 AM and 3:00 PM every day
   // DISABLED: Automatic volunteer reminders replaced by user-controlled per-event
-  // check-in reminder rules (ReminderRulesManager component).
+  // check-in reminders, now the daily event-alert digest (check-in-reminder-service.ts).
   // TSP contacts can now enable/disable reminders individually per event.
   const volunteerReminderJob = cron.schedule('0 9,15 * * *', async () => {
     cronLogger.info('Volunteer reminder job DISABLED - using per-event check-in toggles instead');
@@ -1465,22 +1465,23 @@ export function initializeCronJobs() {
     timezone: 'America/New_York',
   });
 
-  // User-controlled check-in reminders - runs every hour at :15
-  // Processes per-event reminder toggles set by TSP contacts
+  // Event alerts (formerly check-in reminders): ONE digest email per TSP
+  // contact per day. Checked hourly at :15 so a restart at 9:00 can't cost a
+  // day; the service sends on the first run at or after 9 AM ET and claims a
+  // once-per-day slot per person, so repeated runs never send twice.
+  // Dry run (CHECK_IN_REMINDERS_DRY_RUN=true) runs in any environment and
+  // sends nothing; logged once a day, not hourly.
+  let lastDryRunDay: string | null = null;
   const checkInReminderJob = cron.schedule('15 * * * *', async () => {
-    // Dry run (CHECK_IN_REMINDERS_DRY_RUN=true) runs in any environment and
-    // sends nothing; otherwise real reminders only go out in production.
     const dryRun = isCheckInReminderDryRun();
-    if (!isProduction && !dryRun) {
-      cronLogger.info('Skipping check-in reminders - not production environment');
-      return;
-    }
-    cronLogger.info(dryRun
-      ? 'Running check-in reminders in DRY RUN mode (nothing will be sent)...'
-      : 'Running check-in reminder processing...');
+    if (!isProduction && !dryRun) return;
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+    if (dryRun && lastDryRunDay === today) return;
     try {
       const result = await processCheckInReminders();
-      cronLogger.info('Check-in reminder processing completed', {
+      if (result.skipped) return; // before 9 AM ET
+      if (dryRun) lastDryRunDay = today;
+      cronLogger.info('Event alert digest run completed', {
         processed: result.processed,
         sent: result.sent,
         errors: result.errors,
@@ -1491,7 +1492,7 @@ export function initializeCronJobs() {
     } catch (error) {
       logError(
         error as Error,
-        'Error running check-in reminder cron job',
+        'Error running event alert digest cron job',
         undefined,
         { jobType: 'check-in-reminders' }
       );
@@ -1501,8 +1502,8 @@ export function initializeCronJobs() {
     timezone: 'America/New_York'
   });
 
-  cronLogger.info('Check-in reminder job scheduled successfully', {
-    schedule: 'Every hour at :15',
+  cronLogger.info('Event alert digest job scheduled successfully', {
+    schedule: 'Hourly at :15; sends once a day from 9:00 AM',
     timezone: 'America/New_York',
   });
 

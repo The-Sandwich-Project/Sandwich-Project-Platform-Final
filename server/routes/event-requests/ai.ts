@@ -5,6 +5,7 @@
  * - Date suggestions
  * - Intake assistance
  * - Event categorization
+ * - Email writing help (toolkit and other contact emails)
  *
  * Split from event-requests-legacy.ts for better organization.
  */
@@ -17,6 +18,7 @@ import { isAuthenticated } from '../../auth';
 import { isScheduledOrRescheduled } from '../../../shared/event-status-workflow';
 import { logger } from '../../middleware/logger';
 import type { AuthenticatedRequest } from '../../types/express';
+import { z } from 'zod';
 
 const router = Router();
 
@@ -208,6 +210,75 @@ router.post('/:id/ai-categorize', isAuthenticated, async (req, res) => {
     res.status(500).json({
       error: 'Failed to generate AI categorization',
       message: err?.message || 'Unknown error occurred'
+    });
+  }
+});
+
+// AI email writing help for the event email composer. OpenAI (gpt-5).
+// HTML emails send only their visible text pieces, never the markup; see
+// server/services/ai-email-writer.
+const aiEmailAssistSchema = z
+  .object({
+    instruction: z.string().trim().min(1).max(2000),
+    subject: z.string().max(500).default(''),
+    format: z.enum(['plaintext', 'html']),
+    text: z.string().max(20000).optional(),
+    segments: z
+      .array(z.object({ id: z.string().max(20), text: z.string().max(5000) }))
+      .max(400)
+      .optional(),
+  })
+  .refine((b) => b.format !== 'html' || (b.segments && b.segments.length > 0), {
+    message: 'HTML emails need text segments',
+  });
+
+router.post('/:id/ai-email-assist', isAuthenticated, async (req, res) => {
+  try {
+    const eventId = parseInt(req.params.id);
+    if (!eventId || isNaN(eventId)) {
+      return res.status(400).json({ error: 'Valid event ID required' });
+    }
+    if (!hasPermission(req.user, PERMISSIONS.EVENT_REQUESTS_VIEW)) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    const parsed = aiEmailAssistSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: parsed.error.issues[0]?.message,
+      });
+    }
+
+    const eventRequest = await storage.getEventRequestById(eventId);
+    if (!eventRequest) {
+      return res.status(404).json({ error: 'Event request not found' });
+    }
+
+    const user = req.user as AuthenticatedRequest['user'] | undefined;
+    const senderName =
+      user?.displayName ||
+      [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+      undefined;
+
+    const { writeEmailWithAi } = await import('../../services/ai-email-writer');
+    const result = await writeEmailWithAi(eventRequest, { ...parsed.data, senderName });
+
+    await logActivity(
+      req as AuthenticatedRequest,
+      res,
+      'EVENT_REQUESTS_VIEW',
+      `Used AI email writing help for event request: ${eventId}`,
+      { organizationName: eventRequest.organizationName, format: parsed.data.format }
+    );
+
+    res.json(result);
+  } catch (error: unknown) {
+    const err = error as Error;
+    logger.error('❌ Error generating AI email help:', error);
+    res.status(500).json({
+      error: 'AI email help failed',
+      message: err?.message || 'Unknown error occurred',
     });
   }
 });

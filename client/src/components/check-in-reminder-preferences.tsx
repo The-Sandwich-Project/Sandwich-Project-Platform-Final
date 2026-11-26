@@ -1,16 +1,18 @@
 /**
- * CheckInReminderPreferences
+ * Event alert settings (Profile → Alerts).
  *
- * Global "default reminder rules" configuration.  Users set this up once in
- * their profile → Alerts tab.  These defaults automatically apply to every
- * event they're the TSP contact for. Per-event customization was retired —
- * these defaults are the only reminder settings. Saving clears the user's
- * per-event copies so the hourly job re-applies the new defaults.
+ * One set of settings per person, applied to every event they're the TSP
+ * contact for. Everything due on a given day arrives in ONE daily email (see
+ * server/services/check-in-reminder-service.ts). Each alert's own days set its
+ * timing; there's no separate repeat setting:
+ *   No contact / No updates     after X days, then every X days
+ *   Requested date coming up    once at each chosen number of days before
+ *   Event coming up, missing    daily from X days before (pause one from the email)
  */
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { AlarmClock, Loader2, Save, Info, Smartphone } from 'lucide-react';
+import { AlarmClock, Loader2, Save, Info, Smartphone, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -36,7 +38,6 @@ import type { DefaultReminderRule, CheckInReminderPreferences as Prefs } from '@
 import { SmsQuickSetupDialog, useSmsStatus } from '@/components/sms-quick-setup-dialog';
 
 type ReminderChannel = Prefs['defaultChannel'];
-type ReminderFrequency = DefaultReminderRule['frequency'];
 
 // ---------------------------------------------------------------------------
 // Rule type definitions (mirrors the server-side RULE_TYPE_CONFIG)
@@ -45,41 +46,48 @@ type ReminderFrequency = DefaultReminderRule['frequency'];
 const RULE_TYPES = [
   {
     ruleType: 'no_contact',
-    label: 'No Contact Logged',
-    description: 'When no contact attempt has been logged for a while (In Process events)',
+    label: 'No contact logged',
+    description: 'A New or In Process event with no contact attempt logged for a while.',
     defaultThreshold: 5,
-    thresholdPrefix: 'After',
-    thresholdLabel: 'days with no contact',
+    kind: 'repeat' as const,
+    before: 'After',
+    after: (n: number) => `days with no contact logged, then every ${n === 1 ? 'day' : `${n} days`} until one is logged`,
     category: 'in_process' as const,
   },
   {
     ruleType: 'stale_event',
-    label: 'No Updates',
-    description: "When an In Process event hasn't been updated for a while",
+    label: 'No updates',
+    description: "A New or In Process event nobody has updated in the app for a while (the Google Sheet sync doesn't count).",
     defaultThreshold: 7,
-    thresholdPrefix: 'After',
-    thresholdLabel: 'days with no updates',
+    kind: 'repeat' as const,
+    before: 'After',
+    after: (n: number) => `days with no updates, then every ${n === 1 ? 'day' : `${n} days`} until someone updates it`,
     category: 'in_process' as const,
   },
   {
     ruleType: 'date_approaching_inprocess',
-    label: 'Requested Date Coming Up',
-    description: 'When the requested date is getting close and the event is still In Process',
+    label: 'Requested date coming up',
+    description: "The requested date is getting close and the event still isn't scheduled. You get one alert at each point you pick.",
     defaultThreshold: 14,
-    thresholdPrefix: 'Within',
-    thresholdLabel: 'days of requested date',
+    kind: 'checkpoints' as const,
+    before: 'Alert me',
+    after: 'days before the requested date',
     category: 'in_process' as const,
   },
   {
     ruleType: 'date_approaching_scheduled',
-    label: 'Event Coming Up, Missing Info',
-    description: "When a scheduled event is getting close and is missing its time, address, sandwich count or types, or isn't on the planning sheet yet",
+    label: 'Event coming up, missing info',
+    description: "A scheduled event is getting close and is missing its time, address, sandwich count or types, or isn't on the planning sheet yet.",
     defaultThreshold: 7,
-    thresholdPrefix: 'Within',
-    thresholdLabel: 'days of event',
+    kind: 'daily' as const,
+    before: 'Starting',
+    after: "days before the event, every day until it's filled in",
     category: 'scheduled' as const,
   },
 ] as const;
+
+const DEFAULT_CHECKPOINTS = [14, 7, 2];
+const MAX_DAYS = 90;
 
 const CHANNEL_OPTIONS = [
   { value: 'email', label: 'Email' },
@@ -88,13 +96,6 @@ const CHANNEL_OPTIONS = [
 ] as const;
 
 const usesSms = (channel: ReminderChannel) => channel === 'sms' || channel === 'both';
-
-const FREQUENCY_OPTIONS = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'every_3_days', label: 'Every 3 days' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Every 2 weeks' },
-] as const;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -116,9 +117,12 @@ export default function CheckInReminderPreferencesEditor() {
         const existing = serverPrefs?.rules?.find((r) => r.ruleType === rt.ruleType);
         return {
           ruleType: rt.ruleType,
-          enabled: existing?.enabled ?? false,
+          // Same rule as the server: a configured person missing an alert has it off.
+          enabled: existing?.enabled ?? !serverPrefs?.configured,
           thresholdDays: existing?.thresholdDays ?? rt.defaultThreshold,
-          frequency: existing?.frequency ?? 'weekly',
+          ...(rt.kind === 'checkpoints'
+            ? { checkpointDays: existing?.checkpointDays?.length ? existing.checkpointDays : DEFAULT_CHECKPOINTS }
+            : {}),
         };
       }),
     [serverPrefs],
@@ -181,13 +185,13 @@ export default function CheckInReminderPreferencesEditor() {
       toast({
         title: 'Preferences saved',
         description:
-          'Your reminder settings now apply to all your events.',
+          'Your alert settings now apply to all your events, starting with your next daily email.',
       });
     },
-    onError: () => {
+    onError: (error: unknown) => {
       toast({
-        title: 'Error',
-        description: 'Failed to save reminder preferences.',
+        title: "Couldn't save",
+        description: error instanceof Error && error.message ? error.message : 'Failed to save alert settings.',
         variant: 'destructive',
       });
     },
@@ -204,11 +208,18 @@ export default function CheckInReminderPreferencesEditor() {
       prev.map((r) => (r.ruleType === ruleType ? { ...r, thresholdDays } : r)),
     );
   };
-  const handleFrequency = (ruleType: string, frequency: ReminderFrequency) => {
+  const handleCheckpoints = (ruleType: string, checkpointDays: number[]) => {
+    const clean = [...new Set(checkpointDays)].sort((a, b) => b - a);
     setRules((prev) =>
-      prev.map((r) => (r.ruleType === ruleType ? { ...r, frequency } : r)),
+      prev.map((r) =>
+        // thresholdDays mirrors the largest checkpoint but must stay >= 1: "day of" alone is [0].
+        r.ruleType === ruleType ? { ...r, checkpointDays: clean, thresholdDays: Math.max(1, clean[0] ?? r.thresholdDays) } : r,
+      ),
     );
   };
+  const checkpointsMissing = rules.some(
+    (r) => r.ruleType === 'date_approaching_inprocess' && r.enabled && !(r.checkpointDays?.length),
+  );
 
   const handleSave = () => {
     saveMutation.mutate({
@@ -234,12 +245,13 @@ export default function CheckInReminderPreferencesEditor() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlarmClock className="w-5 h-5 text-[#007E8C]" />
-          Event Check-In Reminders
+          Event Alerts
         </CardTitle>
         <CardDescription>
-          Set your default reminder rules here. They'll automatically apply to
-          every event you're assigned to as TSP contact. Changes apply to all
-          your events within the hour.
+          Alerts about the events you're the TSP contact for. Everything that comes up on
+          a given day arrives together in one email (never more than one a day, and none
+          on days nothing comes up), with the group's contact info and links to act on
+          each one. Changes apply starting with your next daily email.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -309,7 +321,7 @@ export default function CheckInReminderPreferencesEditor() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              You're using the standard reminders shown below, which already
+              You're using the standard alerts shown below, which already
               apply to all your events. Change anything and hit Save to make them your own.
             </AlertDescription>
           </Alert>
@@ -318,38 +330,44 @@ export default function CheckInReminderPreferencesEditor() {
         {/* In-process event rules */}
         <RuleSection
           title="While events are in process"
-          subtitle="These fire when an event is new or being coordinated"
+          subtitle="New and In Process events"
           ruleTypes={inProcessRules}
           rules={rules}
           onToggle={handleToggle}
           onThreshold={handleThreshold}
-          onFrequency={handleFrequency}
+          onCheckpoints={handleCheckpoints}
         />
 
         {/* Scheduled event rules */}
         <RuleSection
           title="Once events are scheduled"
-          subtitle="These fire as a confirmed event date approaches"
+          subtitle="Scheduled and Rescheduled events"
           ruleTypes={scheduledRules}
           rules={rules}
           onToggle={handleToggle}
           onThreshold={handleThreshold}
-          onFrequency={handleFrequency}
+          onCheckpoints={handleCheckpoints}
         />
 
+
+        {checkpointsMissing && (
+          <p className="text-sm text-amber-700">
+            Pick at least one day for "Requested date coming up", or turn it off.
+          </p>
+        )}
 
         {/* Save */}
         <Button
           className="w-full bg-[#007E8C] hover:bg-[#006570] text-white"
           onClick={handleSave}
-          disabled={saveMutation.isPending}
+          disabled={saveMutation.isPending || checkpointsMissing}
         >
           {saveMutation.isPending ? (
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
           ) : (
             <Save className="w-4 h-4 mr-2" />
           )}
-          Save Default Reminder Rules
+          Save Alert Settings
         </Button>
       </CardContent>
     </Card>
@@ -367,8 +385,7 @@ function RuleSection({
   rules,
   onToggle,
   onThreshold,
-  onFrequency,
-  accentColor = 'teal',
+  onCheckpoints,
 }: {
   title: string;
   subtitle: string;
@@ -376,11 +393,8 @@ function RuleSection({
   rules: DefaultReminderRule[];
   onToggle: (ruleType: string, enabled: boolean) => void;
   onThreshold: (ruleType: string, days: number) => void;
-  onFrequency: (ruleType: string, freq: ReminderFrequency) => void;
-  accentColor?: 'teal' | 'purple';
+  onCheckpoints: (ruleType: string, days: number[]) => void;
 }) {
-  const enabledBorder = accentColor === 'purple' ? 'border-purple-300/30 bg-purple-50/50' : 'border-[#007E8C]/30 bg-[#007E8C]/5';
-
   return (
     <div className="space-y-3">
       <div>
@@ -390,28 +404,21 @@ function RuleSection({
       {ruleTypes.map((rt) => {
         const rule = rules.find((r) => r.ruleType === rt.ruleType);
         if (!rule) return null;
-        const isFreqBased = 'isFrequencyBased' in rt && rt.isFrequencyBased;
-
         return (
           <div
             key={rt.ruleType}
             className={`border rounded-lg p-3 space-y-2 transition-colors ${
-              rule.enabled
-                ? enabledBorder
-                : 'border-gray-200 bg-gray-50'
+              rule.enabled ? 'border-[#007E8C]/30 bg-[#007E8C]/5' : 'border-gray-200 bg-gray-50'
             }`}
           >
             <div className="flex items-center gap-3">
               <Switch
                 checked={rule.enabled}
                 onCheckedChange={(checked) => onToggle(rt.ruleType, checked)}
+                aria-label={rt.label}
               />
               <div className="flex-1 min-w-0">
-                <p
-                  className={`text-sm font-medium ${
-                    rule.enabled ? 'text-gray-900' : 'text-gray-400'
-                  }`}
-                >
+                <p className={`text-sm font-medium ${rule.enabled ? 'text-gray-900' : 'text-gray-400'}`}>
                   {rt.label}
                 </p>
                 <p className="text-xs text-gray-500">{rt.description}</p>
@@ -419,67 +426,84 @@ function RuleSection({
             </div>
 
             {rule.enabled && (
-              <div className="flex flex-wrap items-center gap-2 pl-10">
-                {isFreqBased ? (
-                  <>
-                    <span className="text-xs text-gray-500">Remind me</span>
-                    <Select
-                      value={rule.frequency}
-                      onValueChange={(val) => onFrequency(rt.ruleType, val as ReminderFrequency)}
-                    >
-                      <SelectTrigger className="w-32 h-7 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FREQUENCY_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
+              <div className="flex flex-wrap items-center gap-2 pl-10 text-xs text-gray-600">
+                <span>{rt.before}</span>
+                {rt.kind === 'checkpoints' ? (
+                  <CheckpointEditor
+                    days={rule.checkpointDays ?? []}
+                    onChange={(d) => onCheckpoints(rt.ruleType, d)}
+                  />
                 ) : (
-                  <>
-                    <span className="text-xs text-gray-500">
-                      {'thresholdPrefix' in rt ? rt.thresholdPrefix : 'After'}
-                    </span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={rule.thresholdDays}
-                      onChange={(e) =>
-                        onThreshold(rt.ruleType, parseInt(e.target.value) || 1)
-                      }
-                      className="w-16 h-7 text-sm text-center"
-                    />
-                    <span className="text-xs text-gray-500 whitespace-nowrap">
-                      {rt.thresholdLabel}
-                    </span>
-                    <span className="text-xs text-gray-500 whitespace-nowrap">, then remind me</span>
-                    <Select
-                      value={rule.frequency}
-                      onValueChange={(val) => onFrequency(rt.ruleType, val as ReminderFrequency)}
-                    >
-                      <SelectTrigger className="w-32 h-7 text-xs" aria-label={`How often to repeat: ${rt.label}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FREQUENCY_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={MAX_DAYS}
+                    value={rule.thresholdDays}
+                    onChange={(e) =>
+                      onThreshold(rt.ruleType, Math.min(MAX_DAYS, Math.max(1, parseInt(e.target.value) || 1)))
+                    }
+                    className="w-16 h-7 text-sm text-center"
+                    aria-label={`${rt.label}: days`}
+                  />
                 )}
+                <span>{typeof rt.after === 'function' ? rt.after(rule.thresholdDays) : rt.after}</span>
               </div>
             )}
           </div>
         );
       })}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// "Requested date coming up": the days before the date to alert on
+// ---------------------------------------------------------------------------
+
+function CheckpointEditor({ days, onChange }: { days: number[]; onChange: (days: number[]) => void }) {
+  const [draft, setDraft] = useState('');
+  const add = () => {
+    const n = parseInt(draft, 10);
+    if (Number.isInteger(n) && n >= 0 && n <= MAX_DAYS) onChange([...days, n]);
+    setDraft('');
+  };
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {days.map((d) => (
+        <span
+          key={d}
+          className="inline-flex items-center gap-1 rounded-full bg-white border border-[#007E8C]/40 px-2 py-0.5 text-xs text-gray-800"
+        >
+          {d === 0 ? 'day of' : d}
+          <button
+            type="button"
+            onClick={() => onChange(days.filter((x) => x !== d))}
+            className="text-gray-400 hover:text-gray-700"
+            aria-label={`Remove ${d} days`}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </span>
+      ))}
+      <Input
+        type="number"
+        min={0}
+        max={MAX_DAYS}
+        value={draft}
+        placeholder="add"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+          }
+        }}
+        className="w-16 h-7 text-sm text-center"
+        aria-label="Add a number of days before the requested date"
+      />
+      <Button type="button" size="sm" variant="outline" className="h-7 px-2" onClick={add} disabled={draft === ''}>
+        <Plus className="w-3 h-3" />
+      </Button>
+    </span>
   );
 }

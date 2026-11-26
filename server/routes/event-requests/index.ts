@@ -34,6 +34,7 @@
 import { Router } from 'express';
 import { emitEventRequestUpdate } from '../../socket-chat';
 import { logger } from '../../middleware/logger';
+import { markEventHumanUpdated } from '../../services/event-alerts/human-update';
 
 // Import the main legacy router - contains core functionality
 import legacyRouter from '../event-requests-legacy';
@@ -77,6 +78,30 @@ router.use('/:id', (req, res, next) => {
     }
     return originalJson(body);
   } as any;
+  next();
+});
+
+// Middleware: record that a PERSON changed this event (event_requests.last_human_update_at).
+// Every write a signed-in user makes to /api/event-requests/:id/... passes
+// through here, across all sub-routers, plus the few routes that take the
+// event id from the body. The Google Sheet sync and cron jobs write to the
+// database directly, never through these routes, so they can't make an
+// untouched event look recently worked on. The "no updates" event alert
+// measures this column instead of updated_at.
+// Not stamped: read-only AI helpers (POST, but they only return suggestions).
+const NOT_AN_UPDATE = /^\/\d+\/ai-/;
+const BODY_ID_ROUTES = new Set(['/complete-contact', '/complete-event-details', '/follow-up']);
+router.use((req: any, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const path = String(req.path || '');
+  const fromPath = /^\/(\d+)(\/|$)/.exec(path);
+  const id = fromPath && !NOT_AN_UPDATE.test(path)
+    ? fromPath[1]
+    : BODY_ID_ROUTES.has(path) ? req.body?.id : null;
+  if (!id) return next();
+  res.on('finish', () => {
+    if (res.statusCode >= 200 && res.statusCode < 300 && req.user?.id) markEventHumanUpdated(id);
+  });
   next();
 });
 
