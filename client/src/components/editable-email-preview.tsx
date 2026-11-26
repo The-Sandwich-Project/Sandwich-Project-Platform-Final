@@ -16,6 +16,8 @@ import DOMPurify from 'dompurify';
 interface EditableEmailPreviewProps {
   html: string;
   onChange: (html: string) => void;
+  /** Locks editing, e.g. while the AI is rewriting the email. */
+  readOnly?: boolean;
   'data-testid'?: string;
 }
 
@@ -34,6 +36,7 @@ export function splitEmailDocument(html: string): {
 export function EditableEmailPreview({
   html,
   onChange,
+  readOnly = false,
   'data-testid': testId,
 }: EditableEmailPreviewProps) {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -69,7 +72,7 @@ export function EditableEmailPreview({
   return (
     <div
       ref={editorRef}
-      contentEditable
+      contentEditable={!readOnly}
       suppressContentEditableWarning
       onInput={emitChange}
       onPaste={handlePaste}
