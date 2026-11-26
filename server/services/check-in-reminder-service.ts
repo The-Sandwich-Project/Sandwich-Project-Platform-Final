@@ -179,10 +179,18 @@ type AlertData = {
 };
 
 async function loadAlertData(onlyUserId?: string): Promise<AlertData> {
-  const assigned = or(
-    sql`coalesce(${eventRequests.tspContact}, '') <> ''`,
-    sql`coalesce(${eventRequests.tspContactAssigned}, '') <> ''`,
-  );
+  // One person: filter by owner in SQL (the per-person re-read runs once per
+  // contact, so it must not pull everyone's events). Same owner rule as
+  // ownerOf(): tspContact, or the legacy field only when tspContact is empty.
+  const assigned = onlyUserId
+    ? or(
+        eq(eventRequests.tspContact, onlyUserId),
+        and(sql`coalesce(${eventRequests.tspContact}, '') = ''`, eq(eventRequests.tspContactAssigned, onlyUserId)),
+      )
+    : or(
+        sql`coalesce(${eventRequests.tspContact}, '') <> ''`,
+        sql`coalesce(${eventRequests.tspContactAssigned}, '') <> ''`,
+      );
   const events = await db
     .select()
     .from(eventRequests)
