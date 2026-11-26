@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Sparkles, Loader2, Undo2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -50,7 +50,36 @@ export function AiEmailHelper({
   const [open, setOpen] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [previous, setPrevious] = useState<{ subject: string; content: string } | null>(null);
+  // An AI result that arrived after the sender changed the email. Held back
+  // until they choose to replace their newer edits or discard it.
+  const [pending, setPending] = useState<{ subject: string; content: string } | null>(null);
   const { toast } = useToast();
+
+  // The email as it is right now. The request can take a while, and the
+  // mutation callbacks would otherwise see the props from when it started.
+  const latest = useRef({ eventRequestId, format, subject, content });
+  useEffect(() => {
+    latest.current = { eventRequestId, format, subject, content };
+  });
+
+  // A held-back suggestion or undo snapshot is in the old format; drop it.
+  useEffect(() => {
+    setPending(null);
+    setPrevious(null);
+  }, [eventRequestId, format]);
+
+  // Undo goes back to whatever was there just before the AI version went in,
+  // not to the email as it was when Rewrite was clicked.
+  const applySuggestion = (next: { subject: string; content: string }) => {
+    const { subject: curSubject, content: curContent } = latest.current;
+    setPrevious({ subject: curSubject, content: curContent });
+    setPending(null);
+    onApply(next);
+    toast({
+      title: 'AI suggestion applied',
+      description: 'Read it over before sending. You can undo or keep editing.',
+    });
+  };
 
   const mutation = useMutation({
     mutationFn: async (prompt: string) => {
@@ -65,19 +94,30 @@ export function AiEmailHelper({
         body,
         120000
       );
-      return { result, before: { subject, content } };
+      return { result, before: { eventRequestId, format, subject, content } };
     },
     onSuccess: ({ result, before }) => {
+      const now = latest.current;
+      // A different event or format means the suggestion no longer fits.
+      if (now.eventRequestId !== before.eventRequestId || now.format !== before.format) {
+        toast({
+          title: 'AI suggestion discarded',
+          description: 'The email changed format while the AI was writing. Try again.',
+        });
+        return;
+      }
+      // The HTML text pieces map onto the email as it was sent to the AI.
       const nextContent =
-        format === 'html'
+        before.format === 'html'
           ? applyEmailTextSegments(before.content, result.segments ?? [])
           : result.text ?? before.content;
-      setPrevious(before);
-      onApply({ subject: result.subject || before.subject, content: nextContent });
-      toast({
-        title: 'AI suggestion applied',
-        description: 'Read it over before sending. You can undo or keep editing.',
-      });
+      const next = { subject: result.subject || before.subject, content: nextContent };
+
+      if (now.subject !== before.subject || now.content !== before.content) {
+        setPending(next);
+        return;
+      }
+      applySuggestion(next);
     },
     onError: (error: any) => {
       toast({
@@ -91,6 +131,7 @@ export function AiEmailHelper({
   const run = (prompt: string) => {
     const trimmed = prompt.trim();
     if (!trimmed || mutation.isPending) return;
+    setPending(null);
     mutation.mutate(trimmed);
   };
 
@@ -148,6 +189,35 @@ export function AiEmailHelper({
             maxLength={2000}
             data-testid="textarea-ai-instruction"
           />
+          {pending && (
+            <div className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 space-y-2">
+              <p>
+                You changed the email while the AI was writing. Replacing it
+                will drop those changes.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs bg-white"
+                  onClick={() => applySuggestion(pending)}
+                  data-testid="button-ai-replace-anyway"
+                >
+                  Replace with AI version
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => setPending(null)}
+                >
+                  Discard
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Button
               type="button"
