@@ -96,6 +96,13 @@ export type EventEvaluation = {
   due: DueAlert[];
   /** Snoozes that are over (expired, or their problem was fixed): deactivate after sending */
   endedSnoozeIds: number[];
+  /**
+   * The subset whose problem was FIXED (not merely expired). Safe to end even
+   * when no digest goes out (e.g. the person already got today's): an expired
+   * snooze must stay until a digest re-sends its alert, a fixed one must not
+   * linger to hide the problem if it comes back.
+   */
+  fixedSnoozeIds: number[];
 };
 
 // ---------------------------------------------------------------------------
@@ -243,9 +250,17 @@ export function evaluateEventAlerts(
 ): EventEvaluation {
   const status = event.status || '';
   const lastContact = getLastContactTimestamp(event as any);
+  const lastHumanUpdate = toDate(event.lastHumanUpdateAt);
+  // A contact logged after a "no contact" snooze (or a person's update after a
+  // "no updates" snooze) fixed the problem it was about, even if the alert's
+  // threshold is already met again by now (e.g. a 1-day threshold).
+  const fixedSinceSnooze = (sn: AlertSnooze): boolean =>
+    (sn.ruleType === 'no_contact' && !!lastContact && lastContact > sn.createdAt) ||
+    (sn.ruleType === 'stale_event' && !!lastHumanUpdate && lastHumanUpdate > sn.createdAt);
   const createdAt = toDate(event.createdAt) ?? now;
   const due: DueAlert[] = [];
   const endedSnoozeIds = new Set<number>();
+  const fixedSnoozeIds = new Set<number>();
   // The snooze cap ("can't hide the last alert") is re-checked every day, not
   // just when the snooze was made: if the event's date moved up to tomorrow or
   // today, every snooze on it is over, however long it was set for.
@@ -263,14 +278,21 @@ export function evaluateEventAlerts(
 
     if (!check.met) {
       // Problem fixed: this alert's snoozes are done (it starts fresh if it returns).
-      mine.forEach(sn => endedSnoozeIds.add(sn.id));
+      mine.forEach(sn => {
+        endedSnoozeIds.add(sn.id);
+        fixedSnoozeIds.add(sn.id);
+      });
       continue;
     }
 
     let silenced = false;
     let snoozeJustEnded = false;
     for (const sn of [...mine, ...wholeEvent]) {
-      if (snoozeCapReached || snoozeIsOver(sn, lastContact, now)) {
+      if (fixedSinceSnooze(sn)) {
+        // Fixed, then due again on its own: normal cadence decides, no forced re-send.
+        endedSnoozeIds.add(sn.id);
+        fixedSnoozeIds.add(sn.id);
+      } else if (snoozeCapReached || snoozeIsOver(sn, lastContact, now)) {
         endedSnoozeIds.add(sn.id);
         // Ended since the last send: the person asked to be reminded, so remind them.
         const endedAt = sn.snoozedUntil ?? now;
@@ -291,7 +313,7 @@ export function evaluateEventAlerts(
     });
   }
 
-  return { due, endedSnoozeIds: [...endedSnoozeIds] };
+  return { due, endedSnoozeIds: [...endedSnoozeIds], fixedSnoozeIds: [...fixedSnoozeIds] };
 }
 
 function checkRule(

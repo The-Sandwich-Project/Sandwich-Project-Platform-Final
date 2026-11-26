@@ -212,7 +212,8 @@ export default function CheckInReminderPreferencesEditor() {
     const clean = [...new Set(checkpointDays)].sort((a, b) => b - a);
     setRules((prev) =>
       prev.map((r) =>
-        r.ruleType === ruleType ? { ...r, checkpointDays: clean, thresholdDays: clean[0] ?? r.thresholdDays } : r,
+        // thresholdDays mirrors the largest checkpoint but must stay >= 1: "day of" alone is [0].
+        r.ruleType === ruleType ? { ...r, checkpointDays: clean, thresholdDays: Math.max(1, clean[0] ?? r.thresholdDays) } : r,
       ),
     );
   };

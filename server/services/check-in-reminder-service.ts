@@ -245,6 +245,8 @@ type PersonDigest = {
   /** Every alert to record as sent: event id + the alert */
   sentAlerts: { eventId: number; alert: DueAlert }[];
   endedSnoozeIds: number[];
+  /** Subset of endedSnoozeIds whose problem was fixed (see EventEvaluation) */
+  fixedSnoozeIds: number[];
   disabledRules: AlertRuleType[];
 };
 
@@ -254,6 +256,7 @@ function buildPersonDigest(user: UserRow, data: AlertData, now: Date): PersonDig
   const scored: { item: DigestItem; due: DueAlert[] }[] = [];
   const sentAlerts: PersonDigest['sentAlerts'] = [];
   const endedSnoozeIds: number[] = [];
+  const fixedSnoozeIds: number[] = [];
 
   for (const event of data.eventsByOwner.get(user.id) ?? []) {
     const state: Partial<Record<AlertRuleType, AlertState>> = {};
@@ -269,6 +272,7 @@ function buildPersonDigest(user: UserRow, data: AlertData, now: Date): PersonDig
       now,
     );
     endedSnoozeIds.push(...result.endedSnoozeIds);
+    fixedSnoozeIds.push(...result.fixedSnoozeIds);
     if (result.due.length === 0) continue;
     result.due.forEach(alert => sentAlerts.push({ eventId: event.id, alert }));
     scored.push({
@@ -278,7 +282,7 @@ function buildPersonDigest(user: UserRow, data: AlertData, now: Date): PersonDig
   }
 
   scored.sort((a, b) => urgencyCompare(a.due, b.due));
-  return { items: scored.map(s => s.item), sentAlerts, endedSnoozeIds, disabledRules };
+  return { items: scored.map(s => s.item), sentAlerts, endedSnoozeIds, fixedSnoozeIds, disabledRules };
 }
 
 /** The digest a person would get right now, or null if nothing is due. For admin previews. */
@@ -377,7 +381,7 @@ export async function processCheckInReminders(
 
   for (const userId of ownerIds) {
     try {
-      if (!dryRun && (await alreadySentToday(userId, today))) continue;
+      const sentToday = !dryRun && (await alreadySentToday(userId, today));
       // Re-read this person's account, events, history and snoozes right
       // before building their digest: earlier sends in this run take time, and
       // an event reassigned (or an account deactivated) meanwhile must not go
@@ -387,6 +391,14 @@ export async function processCheckInReminders(
       if (!user || user.isActive === false) continue;
       result.processed++;
       const digest = buildPersonDigest(user, data, now);
+      if (sentToday) {
+        // Today's digest already went out, but keep snoozes honest: one whose
+        // problem was fixed this afternoon must end now, or it could hide the
+        // problem if it returns before the next digest. (Expired snoozes wait
+        // for tomorrow's digest, which re-sends their alert.)
+        await endSnoozes(digest.fixedSnoozeIds);
+        continue;
+      }
       const prefs = getCheckInReminderPreferences(user);
 
       if (dryRun) {

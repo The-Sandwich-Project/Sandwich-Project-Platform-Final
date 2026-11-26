@@ -228,6 +228,33 @@ describe('snoozes ("remind me again in N days")', () => {
     expect(run(twoOut, only('date_approaching_inprocess', { checkpointDays: [14, 7, 2] }), {}, [long]).due).toHaveLength(0);
   });
 
+  it('a contact logged after a no-contact snooze ends it, even when a 1-day threshold is met again', () => {
+    // Snoozed for a week 2 days ago; contact logged yesterday; 1-day threshold met again today
+    const sn = snooze({ ruleType: 'no_contact', snoozedUntil: inDays(5), createdAt: daysAgo(2) });
+    const ev = event({ lastContactAttempt: daysAgo(1) });
+    const r = run(ev, only('no_contact', { thresholdDays: 1 }), { no_contact: sent(daysAgo(3)) }, [sn]);
+    expect(r.due.map(a => a.ruleType)).toEqual(['no_contact']); // the new problem is not hidden
+    expect(r.fixedSnoozeIds).toEqual([99]);
+  });
+
+  it('a person updating the event after a no-updates snooze ends it', () => {
+    const sn = snooze({ ruleType: 'stale_event', snoozedUntil: inDays(5), createdAt: daysAgo(3) });
+    const r = run(event({ lastHumanUpdateAt: daysAgo(2) }), only('stale_event', { thresholdDays: 1 }), {}, [sn]);
+    expect(r.fixedSnoozeIds).toEqual([99]);
+    expect(r.due).toHaveLength(1);
+  });
+
+  it('expired snoozes are ended but NOT counted as fixed (their alert must be re-sent first)', () => {
+    const r = run(quiet, only('no_contact'), { no_contact: sent(daysAgo(3)) }, [snooze({ snoozedUntil: new Date('2026-12-01T13:00:00Z'), createdAt: daysAgo(4) })]);
+    expect(r.endedSnoozeIds).toEqual([99]);
+    expect(r.fixedSnoozeIds).toEqual([]);
+  });
+
+  it('a condition that is no longer true counts as fixed', () => {
+    const r = run(event({ lastContactAttempt: daysAgo(1) }), only('no_contact'), {}, [snooze({})]);
+    expect(r.fixedSnoozeIds).toEqual([99]);
+  });
+
   it('until_contact snoozes end when a contact is logged after them', () => {
     const s = snooze({ ruleType: null, snoozeType: 'until_contact', snoozedUntil: null, createdAt: daysAgo(9) });
     // contact 8 days ago is after the snooze (9 days ago) -> over -> alerts resume
@@ -278,6 +305,17 @@ describe('settings normalization', () => {
     });
     expect(p.rules.find(r => r.ruleType === 'date_approaching_inprocess')!.checkpointDays).toEqual([14, 7, 2]);
   });
+  it('"day of" alone is a valid checkpoint list, with a positive threshold', () => {
+    const p = normalizeCheckInReminderPreferences({
+      configured: true,
+      defaultChannel: 'email',
+      rules: [{ ruleType: 'date_approaching_inprocess', enabled: true, thresholdDays: 0, checkpointDays: [0] }],
+    });
+    const r = p.rules.find(x => x.ruleType === 'date_approaching_inprocess')!;
+    expect(r.checkpointDays).toEqual([0]);
+    expect(r.thresholdDays).toBeGreaterThanOrEqual(1);
+  });
+
   it('keeps a custom old value as a single checkpoint', () => {
     const p = normalizeCheckInReminderPreferences({
       configured: true,

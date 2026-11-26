@@ -517,7 +517,9 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
       if (r === null || typeof r !== 'object' || !VALID_REMINDER_RULE_TYPES.includes(r.ruleType)) {
         return res.status(400).json({ message: 'rules contains invalid entries' });
       }
-      if (r.thresholdDays !== undefined && (typeof r.thresholdDays !== 'number' || r.thresholdDays < 1 || r.thresholdDays > MAX_ALERT_DAYS)) {
+      // "Requested date coming up" is driven by checkpointDays (0 = day of is valid);
+      // its thresholdDays is derived, and normalization fixes it, so don't reject it here.
+      if (r.ruleType !== 'date_approaching_inprocess' && r.thresholdDays !== undefined && (typeof r.thresholdDays !== 'number' || r.thresholdDays < 1 || r.thresholdDays > MAX_ALERT_DAYS)) {
         return res.status(400).json({ message: `Days must be between 1 and ${MAX_ALERT_DAYS}` });
       }
       if (r.ruleType === 'date_approaching_inprocess' && r.enabled === true) {
