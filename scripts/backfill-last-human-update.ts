@@ -47,28 +47,40 @@ function arg(name: string): string | undefined {
 // would be re-read in the shell's local time zone and could miss the exact match.
 type Stamp = { at: string; count: number; olderEvents: number; updatedAfter: number };
 
-/** The publish-moment stamp, if the data clearly shows one (see header). */
+/**
+ * The publish-moment stamp, if the data clearly shows one (see header).
+ *
+ * Every timestamp group is a candidate, not just the largest: other bulk
+ * inserts also share one timestamp (the planning-sheet import adds a whole
+ * batch in one statement, so those events share created_at AND
+ * last_human_update_at). Such a batch is never the stamp (its rows weren't
+ * created before it) but it can outnumber the remaining stamped events, so
+ * candidates whose rows weren't all created earlier are skipped, not fatal.
+ */
 async function findPublishStamp(client: pg.Client): Promise<Stamp | null> {
-  const top = await client.query(`
-    SELECT last_human_update_at::text AS at, count(*)::int AS count
-      FROM event_requests
-     WHERE last_human_update_at IS NOT NULL
-     GROUP BY last_human_update_at
-     ORDER BY count(*) DESC
-     LIMIT 1`);
-  if (top.rowCount === 0) return null;
-  const { at, count } = top.rows[0] as { at: string; count: number };
-  const ctx = await client.query(
-    `SELECT
-       (SELECT count(*)::int FROM event_requests WHERE created_at < $1::timestamp) AS older_events,
-       (SELECT count(*)::int FROM event_requests WHERE last_human_update_at = $1::timestamp AND created_at >= $1::timestamp) AS created_after,
-       (SELECT count(*)::int FROM event_requests WHERE last_human_update_at = $1::timestamp AND updated_at > $1::timestamp) AS updated_after`,
-    [at],
+  const candidates = await client.query(
+    `SELECT last_human_update_at::text AS at,
+            count(*)::int AS count,
+            count(*) FILTER (WHERE updated_at > last_human_update_at)::int AS updated_after
+       FROM event_requests
+      WHERE last_human_update_at IS NOT NULL
+      GROUP BY last_human_update_at
+     HAVING count(*) >= $1 AND bool_and(created_at < last_human_update_at)
+      ORDER BY count(*) DESC
+      LIMIT 20`,
+    [MIN_STAMPED],
   );
-  const { older_events, created_after, updated_after } = ctx.rows[0];
-  const isStamp =
-    count >= MIN_STAMPED && created_after === 0 && older_events > 0 && count / older_events >= MIN_SHARE;
-  return isStamp ? { at, count, olderEvents: older_events, updatedAfter: updated_after } : null;
+  for (const row of candidates.rows as { at: string; count: number; updated_after: number }[]) {
+    const older = await client.query(
+      `SELECT count(*)::int AS n FROM event_requests WHERE created_at < $1::timestamp`,
+      [row.at],
+    );
+    const olderEvents = older.rows[0].n as number;
+    if (olderEvents > 0 && row.count / olderEvents >= MIN_SHARE) {
+      return { at: row.at, count: row.count, olderEvents, updatedAfter: row.updated_after };
+    }
+  }
+  return null;
 }
 
 async function main() {
@@ -113,7 +125,8 @@ async function main() {
       if (stamp.updatedAfter > 0) {
         console.log(
           `  of which ${stamp.updatedAfter} had updated_at bumped since (sheet sync); their earlier updated_at is gone,\n` +
-            `  so they get the publish moment itself, the latest they could have been changed by a person.`,
+            `  so they keep the publish moment itself, the latest they could have been changed by a person\n` +
+            `  (already their final value, so they aren't counted below).`,
         );
       }
     } else {
@@ -125,9 +138,14 @@ async function main() {
     const target = stamp
       ? `least(coalesce(updated_at, created_at), $1::timestamp)`
       : `coalesce(updated_at, created_at)`;
-    const where = stamp
+    // Rows already holding their final value are skipped: a sync-bumped event
+    // is set to the publish moment itself, which still equals the stamp, and
+    // would otherwise be re-counted (and rewritten to the same value) on every
+    // re-run.
+    const needsFix = stamp
       ? `(last_human_update_at IS NULL OR (last_human_update_at = $1::timestamp AND created_at < $1::timestamp))`
       : `last_human_update_at IS NULL`;
+    const where = `${needsFix} AND last_human_update_at IS DISTINCT FROM ${target}`;
     const params = stamp ? [stamp.at] : [];
 
     const total = (await client.query(`SELECT count(*)::int AS n FROM event_requests WHERE ${where}`, params)).rows[0].n as number;
