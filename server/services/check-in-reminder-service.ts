@@ -13,8 +13,15 @@
  * - Runs hourly (cron-jobs.ts) and sends on the first run at or after 9 AM
  *   Eastern, so a server restart at 9:00 doesn't cost a day.
  * - HARD LIMIT: one digest per person per Eastern day. Today's slot is claimed
- *   with a single conditional UPDATE on the person's users row before
- *   anything is sent, so a double run or two servers can't send twice.
+ *   by inserting a row in event_alert_digest_sends (primary key: person + day)
+ *   before anything is sent, so a double run or two servers can't send twice.
+ *   It lives in its own table, not users.metadata, so a settings save that
+ *   rewrites metadata can't erase a claim mid-send.
+ * - Each person's events and account are re-read right before their digest is
+ *   built, so a reassignment or deactivation during the run is respected.
+ * - Each real run first forgets sent-history that no longer applies (event
+ *   reassigned, moved to a status the alert doesn't cover, deleted), so a
+ *   returned event or a status reversal gets fresh alerts.
  * - The bell entry is written first; if that fails the slot is released and
  *   the next hourly run retries. Email/text failures are logged (the bell
  *   still has it).
@@ -25,8 +32,8 @@
  *   works out exactly what each person would get and writes NOTHING.
  */
 import { sendEmailOrThrow, isEmailConfigured } from './email';
-import { db } from '../db';
-import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, notifications } from '@shared/schema';
+import { db, executeRawSql } from '../db';
+import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, notifications, eventAlertDigestSends } from '@shared/schema';
 import { and, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
 import { logger } from '../utils/production-safe-logger';
 import { getAppBaseUrl } from '../config/constants';
@@ -49,9 +56,6 @@ import { renderDigest, type DigestItem, type RenderedDigest } from './event-aler
 
 /** First Eastern hour the daily digest may go out. */
 export const DIGEST_SEND_HOUR = 9;
-
-/** Key in users.metadata holding the Eastern date of the last digest sent. */
-const DAILY_SLOT_KEY = 'checkInReminderLastSentOn';
 
 type UserRow = typeof users.$inferSelect;
 type EventRow = typeof eventRequests.$inferSelect;
@@ -107,28 +111,58 @@ function ownerOf(event: Pick<EventRow, 'tspContact' | 'tspContactAssigned'>): st
 // Daily limit
 // ---------------------------------------------------------------------------
 
-function alreadySentToday(user: UserRow, today: string): boolean {
-  return (getUserMetadata(user) as Record<string, unknown>)[DAILY_SLOT_KEY] === today;
+async function alreadySentToday(userId: string, today: string): Promise<boolean> {
+  const rows = await db
+    .select({ userId: eventAlertDigestSends.userId })
+    .from(eventAlertDigestSends)
+    .where(and(eq(eventAlertDigestSends.userId, userId), eq(eventAlertDigestSends.sentOn, today)))
+    .limit(1);
+  return rows.length > 0;
 }
 
 /** Atomically claim today's digest for this person. False = already sent today. */
 async function claimDailySlot(userId: string, today: string): Promise<boolean> {
   const claimed = await db
-    .update(users)
-    .set({
-      metadata: sql`jsonb_set(coalesce(${users.metadata}, '{}'::jsonb), '{${sql.raw(DAILY_SLOT_KEY)}}', to_jsonb(${today}::text))`,
-    })
-    .where(and(eq(users.id, userId), sql`coalesce(${users.metadata} ->> ${DAILY_SLOT_KEY}, '') <> ${today}`))
-    .returning({ id: users.id });
+    .insert(eventAlertDigestSends)
+    .values({ userId, sentOn: today })
+    .onConflictDoNothing()
+    .returning({ userId: eventAlertDigestSends.userId });
   return claimed.length > 0;
 }
 
 /** Give today's slot back (nothing was delivered), so the next hourly run retries. */
 async function releaseDailySlot(userId: string, today: string): Promise<void> {
   await db
-    .update(users)
-    .set({ metadata: sql`${users.metadata} - ${DAILY_SLOT_KEY}` })
-    .where(and(eq(users.id, userId), sql`${users.metadata} ->> ${DAILY_SLOT_KEY} = ${today}`));
+    .delete(eventAlertDigestSends)
+    .where(and(eq(eventAlertDigestSends.userId, userId), eq(eventAlertDigestSends.sentOn, today)));
+}
+
+/**
+ * Forget sent-history that no longer applies, so the alert starts fresh:
+ * - the event now belongs to someone else (a later return to this person gets
+ *   a catch-up alert), or is deleted / gone
+ * - the event left the statuses that alert covers (e.g. Scheduled back to In
+ *   Process gets its requested-date checkpoints again)
+ * A status change and change back between two hourly runs isn't seen; that's
+ * an accepted gap.
+ */
+async function pruneStaleAlertHistory(): Promise<void> {
+  // executeRawSql: works on both the Neon HTTP driver (production) and node-postgres.
+  await executeRawSql(sql`
+    DELETE FROM event_check_in_reminders r
+     WHERE NOT EXISTS (SELECT 1 FROM event_requests e WHERE e.id = r.event_request_id)
+        OR EXISTS (
+          SELECT 1 FROM event_requests e
+           WHERE e.id = r.event_request_id
+             AND (
+               e.deleted_at IS NOT NULL
+               OR coalesce(nullif(e.tsp_contact, ''), nullif(e.tsp_contact_assigned, '')) IS DISTINCT FROM r.user_id
+               OR (r.rule_type IN ('no_contact', 'stale_event', 'date_approaching_inprocess')
+                   AND e.status NOT IN ('new', 'in_process'))
+               OR (r.rule_type = 'date_approaching_scheduled'
+                   AND e.status NOT IN ('scheduled', 'rescheduled'))
+             )
+        )`);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,21 +354,30 @@ export async function processCheckInReminders(
 
   const today = easternDateString(now);
   const baseUrl = getAppBaseUrl();
-  let data: AlertData;
+  let ownerIds: string[];
   try {
-    data = await loadAlertData();
-    if (!dryRun) await deleteRetiredRows();
+    if (!dryRun) {
+      await deleteRetiredRows();
+      await pruneStaleAlertHistory();
+    }
+    ownerIds = [...(await loadAlertData()).usersById.keys()];
   } catch (error) {
     logger.error('[EventAlerts] Failed to load alert data:', error);
     result.errors++;
     return result;
   }
 
-  for (const [userId, user] of data.usersById) {
-    if (user.isActive === false) continue;
-    result.processed++;
+  for (const userId of ownerIds) {
     try {
-      if (!dryRun && alreadySentToday(user, today)) continue;
+      if (!dryRun && (await alreadySentToday(userId, today))) continue;
+      // Re-read this person's account, events, history and snoozes right
+      // before building their digest: earlier sends in this run take time, and
+      // an event reassigned (or an account deactivated) meanwhile must not go
+      // to its former contact.
+      const data = await loadAlertData(userId);
+      const user = data.usersById.get(userId);
+      if (!user || user.isActive === false) continue;
+      result.processed++;
       const digest = buildPersonDigest(user, data, now);
       const prefs = getCheckInReminderPreferences(user);
 

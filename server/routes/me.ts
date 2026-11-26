@@ -6,8 +6,8 @@ import type { AuthenticatedRequest } from '../types/express';
 import { getUserMetadata, getEventNotificationPreferences, getCheckInReminderPreferences, normalizeCheckInReminderPreferences, normalizeCheckpointDays, MAX_ALERT_DAYS } from '@shared/types';
 import type { EventNotificationPreferences, CheckInReminderPreferences } from '@shared/types';
 import { db } from '../db';
-import { eventReminderSnoozes } from '@shared/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { eventReminderSnoozes, eventCheckInReminders } from '@shared/schema';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 interface DashboardItem {
   id: number;
@@ -554,6 +554,16 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
         eq(eventReminderSnoozes.active, true),
         isNull(eventReminderSnoozes.ruleType),
       ));
+
+    // An alert turned off forgets what it sent, right now (not at the next
+    // send, which may be tomorrow): turning it back on later starts fresh,
+    // with a catch-up alert instead of resuming an old schedule.
+    const disabledRules = updatedPreferences.rules.filter(r => !r.enabled).map(r => r.ruleType);
+    if (disabledRules.length) {
+      await db
+        .delete(eventCheckInReminders)
+        .where(and(eq(eventCheckInReminders.userId, fullUser.id), inArray(eventCheckInReminders.ruleType, disabledRules)));
+    }
 
     logger.info(`Updated check-in reminder preferences for user ${normalizedUserId}`);
     res.json({ success: true, preferences: updatedPreferences });

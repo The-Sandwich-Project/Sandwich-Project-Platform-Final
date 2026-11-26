@@ -110,9 +110,11 @@ describe('no updates', () => {
     expect(run(ev, rules).due[0].line).toBe('No updates in 9 days');
   });
 
-  it('falls back to the created date when no person has edited it', () => {
-    expect(run(event({ createdAt: daysAgo(7) }), rules).due).toHaveLength(1);
-    expect(run(event({ createdAt: daysAgo(6) }), rules).due).toHaveLength(0);
+  it('not yet backfilled: falls back to updated_at (old behavior), then the created date', () => {
+    expect(run(event({ lastHumanUpdateAt: null, updatedAt: daysAgo(2), createdAt: daysAgo(90) }), rules).due).toHaveLength(0);
+    expect(run(event({ lastHumanUpdateAt: null, updatedAt: daysAgo(8) }), rules).due).toHaveLength(1);
+    expect(run(event({ lastHumanUpdateAt: null, updatedAt: null, createdAt: daysAgo(7) }), rules).due).toHaveLength(1);
+    expect(run(event({ lastHumanUpdateAt: null, updatedAt: null, createdAt: daysAgo(6) }), rules).due).toHaveLength(0);
   });
 });
 
@@ -212,6 +214,18 @@ describe('snoozes ("remind me again in N days")', () => {
     const r = run(fixed, only('no_contact'), {}, [snooze({})]);
     expect(r.due).toHaveLength(0);
     expect(r.endedSnoozeIds).toEqual([99]);
+  });
+
+  it('no snooze silences anything the day before or day of the event, even one made before the date moved up', () => {
+    // Snoozed for a week when the date was weeks away; the date is now tomorrow
+    const moved = event({ desiredEventDate: inDays(1), lastContactAttempt: daysAgo(8) });
+    const long = snooze({ ruleType: 'date_approaching_inprocess', snoozedUntil: inDays(7) });
+    const r = run(moved, only('date_approaching_inprocess', { checkpointDays: [14, 7, 2] }), {}, [long]);
+    expect(r.due.map(a => a.ruleType)).toEqual(['date_approaching_inprocess']);
+    expect(r.endedSnoozeIds).toEqual([99]);
+    // Two days out: the snooze still holds (it can't run past tomorrow, but today it's fine)
+    const twoOut = event({ desiredEventDate: inDays(2), lastContactAttempt: daysAgo(8) });
+    expect(run(twoOut, only('date_approaching_inprocess', { checkpointDays: [14, 7, 2] }), {}, [long]).due).toHaveLength(0);
   });
 
   it('until_contact snoozes end when a contact is logged after them', () => {

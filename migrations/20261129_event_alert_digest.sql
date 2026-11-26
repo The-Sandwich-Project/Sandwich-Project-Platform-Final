@@ -27,11 +27,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_reminder_snoozes_active_event_user_rule
   WHERE active = true;
 
 -- Last time a person (not the sheet sync or a cron job) changed the event.
+-- Added WITHOUT a default first so existing rows stay NULL (adding it with
+-- DEFAULT now() would stamp every old event as "updated today"). Then new
+-- rows default to now(): a brand-new event counts from its creation.
+-- Existing rows are filled by scripts/backfill-last-human-update.ts, run
+-- deliberately with --dry-run first (CLAUDE.md schema rule 8). Until then the
+-- alert falls back to updated_at, i.e. the old behavior.
 ALTER TABLE event_requests ADD COLUMN IF NOT EXISTS last_human_update_at TIMESTAMP;
+ALTER TABLE event_requests ALTER COLUMN last_human_update_at SET DEFAULT now();
 
--- Starting point: updated_at is the best estimate available for existing
--- events. Only fills empty values, so a re-run can't overwrite real stamps.
--- (No trigger on event_requests, so this doesn't touch updated_at.)
-UPDATE event_requests
-   SET last_human_update_at = updated_at
- WHERE last_human_update_at IS NULL;
+-- The once-a-day digest limit: one row per person per Eastern day. A run
+-- claims the day by inserting (the primary key rejects a second claim).
+CREATE TABLE IF NOT EXISTS event_alert_digest_sends (
+  user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sent_on DATE NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, sent_on)
+);

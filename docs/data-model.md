@@ -403,6 +403,7 @@ erDiagram
     users ||--o{ event_check_in_reminders : "user_id (no FK yet)"
     event_requests ||--o{ event_reminder_snoozes : "event_request_id (no FK yet)"
     users ||--o{ event_reminder_snoozes : "user_id (no FK yet)"
+    users ||--o{ event_alert_digest_sends : "user_id (FK, cascade)"
 
     event_check_in_reminders {
         int event_request_id
@@ -418,17 +419,26 @@ erDiagram
         timestamp snoozed_until "midnight Eastern of the day it returns"
         bool active "one active per event + user + alert"
     }
+    event_alert_digest_sends {
+        varchar user_id PK "FK users.id ON DELETE CASCADE"
+        date sent_on PK "Eastern calendar day"
+    }
 ```
 
 | Table | One row is | Notes |
 |---|---|---|
-| `event_check_in_reminders` | What was last sent for one alert, on one event, to one person | Written when a digest goes out. A reassigned event has no row for the new owner, so they get one catch-up alert. Rows for an alert the person turned off are deleted, so turning it back on starts fresh. Legacy columns (`enabled`, `threshold_days`, `frequency`, `channel`, `next_due_at`) are no longer read. |
-| `event_reminder_snoozes` | One "remind me again in N days" pause | Created from the email's confirm step (`AlertSnoozeFromLink.tsx`). Ends when it expires (the alert returns in that day's digest) or when its problem is fixed. Capped server-side to end by the day before the event. |
+| `event_check_in_reminders` | What was last sent for one alert, on one event, to one person | Written when a digest goes out. Each run first deletes rows that no longer apply (event reassigned or deleted, or moved to a status that alert doesn't cover), so a returned event or a status reversal gets fresh alerts. Rows for an alert the person turns off are deleted when they save, so turning it back on starts fresh. Legacy columns (`enabled`, `threshold_days`, `frequency`, `channel`, `next_due_at`) are no longer read. |
+| `event_alert_digest_sends` | One daily digest sent to one person on one Eastern day | The once-a-day limit. A run claims the day by inserting this row before sending (the primary key rejects a second claim) and deletes it if nothing was delivered, so the next hourly run retries. Its own table, not `users.metadata`, because settings saves rewrite that whole blob and could erase a claim mid-send. |
+| `event_reminder_snoozes` | One "remind me again in N days" pause | Created from the email's confirm step (`AlertSnoozeFromLink.tsx`). Ends when it expires (the alert returns in that day's digest) or when its problem is fixed. Capped server-side to end by the day before the event, and re-checked daily: if the event's date moves up to tomorrow or today, no snooze silences it. |
 
 `event_requests.last_human_update_at` is what "no updates" measures: stamped by
-the per-event middleware in `server/routes/event-requests/index.ts` on any
-successful write by a signed-in user, never by the Google Sheet sync or cron
-jobs (which do bump `updated_at`).
+`markEventHumanUpdated()` (`server/services/event-alerts/human-update.ts`) on
+successful writes by a signed-in user (every `/api/event-requests/:id/...`
+write, the body-id routes, notification action buttons), never by the Google
+Sheet sync or cron jobs (which do bump `updated_at`). New events default to
+`now()`. Events that existed before the column are filled once by
+`npm run alerts:backfill` (dry run first); until then the alert falls back to
+`updated_at`.
 
 Both tables predate the schema rules: their `event_request_id` / `user_id`
 links have no foreign keys yet (listed in the baseline). Adding them needs a

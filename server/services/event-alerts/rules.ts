@@ -28,6 +28,8 @@
  * event; legacy snoozes with no rule silence every alert on the event. When a
  * snooze ends and the problem is still there, the alert comes back right away,
  * whatever its normal cadence. Fixing the problem ends that alert's snooze.
+ * No snooze silences anything on the day before or the day of the event, even
+ * one made before the date moved up.
  *
  * Days are counted in Eastern calendar days, never raw hours: a send at 9:05
  * and a check at 9:02 five days later is still five days.
@@ -62,6 +64,7 @@ export type AlertEvent = {
   contactAttemptsLog?: unknown;
   lastContactAttempt?: Date | string | null;
   lastHumanUpdateAt?: Date | string | null;
+  updatedAt?: Date | string | null;
   [key: string]: unknown;
 };
 
@@ -243,6 +246,11 @@ export function evaluateEventAlerts(
   const createdAt = toDate(event.createdAt) ?? now;
   const due: DueAlert[] = [];
   const endedSnoozeIds = new Set<number>();
+  // The snooze cap ("can't hide the last alert") is re-checked every day, not
+  // just when the snooze was made: if the event's date moved up to tomorrow or
+  // today, every snooze on it is over, however long it was set for.
+  const daysToDate = daysUntilEventDate(relevantEventDate(event), now);
+  const snoozeCapReached = daysToDate !== null && daysToDate >= 0 && daysToDate <= 1;
 
   for (const rule of rules) {
     if (!rule.enabled) continue;
@@ -262,7 +270,7 @@ export function evaluateEventAlerts(
     let silenced = false;
     let snoozeJustEnded = false;
     for (const sn of [...mine, ...wholeEvent]) {
-      if (snoozeIsOver(sn, lastContact, now)) {
+      if (snoozeCapReached || snoozeIsOver(sn, lastContact, now)) {
         endedSnoozeIds.add(sn.id);
         // Ended since the last send: the person asked to be reminded, so remind them.
         const endedAt = sn.snoozedUntil ?? now;
@@ -318,7 +326,10 @@ function checkRule(
     }
     case 'stale_event': {
       if (!PRE_SCHEDULE.has(status)) return { met: false };
-      const anchor = toDate(event.lastHumanUpdateAt) ?? createdAt;
+      // Not yet backfilled (scripts/backfill-last-human-update.ts): fall back
+      // to updated_at, the old behavior, rather than the creation date, which
+      // would flag every older event at once.
+      const anchor = toDate(event.lastHumanUpdateAt) ?? toDate(event.updatedAt) ?? createdAt;
       const since = easternDaysBetween(anchor, now);
       if (since < rule.thresholdDays) return { met: false };
       return {

@@ -7,10 +7,10 @@
  * Settings live in Profile → Alerts (/api/me/check-in-reminder-preferences).
  */
 import express from 'express';
-import { db } from '../db';
+import { db, executeRawSql } from '../db';
 import { eventReminderSnoozes, eventRequests } from '@shared/schema';
 import { ACTIVE_ALERT_RULE_TYPES } from '@shared/types';
-import { eq, and, inArray, isNull } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql } from 'drizzle-orm';
 import { logger } from '../utils/production-safe-logger';
 import { processCheckInReminders, previewDigestForUser } from '../services/check-in-reminder-service';
 import { maxSnoozeDays, easternDateString } from '../services/event-alerts/rules';
@@ -31,6 +31,13 @@ router.get('/dry-run', async (req: any, res) => {
   try {
     const result = await processCheckInReminders({ dryRun: true, ignoreSendHour: true });
     const complete = result.errors === 0;
+    // Events that predate last_human_update_at and haven't been backfilled yet
+    // (scripts/backfill-last-human-update.ts). Their "no updates" alert falls
+    // back to updated_at, which the sheet sync keeps bumping.
+    const [{ count: notBackfilled }] = await executeRawSql<{ count: number }>(sql`
+      SELECT count(*)::int AS count FROM event_requests
+       WHERE last_human_update_at IS NULL AND deleted_at IS NULL
+         AND status IN ('new', 'in_process', 'scheduled', 'rescheduled')`);
     res.status(complete ? 200 : 500).json({
       dryRun: true,
       complete,
@@ -38,6 +45,9 @@ router.get('/dry-run', async (req: any, res) => {
       note: complete
         ? 'Nothing was sent. This is what the next daily digest would contain. See /api/event-check-in-reminders/dry-run/preview?userId=... for the email itself.'
         : `Nothing was sent, but ${result.errors} part(s) of the dry run failed (see server logs), so this list is INCOMPLETE.`,
+      backfill: notBackfilled > 0
+        ? `${notBackfilled} active event(s) still need the one-time backfill: run \`npm run alerts:backfill -- --dry-run\`, then \`--apply\`, before turning alerts on.`
+        : 'Done: every active event has last_human_update_at.',
       totals: {
         people: result.plan.length,
         events: result.plan.reduce((n, e) => n + e.events.length, 0),

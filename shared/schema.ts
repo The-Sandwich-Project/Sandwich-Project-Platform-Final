@@ -1549,8 +1549,9 @@ export const peopleRelations = relations(people, ({ one, many }) => ({
   sheetFieldConflicts: many(sheetFieldConflicts),
 }));
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   person: one(people, { fields: [users.personId], references: [people.id] }),
+  eventAlertDigestSends: many(eventAlertDigestSends),
 }));
 
 export const personNameAliasesRelations = relations(personNameAliases, ({ one }) => ({
@@ -2844,7 +2845,10 @@ export const eventRequests = pgTable(
     // successful write to /api/event-requests/:id...). Unlike updatedAt, the
     // Google Sheet sync and cron jobs never touch it, so it's what the
     // "no updates" event alert measures. Stamped in server/routes/event-requests/index.ts.
-    lastHumanUpdateAt: timestamp('last_human_update_at'),
+    // New rows default to now(), so a brand-new event counts from its creation.
+    // Rows that existed before the column are filled by
+    // scripts/backfill-last-human-update.ts (run deliberately; see CLAUDE.md).
+    lastHumanUpdateAt: timestamp('last_human_update_at').defaultNow(),
     assignedTo: varchar('assigned_to'), // User ID of person handling this request
     nextAction: text('next_action'), // What needs to happen next for this event (intake tracking)
     nextActionUpdatedAt: timestamp('next_action_updated_at'), // When nextAction was last updated
@@ -3431,6 +3435,29 @@ export const eventReminderSnoozes = pgTable(
 );
 
 export type EventReminderSnooze = typeof eventReminderSnoozes.$inferSelect;
+
+// Event alerts: one row per person per Eastern day a daily digest went out.
+// The once-a-day limit: a run claims today by inserting this row (the primary
+// key makes a second claim fail), and gives it back by deleting it if nothing
+// was delivered. Kept out of users.metadata on purpose: settings saves rewrite
+// that whole blob and could erase a claim mid-send.
+export const eventAlertDigestSends = pgTable(
+  'event_alert_digest_sends',
+  {
+    userId: varchar('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sentOn: date('sent_on').notNull(), // Eastern calendar date
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.sentOn] }),
+  }),
+);
+
+export const eventAlertDigestSendsRelations = relations(eventAlertDigestSends, ({ one }) => ({
+  user: one(users, { fields: [eventAlertDigestSends.userId], references: [users.id] }),
+}));
 
 // Event collaboration comments table for team discussion on event planning
 export const eventCollaborationComments = pgTable(
