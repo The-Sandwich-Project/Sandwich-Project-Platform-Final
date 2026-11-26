@@ -1,528 +1,94 @@
 /**
- * Check-In Reminder Processing Service
+ * Event alerts (formerly "check-in reminders"): one daily email per TSP contact.
  *
- * Processes user-configured recurring reminders for event requests.
- * Supports multiple rule types per event:
- *   - no_contact: No contact attempt logged in X days
- *   - stale_event: No updates on event for X days
- *   - date_approaching_inprocess: Desired date nearing while still in-process
- *   - date_approaching_scheduled: Scheduled event date approaching
- *   - staffing_unmet: Unmet staffing needs X days before scheduled event
- *   - general_checkin: General periodic check-in (legacy)
+ * Once a day, for each active person, check every event they're the TSP
+ * contact for (New, In Process, Scheduled, Rescheduled) against their alert
+ * settings, and send ONE email listing every alert due today, most urgent
+ * first, with everything needed to act from the email. Nothing due = no email.
+ *
+ * Timing rules (which alert fires when) are in ./event-alerts/rules.ts; the
+ * email/text/bell content is in ./event-alerts/digest-email.ts. This file
+ * loads the data, enforces the daily limit, sends, and records what went out.
+ *
+ * - Runs hourly (cron-jobs.ts) and sends on the first run at or after 9 AM
+ *   Eastern, so a server restart at 9:00 doesn't cost a day.
+ * - HARD LIMIT: one digest per person per Eastern day. Today's slot is claimed
+ *   with a single conditional UPDATE on the person's users row before
+ *   anything is sent, so a double run or two servers can't send twice.
+ * - The bell entry is written first; if that fails the slot is released and
+ *   the next hourly run retries. Email/text failures are logged (the bell
+ *   still has it).
+ * - What was sent is recorded per event + person + alert in
+ *   event_check_in_reminders (last_sent_at / last_sent_key). That drives the
+ *   "every X days" and "once per checkpoint" timing.
+ * - Dry run (CHECK_IN_REMINDERS_DRY_RUN=true, or the admin dry-run endpoint):
+ *   works out exactly what each person would get and writes NOTHING.
  */
-
 import { sendEmailOrThrow, isEmailConfigured } from './email';
 import { db } from '../db';
-import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, notifications, REMINDER_RULE_TYPES } from '@shared/schema';
-import { and, eq, inArray, lte, or, sql } from 'drizzle-orm';
+import { eventCheckInReminders, eventReminderSnoozes, eventRequests, users, notifications } from '@shared/schema';
+import { and, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
 import { logger } from '../utils/production-safe-logger';
-import { EMAIL_FOOTER_HTML } from '../utils/email-footer';
 import { getAppBaseUrl } from '../config/constants';
-import { getUserMetadata, getCheckInReminderPreferences } from '@shared/types';
-import type { CheckInReminderPreferences, DefaultReminderRule } from '@shared/types';
-import { getLastContactTimestamp } from '@shared/contact-age';
-import { estimateStateFromFields } from '@shared/sandwich-estimate';
-import { isScheduledOrRescheduled, STATUS_DEFINITIONS, type EventStatus } from '../../shared/event-status-workflow';
+import { getUserMetadata, getCheckInReminderPreferences, ACTIVE_ALERT_RULE_TYPES } from '@shared/types';
 import { sendTSPFollowupReminderSMS } from '../sms-service';
 import {
-  calculateNextDue,
-  ReminderFrequency,
-  CONDITION_CHECK_FREQUENCY,
-} from '../utils/reminder-scheduling';
+  ALERT_STATUSES,
+  easternDateString,
+  easternHour,
+  evaluateEventAlerts,
+  maxSnoozeDays,
+  toAlertLines,
+  urgencyCompare,
+  type AlertRuleType,
+  type AlertSnooze,
+  type AlertState,
+  type DueAlert,
+} from './event-alerts/rules';
+import { renderDigest, type DigestItem, type RenderedDigest } from './event-alerts/digest-email';
 
-// Rule type display labels and descriptions for emails
-/**
- * Reminder copy. Tone: friendly heads-up. The team are the experts on their
- * events, so messages state what we noticed + give contact info; they never
- * tell people how to run the process. Never say "overdue" or "needs attention".
- */
-type ReminderEvent = typeof eventRequests.$inferSelect;
+/** First Eastern hour the daily digest may go out. */
+export const DIGEST_SEND_HOUR = 9;
 
-/**
- * Rules that no longer send: staffing (Volunteer Hub later), missing details
- * (folded into the date reminders), and the general timed check-in (removed
- * at the planning team's request). Existing rows switch off automatically.
- */
-const RETIRED_RULE_TYPES = new Set<string>([
-  REMINDER_RULE_TYPES.STAFFING_UNMET,
-  REMINDER_RULE_TYPES.MISSING_DETAILS,
-  REMINDER_RULE_TYPES.GENERAL_CHECKIN,
-]);
+/** Key in users.metadata holding the Eastern date of the last digest sent. */
+const DAILY_SLOT_KEY = 'checkInReminderLastSentOn';
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+type UserRow = typeof users.$inferSelect;
+type EventRow = typeof eventRequests.$inferSelect;
 
-function wholeDays(ms: number): number {
-  return Math.max(0, Math.round(ms / MS_PER_DAY));
-}
-
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? '' : 's'}`;
-}
-
-function joinList(items: string[]): string {
-  if (items.length <= 1) return items.join('');
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
-}
-
-/** Last contact: structured log first, then the legacy lastContactAttempt field. */
-function lastContactDate(event: ReminderEvent): Date | null {
-  return getLastContactTimestamp(event as any);
-}
-
-/** Today's calendar date in Eastern, as a UTC-midnight timestamp. */
-function easternTodayUtcMs(now: Date = new Date()): number {
-  const ymd = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(now); // YYYY-MM-DD
-  const [y, m, d] = ymd.split('-').map(Number);
-  return Date.UTC(y, m - 1, d);
-}
-
-/**
- * Whole calendar days from today (Eastern) until an event date. Event dates
- * are date-only values stored as UTC midnight, so use their UTC date parts.
- * 0 = today, 1 = tomorrow, negative = past.
- */
-function calendarDaysUntil(date: Date | string | null | undefined): number | null {
-  if (!date) return null;
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return null;
-  const eventDay = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-  return Math.round((eventDay - easternTodayUtcMs()) / MS_PER_DAY);
-}
-
-/** "today" / "tomorrow" / "in 5 days" */
-function whenPhrase(days: number): string {
-  if (days <= 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  return `in ${days} days`;
-}
-
-function formatEventDate(d: Date | string | null | undefined): string {
-  if (!d) return 'TBD';
-  return new Date(d).toLocaleDateString('en-US', {
-    // Event dates are date-only values stored as UTC midnight: format in UTC
-    // so the calendar day isn't shifted back by the Eastern offset.
-    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
-  });
-}
-
-/** Critical info still blank on an event (used for the date-approaching reminders). */
-function missingEventInfo(event: ReminderEvent): string[] {
-  const missing: string[] = [];
-  if (!event.eventStartTime) missing.push('the event time');
-  if (!event.eventAddress) missing.push('the address');
-  // Normalize with the shared helper: handles JSON-string sandwichTypes,
-  // ranges, and the legacy estimatedSandwichRangeType field.
-  const estimate = estimateStateFromFields(event as any);
-  // A count is known if there's a total, or every type line has an amount
-  // (150 deli + PBJ amount TBD doesn't tell us the count).
-  const hasCount = !!estimate.total || (estimate.lines.length > 0 && estimate.lines.every(l => l.amount));
-  if (!hasCount) missing.push('the sandwich count');
-  // No types at all, or some sandwiches still marked "unknown" type
-  if (estimate.lines.length === 0 || estimate.lines.some(l => l.type === 'unknown')) {
-    missing.push('the sandwich types');
-  }
-  return missing;
-}
-
-export type ReminderMessage = {
-  /** Subject line, bell title */
-  subject: string;
-  /** Body sentences shown before the contact info */
-  intro: string;
-  /** Optional sentence shown after the contact info */
-  outro?: string;
-  /** Short phrase for the one-time summary list */
-  short: string;
-};
-
-export function buildReminderMessage(ruleType: string, thresholdDays: number, event: ReminderEvent): ReminderMessage {
-  const org = event.organizationName || 'this group';
-  const now = Date.now();
-
-  switch (ruleType) {
-    case REMINDER_RULE_TYPES.NO_CONTACT: {
-      const last = lastContactDate(event);
-      const days = last
-        ? wholeDays(now - last.getTime())
-        : wholeDays(now - new Date(event.createdAt).getTime());
-      const badgeLine = days >= 7
-        ? `If now isn't a good time, no worries. Next time you're in the app, this event's card will show a "follow-up needed" badge as a reminder.`
-        : `If now isn't a good time, no worries. Once it's been a week, this event's card will show a "follow-up needed" badge as a reminder.`;
-      return {
-        subject: `No contact reminder for ${org}`,
-        intro: last
-          ? `It's been ${plural(days, 'day')} since the last contact attempt was logged for ${org}. Here's their contact info if you'd like to reach out now.`
-          : `No contact attempt has been logged yet for ${org}, which came in ${plural(days, 'day')} ago. Here's their contact info if you'd like to reach out now.`,
-        outro: badgeLine,
-        short: last ? `no contact logged in ${plural(days, 'day')}` : 'no contact logged yet',
-      };
-    }
-
-    case REMINDER_RULE_TYPES.STALE_EVENT: {
-      const days = wholeDays(now - new Date(event.updatedAt ?? event.createdAt).getTime());
-      return {
-        subject: `${org}'s event hasn't been updated in ${plural(days, 'day')}`,
-        intro: `Just a heads-up that ${org}'s event hasn't been updated in ${plural(days, 'day')}. Have you heard anything new from them, or would it help to check in again? Here's their contact info:`,
-        short: `not updated in ${plural(days, 'day')}`,
-      };
-    }
-
-    case REMINDER_RULE_TYPES.DATE_APPROACHING_INPROCESS: {
-      const days = Math.max(0, calendarDaysUntil(event.desiredEventDate) ?? 0);
-      const missing = missingEventInfo(event);
-      const missingLine = missing.length
-        ? ` For reference, ${joinList(missing)} ${missing.length === 1 ? "hasn't" : "haven't"} been recorded yet.`
-        : '';
-      return {
-        subject: `${org}'s event is coming up ${whenPhrase(days)}`,
-        intro: `${org}'s requested date is ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `${plural(days, 'day')} from now`} (${formatEventDate(event.desiredEventDate)}), and it's still set to In Process in the app. Has anything new come in that would let you schedule it, or should it move to Stalled, Declined, or Cancelled?${missingLine} Here's their contact info in case it's useful:`,
-        short: `requested date ${whenPhrase(days)}, still In Process`,
-      };
-    }
-
-    case REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED: {
-      const days = Math.max(0, calendarDaysUntil(event.scheduledEventDate) ?? 0);
-      const missing = missingEventInfo(event);
-      const sentences: string[] = [];
-      if (missing.length) {
-        sentences.push(`${org}'s event is set for ${formatEventDate(event.scheduledEventDate)}, and ${joinList(missing)} ${missing.length === 1 ? "hasn't" : "haven't"} been recorded yet.`);
-      } else {
-        sentences.push(`${org}'s event is set for ${formatEventDate(event.scheduledEventDate)}.`);
-      }
-      if (!event.addedToOfficialSheet) {
-        sentences.push(`It also hasn't been marked as added to the planning sheet yet.`);
-      }
-      const shortBits = [...missing.map(m => m.replace(/^the /, ''))];
-      if (!event.addedToOfficialSheet) shortBits.push('planning sheet');
-      return {
-        subject: `${org}'s event is coming up ${whenPhrase(days)} and is missing some information`,
-        intro: `${sentences.join(' ')} Here's the contact's info in case you need to reach out for anything:`,
-        short: `coming up ${whenPhrase(days)}, missing ${joinList(shortBits)}`,
-      };
-    }
-
-    case REMINDER_RULE_TYPES.GENERAL_CHECKIN:
-    default:
-      return {
-        subject: `Your regular check-in on ${org}`,
-        intro: `Here's your regular check-in on ${org}'s event. Nothing needed unless something has changed. Their contact info, in case it's handy:`,
-        short: 'regular check-in',
-      };
-  }
-}
-
-function contactDetails(event: ReminderEvent): { name: string; phone: string | null; email: string | null } {
-  const name = [event.firstName, event.lastName].filter(Boolean).join(' ').trim() || 'No contact name on file';
-  return { name, phone: event.phone || null, email: event.email || null };
-}
-
-function contactHtml(event: ReminderEvent): string {
-  const c = contactDetails(event);
-  return `
-    <div style="background: white; border-left: 4px solid #FBAD3F; padding: 16px; margin: 16px 0; border-radius: 4px;">
-      <p style="margin: 0 0 6px 0; font-size: 16px; font-weight: 600; color: #1f2937;">${escapeHtml(c.name)}</p>
-      <p style="margin: 0 0 4px 0; font-size: 14px; color: #4b5563;">Phone: ${c.phone ? `<a href="tel:${escapeHtml(c.phone)}" style="color:#236383;">${escapeHtml(c.phone)}</a>` : 'not on file'}</p>
-      <p style="margin: 0; font-size: 14px; color: #4b5563;">Email: ${c.email ? `<a href="mailto:${escapeHtml(c.email)}" style="color:#236383;">${escapeHtml(c.email)}</a>` : 'not on file'}</p>
-    </div>`;
-}
-
-function contactText(event: ReminderEvent): string {
-  const c = contactDetails(event);
-  return [c.name, c.phone, c.email].filter(Boolean).join(' · ');
-}
-
-/**
- * Standard List-Unsubscribe header: gives Gmail/Outlook their built-in
- * "Unsubscribe" link and helps keep reminders out of spam.
- */
-function reminderUnsubscribeHeaders(baseUrl: string): Record<string, string> {
-  return {
-    'List-Unsubscribe': `<mailto:katie@thesandwichproject.org?subject=Unsubscribe%20from%20reminders>, <${baseUrl}/profile?tab=notifications>`,
-  };
-}
-
-function friendlyStatus(status: string): string {
-  return STATUS_DEFINITIONS[status as EventStatus]?.label || status.replace(/_/g, ' ');
-}
-
-
-export function isConditionBasedRule(ruleType: string): boolean {
-  return ruleType !== REMINDER_RULE_TYPES.GENERAL_CHECKIN;
-}
-
-/**
- * Evaluate whether a reminder rule's condition is currently met.
- * Returns true if the condition IS met (i.e., the reminder SHOULD fire).
- */
-function evaluateRuleCondition(
-  ruleType: string,
-  thresholdDays: number,
-  event: any
-): boolean {
-  const now = new Date();
-  const msPerDay = 24 * 60 * 60 * 1000;
-
-  switch (ruleType) {
-    case REMINDER_RULE_TYPES.NO_CONTACT: {
-      // Only applies to in_process events
-      if (event.status !== 'in_process') return false;
-      // Last contact (log or legacy field); never contacted counts from creation
-      const since = lastContactDate(event) ?? (event.createdAt ? new Date(event.createdAt) : null);
-      if (!since) return true;
-      return (now.getTime() - since.getTime()) / msPerDay >= thresholdDays;
-    }
-
-    case REMINDER_RULE_TYPES.STALE_EVENT: {
-      // Only applies to in_process events
-      if (event.status !== 'in_process') return false;
-      const lastUpdated = event.updatedAt ? new Date(event.updatedAt) : null;
-      if (!lastUpdated) return true;
-      const daysSinceUpdate = (now.getTime() - lastUpdated.getTime()) / msPerDay;
-      return daysSinceUpdate >= thresholdDays;
-    }
-
-    case REMINDER_RULE_TYPES.DATE_APPROACHING_INPROCESS: {
-      // Only applies to in_process events with a desired date
-      if (event.status !== 'in_process') return false;
-      // Calendar days (Eastern), inclusive: today counts as 0
-      const daysUntilDate = calendarDaysUntil(event.desiredEventDate);
-      if (daysUntilDate === null) return false;
-      return daysUntilDate >= 0 && daysUntilDate <= thresholdDays;
-    }
-
-    case REMINDER_RULE_TYPES.DATE_APPROACHING_SCHEDULED: {
-      // Scheduled events coming up that are still missing critical info
-      // (time, address, sandwich count/types) or aren't on the planning sheet.
-      if (!isScheduledOrRescheduled(event.status)) return false;
-      const daysUntilDate = calendarDaysUntil(event.scheduledEventDate);
-      if (daysUntilDate === null || daysUntilDate < 0 || daysUntilDate > thresholdDays) return false;
-      return missingEventInfo(event).length > 0 || !event.addedToOfficialSheet;
-    }
-
-    case REMINDER_RULE_TYPES.STAFFING_UNMET:
-    case REMINDER_RULE_TYPES.MISSING_DETAILS:
-      // Retired: staffing alerts will live in the Volunteer Hub; missing
-      // details are now part of the two date-approaching reminders.
-      return false;
-
-    case REMINDER_RULE_TYPES.GENERAL_CHECKIN:
-    default:
-      // General check-in always fires when due (frequency-based only)
-      return true;
-  }
-}
-
-/** HTML for a single-event reminder email (exported for previews/tests). */
-export function renderReminderEmailHtml(
-  userName: string,
-  event: ReminderEvent,
-  msg: ReminderMessage,
-  baseUrl: string,
-): string {
-  const eventUrl = `${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.id}`;
-  return `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
-            <h2 style="color: white; margin: 0;">${escapeHtml(msg.subject)}</h2>
-          </div>
-          <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-            <p style="font-size: 16px; color: #374151;">Hi ${escapeHtml(userName)},</p>
-            <p style="font-size: 15px; color: #4b5563;">${escapeHtml(msg.intro)}</p>
-            ${contactHtml(event)}
-            ${msg.outro ? `<p style="font-size: 15px; color: #4b5563;">${escapeHtml(msg.outro)}</p>` : ''}
-            <a href="${eventUrl}" style="display: inline-block; background: #007E8C; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin: 12px 0;">
-              Open the event
-            </a>
-            <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
-              You can change how often you get these, or turn them off, anytime in
-              <a href="${baseUrl}/profile?tab=notifications" style="color: #236383;">Profile → Alerts</a>.
-            </p>
-          </div>
-          ${EMAIL_FOOTER_HTML}
-        </div>
-      `;
-}
-
-async function sendReminderEmail(
-  email: string,
-  userName: string,
-  event: ReminderEvent,
-  msg: ReminderMessage,
-): Promise<boolean> {
-  if (!isEmailConfigured()) return false;
-
-  const baseUrl = getAppBaseUrl();
-
-  try {
-    const result = await sendEmailOrThrow({
-      to: email,
-      from: 'katie@thesandwichproject.org',
-      subject: msg.subject,
-      headers: reminderUnsubscribeHeaders(baseUrl),
-      html: renderReminderEmailHtml(userName, event, msg, baseUrl),
-      emailStream: 'operational',
-    });
-    // false when the recipient unsubscribed (nothing was sent)
-    return result.success;
-  } catch (error) {
-    logger.error(`Failed to send reminder email to ${email}:`, error);
-    return false;
-  }
-}
-
-async function sendReminderSMS(
-  phoneNumber: string,
-  event: ReminderEvent,
-  msg: ReminderMessage,
-): Promise<boolean> {
-  const eventUrl = `${getAppBaseUrl()}/dashboard?section=event-requests&tab=all&eventId=${event.id}`;
-  const message = `TSP reminder: ${msg.subject}. Contact: ${contactText(event)}. ${eventUrl}`;
-
-  try {
-    const result = await sendTSPFollowupReminderSMS(phoneNumber, message);
-    return result.success;
-  } catch (error) {
-    logger.error('Failed to send reminder SMS:', error);
-    return false;
-  }
-}
-
-/** One line per event (an event can have several reminder types due). */
-function groupByEvent(items: { event: ReminderEvent; msg: ReminderMessage }[]): { event: ReminderEvent; detail: string }[] {
-  const byId = new Map<number, { event: ReminderEvent; details: string[] }>();
-  for (const { event, msg } of items) {
-    const g = byId.get(event.id) ?? { event, details: [] };
-    if (!g.details.includes(msg.short)) g.details.push(msg.short);
-    byId.set(event.id, g);
-  }
-  return [...byId.values()].map(g => ({ event: g.event, detail: g.details.join(', ') }));
-}
-
-/** Subject for one email listing several events. */
-function combinedSubject(count: number): string {
-  return `${count} of your events could use a look`;
-}
-
-/** One email listing every event due for this person today. */
-async function sendCombinedReminderEmail(
-  email: string,
-  userName: string,
-  items: { event: ReminderEvent; msg: ReminderMessage }[],
-): Promise<boolean> {
-  if (!isEmailConfigured()) return false;
-  const baseUrl = getAppBaseUrl();
-  const events = groupByEvent(items);
-  const subject = combinedSubject(events.length);
-  const list = events
-    .map(({ event, detail }) => `<li style="margin-bottom:8px;"><a href="${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.id}" style="color:#007E8C;font-weight:600;">${escapeHtml(event.organizationName || 'Unknown Organization')}</a><br/><span style="font-size:13px;color:#6b7280;">${escapeHtml(detail)}</span></li>`)
-    .join('');
-  try {
-    const result = await sendEmailOrThrow({
-      to: email,
-      from: 'katie@thesandwichproject.org',
-      subject,
-      headers: reminderUnsubscribeHeaders(baseUrl),
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
-            <h2 style="color: white; margin: 0;">${escapeHtml(subject)}</h2>
-          </div>
-          <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-            <p style="font-size: 16px; color: #374151;">Hi ${escapeHtml(userName)},</p>
-            <p style="font-size: 15px; color: #4b5563;">A few of your events could use a look when you have time. We put them together in one email.</p>
-            <ul style="padding-left: 18px; color: #1f2937;">${list}</ul>
-            <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
-              You can change how often you get these, or turn them off, anytime in
-              <a href="${baseUrl}/profile?tab=notifications" style="color: #236383;">Profile → Alerts</a>.
-            </p>
-          </div>
-          ${EMAIL_FOOTER_HTML}
-        </div>
-      `,
-      emailStream: 'operational',
-    });
-    return result.success;
-  } catch (error) {
-    logger.error(`Failed to send combined reminder email to ${email}:`, error);
-    return false;
-  }
-}
-
-/** One text for several events. */
-async function sendCombinedReminderSMS(phoneNumber: string, count: number): Promise<boolean> {
-  try {
-    const result = await sendTSPFollowupReminderSMS(
-      phoneNumber,
-      `TSP: ${count} of your events could use a look when you have time. ${getAppBaseUrl()}/dashboard?section=event-requests&tab=all`,
-    );
-    return result.success;
-  } catch (error) {
-    logger.error('Failed to send combined reminder SMS:', error);
-    return false;
-  }
-}
-
-/** Statuses where an assigned TSP contact gets reminders. */
-const REMINDER_STATUSES = ['new', 'in_process', 'scheduled', 'rescheduled', 'stalled'];
-
-/**
- * The event's current TSP contact: tspContact is authoritative; the legacy
- * tspContactAssigned only counts when tspContact is empty. (After a
- * reassignment the legacy field can still hold the former contact.)
- */
-function isAssignedTo(event: { tspContact?: string | null; tspContactAssigned?: string | null }, userId: string): boolean {
-  const current = event.tspContact || event.tspContactAssigned || null;
-  return current === userId;
-}
-
-/** The rules that apply to the user's events (same for every event). */
-function activeRules(prefs: CheckInReminderPreferences): DefaultReminderRule[] {
-  return prefs.rules.filter(r => r.enabled && !RETIRED_RULE_TYPES.has(r.ruleType));
-}
-
-/**
- * Dry run: work out exactly who would get what, log it, and send NOTHING.
- * Turned on with CHECK_IN_REMINDERS_DRY_RUN=true (the daily job then runs in
- * any environment, including dev), or on demand via the admin dry-run endpoint.
- * A dry run never writes anything that would change the real first run: no
- * notifications, no summary marker, no grace periods, no sent timestamps.
- * (Row sync still runs; it's bookkeeping and idempotent.)
- */
 export function isCheckInReminderDryRun(): boolean {
   return process.env.CHECK_IN_REMINDERS_DRY_RUN === 'true';
 }
 
 export type DryRunEntry = {
-  kind: 'summary' | 'reminder';
+  kind: 'digest';
   userId: string;
   userName: string;
-  /** Where it would go: email and/or SMS (bell is always included) */
+  /** Where it would go (the bell always gets it too) */
   wouldEmail: string | null;
   wouldText: string | null;
   subject: string;
-  /** Reminder: one event. Summary: every event in it. */
   events: { id: number; organization: string; detail: string }[];
 };
 
-type RunContext = {
-  dryRun: boolean;
-  plan: DryRunEntry[];
-  /** Rows the (dry-run) summary covered, so the send loop doesn't list them twice */
-  summarizedRowIds: Set<number>;
-  /** When this run started; rows due at or before it are processed this run */
-  runStartedAt: Date;
-  /** Failures in sync/summary (the per-reminder loop counts its own) */
+export type DigestRunResult = {
+  /** People whose events were evaluated */
+  processed: number;
+  /** Digests delivered by email or text */
+  sent: number;
   errors: number;
-  /** Today's date in Eastern (YYYY-MM-DD): the key for the one-message-a-day limit */
-  today: string;
-  /** Dry run only: people who would already get a message this run (their summary) */
-  messagedUserIds: Set<string>;
+  dryRun: boolean;
+  /** Set when the run did nothing on purpose (e.g. before 9 AM) */
+  skipped?: string;
+  /** Dry run only: everything that would have gone out */
+  plan: DryRunEntry[];
 };
 
-function plannedChannels(user: typeof users.$inferSelect, channel: string): { wouldEmail: string | null; wouldText: string | null } {
+function displayName(user: UserRow): string {
+  return user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id;
+}
+
+function plannedChannels(user: UserRow, channel: string): { wouldEmail: string | null; wouldText: string | null } {
   const email = user.preferredEmail || user.email || null;
   const consent = getUserMetadata(user).smsConsent;
   const phone = consent?.enabled && consent.phoneNumber ? consent.phoneNumber : null;
@@ -532,827 +98,339 @@ function plannedChannels(user: typeof users.$inferSelect, channel: string): { wo
   };
 }
 
-/**
- * HARD LIMIT: one check-in reminder message per person per day.
- *
- * Whatever the data looks like (hundreds of due reminders, a backlog, a bad
- * import, the job running twice or on two servers at once), a person gets at
- * most ONE check-in reminder email and/or text per Eastern calendar day:
- * either their first-time summary or one combined list of everything due.
- * Before anything is sent, today's slot is claimed with a single conditional
- * UPDATE on the user's row; if it's already claimed, nothing is sent and their
- * reminders stay due for tomorrow. So the most a day can ever send is one
- * message per TSP contact.
- */
-const DAILY_SLOT_KEY = 'checkInReminderLastSentOn';
-
-function easternDateString(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(now); // YYYY-MM-DD
+/** Same rule everywhere: tspContact wins; the legacy field counts only when it's empty. */
+function ownerOf(event: Pick<EventRow, 'tspContact' | 'tspContactAssigned'>): string | null {
+  return event.tspContact || event.tspContactAssigned || null;
 }
 
-/** Read-only: has this person already been sent a reminder message today? */
-function alreadyMessagedToday(user: typeof users.$inferSelect, today: string): boolean {
+// ---------------------------------------------------------------------------
+// Daily limit
+// ---------------------------------------------------------------------------
+
+function alreadySentToday(user: UserRow, today: string): boolean {
   return (getUserMetadata(user) as Record<string, unknown>)[DAILY_SLOT_KEY] === today;
 }
 
-/** Atomically claim today's slot for this person. False = already used today: send nothing. */
+/** Atomically claim today's digest for this person. False = already sent today. */
 async function claimDailySlot(userId: string, today: string): Promise<boolean> {
   const claimed = await db
     .update(users)
     .set({
       metadata: sql`jsonb_set(coalesce(${users.metadata}, '{}'::jsonb), '{${sql.raw(DAILY_SLOT_KEY)}}', to_jsonb(${today}::text))`,
     })
-    .where(and(
-      eq(users.id, userId),
-      sql`coalesce(${users.metadata} ->> ${DAILY_SLOT_KEY}, '') <> ${today}`,
-    ))
+    .where(and(eq(users.id, userId), sql`coalesce(${users.metadata} ->> ${DAILY_SLOT_KEY}, '') <> ${today}`))
     .returning({ id: users.id });
   return claimed.length > 0;
 }
 
-/** Days an event in the first-run summary waits before it can send its own reminder. */
-const BACKLOG_GRACE_DAYS = 7;
+/** Give today's slot back (nothing was delivered), so the next hourly run retries. */
+async function releaseDailySlot(userId: string, today: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ metadata: sql`${users.metadata} - ${DAILY_SLOT_KEY}` })
+    .where(and(eq(users.id, userId), sql`${users.metadata} ->> ${DAILY_SLOT_KEY} = ${today}`));
+}
 
-/**
- * First run for a user (no baseline yet): instead of one reminder per event
- * that is ALREADY overdue, send a single summary listing them, and give those
- * reminders a grace period. After that, reminders behave normally — only
- * problems that arise later fire individually. Runs again after the user
- * saves new settings (the baseline is cleared then).
- */
-async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: RunContext): Promise<void> {
-  // Re-read the account: the sync for this user may have taken a while, and a
-  // summary must not go to an account deactivated in the meantime.
-  const [user] = await db.select().from(users).where(eq(users.id, staleUser.id)).limit(1);
-  if (!user || user.isActive === false) return;
-  const metadata = getUserMetadata(user);
-  if (metadata.checkInRemindersBaselinedAt) return;
+// ---------------------------------------------------------------------------
+// Loading
+// ---------------------------------------------------------------------------
+
+type AlertData = {
+  usersById: Map<string, UserRow>;
+  eventsByOwner: Map<string, EventRow[]>;
+  /** `${eventId}:${userId}:${ruleType}` -> state */
+  state: Map<string, AlertState>;
+  /** `${eventId}:${userId}` -> active snoozes */
+  snoozes: Map<string, AlertSnooze[]>;
+};
+
+async function loadAlertData(onlyUserId?: string): Promise<AlertData> {
+  const assigned = or(
+    sql`coalesce(${eventRequests.tspContact}, '') <> ''`,
+    sql`coalesce(${eventRequests.tspContactAssigned}, '') <> ''`,
+  );
+  const events = await db
+    .select()
+    .from(eventRequests)
+    .where(and(
+      inArray(eventRequests.status, [...ALERT_STATUSES]),
+      isNull(eventRequests.deletedAt),
+      assigned,
+    ));
+
+  const eventsByOwner = new Map<string, EventRow[]>();
+  for (const ev of events) {
+    const owner = ownerOf(ev);
+    if (!owner || (onlyUserId && owner !== onlyUserId)) continue;
+    eventsByOwner.set(owner, [...(eventsByOwner.get(owner) ?? []), ev]);
+  }
+
+  const ownerIds = [...eventsByOwner.keys()];
+  const usersById = new Map<string, UserRow>();
+  const state = new Map<string, AlertState>();
+  const snoozes = new Map<string, AlertSnooze[]>();
+  if (ownerIds.length === 0) return { usersById, eventsByOwner, state, snoozes };
+
+  for (const u of await db.select().from(users).where(inArray(users.id, ownerIds))) usersById.set(u.id, u);
 
   const rows = await db
     .select()
     .from(eventCheckInReminders)
-    .where(and(eq(eventCheckInReminders.userId, user.id), eq(eventCheckInReminders.enabled, true)));
-
-  // Condition rules, plus general check-ins that are already due (otherwise
-  // they'd still go out individually in this same run).
-  const nowForDue = new Date();
-  const condRows = rows.filter(r =>
-    !RETIRED_RULE_TYPES.has(r.ruleType) &&
-    (isConditionBasedRule(r.ruleType) || (!!r.nextDueAt && r.nextDueAt <= nowForDue)));
-  const eventIds = [...new Set(condRows.map(r => r.eventRequestId))];
-  const events = eventIds.length
-    ? await db.select().from(eventRequests).where(inArray(eventRequests.id, eventIds))
-    : [];
-  const eventById = new Map(events.map(e => [e.id, e]));
-
-  // event id -> labels of rules already triggered
-  const backlog = new Map<number, string[]>();
-  // Rows to pause for the grace period. Applied only after the summary's bell
-  // entry is saved, so a failure there can't silence reminders for a week.
-  const graceRowIds: number[] = [];
-  const graceUntil = new Date();
-  graceUntil.setDate(graceUntil.getDate() + BACKLOG_GRACE_DAYS);
-  graceUntil.setHours(9, 0, 0, 0);
-
-  // Respect any pauses the user set before per-event controls were retired,
-  // the same way the regular reminder loop does.
-  const activeSnoozes = eventIds.length
-    ? await db
-        .select()
-        .from(eventReminderSnoozes)
-        .where(
-          and(
-            eq(eventReminderSnoozes.userId, user.id),
-            eq(eventReminderSnoozes.active, true),
-            inArray(eventReminderSnoozes.eventRequestId, eventIds),
-          ),
-        )
-    : [];
-  const isSnoozed = (event: ReminderEvent): boolean => {
-    const snooze = activeSnoozes.find(sn => sn.eventRequestId === event.id);
-    if (!snooze) return false;
-    if (snooze.snoozeType === 'until_contact') {
-      const last = lastContactDate(event);
-      return !(last && last > snooze.createdAt);
-    }
-    return !!snooze.snoozedUntil && new Date() <= snooze.snoozedUntil;
-  };
-
-  for (const row of condRows) {
-    const event = eventById.get(row.eventRequestId);
-    if (!event || event.deletedAt) continue;
-    if (!isAssignedTo(event, user.id)) continue;
-    if (isSnoozed(event)) continue;
-    if (!evaluateRuleCondition(row.ruleType, row.thresholdDays || 7, event)) continue;
-    const label = buildReminderMessage(row.ruleType, row.thresholdDays || 7, event).short;
-    backlog.set(event.id, [...(backlog.get(event.id) || []), label]);
-    if (ctx.dryRun) {
-      ctx.summarizedRowIds.add(row.id);
-      continue;
-    }
-    graceRowIds.push(row.id);
+    .where(inArray(eventCheckInReminders.userId, ownerIds));
+  for (const r of rows) {
+    state.set(`${r.eventRequestId}:${r.userId}:${r.ruleType}`, { lastSentAt: r.lastSentAt, lastSentKey: r.lastSentKey });
   }
 
-  if (ctx.dryRun) {
-    // Record what the summary would be; write nothing, so the real first run
-    // still sends it.
-    if (backlog.size > 0 && alreadyMessagedToday(user, ctx.today)) {
-      logger.info(`[CheckInReminders][DRY RUN] ${user.id} already got a reminder message today; summary would wait until tomorrow`);
-    } else if (backlog.size > 0) {
-      ctx.messagedUserIds.add(user.id);
-      const entry: DryRunEntry = {
-        kind: 'summary',
-        userId: user.id,
-        userName: user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id,
-        ...plannedChannels(user, getCheckInReminderPreferences(user).defaultChannel),
-        subject: 'A quick look at your events',
-        events: [...backlog.entries()].map(([id, labels]) => ({
-          id,
-          organization: eventById.get(id)?.organizationName || 'Unknown Organization',
-          detail: labels.join(', '),
-        })),
-      };
-      ctx.plan.push(entry);
-      logger.info(`[CheckInReminders][DRY RUN] would send summary to ${entry.userName}: ${entry.events.length} events`);
-    }
-    return;
+  const sn = await db
+    .select()
+    .from(eventReminderSnoozes)
+    .where(and(inArray(eventReminderSnoozes.userId, ownerIds), eq(eventReminderSnoozes.active, true)));
+  for (const s of sn) {
+    const k = `${s.eventRequestId}:${s.userId}`;
+    snoozes.set(k, [...(snoozes.get(k) ?? []), {
+      id: s.id, ruleType: s.ruleType, snoozeType: s.snoozeType, snoozedUntil: s.snoozedUntil, createdAt: s.createdAt,
+    }]);
   }
-
-  if (backlog.size > 0) {
-    // One message per person per day. If today's is used, send nothing and
-    // leave the baseline unset so the summary goes out on a later run.
-    if (!(await claimDailySlot(user.id, ctx.today))) {
-      logger.info(`[CheckInReminders] ${user.id} already got a reminder message today; summary waits until tomorrow`);
-      return;
-    }
-    const baseUrl = getAppBaseUrl();
-    const items = [...backlog.entries()].map(([id, labels]) => ({
-      id,
-      orgName: eventById.get(id)?.organizationName || 'Unknown Organization',
-      labels,
-    }));
-    const count = items.length;
-    const title = 'A quick look at your events';
-    const message = `${count} event${count === 1 ? '' : 's'} could use a look when you have time:\n` +
-      items.map(i => `• ${i.orgName}: ${i.labels.join(', ')}`).join('\n');
-
-    await db.insert(notifications).values({
-      userId: user.id,
-      type: 'reminder',
-      priority: 'high',
-      title,
-      message,
-      category: 'events',
-      relatedType: 'event_request_summary',
-      actionUrl: '/dashboard?section=event-requests&tab=all',
-      actionText: 'Open events',
-      metadata: { eventIds: items.map(i => i.id), source: 'check_in_reminder_summary' },
-    });
-
-    // The summary is saved in the bell; now pause the summarized reminders.
-    if (graceRowIds.length) {
-      await db
-        .update(eventCheckInReminders)
-        // Push out to the grace date, but never pull an already-later date in
-        .set({
-          nextDueAt: sql`GREATEST(COALESCE(${eventCheckInReminders.nextDueAt}, ${graceUntil.toISOString()}::timestamp), ${graceUntil.toISOString()}::timestamp)`,
-          updatedAt: new Date(),
-        })
-        .where(inArray(eventCheckInReminders.id, graceRowIds));
-    }
-
-    const prefs = getCheckInReminderPreferences(user);
-    const email = user.preferredEmail || user.email;
-    if (isEmailConfigured() && email && (prefs.defaultChannel === 'email' || prefs.defaultChannel === 'both')) {
-      const userName = user.displayName || user.firstName || 'there';
-      const list = items
-        .map(i => `<li style="margin-bottom:8px;"><a href="${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${i.id}" style="color:#007E8C;font-weight:600;">${escapeHtml(i.orgName)}</a><br/><span style="font-size:13px;color:#6b7280;">${i.labels.join(', ')}</span></li>`)
-        .join('');
-      try {
-        await sendEmailOrThrow({
-          to: email,
-          from: 'katie@thesandwichproject.org',
-          subject: title,
-          headers: reminderUnsubscribeHeaders(baseUrl),
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
-                <h2 style="color: white; margin: 0;">${title}</h2>
-              </div>
-              <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-                <p style="font-size: 16px; color: #374151;">Hi ${escapeHtml(userName)},</p>
-                <p style="font-size: 15px; color: #4b5563;">
-                  Here's a quick snapshot of ${count === 1 ? 'an event' : 'a few events'} that could use a look when you have time.
-                  We put ${count === 1 ? 'it' : 'them'} together in one email so they don't arrive one at a time.
-                </p>
-                <ul style="padding-left: 18px; color: #1f2937;">${list}</ul>
-                <p style="font-size: 14px; color: #6b7280;">
-                  No rush. We'll hold off on separate reminders for these for the next week.
-                  If anything's still open after that, you'll get a gentle nudge for just that one.
-                </p>
-                <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
-                  You can change how often you get these, or turn them off, anytime in
-              <a href="${baseUrl}/profile?tab=notifications" style="color: #236383;">Profile → Alerts</a>.
-                </p>
-              </div>
-              ${EMAIL_FOOTER_HTML}
-            </div>
-          `,
-          emailStream: 'operational',
-        });
-      } catch (error) {
-        logger.error(`[CheckInReminders] Failed to send backlog summary email to user ${user.id}:`, error);
-      }
-    }
-    if (prefs.defaultChannel === 'sms' || prefs.defaultChannel === 'both') {
-      const smsConsent = metadata.smsConsent;
-      if (smsConsent?.enabled && smsConsent.phoneNumber) {
-        try {
-          await sendTSPFollowupReminderSMS(
-            smsConsent.phoneNumber,
-            `TSP: ${count === 1 ? '1 of your events' : `${count} of your events`} could use a look when you have time. ${baseUrl}/dashboard?section=event-requests&tab=all`,
-          );
-        } catch (error) {
-          logger.error(`[CheckInReminders] Failed to send backlog summary SMS to user ${user.id}:`, error);
-        }
-      }
-    }
-    logger.info(`[CheckInReminders] Sent backlog summary to user ${user.id} (${count} events)`);
-  }
-
-  // Set only the baseline key (don't overwrite the rest of metadata, which the
-  // user may have changed meanwhile), and only if their reminder settings are
-  // still the ones this summary was built from. If they saved new settings
-  // mid-run, leave it unset so the next run summarizes under the new ones.
-  const prefsAtRead = metadata.checkInReminderPreferences;
-  const prefsUnchanged = prefsAtRead
-    ? sql`(${users.metadata} -> 'checkInReminderPreferences') = ${JSON.stringify(prefsAtRead)}::jsonb`
-    : sql`(${users.metadata} -> 'checkInReminderPreferences') IS NULL`;
-  await db
-    .update(users)
-    .set({
-      metadata: sql`jsonb_set(coalesce(${users.metadata}, '{}'::jsonb), '{checkInRemindersBaselinedAt}', to_jsonb(${new Date().toISOString()}::text))`,
-    })
-    .where(and(eq(users.id, user.id), prefsUnchanged));
+  return { usersById, eventsByOwner, state, snoozes };
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+// ---------------------------------------------------------------------------
+// Building one person's digest
+// ---------------------------------------------------------------------------
+
+type PersonDigest = {
+  items: DigestItem[];
+  /** Every alert to record as sent: event id + the alert */
+  sentAlerts: { eventId: number; alert: DueAlert }[];
+  endedSnoozeIds: number[];
+  disabledRules: AlertRuleType[];
+};
+
+function buildPersonDigest(user: UserRow, data: AlertData, now: Date): PersonDigest {
+  const prefs = getCheckInReminderPreferences(user);
+  const disabledRules = prefs.rules.filter(r => !r.enabled).map(r => r.ruleType as AlertRuleType);
+  const scored: { item: DigestItem; due: DueAlert[] }[] = [];
+  const sentAlerts: PersonDigest['sentAlerts'] = [];
+  const endedSnoozeIds: number[] = [];
+
+  for (const event of data.eventsByOwner.get(user.id) ?? []) {
+    const state: Partial<Record<AlertRuleType, AlertState>> = {};
+    for (const r of prefs.rules) {
+      const s = data.state.get(`${event.id}:${user.id}:${r.ruleType}`);
+      if (s) state[r.ruleType as AlertRuleType] = s;
+    }
+    const result = evaluateEventAlerts(
+      event as any,
+      prefs.rules,
+      state,
+      data.snoozes.get(`${event.id}:${user.id}`) ?? [],
+      now,
+    );
+    endedSnoozeIds.push(...result.endedSnoozeIds);
+    if (result.due.length === 0) continue;
+    result.due.forEach(alert => sentAlerts.push({ eventId: event.id, alert }));
+    scored.push({
+      due: result.due,
+      item: { event: event as any, lines: toAlertLines(result.due), maxSnoozeDays: maxSnoozeDays(event as any, now) },
+    });
+  }
+
+  scored.sort((a, b) => urgencyCompare(a.due, b.due));
+  return { items: scored.map(s => s.item), sentAlerts, endedSnoozeIds, disabledRules };
+}
+
+/** The digest a person would get right now, or null if nothing is due. For admin previews. */
+export async function previewDigestForUser(userId: string, now = new Date()): Promise<RenderedDigest | null> {
+  const data = await loadAlertData(userId);
+  const user = data.usersById.get(userId);
+  if (!user) return null;
+  const { items } = buildPersonDigest(user, data, now);
+  if (items.length === 0) return null;
+  return renderDigest(user.displayName || user.firstName || 'there', items, getAppBaseUrl());
+}
+
+// ---------------------------------------------------------------------------
+// After sending
+// ---------------------------------------------------------------------------
+
+async function recordSent(userId: string, channel: string, sent: PersonDigest['sentAlerts'], at: Date): Promise<void> {
+  for (const { eventId, alert } of sent) {
+    await db
+      .insert(eventCheckInReminders)
+      .values({
+        eventRequestId: eventId,
+        userId,
+        ruleType: alert.ruleType,
+        enabled: true,
+        channel,
+        lastSentAt: at,
+        lastSentKey: alert.stateKey,
+      })
+      .onConflictDoUpdate({
+        target: [eventCheckInReminders.eventRequestId, eventCheckInReminders.userId, eventCheckInReminders.ruleType],
+        set: { lastSentAt: at, lastSentKey: alert.stateKey, enabled: true, updatedAt: at },
+      });
+  }
+}
+
+async function endSnoozes(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db
+    .update(eventReminderSnoozes)
+    .set({ active: false, cancelledAt: new Date() })
+    .where(and(inArray(eventReminderSnoozes.id, ids), eq(eventReminderSnoozes.active, true)));
 }
 
 /**
- * Daily sync of every user's per-event reminder rows with their CURRENT
- * settings and assignments (settings are global; rows are just the
- * per-event bookkeeping the scheduler needs):
- *  - inactive users: all rows switched off
- *  - events they're no longer assigned to, or that left an active status: off
- *  - rules not in their settings (or retired): off
- *  - rules in their settings: on, with current threshold/frequency/channel
- *  - missing rows: created
- * Because this runs every day against fresh settings, rows written from a
- * stale read, older thresholds, or pre-existing per-event customizations
- * converge to the user's settings on the next run.
+ * Forget what was sent for alerts the person has turned off, so turning one
+ * back on starts fresh (one catch-up alert, then normal timing).
  */
-async function syncReminderRows(ctx: RunContext): Promise<number> {
-  let changed = 0;
+async function forgetDisabledAlerts(userId: string, disabled: AlertRuleType[]): Promise<void> {
+  if (disabled.length === 0) return;
+  await db
+    .delete(eventCheckInReminders)
+    .where(and(eq(eventCheckInReminders.userId, userId), inArray(eventCheckInReminders.ruleType, disabled)));
+}
+
+/**
+ * Old per-event reminder types that no longer exist (general check-in,
+ * staffing, missing details): their rows are dead weight. Cheap and idempotent.
+ */
+async function deleteRetiredRows(): Promise<void> {
+  await db
+    .delete(eventCheckInReminders)
+    .where(notInArray(eventCheckInReminders.ruleType, [...ACTIVE_ALERT_RULE_TYPES]));
+}
+
+// ---------------------------------------------------------------------------
+// The run
+// ---------------------------------------------------------------------------
+
+export async function processCheckInReminders(
+  options: { dryRun?: boolean; ignoreSendHour?: boolean; now?: Date } = {},
+): Promise<DigestRunResult> {
+  const now = options.now ?? new Date();
+  const dryRun = options.dryRun ?? isCheckInReminderDryRun();
+  const result: DigestRunResult = { processed: 0, sent: 0, errors: 0, dryRun, plan: [] };
+
+  if (!options.ignoreSendHour && easternHour(now) < DIGEST_SEND_HOUR) {
+    result.skipped = `before ${DIGEST_SEND_HOUR} AM Eastern`;
+    return result;
+  }
+
+  const today = easternDateString(now);
+  const baseUrl = getAppBaseUrl();
+  let data: AlertData;
   try {
-    const allUsers = await db.select({ id: users.id }).from(users);
+    data = await loadAlertData();
+    if (!dryRun) await deleteRetiredRows();
+  } catch (error) {
+    logger.error('[EventAlerts] Failed to load alert data:', error);
+    result.errors++;
+    return result;
+  }
 
-    for (const { id: userId } of allUsers) {
-      // Re-read each user right before syncing them, to keep the window for
-      // a concurrent settings save as small as possible.
-      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      if (!user) continue;
+  for (const [userId, user] of data.usersById) {
+    if (user.isActive === false) continue;
+    result.processed++;
+    try {
+      if (!dryRun && alreadySentToday(user, today)) continue;
+      const digest = buildPersonDigest(user, data, now);
+      const prefs = getCheckInReminderPreferences(user);
 
-      const existing = await db
-        .select()
-        .from(eventCheckInReminders)
-        .where(eq(eventCheckInReminders.userId, user.id));
-
-      // Deactivated accounts keep old assignments; switch everything off.
-      if (user.isActive === false) {
-        const enabledIds = existing.filter(r => r.enabled).map(r => r.id);
-        if (enabledIds.length) {
-          await db
-            .update(eventCheckInReminders)
-            .set({ enabled: false, updatedAt: new Date() })
-            .where(inArray(eventCheckInReminders.id, enabledIds));
-          changed += enabledIds.length;
-        }
+      if (dryRun) {
+        if (digest.items.length === 0) continue;
+        const rendered = renderDigest(displayName(user), digest.items, baseUrl);
+        result.plan.push({
+          kind: 'digest',
+          userId,
+          userName: displayName(user),
+          ...plannedChannels(user, prefs.defaultChannel),
+          subject: rendered.subject,
+          events: digest.items.map(i => ({
+            id: i.event.id,
+            organization: i.event.organizationName || 'Unnamed group',
+            detail: i.lines.map(l => l.line).join('; '),
+          })),
+        });
+        logger.info(`[EventAlerts][DRY RUN] would send ${displayName(user)}: ${rendered.subject}`);
         continue;
       }
 
-      const prefs = getCheckInReminderPreferences(user);
-
-      const assignedEvents = await db
-        .select({ id: eventRequests.id })
-        .from(eventRequests)
-        .where(
-          and(
-            // Same rule as isAssignedTo: tspContact wins; legacy field only if empty
-            or(
-              eq(eventRequests.tspContact, user.id),
-              and(
-                sql`(${eventRequests.tspContact} IS NULL OR ${eventRequests.tspContact} = '')`,
-                eq(eventRequests.tspContactAssigned, user.id),
-              ),
-            ),
-            sql`${eventRequests.status} IN (${sql.join(REMINDER_STATUSES.map(st => sql`${st}`), sql`, `)})`,
-            sql`${eventRequests.deletedAt} IS NULL`,
-          ),
-        );
-
-      // Desired (event, ruleType) -> rule
-      const desired = new Map<string, { eventId: number; rule: DefaultReminderRule }>();
-      for (const ev of assignedEvents) {
-        for (const rule of activeRules(prefs)) {
-          desired.set(`${ev.id}:${rule.ruleType}`, { eventId: ev.id, rule });
-        }
+      if (digest.items.length === 0) {
+        // Nothing to send; still tidy up snoozes whose problem was fixed.
+        await endSnoozes(digest.endedSnoozeIds);
+        await forgetDisabledAlerts(userId, digest.disabledRules);
+        continue;
       }
 
-      // Reconcile existing rows
-      const seen = new Set<string>();
-      for (const row of existing) {
-        const key = `${row.eventRequestId}:${row.ruleType}`;
-        const want = desired.get(key);
-        if (!want) {
-          if (row.enabled) {
-            await db
-              .update(eventCheckInReminders)
-              .set({ enabled: false, updatedAt: new Date() })
-              .where(eq(eventCheckInReminders.id, row.id));
-            changed++;
-          }
-          continue;
-        }
-        seen.add(key);
-        const patch: Partial<typeof eventCheckInReminders.$inferInsert> = {};
-        if (!row.enabled) {
-          patch.enabled = true;
-          // Conditions are checked right away (this run); general rules wait
-          // for their frequency.
-          patch.nextDueAt = isConditionBasedRule(want.rule.ruleType)
-            ? ctx.runStartedAt
-            : calculateNextDue(want.rule.frequency as ReminderFrequency);
-        }
-        if (row.thresholdDays !== want.rule.thresholdDays) patch.thresholdDays = want.rule.thresholdDays;
-        if (row.frequency !== want.rule.frequency) patch.frequency = want.rule.frequency;
-        if (row.channel !== prefs.defaultChannel) patch.channel = prefs.defaultChannel;
-        if (Object.keys(patch).length) {
-          await db
-            .update(eventCheckInReminders)
-            .set({ ...patch, updatedAt: new Date() })
-            .where(eq(eventCheckInReminders.id, row.id));
-          changed++;
-        }
-      }
+      if (!(await claimDailySlot(userId, today))) continue;
 
-      // Create missing rows
-      for (const [key, { eventId, rule }] of desired) {
-        if (seen.has(key)) continue;
-        const isCondBased = isConditionBasedRule(rule.ruleType);
-        await db.insert(eventCheckInReminders).values({
-          eventRequestId: eventId,
-          userId: user.id,
-          ruleType: rule.ruleType,
-          enabled: true,
-          thresholdDays: rule.thresholdDays,
-          // Configured frequency = how often to repeat after a reminder goes
-          // out. Conditions are still checked daily (see processor).
-          frequency: rule.frequency,
-          channel: prefs.defaultChannel,
-          // Check conditions this run; general rules wait for their frequency
-          nextDueAt: isCondBased ? ctx.runStartedAt : calculateNextDue(rule.frequency as ReminderFrequency),
-        }).onConflictDoNothing(); // unique index prevents duplicates
-        changed++;
-      }
+      const userName = user.displayName || user.firstName || 'there';
+      const rendered = renderDigest(userName, digest.items, baseUrl);
 
-      // First run for this user: roll anything already triggering into one summary.
+      // Bell first: it's the record. If it fails, give the slot back and retry next hour.
       try {
-        await baselineUserBacklog(user, ctx);
+        await db.insert(notifications).values({
+          userId,
+          type: 'reminder',
+          priority: 'medium',
+          title: rendered.subject,
+          message: rendered.bellMessage,
+          category: 'events',
+          relatedType: 'event_request_summary',
+          actionUrl: '/dashboard?section=event-requests&tab=my_assignments',
+          actionText: 'Open my events',
+          metadata: { eventIds: digest.items.map(i => i.event.id), source: 'event_alert_digest' },
+        });
       } catch (error) {
-        ctx.errors++;
-        logger.error(`[CheckInReminders] Backlog summary failed for user ${user.id}:`, error);
+        await releaseDailySlot(userId, today);
+        throw error;
       }
-    }
-  } catch (error) {
-    ctx.errors++;
-    logger.error('[CheckInReminders] Error syncing reminder rows:', error);
-  }
-  return changed;
-}
 
-/**
- * Dry run of the send loop: the same checks as the real loop (event still
- * active, current contact, account active, rule not retired, not paused,
- * condition met), recorded in ctx.plan. Strictly read-only: no schedule,
- * pause, row, bell or delivery writes. Returns how many reminders errored.
- */
-async function previewDueReminders(
-  dueReminders: (typeof eventCheckInReminders.$inferSelect)[],
-  ctx: RunContext,
-): Promise<number> {
-  let errors = 0;
-  const now = new Date();
-  // One combined message per person (see DAILY_SLOT_KEY)
-  const perUser = new Map<string, { user: typeof users.$inferSelect; channel: string; events: DryRunEntry['events']; subjects: string[] }>();
-  for (const reminder of dueReminders) {
-    try {
-      if (ctx.summarizedRowIds.has(reminder.id)) continue; // in this run's summary
-      if (RETIRED_RULE_TYPES.has(reminder.ruleType)) continue;
-      const [event] = await db.select().from(eventRequests).where(eq(eventRequests.id, reminder.eventRequestId)).limit(1);
-      if (!event || event.deletedAt) continue;
-      if (['completed', 'declined', 'cancelled'].includes(event.status || '')) continue;
-      if (!isAssignedTo(event, reminder.userId)) continue;
-      const [user] = await db.select().from(users).where(eq(users.id, reminder.userId)).limit(1);
-      if (!user || user.isActive === false) continue;
-      const [snooze] = await db
-        .select()
-        .from(eventReminderSnoozes)
-        .where(and(
-          eq(eventReminderSnoozes.eventRequestId, event.id),
-          eq(eventReminderSnoozes.userId, reminder.userId),
-          eq(eventReminderSnoozes.active, true),
-        ))
-        .limit(1);
-      if (snooze) {
-        const last = lastContactDate(event);
-        const paused = snooze.snoozeType === 'until_contact'
-          ? !(last && last > snooze.createdAt)
-          : !!snooze.snoozedUntil && now <= snooze.snoozedUntil;
-        if (paused) continue;
+      let delivered = false;
+      const channel = prefs.defaultChannel;
+      const email = user.preferredEmail || user.email;
+      if ((channel === 'email' || channel === 'both') && email && isEmailConfigured()) {
+        try {
+          const sent = await sendEmailOrThrow({
+            to: email,
+            from: 'katie@thesandwichproject.org',
+            subject: rendered.subject,
+            headers: {
+              'List-Unsubscribe': `<mailto:katie@thesandwichproject.org?subject=Unsubscribe%20from%20event%20alerts>, <${baseUrl}/profile?tab=notifications>`,
+            },
+            html: rendered.html,
+            emailStream: 'operational',
+          });
+          delivered = delivered || sent.success; // false = they unsubscribed
+        } catch (error) {
+          result.errors++;
+          logger.error(`[EventAlerts] Email to user ${userId} failed (bell has it):`, error);
+        }
       }
-      if (!evaluateRuleCondition(reminder.ruleType, reminder.thresholdDays || 7, event)) continue;
+      const consent = getUserMetadata(user).smsConsent;
+      if ((channel === 'sms' || channel === 'both') && consent?.enabled && consent.phoneNumber) {
+        try {
+          const sms = await sendTSPFollowupReminderSMS(consent.phoneNumber, rendered.sms);
+          delivered = delivered || sms.success;
+        } catch (error) {
+          result.errors++;
+          logger.error(`[EventAlerts] Text to user ${userId} failed (bell has it):`, error);
+        }
+      }
+      if (delivered) result.sent++;
 
-      const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
-      const group = perUser.get(user.id) ?? { user, channel: reminder.channel, events: [], subjects: [] };
-      const existing = group.events.find(e => e.id === event.id);
-      if (existing) {
-        if (!existing.detail.split(', ').includes(msg.short)) existing.detail += `, ${msg.short}`;
-      } else {
-        group.events.push({ id: event.id, organization: event.organizationName || 'Unknown Organization', detail: msg.short });
-      }
-      group.subjects.push(msg.subject);
-      perUser.set(user.id, group);
+      await recordSent(userId, channel, digest.sentAlerts, now);
+      await endSnoozes(digest.endedSnoozeIds);
+      await forgetDisabledAlerts(userId, digest.disabledRules);
+      logger.info(`[EventAlerts] Sent ${userId} a digest of ${digest.items.length} event(s)`);
     } catch (error) {
-      errors++;
-      logger.error(`[CheckInReminders][DRY RUN] Error previewing reminder ${reminder.id}:`, error);
+      result.errors++;
+      logger.error(`[EventAlerts] Failed for user ${userId}:`, error);
     }
   }
-  for (const { user, channel, events, subjects } of perUser.values()) {
-    const userName = user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id;
-    if (ctx.messagedUserIds.has(user.id) || alreadyMessagedToday(user, ctx.today)) {
-      logger.info(`[CheckInReminders][DRY RUN] ${userName} already gets a reminder message today; ${events.length} reminder(s) would wait until tomorrow`);
-      continue;
-    }
-    ctx.messagedUserIds.add(user.id);
-    const entry: DryRunEntry = {
-      kind: 'reminder',
-      userId: user.id,
-      userName,
-      ...plannedChannels(user, channel),
-      subject: subjects.length === 1 ? subjects[0] : combinedSubject(events.length),
-      events,
-    };
-    ctx.plan.push(entry);
-    logger.info(`[CheckInReminders][DRY RUN] would send to ${userName}: ${entry.subject}`);
-  }
-  return errors;
-}
 
-export async function processCheckInReminders(options: { dryRun?: boolean } = {}): Promise<{
-  processed: number;
-  sent: number;
-  errors: number;
-  dryRun: boolean;
-  /** Only filled in a dry run: everything that would have gone out */
-  plan: DryRunEntry[];
-}> {
-  const now = new Date();
-  let processed = 0;
-  let sent = 0;
-  let errors = 0;
-  const ctx: RunContext = {
-    dryRun: options.dryRun ?? isCheckInReminderDryRun(),
-    plan: [],
-    summarizedRowIds: new Set(),
-    runStartedAt: now,
-    errors: 0,
-    today: easternDateString(now),
-    messagedUserIds: new Set(),
-  };
-  if (ctx.dryRun) {
-    logger.info('[CheckInReminders][DRY RUN] Starting: nothing will be sent or marked as sent');
-  }
-
-  try {
-    // Bring per-event rows in line with each user's settings and assignments
-    const synced = await syncReminderRows(ctx);
-    if (synced > 0) {
-      logger.info(`[CheckInReminders] Synced ${synced} reminder rows with user settings`);
-    }
-
-    // Get all enabled reminders that are due
-    const dueReminders = await db
-      .select()
-      .from(eventCheckInReminders)
-      .where(
-        and(
-          eq(eventCheckInReminders.enabled, true),
-          lte(eventCheckInReminders.nextDueAt, now)
-        )
-      );
-
-    if (dueReminders.length === 0) {
-      return { processed: 0, sent: 0, errors: ctx.errors, dryRun: ctx.dryRun, plan: ctx.plan };
-    }
-
-    logger.info(`[CheckInReminders] Processing ${dueReminders.length} due reminders`);
-
-    if (ctx.dryRun) {
-      // Read-only: evaluate the same checks as the real loop, write nothing.
-      const previewErrors = await previewDueReminders(dueReminders, ctx);
-      return { processed: dueReminders.length, sent: 0, errors: ctx.errors + previewErrors, dryRun: true, plan: ctx.plan };
-    }
-
-    // Prefetch all active snoozes for the affected event+user pairs to avoid per-reminder N+1 queries.
-    const affectedEventIds = [...new Set(dueReminders.map(r => r.eventRequestId))];
-    const allActiveSnoozes = affectedEventIds.length > 0
-      ? await db
-          .select()
-          .from(eventReminderSnoozes)
-          .where(
-            and(
-              inArray(eventReminderSnoozes.eventRequestId, affectedEventIds),
-              eq(eventReminderSnoozes.active, true),
-            ),
-          )
-      : [];
-    // Build a lookup map keyed by "eventRequestId:userId" for O(1) access in the loop
-    const snoozeMap = new Map<string, typeof allActiveSnoozes[0]>();
-    for (const snooze of allActiveSnoozes) {
-      snoozeMap.set(`${snooze.eventRequestId}:${snooze.userId}`, snooze);
-    }
-
-    // Reminders to send, grouped per person (one message each, below)
-    type PendingItem = { reminder: typeof dueReminders[number]; event: ReminderEvent; msg: ReminderMessage };
-    const pending = new Map<string, { user: typeof users.$inferSelect; channel: string; items: PendingItem[] }>();
-
-    for (const reminder of dueReminders) {
-      processed++;
-
-      try {
-        // Get the event request with all fields needed for condition evaluation
-        const [event] = await db
-          .select()
-          .from(eventRequests)
-          .where(eq(eventRequests.id, reminder.eventRequestId))
-          .limit(1);
-
-        if (!event || event.deletedAt) {
-          // Event deleted or doesn't exist - disable reminder
-          await db
-            .update(eventCheckInReminders)
-            .set({ enabled: false, updatedAt: new Date() })
-            .where(eq(eventCheckInReminders.id, reminder.id));
-          continue;
-        }
-
-        // Skip completed/declined events - auto-disable
-        if (['completed', 'declined', 'cancelled'].includes(event.status || '')) {
-          await db
-            .update(eventCheckInReminders)
-            .set({ enabled: false, updatedAt: new Date() })
-            .where(eq(eventCheckInReminders.id, reminder.id));
-          continue;
-        }
-
-        // Check for active snooze on this event+user (using prefetched map)
-        const activeSnooze = snoozeMap.get(`${reminder.eventRequestId}:${reminder.userId}`) ?? null;
-
-        if (activeSnooze) {
-          let snoozeSuppressed = false;
-
-          if (activeSnooze.snoozeType === 'until_contact') {
-            // Auto-cancel if a new contact was logged after the snooze was created
-            const contactLog = event.contactAttemptsLog as Array<{ timestamp: string }> | null;
-            const latestContact = contactLog?.reduce(
-              (latest: string | null, entry: { timestamp: string }) =>
-                !latest || entry.timestamp > latest ? entry.timestamp : latest,
-              null,
-            );
-            if (latestContact && new Date(latestContact) > activeSnooze.createdAt) {
-              // Contact logged since snooze — auto-cancel
-              await db
-                .update(eventReminderSnoozes)
-                .set({ active: false, cancelledAt: new Date() })
-                .where(eq(eventReminderSnoozes.id, activeSnooze.id));
-              snoozeMap.delete(`${reminder.eventRequestId}:${reminder.userId}`);
-              logger.info(`[CheckInReminders] Auto-cancelled until_contact snooze for event ${reminder.eventRequestId} (new contact logged)`);
-            } else {
-              snoozeSuppressed = true;
-            }
-          } else if (activeSnooze.snoozedUntil) {
-            // Timed or until_date: check if snooze has expired
-            if (now <= activeSnooze.snoozedUntil) {
-              snoozeSuppressed = true;
-            } else {
-              // Snooze expired — auto-cancel
-              await db
-                .update(eventReminderSnoozes)
-                .set({ active: false, cancelledAt: new Date() })
-                .where(eq(eventReminderSnoozes.id, activeSnooze.id));
-              snoozeMap.delete(`${reminder.eventRequestId}:${reminder.userId}`);
-            }
-          }
-
-          if (snoozeSuppressed) {
-            // For timed/until_date snoozes, reschedule to just after snooze end to avoid daily writes.
-            // For until_contact (open-ended), fall back to daily check.
-            let nextDue: Date;
-            if (activeSnooze.snoozedUntil) {
-              // Re-check the day after the snooze expires (9 AM)
-              nextDue = new Date(activeSnooze.snoozedUntil);
-              nextDue.setDate(nextDue.getDate() + 1);
-              nextDue.setHours(9, 0, 0, 0);
-            } else {
-              nextDue = calculateNextDue('daily');
-            }
-            await db
-              .update(eventCheckInReminders)
-              .set({ nextDueAt: nextDue, updatedAt: new Date() })
-              .where(eq(eventCheckInReminders.id, reminder.id));
-            continue;
-          }
-        }
-
-        // No longer this user's event (reassigned)? Switch off; never send a
-        // group's contact details to a former contact.
-        if (!isAssignedTo(event, reminder.userId)) {
-          await db
-            .update(eventCheckInReminders)
-            .set({ enabled: false, updatedAt: new Date() })
-            .where(eq(eventCheckInReminders.id, reminder.id));
-          continue;
-        }
-
-        // Retired reminder types: switch the row off instead of sending.
-        if (RETIRED_RULE_TYPES.has(reminder.ruleType)) {
-          await db
-            .update(eventCheckInReminders)
-            .set({ enabled: false, updatedAt: new Date() })
-            .where(eq(eventCheckInReminders.id, reminder.id));
-          continue;
-        }
-
-        // Evaluate whether the rule's condition is met
-        const conditionMet = evaluateRuleCondition(
-          reminder.ruleType,
-          reminder.thresholdDays || 7,
-          event
-        );
-
-        if (!conditionMet) {
-          // Condition not met — reschedule for next check but don't send
-          // Condition-based rules recheck daily; frequency-based use their frequency
-          const nextDue = isConditionBasedRule(reminder.ruleType)
-            ? calculateNextDue(CONDITION_CHECK_FREQUENCY)
-            : calculateNextDue(reminder.frequency as ReminderFrequency);
-          await db
-            .update(eventCheckInReminders)
-            .set({ nextDueAt: nextDue, updatedAt: new Date() })
-            .where(eq(eventCheckInReminders.id, reminder.id));
-          continue;
-        }
-
-        // Get the user
-        const [user] = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, reminder.userId))
-          .limit(1);
-
-        if (!user) {
-          errors++;
-          continue;
-        }
-
-        // Deactivated account: switch off instead of sending.
-        if (user.isActive === false) {
-          await db
-            .update(eventCheckInReminders)
-            .set({ enabled: false, updatedAt: new Date() })
-            .where(eq(eventCheckInReminders.id, reminder.id));
-          continue;
-        }
-
-        // Don't send here: collect, then send ONE message per person below.
-        const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
-        const group = pending.get(user.id) ?? { user, channel: reminder.channel, items: [] };
-        group.items.push({ reminder, event, msg });
-        pending.set(user.id, group);
-      } catch (error) {
-        errors++;
-        logger.error(`Error processing reminder ${reminder.id} (type: ${reminder.ruleType}):`, error);
-      }
-    }
-
-    // One message per person per day (see DAILY_SLOT_KEY).
-    for (const { user, channel, items } of pending.values()) {
-      try {
-        if (!(await claimDailySlot(user.id, ctx.today))) {
-          logger.info(`[CheckInReminders] ${user.id} already got a reminder message today; ${items.length} reminder(s) wait until tomorrow`);
-          continue;
-        }
-        const userName = user.displayName || user.firstName || 'there';
-        const single = items.length === 1 ? items[0] : null;
-        const events = groupByEvent(items);
-
-        // Always record the reminder in the in-app notification bell first,
-        // so it exists even if email/SMS isn't configured or fails to send.
-        // If this insert fails, the error goes to the per-reminder catch and
-        // the row stays due for a retry next run (nothing sent, nothing marked).
-        if (single) {
-          const { event, msg, reminder } = single;
-          await db.insert(notifications).values({
-            userId: user.id,
-            type: 'reminder',
-            priority: 'medium',
-            title: msg.subject,
-            message: `${msg.intro}\nContact: ${contactText(event)}${msg.outro ? `\n${msg.outro}` : ''}`,
-            category: 'events',
-            relatedType: 'event_request',
-            relatedId: event.id,
-            actionUrl: `/dashboard?section=event-requests&tab=all&eventId=${event.id}`,
-            actionText: 'Open the event',
-            metadata: { eventId: event.id, ruleType: reminder.ruleType, source: 'check_in_reminder' },
-          });
-        } else {
-          await db.insert(notifications).values({
-            userId: user.id,
-            type: 'reminder',
-            priority: 'medium',
-            title: combinedSubject(events.length),
-            message: events.map(e => `• ${e.event.organizationName || 'Unknown Organization'}: ${e.detail}`).join('\n'),
-            category: 'events',
-            relatedType: 'event_request_summary',
-            actionUrl: '/dashboard?section=event-requests&tab=all',
-            actionText: 'Open events',
-            metadata: { eventIds: events.map(e => e.event.id), source: 'check_in_reminder' },
-          });
-        }
-
-        let emailSent = false;
-        let smsSent = false;
-
-        if (channel === 'email' || channel === 'both') {
-          const email = user.preferredEmail || user.email;
-          if (email) {
-            emailSent = single
-              ? await sendReminderEmail(email, userName, single.event, single.msg)
-              : await sendCombinedReminderEmail(email, userName, items);
-          }
-        }
-
-        if (channel === 'sms' || channel === 'both') {
-          const smsConsent = getUserMetadata(user).smsConsent;
-          if (smsConsent?.enabled && smsConsent.phoneNumber) {
-            smsSent = single
-              ? await sendReminderSMS(smsConsent.phoneNumber, single.event, single.msg)
-              : await sendCombinedReminderSMS(smsConsent.phoneNumber, events.length);
-          }
-        }
-
-        if (emailSent || smsSent) {
-          sent++;
-        }
-
-        // Update lastSentAt; each row repeats at the user's chosen frequency
-        // (the sync has already copied their current setting onto it).
-        for (const { reminder } of items) {
-          await db
-            .update(eventCheckInReminders)
-            .set({
-              lastSentAt: new Date(),
-              nextDueAt: calculateNextDue(reminder.frequency as ReminderFrequency),
-              updatedAt: new Date(),
-            })
-            .where(eq(eventCheckInReminders.id, reminder.id));
-        }
-      } catch (error) {
-        errors++;
-        logger.error(`[CheckInReminders] Error sending reminders to user ${user.id}:`, error);
-      }
-    }
-
-    logger.info(
-      `[CheckInReminders] Complete: ${processed} processed, ${sent} sent, ${errors} errors`
-    );
-  } catch (error) {
-    logger.error('[CheckInReminders] Failed to process reminders:', error);
-  }
-
-  return { processed, sent, errors, dryRun: ctx.dryRun, plan: ctx.plan };
+  logger.info(`[EventAlerts] ${dryRun ? 'DRY RUN ' : ''}done: ${result.processed} people checked, ${result.sent} sent, ${result.errors} errors`);
+  return result;
 }

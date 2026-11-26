@@ -301,10 +301,8 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/enhanced-user-activity?${params} | 2 | client/src/components/detailed-activity-analytics.tsx<br>client/src/components/individual-user-activity.tsx |
 | /api/error-logs | 1 | client/src/hooks/useErrorHandler.ts |
 | /api/event-check-in-reminders | 1 | tests/unit/check-in-reminder-bulk-route.test.ts |
-| /api/event-check-in-reminders/${eventRequestId} | 1 | client/src/components/event-requests/ReminderRulesManager.tsx |
-| /api/event-check-in-reminders/${eventRequestId}/${ruleType} | 1 | client/src/components/event-requests/ReminderRulesManager.tsx |
-| /api/event-check-in-reminders/${eventRequestId}/snooze | 3 | client/src/components/event-requests/ReminderRulesManager.tsx |
-| /api/event-check-in-reminders/bulk | 2 | client/src/components/event-requests/ReminderRulesManager.tsx<br>tests/unit/check-in-reminder-bulk-route.test.ts |
+| /api/event-check-in-reminders/${link.eventId}/snooze | 2 | client/src/components/event-requests/AlertSnoozeFromLink.tsx |
+| /api/event-check-in-reminders/bulk | 1 | tests/unit/check-in-reminder-bulk-route.test.ts |
 | /api/event-contacts | 2 | client/src/components/event-contacts-directory.tsx<br>client/src/pages/event-contact-detail.tsx |
 | /api/event-map | 11 | client/src/components/event-requests/EventMapView.tsx<br>client/src/lib/queryClient.ts<br>client/src/mobile/pages/mobile-driver-planning.tsx<br>client/src/pages/driver-planning.tsx |
 | /api/event-map/geocode-address | 4 | client/src/components/event-requests/EventMapView.tsx<br>client/src/pages/driver-planning.tsx<br>client/src/pages/route-map.tsx<br>client/src/pages/volunteer-event-hub.tsx |
@@ -336,6 +334,8 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/event-requests/${id}/schedule-call | 1 | client/src/components/event-requests/hooks/useEventMutations.tsx |
 | /api/event-requests/${id}/toolkit-sent | 1 | client/src/components/event-requests/hooks/useEventMutations.tsx |
 | /api/event-requests/${id}/tsp-contact | 1 | client/src/components/event-requests/hooks/useEventMutations.tsx |
+| /api/event-requests/${initialEventId} | 1 | client/src/components/event-requests/context/EventRequestContext.tsx |
+| /api/event-requests/${link.eventId} | 1 | client/src/components/event-requests/AlertSnoozeFromLink.tsx |
 | /api/event-requests/${request.id}/social-media | 2 | client/src/components/event-requests/cards/CompletedCard.tsx |
 | /api/event-requests/${resourceId}/collaboration/comments | 3 | client/src/hooks/use-collaboration.ts |
 | /api/event-requests/${resourceId}/collaboration/comments/${id} | 2 | client/src/hooks/use-collaboration.ts |
@@ -435,7 +435,7 @@ This is heuristic. It intentionally ignores the broad `/api` catch-all because t
 | /api/maps/config | 1 | client/src/components/maps/BaseMapTiles.tsx |
 | /api/maps/copyright?${params} | 1 | client/src/components/maps/BaseMapTiles.tsx |
 | /api/maps/tiles/{z}/{x}/{y} | 1 | client/src/components/maps/BaseMapTiles.tsx |
-| /api/me/check-in-reminder-preferences | 11 | client/src/components/__tests__/sms-reminder-gating.test.tsx<br>client/src/components/check-in-reminder-preferences.tsx<br>client/src/components/event-requests/InProcessFilterBar.tsx<br>client/src/components/event-requests/ReminderRulesManager.tsx |
+| /api/me/check-in-reminder-preferences | 9 | client/src/components/__tests__/sms-reminder-gating.test.tsx<br>client/src/components/check-in-reminder-preferences.tsx<br>client/src/components/event-requests/InProcessFilterBar.tsx<br>client/src/components/event-requests/ReminderSettingsButton.tsx |
 | /api/me/dashboard | 3 | client/src/components/action-tracking-enhanced.tsx<br>client/src/components/dashboard-action-tracker.tsx |
 | /api/me/notification-preferences | 4 | client/src/components/notification-preferences.tsx |
 | /api/me/sms-campaigns | 1 | client/src/components/alert-preferences/SMSSetupSection.tsx |

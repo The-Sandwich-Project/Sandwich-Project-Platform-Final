@@ -3,11 +3,11 @@ import type { IStorage } from '../storage';
 import { storage } from '../storage-wrapper';
 import { logger } from '../utils/production-safe-logger';
 import type { AuthenticatedRequest } from '../types/express';
-import { getUserMetadata, getEventNotificationPreferences, getCheckInReminderPreferences } from '@shared/types';
+import { getUserMetadata, getEventNotificationPreferences, getCheckInReminderPreferences, normalizeCheckInReminderPreferences, normalizeCheckpointDays, MAX_ALERT_DAYS } from '@shared/types';
 import type { EventNotificationPreferences, CheckInReminderPreferences } from '@shared/types';
 import { db } from '../db';
 import { eventReminderSnoozes } from '@shared/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 interface DashboardItem {
   id: number;
@@ -471,7 +471,6 @@ const VALID_REMINDER_RULE_TYPES = [
   'date_approaching_scheduled', 'staffing_unmet', 'missing_details', 'general_checkin',
 ];
 const VALID_CHANNELS = ['email', 'sms', 'both'];
-const VALID_FREQUENCIES = ['daily', 'every_3_days', 'weekly', 'biweekly'];
 
 // GET /check-in-reminder-preferences
 meRouter.get('/check-in-reminder-preferences', async (req: AuthenticatedRequest, res: Response) => {
@@ -512,30 +511,20 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
       return res.status(400).json({ message: 'rules must be an array' });
     }
 
-    type ValidatedRule = { ruleType: string; enabled: boolean; thresholdDays: number; frequency: string };
-    const validateRuleArray = (arr: any[]): ValidatedRule[] | null => {
-      const hasInvalidEntry = arr.some(r => r === null || typeof r !== 'object');
-      if (hasInvalidEntry) {
-        return null; // signal validation failure
+    // Reject malformed input outright; normalizeCheckInReminderPreferences
+    // then fills defaults and clamps values into range.
+    for (const r of rules) {
+      if (r === null || typeof r !== 'object' || !VALID_REMINDER_RULE_TYPES.includes(r.ruleType)) {
+        return res.status(400).json({ message: 'rules contains invalid entries' });
       }
-      const result: ValidatedRule[] = [];
-      for (const r of arr) {
-        if (!VALID_REMINDER_RULE_TYPES.includes(r.ruleType)) {
-          return null; // reject unknown rule types instead of silently coercing
+      if (r.thresholdDays !== undefined && (typeof r.thresholdDays !== 'number' || r.thresholdDays < 1 || r.thresholdDays > MAX_ALERT_DAYS)) {
+        return res.status(400).json({ message: `Days must be between 1 and ${MAX_ALERT_DAYS}` });
+      }
+      if (r.ruleType === 'date_approaching_inprocess' && r.enabled === true) {
+        if (normalizeCheckpointDays(r.checkpointDays).length === 0) {
+          return res.status(400).json({ message: 'Pick at least one day for "Requested date coming up", or turn it off' });
         }
-        result.push({
-          ruleType: r.ruleType as string,
-          enabled: r.enabled === true,
-          thresholdDays: typeof r.thresholdDays === 'number' && r.thresholdDays > 0 ? r.thresholdDays : 7,
-          frequency: VALID_FREQUENCIES.includes(r.frequency) ? r.frequency : 'weekly',
-        });
       }
-      return result;
-    };
-
-    const validatedRules = validateRuleArray(rules);
-    if (validatedRules === null) {
-      return res.status(400).json({ message: 'rules contains invalid entries' });
     }
 
     const allUsers = await storage.getAllUsers();
@@ -543,27 +532,28 @@ meRouter.put('/check-in-reminder-preferences', async (req: AuthenticatedRequest,
     if (!fullUser) return res.status(404).json({ message: 'User not found' });
 
     const metadata = getUserMetadata(fullUser);
-    const updatedPreferences: CheckInReminderPreferences = {
+    const updatedPreferences: CheckInReminderPreferences = normalizeCheckInReminderPreferences({
       configured: true,
       defaultChannel,
-      rules: validatedRules,
-    };
-
-    await storage.updateUser(normalizedUserId, {
-      // Clearing the baseline makes the next run send one summary for anything
-      // already overdue under the new rules, instead of a burst of reminders.
-      metadata: { ...metadata, checkInReminderPreferences: updatedPreferences, checkInRemindersBaselinedAt: undefined },
+      rules,
     });
 
-    // Defaults are the ONLY reminder settings (per-event customization was
-    // retired). The hourly sync brings this user's per-event rows in line
-    // with the new settings within the hour, keeping their schedules intact.
-    // Per-event pauses had their own controls, which were retired with
-    // per-event settings. Clear them so new settings actually take effect.
+    await storage.updateUser(normalizedUserId, {
+      metadata: { ...metadata, checkInReminderPreferences: updatedPreferences },
+    });
+
+    // Old whole-event pauses (rule_type NULL) came from the retired per-event
+    // reminder controls; clear them so the new settings take effect. Keep
+    // per-alert snoozes: those are "remind me again in N days" clicks from
+    // the daily email and should run their course.
     await db
       .update(eventReminderSnoozes)
       .set({ active: false, cancelledAt: new Date() })
-      .where(and(eq(eventReminderSnoozes.userId, fullUser.id), eq(eventReminderSnoozes.active, true)));
+      .where(and(
+        eq(eventReminderSnoozes.userId, fullUser.id),
+        eq(eventReminderSnoozes.active, true),
+        isNull(eventReminderSnoozes.ruleType),
+      ));
 
     logger.info(`Updated check-in reminder preferences for user ${normalizedUserId}`);
     res.json({ success: true, preferences: updatedPreferences });

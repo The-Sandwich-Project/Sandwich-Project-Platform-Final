@@ -187,8 +187,10 @@ function Router() {
         </Route>
         <Route>
           {() => {
-            // Default fallback - redirect to login page
-            window.location.href = '/login';
+            // Default fallback - redirect to login page, then back here after
+            // signing in (e.g. a link from an email to a specific event).
+            const here = window.location.pathname + window.location.search;
+            window.location.href = here && here !== '/' ? `/login?returnTo=${encodeURIComponent(here)}` : '/login';
             return (
               <LoadingState
                 text="Redirecting to login..."

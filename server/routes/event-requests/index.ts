@@ -34,6 +34,9 @@
 import { Router } from 'express';
 import { emitEventRequestUpdate } from '../../socket-chat';
 import { logger } from '../../middleware/logger';
+import { db } from '../../db';
+import { eventRequests } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 // Import the main legacy router - contains core functionality
 import legacyRouter from '../event-requests-legacy';
@@ -77,6 +80,30 @@ router.use('/:id', (req, res, next) => {
     }
     return originalJson(body);
   } as any;
+  next();
+});
+
+// Middleware: record that a PERSON changed this event (event_requests.last_human_update_at).
+// Every write a signed-in user makes to /api/event-requests/:id/... passes
+// through here, across all sub-routers. The Google Sheet sync and cron jobs
+// write to the database directly, never through these routes, so they can't
+// make an untouched event look recently worked on. The "no updates" event
+// alert measures this column instead of updated_at.
+// Not stamped: read-only AI helpers (POST, but they only return suggestions).
+const NOT_AN_UPDATE = /^\/\d+\/ai-/;
+router.use('/:id', (req: any, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0 || NOT_AN_UPDATE.test(req.originalUrl.replace(/^\/api\/event-requests/, '').split('?')[0])) {
+    return next();
+  }
+  res.on('finish', () => {
+    if (res.statusCode < 200 || res.statusCode >= 300 || !req.user?.id) return;
+    db.update(eventRequests)
+      .set({ lastHumanUpdateAt: new Date() })
+      .where(eq(eventRequests.id, id))
+      .catch((e: any) => logger.warn('Failed to stamp last_human_update_at:', e));
+  });
   next();
 });
 

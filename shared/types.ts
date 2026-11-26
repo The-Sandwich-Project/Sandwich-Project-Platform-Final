@@ -58,15 +58,24 @@ export interface EventNotificationPreferences {
 }
 
 /**
- * A single default reminder rule in the user's global preferences.
- * When a user has no per-event overrides, these rules apply automatically.
+ * One event alert in a person's settings (Profile → Alerts). Applies to every
+ * event they're the TSP contact for. What thresholdDays means depends on the
+ * alert (see server/services/check-in-reminder-service.ts):
+ *   no_contact / stale_event      after X days, and again every X days
+ *   date_approaching_scheduled    starting X days before the event, daily
+ *   date_approaching_inprocess    uses checkpointDays instead
  */
 export interface DefaultReminderRule {
   ruleType: ReminderRuleType;
   enabled: boolean;
   thresholdDays: number;
-  /** Frequency for general_checkin; condition-based rules ignore this field */
-  frequency: 'daily' | 'every_3_days' | 'weekly' | 'biweekly';
+  /**
+   * "Requested date coming up" only: alert once at each of these many days
+   * before the requested date, e.g. [14, 7, 2] or just [7]. Largest first.
+   */
+  checkpointDays?: number[];
+  /** @deprecated No longer used: each alert's timing is set by its days. Kept so old saved settings still parse. */
+  frequency?: 'daily' | 'every_3_days' | 'weekly' | 'biweekly';
 }
 
 /**
@@ -99,12 +108,10 @@ export interface UserMetadata {
 
   // Global check-in reminder defaults (applied to all events unless overridden)
   checkInReminderPreferences?: CheckInReminderPreferences;
-  /**
-   * When this user's existing backlog was rolled into one summary reminder.
-   * Unset = next reminder run sends a summary instead of one reminder per
-   * already-overdue event. Cleared when they save new reminder settings.
-   */
+  /** @deprecated From the retired first-run summary; no longer read. */
   checkInRemindersBaselinedAt?: string;
+  /** Eastern date (YYYY-MM-DD) of the last daily event-alert email: the one-per-day limit. */
+  checkInReminderLastSentOn?: string;
 
   // Additional contact information
   phoneNumber?: string;
@@ -276,33 +283,100 @@ export function getEventNotificationPreferences(
   };
 }
 
+/** The four event alerts, in display order. Other rule types are retired. */
+export const ACTIVE_ALERT_RULE_TYPES = [
+  'no_contact',
+  'stale_event',
+  'date_approaching_inprocess',
+  'date_approaching_scheduled',
+] as const satisfies readonly ReminderRuleType[];
+
+export const DEFAULT_REQUESTED_DATE_CHECKPOINTS = [14, 7, 2];
+/** Largest checkpoint / threshold a person can set. */
+export const MAX_ALERT_DAYS = 90;
+
 /**
- * Organization-wide reminder defaults. Used for anyone who hasn't saved their
- * own settings in Profile → Alerts, so reminders work without setup.
- * The four reminders the planning team asked for: no contact, no updates,
- * requested date coming up, and event coming up with missing info.
+ * Organization-wide alert defaults. Used for anyone who hasn't saved their
+ * own settings in Profile → Alerts, so alerts work without setup.
+ * The four the planning team asked for: no contact, no updates, requested
+ * date coming up, and event coming up with missing info.
  */
 export const SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES: CheckInReminderPreferences = {
   configured: false,
   defaultChannel: 'email',
   rules: [
-    { ruleType: 'no_contact', enabled: true, thresholdDays: 5, frequency: 'weekly' },
-    { ruleType: 'stale_event', enabled: true, thresholdDays: 7, frequency: 'weekly' },
-    { ruleType: 'date_approaching_inprocess', enabled: true, thresholdDays: 14, frequency: 'weekly' },
-    { ruleType: 'date_approaching_scheduled', enabled: true, thresholdDays: 7, frequency: 'weekly' },
+    { ruleType: 'no_contact', enabled: true, thresholdDays: 5 },
+    { ruleType: 'stale_event', enabled: true, thresholdDays: 7 },
+    {
+      ruleType: 'date_approaching_inprocess',
+      enabled: true,
+      thresholdDays: DEFAULT_REQUESTED_DATE_CHECKPOINTS[0],
+      checkpointDays: [...DEFAULT_REQUESTED_DATE_CHECKPOINTS],
+    },
+    { ruleType: 'date_approaching_scheduled', enabled: true, thresholdDays: 7 },
   ],
 };
 
+/** Whole days, 1..MAX_ALERT_DAYS (0 allowed for checkpoints = "the day of"). */
+function clampDays(n: unknown, min: number, fallback: number): number {
+  const v = typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : NaN;
+  if (Number.isNaN(v)) return fallback;
+  return Math.min(MAX_ALERT_DAYS, Math.max(min, v));
+}
+
+/** Unique, in range, largest first. Empty input -> empty (caller decides). */
+export function normalizeCheckpointDays(days: unknown): number[] {
+  if (!Array.isArray(days)) return [];
+  const clean = days
+    .filter((d): d is number => typeof d === 'number' && Number.isFinite(d))
+    .map(d => clampDays(d, 0, 0));
+  return [...new Set(clean)].sort((a, b) => b - a);
+}
+
 /**
- * Helper to get check-in reminder preferences from user metadata.
- * Falls back to the organization defaults (configured: false) if the user
- * has never saved their own.
+ * Settings in their current shape: exactly the four active alerts, valid
+ * days, and checkpoint lists for "requested date coming up". Older saved
+ * settings had one "within X days" number and a repeat frequency; X becomes a
+ * single checkpoint, except the old default (14), which becomes the new
+ * default list (14, 7, 2). A configured person missing an alert has it off.
+ */
+export function normalizeCheckInReminderPreferences(
+  prefs: CheckInReminderPreferences | null | undefined
+): CheckInReminderPreferences {
+  if (!prefs) return SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES;
+  const channel = (['email', 'sms', 'both'] as const).includes(prefs.defaultChannel)
+    ? prefs.defaultChannel
+    : 'email';
+  const saved = Array.isArray(prefs.rules) ? prefs.rules : [];
+  const rules = ACTIVE_ALERT_RULE_TYPES.map((ruleType): DefaultReminderRule => {
+    const def = SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES.rules.find(r => r.ruleType === ruleType)!;
+    const mine = saved.find(r => r && r.ruleType === ruleType);
+    if (!mine) return { ...def, enabled: prefs.configured ? false : def.enabled };
+    const thresholdDays = clampDays(mine.thresholdDays, 1, def.thresholdDays);
+    if (ruleType !== 'date_approaching_inprocess') {
+      return { ruleType, enabled: mine.enabled === true, thresholdDays };
+    }
+    let checkpointDays = normalizeCheckpointDays(mine.checkpointDays);
+    if (checkpointDays.length === 0) {
+      checkpointDays = thresholdDays === DEFAULT_REQUESTED_DATE_CHECKPOINTS[0]
+        ? [...DEFAULT_REQUESTED_DATE_CHECKPOINTS]
+        : [thresholdDays];
+    }
+    return { ruleType, enabled: mine.enabled === true, thresholdDays: checkpointDays[0] || thresholdDays, checkpointDays };
+  });
+  return { configured: !!prefs.configured, defaultChannel: channel, rules };
+}
+
+/**
+ * A person's event alert settings, in their current shape (see
+ * normalizeCheckInReminderPreferences). Falls back to the organization
+ * defaults (configured: false) if they have never saved their own.
  */
 export function getCheckInReminderPreferences(
   user: DrizzleUser | User | null | undefined
 ): CheckInReminderPreferences {
   const metadata = getUserMetadata(user);
-  return metadata.checkInReminderPreferences ?? SYSTEM_DEFAULT_CHECK_IN_REMINDER_PREFERENCES;
+  return normalizeCheckInReminderPreferences(metadata.checkInReminderPreferences);
 }
 
 // ============================================================================

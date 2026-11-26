@@ -26,6 +26,18 @@ import { AlertCircle, Clock, LogIn, Eye, EyeOff } from 'lucide-react';
 import tspLogo from '@assets/CMYK_PRINT_TSP-01_1749585167435.png';
 import { AuthPageLayout } from '@/components/layout/responsive-page-layout';
 
+/**
+ * Where to go after signing in: the ?returnTo= page the person was trying to
+ * reach (set by App.tsx when a signed-out visitor opens a deep link), or home.
+ * Only same-site paths are allowed, so the parameter can't send anyone to
+ * another website.
+ */
+export function safeReturnTo(search: string): string {
+  const raw = new URLSearchParams(search).get('returnTo');
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\') || raw.startsWith('/login')) return '/';
+  return raw;
+}
+
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string(), // Allow empty - server will redirect to set-password if needed
@@ -64,7 +76,7 @@ export default function LoginPage() {
       });
 
       if (response.ok || response.redirected) {
-        window.location.href = '/';
+        window.location.href = safeReturnTo(window.location.search);
         return;
       }
 
