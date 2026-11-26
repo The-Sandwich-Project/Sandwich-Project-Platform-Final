@@ -10,7 +10,7 @@ A full-stack management platform for The Sandwich Project, an Atlanta-based nonp
 - **Hosting**: Replit
 - **Email**: Twilio Email API (`POST https://comms.twilio.com/v1/Emails`, `katie@thesandwichproject.org` as default sender). Replaced SendGrid; `@sendgrid/mail` is gone
 - **SMS**: Twilio
-- **AI**: Mostly **OpenAI** (gpt-5 / gpt-5-mini) — AI chat, AI analyst, intake assistance, date suggestions, categorization, impact reports, predictions, receipt processing, smart-search embeddings. **Claude** (Anthropic SDK) is used in exactly one place: sign-in sheet photo parsing (`server/services/signin-sheet-parser.ts`).
+- **AI**: Mostly **OpenAI** (gpt-5 / gpt-5-mini) — AI chat, AI analyst, intake assistance, email writing help in the event email composer (gpt-5), date suggestions, categorization, impact reports, predictions, receipt processing, smart-search embeddings. **Claude** (Anthropic SDK) is used in exactly one place: sign-in sheet photo parsing (`server/services/signin-sheet-parser.ts`).
 
 For a full module inventory, external-service map, and background-job list, see `docs/README.md`.
 
