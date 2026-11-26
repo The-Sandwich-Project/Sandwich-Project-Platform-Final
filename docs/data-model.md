@@ -387,3 +387,59 @@ erDiagram
 Scopes: `newsletter` blocks newsletter/announcement mail, `operational` blocks
 operational mail, `all` blocks everything. The admin monitoring copy is never
 suppressed.
+
+---
+
+## 6. Event alerts
+
+The daily digest email TSP contacts get about their events (formerly "check-in
+reminders"). Timing rules: `server/services/event-alerts/rules.ts`. Runner:
+`server/services/check-in-reminder-service.ts`. Settings live in
+`users.metadata.checkInReminderPreferences` (one set per person, all events).
+
+```mermaid
+erDiagram
+    event_requests ||--o{ event_check_in_reminders : "event_request_id (no FK yet)"
+    users ||--o{ event_check_in_reminders : "user_id (no FK yet)"
+    event_requests ||--o{ event_reminder_snoozes : "event_request_id (no FK yet)"
+    users ||--o{ event_reminder_snoozes : "user_id (no FK yet)"
+    users ||--o{ event_alert_digest_sends : "user_id (FK, cascade)"
+
+    event_check_in_reminders {
+        int event_request_id
+        varchar user_id "the TSP contact it was sent to"
+        varchar rule_type "UNIQUE with event + user"
+        timestamp last_sent_at "drives 'every X days'"
+        text last_sent_key "requested-date checkpoint: '<date>:<days out>'"
+    }
+    event_reminder_snoozes {
+        int event_request_id
+        varchar user_id
+        varchar rule_type "NULL = whole event (legacy); CHECK active alert types"
+        timestamp snoozed_until "midnight Eastern of the day it returns"
+        bool active "one active per event + user + alert"
+    }
+    event_alert_digest_sends {
+        varchar user_id PK "FK users.id ON DELETE CASCADE"
+        date sent_on PK "Eastern calendar day"
+    }
+```
+
+| Table | One row is | Notes |
+|---|---|---|
+| `event_check_in_reminders` | What was last sent for one alert, on one event, to one person | Written when a digest goes out. Each run first deletes rows that no longer apply (event reassigned or deleted, or moved to a status that alert doesn't cover), so a returned event or a status reversal gets fresh alerts. Rows for an alert the person turns off are deleted when they save, so turning it back on starts fresh. Legacy columns (`enabled`, `threshold_days`, `frequency`, `channel`, `next_due_at`) are no longer read. |
+| `event_alert_digest_sends` | One daily digest sent to one person on one Eastern day | The once-a-day limit. A run claims the day by inserting this row before sending (the primary key rejects a second claim) and deletes it if nothing was delivered, so the next hourly run retries. Its own table, not `users.metadata`, because settings saves rewrite that whole blob and could erase a claim mid-send. |
+| `event_reminder_snoozes` | One "remind me again in N days" pause | Created from the email's confirm step (`AlertSnoozeFromLink.tsx`). Ends when it expires (the alert returns in that day's digest) or when its problem is fixed. Capped server-side to end by the day before the event, and re-checked daily: if the event's date moves up to tomorrow or today, no snooze silences it. |
+
+`event_requests.last_human_update_at` is what "no updates" measures: stamped by
+`markEventHumanUpdated()` (`server/services/event-alerts/human-update.ts`) on
+successful writes by a signed-in user (every `/api/event-requests/:id/...`
+write, the body-id routes, notification action buttons), never by the Google
+Sheet sync or cron jobs (which do bump `updated_at`). New events default to
+`now()`. Events that existed before the column are filled once by
+`npm run alerts:backfill` (dry run first); until then the alert falls back to
+`updated_at`.
+
+Both tables predate the schema rules: their `event_request_id` / `user_id`
+links have no foreign keys yet (listed in the baseline). Adding them needs a
+cleanup of orphaned rows first, so it's left for its own PR.
