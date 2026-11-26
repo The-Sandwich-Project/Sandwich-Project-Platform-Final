@@ -1,26 +1,74 @@
 /**
  * One-time backfill for event_requests.last_human_update_at (event alerts).
  *
- * The column was added by migrations/20261129_event_alert_digest.sql with no
- * value for existing events (new events default to now()). Until this runs,
- * the "no updates" alert falls back to updated_at for those events, which the
- * Google Sheet sync keeps bumping. This fills them with updated_at, the best
- * estimate of the last real change, ONCE, so the sync can't move it again.
+ * "No updates" measures last_human_update_at: the last time a PERSON changed
+ * the event (the Google Sheet sync and cron jobs bump updated_at instead).
+ * Events that existed before the column have no real value for it. This fills
+ * them with updated_at, the best estimate of their last real change, ONCE, so
+ * the sync can't move it later.
  *
- * Only fills empty values, so re-running is harmless.
+ * Two shapes of "no real value" are handled:
+ *  1. NULL: the column was added without a default (how the migration file
+ *     does it).
+ *  2. The publish moment: Replit's publish screen applied the change as a
+ *     single `ADD COLUMN ... DEFAULT now()`, which stamped EVERY existing
+ *     event with the same timestamp. That stamp is detected from the data:
+ *     the one timestamp shared by many events, all created before it. Real
+ *     edits made since publishing have their own, later timestamps and are
+ *     left alone. If no clear stamp is found, nothing in shape 2 is touched.
+ *
+ * Re-running is harmless: filled rows no longer match either shape.
  *
  *   npm run alerts:backfill -- --dry-run   # preview: counts and samples, changes nothing
  *   npm run alerts:backfill -- --apply     # fill them
  *
  * Database: TARGET_DATABASE_URL (or --url). Per CLAUDE.md, run --dry-run
- * against a Neon branch of production first, then --apply on production
- * BEFORE removing CHECK_IN_REMINDERS_DRY_RUN.
+ * against a Neon branch of production first (made AFTER the publish), then
+ * --apply on production BEFORE removing CHECK_IN_REMINDERS_DRY_RUN.
  */
 import pg from 'pg';
+
+/** A shared timestamp counts as the publish stamp only if this many events carry it... */
+const MIN_STAMPED = 10;
+/**
+ * ...and they're at least this share of all events created before it. People
+ * keep editing events after the publish (each edit gives that event its own
+ * new timestamp), so the share shrinks over time; a microsecond-exact
+ * timestamp shared by most older events only comes from one bulk statement.
+ */
+const MIN_SHARE = 0.5;
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
+// `at` is kept as the exact text Postgres gives (microseconds, no time zone): a JS Date
+// would be re-read in the shell's local time zone and could miss the exact match.
+type Stamp = { at: string; count: number; olderEvents: number; updatedAfter: number };
+
+/** The publish-moment stamp, if the data clearly shows one (see header). */
+async function findPublishStamp(client: pg.Client): Promise<Stamp | null> {
+  const top = await client.query(`
+    SELECT last_human_update_at::text AS at, count(*)::int AS count
+      FROM event_requests
+     WHERE last_human_update_at IS NOT NULL
+     GROUP BY last_human_update_at
+     ORDER BY count(*) DESC
+     LIMIT 1`);
+  if (top.rowCount === 0) return null;
+  const { at, count } = top.rows[0] as { at: string; count: number };
+  const ctx = await client.query(
+    `SELECT
+       (SELECT count(*)::int FROM event_requests WHERE created_at < $1::timestamp) AS older_events,
+       (SELECT count(*)::int FROM event_requests WHERE last_human_update_at = $1::timestamp AND created_at >= $1::timestamp) AS created_after,
+       (SELECT count(*)::int FROM event_requests WHERE last_human_update_at = $1::timestamp AND updated_at > $1::timestamp) AS updated_after`,
+    [at],
+  );
+  const { older_events, created_after, updated_after } = ctx.rows[0];
+  const isStamp =
+    count >= MIN_STAMPED && created_after === 0 && older_events > 0 && count / older_events >= MIN_SHARE;
+  return isStamp ? { at, count, olderEvents: older_events, updatedAfter: updated_after } : null;
 }
 
 async function main() {
@@ -47,46 +95,71 @@ async function main() {
   await client.connect();
   try {
     const col = await client.query(
-      `select 1 from information_schema.columns where table_name = 'event_requests' and column_name = 'last_human_update_at'`,
+      `SELECT 1 FROM information_schema.columns WHERE table_name = 'event_requests' AND column_name = 'last_human_update_at'`,
     );
     if (col.rowCount === 0) {
       console.error('event_requests.last_human_update_at does not exist yet: deploy the migration first.');
       process.exit(1);
     }
 
-    const counts = await client.query(`
-      select count(*)::int as empty,
-             count(*) filter (where status in ('new', 'in_process', 'scheduled', 'rescheduled') and deleted_at is null)::int as active_empty
-        from event_requests
-       where last_human_update_at is null`);
-    const { empty, active_empty } = counts.rows[0];
-    console.log(`Events with no last_human_update_at:  ${empty}`);
-    console.log(`  of which active (get alerts):       ${active_empty}`);
+    // Shape 1: empty values
+    const nulls = (await client.query(`SELECT count(*)::int AS n FROM event_requests WHERE last_human_update_at IS NULL`)).rows[0].n as number;
+    console.log(`Empty (NULL) values:                 ${nulls}`);
 
-    const sample = await client.query(`
-      select id, status, updated_at, created_at
-        from event_requests
-       where last_human_update_at is null and deleted_at is null
-         and status in ('new', 'in_process', 'scheduled', 'rescheduled')
-       order by updated_at desc nulls last
-       limit 10`);
+    // Shape 2: the publish-moment stamp
+    const stamp = await findPublishStamp(client);
+    if (stamp) {
+      console.log(`Stamped at the publish moment:       ${stamp.count}  (all at ${stamp.at}; ${stamp.olderEvents} events existed then)`);
+      if (stamp.updatedAfter > 0) {
+        console.log(
+          `  of which ${stamp.updatedAfter} had updated_at bumped since (sheet sync); their earlier updated_at is gone,\n` +
+            `  so they get the publish moment itself, the latest they could have been changed by a person.`,
+        );
+      }
+    } else {
+      console.log('Stamped at the publish moment:       none detected (no single timestamp shared by most older events)');
+    }
+
+    // What each row would become: updated_at, capped at the publish moment
+    // (a later updated_at was the sync, not a person), falling back to created_at.
+    const target = stamp
+      ? `least(coalesce(updated_at, created_at), $1::timestamp)`
+      : `coalesce(updated_at, created_at)`;
+    const where = stamp
+      ? `(last_human_update_at IS NULL OR (last_human_update_at = $1::timestamp AND created_at < $1::timestamp))`
+      : `last_human_update_at IS NULL`;
+    const params = stamp ? [stamp.at] : [];
+
+    const total = (await client.query(`SELECT count(*)::int AS n FROM event_requests WHERE ${where}`, params)).rows[0].n as number;
+    const active = (await client.query(
+      `SELECT count(*)::int AS n FROM event_requests
+        WHERE ${where} AND deleted_at IS NULL AND status IN ('new', 'in_process', 'scheduled', 'rescheduled')`,
+      params,
+    )).rows[0].n as number;
+    console.log(`\nWill fill:                           ${total}`);
+    console.log(`  of which active (get alerts):      ${active}`);
+
+    const sample = await client.query(
+      `SELECT id, status, last_human_update_at::text AS now_value, (${target})::text AS new_value
+         FROM event_requests
+        WHERE ${where} AND deleted_at IS NULL AND status IN ('new', 'in_process', 'scheduled', 'rescheduled')
+        ORDER BY ${target} ASC NULLS LAST
+        LIMIT 10`,
+      params,
+    );
     if (sample.rowCount) {
-      console.log('\nSample (active events; will be set to updated_at):');
+      console.log('\nSample (active events, longest without a real update first):');
       for (const r of sample.rows) {
-        console.log(`  #${r.id}  ${String(r.status).padEnd(11)}  updated_at=${r.updated_at?.toISOString?.() ?? r.updated_at}`);
+        const fmt = (d: string | null) => (d ? d.slice(0, 16) : 'empty');
+        console.log(`  #${r.id}  ${String(r.status).padEnd(11)}  ${fmt(r.now_value)}  ->  ${fmt(r.new_value)}`);
       }
     }
 
     if (dryRun) {
-      console.log(`\nNothing changed. Re-run with --apply to fill ${empty} event(s).`);
+      console.log(`\nNothing changed. Re-run with --apply to fill ${total} event(s).`);
       return;
     }
-
-    const res = await client.query(
-      `update event_requests
-          set last_human_update_at = coalesce(updated_at, created_at)
-        where last_human_update_at is null`,
-    );
+    const res = await client.query(`UPDATE event_requests SET last_human_update_at = ${target} WHERE ${where}`, params);
     console.log(`\nFilled ${res.rowCount} event(s).`);
   } finally {
     await client.end();
