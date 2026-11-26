@@ -1465,9 +1465,10 @@ export function initializeCronJobs() {
     timezone: 'America/New_York',
   });
 
-  // User-controlled check-in reminders - runs every hour at :15
-  // Processes per-event reminder toggles set by TSP contacts
-  const checkInReminderJob = cron.schedule('15 * * * *', async () => {
+  // Check-in reminders for TSP contacts - ONCE A DAY at 9:00 AM ET (never
+  // hourly). The service also enforces at most one reminder message per
+  // person per day, so even a repeated run can't send more.
+  const checkInReminderJob = cron.schedule('0 9 * * *', async () => {
     // Dry run (CHECK_IN_REMINDERS_DRY_RUN=true) runs in any environment and
     // sends nothing; otherwise real reminders only go out in production.
     const dryRun = isCheckInReminderDryRun();
@@ -1502,7 +1503,7 @@ export function initializeCronJobs() {
   });
 
   cronLogger.info('Check-in reminder job scheduled successfully', {
-    schedule: 'Every hour at :15',
+    schedule: 'Daily at 9:00 AM',
     timezone: 'America/New_York',
   });
 

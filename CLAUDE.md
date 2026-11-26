@@ -136,7 +136,7 @@ Boolean fields on event cards (isConfirmed, addedToOfficialSheet, showOnVoluntee
 ### Cron Jobs
 All in `server/services/cron-jobs.ts` (node-cron, `America/New_York`). Key jobs:
 - `autoCompletePassedEvents` — nightly at 12:05am, moves scheduled/rescheduled events past their date to completed
-- `processCheckInReminders` — hourly at :15, sends the per-event check-in reminders TSP contacts turn on (this replaced the old automatic volunteer reminders)
+- `processCheckInReminders` — **once a day at 9:00am** (never hourly), sends the check-in reminders TSP contacts turn on. **Hard limit: one reminder message (email and/or text) per person per day**: everything due for someone is combined into one message, claimed atomically per person (`claimDailySlot` in `server/services/check-in-reminder-service.ts`), so no data or double run can send more. Still in dry-run mode while `CHECK_IN_REMINDERS_DRY_RUN=true`
 - Collective Learning auto-log — daily at 6:20pm (prod only), records the standing weekly PBJ count (default 250) as a `submission_method = 'auto_recurring'` collection unless a per-week override (`recurring_collection_overrides`) says they didn't collect or gives a different count. Admin card on the Collections page.
 - Volunteer sheet sync — daily at 5:40am (prod only), reads the volunteer Google Sheet into `people` / `volunteer_profiles` (`server/services/people/volunteer-sheet-sync.ts`). Skips until a first sync has been run by hand (`npm run volunteers:sync -- --dry-run` / `--apply`, or "Sync now" on the People page).
 - Weekly/admin digests, admin SMS pulse, standby follow-ups, daily error digest — **production only** (bodies return early unless `NODE_ENV=production`)

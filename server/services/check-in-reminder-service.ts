@@ -390,6 +390,81 @@ async function sendReminderSMS(
   }
 }
 
+/** One line per event (an event can have several reminder types due). */
+function groupByEvent(items: { event: ReminderEvent; msg: ReminderMessage }[]): { event: ReminderEvent; detail: string }[] {
+  const byId = new Map<number, { event: ReminderEvent; details: string[] }>();
+  for (const { event, msg } of items) {
+    const g = byId.get(event.id) ?? { event, details: [] };
+    if (!g.details.includes(msg.short)) g.details.push(msg.short);
+    byId.set(event.id, g);
+  }
+  return [...byId.values()].map(g => ({ event: g.event, detail: g.details.join(', ') }));
+}
+
+/** Subject for one email listing several events. */
+function combinedSubject(count: number): string {
+  return `${count} of your events could use a look`;
+}
+
+/** One email listing every event due for this person today. */
+async function sendCombinedReminderEmail(
+  email: string,
+  userName: string,
+  items: { event: ReminderEvent; msg: ReminderMessage }[],
+): Promise<boolean> {
+  if (!isEmailConfigured()) return false;
+  const baseUrl = getAppBaseUrl();
+  const events = groupByEvent(items);
+  const subject = combinedSubject(events.length);
+  const list = events
+    .map(({ event, detail }) => `<li style="margin-bottom:8px;"><a href="${baseUrl}/dashboard?section=event-requests&tab=all&eventId=${event.id}" style="color:#007E8C;font-weight:600;">${escapeHtml(event.organizationName || 'Unknown Organization')}</a><br/><span style="font-size:13px;color:#6b7280;">${escapeHtml(detail)}</span></li>`)
+    .join('');
+  try {
+    const result = await sendEmailOrThrow({
+      to: email,
+      from: 'katie@thesandwichproject.org',
+      subject,
+      headers: reminderUnsubscribeHeaders(baseUrl),
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #236383, #007E8C); padding: 20px; border-radius: 8px 8px 0 0;">
+            <h2 style="color: white; margin: 0;">${escapeHtml(subject)}</h2>
+          </div>
+          <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <p style="font-size: 16px; color: #374151;">Hi ${escapeHtml(userName)},</p>
+            <p style="font-size: 15px; color: #4b5563;">A few of your events could use a look when you have time. We put them together in one email.</p>
+            <ul style="padding-left: 18px; color: #1f2937;">${list}</ul>
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
+              You can change how often you get these, or turn them off, anytime in
+              <a href="${baseUrl}/profile?tab=notifications" style="color: #236383;">Profile → Alerts</a>.
+            </p>
+          </div>
+          ${EMAIL_FOOTER_HTML}
+        </div>
+      `,
+      emailStream: 'operational',
+    });
+    return result.success;
+  } catch (error) {
+    logger.error(`Failed to send combined reminder email to ${email}:`, error);
+    return false;
+  }
+}
+
+/** One text for several events. */
+async function sendCombinedReminderSMS(phoneNumber: string, count: number): Promise<boolean> {
+  try {
+    const result = await sendTSPFollowupReminderSMS(
+      phoneNumber,
+      `TSP: ${count} of your events could use a look when you have time. ${getAppBaseUrl()}/dashboard?section=event-requests&tab=all`,
+    );
+    return result.success;
+  } catch (error) {
+    logger.error('Failed to send combined reminder SMS:', error);
+    return false;
+  }
+}
+
 /** Statuses where an assigned TSP contact gets reminders. */
 const REMINDER_STATUSES = ['new', 'in_process', 'scheduled', 'rescheduled', 'stalled'];
 
@@ -410,7 +485,7 @@ function activeRules(prefs: CheckInReminderPreferences): DefaultReminderRule[] {
 
 /**
  * Dry run: work out exactly who would get what, log it, and send NOTHING.
- * Turned on with CHECK_IN_REMINDERS_DRY_RUN=true (the hourly job then runs in
+ * Turned on with CHECK_IN_REMINDERS_DRY_RUN=true (the daily job then runs in
  * any environment, including dev), or on demand via the admin dry-run endpoint.
  * A dry run never writes anything that would change the real first run: no
  * notifications, no summary marker, no grace periods, no sent timestamps.
@@ -441,6 +516,10 @@ type RunContext = {
   runStartedAt: Date;
   /** Failures in sync/summary (the per-reminder loop counts its own) */
   errors: number;
+  /** Today's date in Eastern (YYYY-MM-DD): the key for the one-message-a-day limit */
+  today: string;
+  /** Dry run only: people who would already get a message this run (their summary) */
+  messagedUserIds: Set<string>;
 };
 
 function plannedChannels(user: typeof users.$inferSelect, channel: string): { wouldEmail: string | null; wouldText: string | null } {
@@ -451,6 +530,46 @@ function plannedChannels(user: typeof users.$inferSelect, channel: string): { wo
     wouldEmail: channel === 'email' || channel === 'both' ? email : null,
     wouldText: channel === 'sms' || channel === 'both' ? phone : null,
   };
+}
+
+/**
+ * HARD LIMIT: one check-in reminder message per person per day.
+ *
+ * Whatever the data looks like (hundreds of due reminders, a backlog, a bad
+ * import, the job running twice or on two servers at once), a person gets at
+ * most ONE check-in reminder email and/or text per Eastern calendar day:
+ * either their first-time summary or one combined list of everything due.
+ * Before anything is sent, today's slot is claimed with a single conditional
+ * UPDATE on the user's row; if it's already claimed, nothing is sent and their
+ * reminders stay due for tomorrow. So the most a day can ever send is one
+ * message per TSP contact.
+ */
+const DAILY_SLOT_KEY = 'checkInReminderLastSentOn';
+
+function easternDateString(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now); // YYYY-MM-DD
+}
+
+/** Read-only: has this person already been sent a reminder message today? */
+function alreadyMessagedToday(user: typeof users.$inferSelect, today: string): boolean {
+  return (getUserMetadata(user) as Record<string, unknown>)[DAILY_SLOT_KEY] === today;
+}
+
+/** Atomically claim today's slot for this person. False = already used today: send nothing. */
+async function claimDailySlot(userId: string, today: string): Promise<boolean> {
+  const claimed = await db
+    .update(users)
+    .set({
+      metadata: sql`jsonb_set(coalesce(${users.metadata}, '{}'::jsonb), '{${sql.raw(DAILY_SLOT_KEY)}}', to_jsonb(${today}::text))`,
+    })
+    .where(and(
+      eq(users.id, userId),
+      sql`coalesce(${users.metadata} ->> ${DAILY_SLOT_KEY}, '') <> ${today}`,
+    ))
+    .returning({ id: users.id });
+  return claimed.length > 0;
 }
 
 /** Days an event in the first-run summary waits before it can send its own reminder. */
@@ -539,7 +658,10 @@ async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: Ru
   if (ctx.dryRun) {
     // Record what the summary would be; write nothing, so the real first run
     // still sends it.
-    if (backlog.size > 0) {
+    if (backlog.size > 0 && alreadyMessagedToday(user, ctx.today)) {
+      logger.info(`[CheckInReminders][DRY RUN] ${user.id} already got a reminder message today; summary would wait until tomorrow`);
+    } else if (backlog.size > 0) {
+      ctx.messagedUserIds.add(user.id);
       const entry: DryRunEntry = {
         kind: 'summary',
         userId: user.id,
@@ -559,6 +681,12 @@ async function baselineUserBacklog(staleUser: typeof users.$inferSelect, ctx: Ru
   }
 
   if (backlog.size > 0) {
+    // One message per person per day. If today's is used, send nothing and
+    // leave the baseline unset so the summary goes out on a later run.
+    if (!(await claimDailySlot(user.id, ctx.today))) {
+      logger.info(`[CheckInReminders] ${user.id} already got a reminder message today; summary waits until tomorrow`);
+      return;
+    }
     const baseUrl = getAppBaseUrl();
     const items = [...backlog.entries()].map(([id, labels]) => ({
       id,
@@ -675,7 +803,7 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Hourly sync of every user's per-event reminder rows with their CURRENT
+ * Daily sync of every user's per-event reminder rows with their CURRENT
  * settings and assignments (settings are global; rows are just the
  * per-event bookkeeping the scheduler needs):
  *  - inactive users: all rows switched off
@@ -683,7 +811,7 @@ function escapeHtml(s: string): string {
  *  - rules not in their settings (or retired): off
  *  - rules in their settings: on, with current threshold/frequency/channel
  *  - missing rows: created
- * Because this runs every hour against fresh settings, rows written from a
+ * Because this runs every day against fresh settings, rows written from a
  * stale read, older thresholds, or pre-existing per-event customizations
  * converge to the user's settings on the next run.
  */
@@ -828,6 +956,8 @@ async function previewDueReminders(
 ): Promise<number> {
   let errors = 0;
   const now = new Date();
+  // One combined message per person (see DAILY_SLOT_KEY)
+  const perUser = new Map<string, { user: typeof users.$inferSelect; channel: string; events: DryRunEntry['events']; subjects: string[] }>();
   for (const reminder of dueReminders) {
     try {
       if (ctx.summarizedRowIds.has(reminder.id)) continue; // in this run's summary
@@ -857,20 +987,37 @@ async function previewDueReminders(
       if (!evaluateRuleCondition(reminder.ruleType, reminder.thresholdDays || 7, event)) continue;
 
       const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
-      const entry: DryRunEntry = {
-        kind: 'reminder',
-        userId: user.id,
-        userName: user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id,
-        ...plannedChannels(user, reminder.channel),
-        subject: msg.subject,
-        events: [{ id: event.id, organization: event.organizationName || 'Unknown Organization', detail: msg.short }],
-      };
-      ctx.plan.push(entry);
-      logger.info(`[CheckInReminders][DRY RUN] would send to ${entry.userName}: ${msg.subject}`);
+      const group = perUser.get(user.id) ?? { user, channel: reminder.channel, events: [], subjects: [] };
+      const existing = group.events.find(e => e.id === event.id);
+      if (existing) {
+        if (!existing.detail.split(', ').includes(msg.short)) existing.detail += `, ${msg.short}`;
+      } else {
+        group.events.push({ id: event.id, organization: event.organizationName || 'Unknown Organization', detail: msg.short });
+      }
+      group.subjects.push(msg.subject);
+      perUser.set(user.id, group);
     } catch (error) {
       errors++;
       logger.error(`[CheckInReminders][DRY RUN] Error previewing reminder ${reminder.id}:`, error);
     }
+  }
+  for (const { user, channel, events, subjects } of perUser.values()) {
+    const userName = user.displayName || [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id;
+    if (ctx.messagedUserIds.has(user.id) || alreadyMessagedToday(user, ctx.today)) {
+      logger.info(`[CheckInReminders][DRY RUN] ${userName} already gets a reminder message today; ${events.length} reminder(s) would wait until tomorrow`);
+      continue;
+    }
+    ctx.messagedUserIds.add(user.id);
+    const entry: DryRunEntry = {
+      kind: 'reminder',
+      userId: user.id,
+      userName,
+      ...plannedChannels(user, channel),
+      subject: subjects.length === 1 ? subjects[0] : combinedSubject(events.length),
+      events,
+    };
+    ctx.plan.push(entry);
+    logger.info(`[CheckInReminders][DRY RUN] would send to ${userName}: ${entry.subject}`);
   }
   return errors;
 }
@@ -893,6 +1040,8 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
     summarizedRowIds: new Set(),
     runStartedAt: now,
     errors: 0,
+    today: easternDateString(now),
+    messagedUserIds: new Set(),
   };
   if (ctx.dryRun) {
     logger.info('[CheckInReminders][DRY RUN] Starting: nothing will be sent or marked as sent');
@@ -946,6 +1095,10 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
     for (const snooze of allActiveSnoozes) {
       snoozeMap.set(`${snooze.eventRequestId}:${snooze.userId}`, snooze);
     }
+
+    // Reminders to send, grouped per person (one message each, below)
+    type PendingItem = { reminder: typeof dueReminders[number]; event: ReminderEvent; msg: ReminderMessage };
+    const pending = new Map<string, { user: typeof users.$inferSelect; channel: string; items: PendingItem[] }>();
 
     for (const reminder of dueReminders) {
       processed++;
@@ -1095,17 +1248,36 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
           continue;
         }
 
-        const userName = user.displayName || user.firstName || 'there';
+        // Don't send here: collect, then send ONE message per person below.
         const msg = buildReminderMessage(reminder.ruleType, reminder.thresholdDays || 7, event);
+        const group = pending.get(user.id) ?? { user, channel: reminder.channel, items: [] };
+        group.items.push({ reminder, event, msg });
+        pending.set(user.id, group);
+      } catch (error) {
+        errors++;
+        logger.error(`Error processing reminder ${reminder.id} (type: ${reminder.ruleType}):`, error);
+      }
+    }
 
+    // One message per person per day (see DAILY_SLOT_KEY).
+    for (const { user, channel, items } of pending.values()) {
+      try {
+        if (!(await claimDailySlot(user.id, ctx.today))) {
+          logger.info(`[CheckInReminders] ${user.id} already got a reminder message today; ${items.length} reminder(s) wait until tomorrow`);
+          continue;
+        }
+        const userName = user.displayName || user.firstName || 'there';
+        const single = items.length === 1 ? items[0] : null;
+        const events = groupByEvent(items);
 
         // Always record the reminder in the in-app notification bell first,
         // so it exists even if email/SMS isn't configured or fails to send.
         // If this insert fails, the error goes to the per-reminder catch and
         // the row stays due for a retry next run (nothing sent, nothing marked).
-        {
+        if (single) {
+          const { event, msg, reminder } = single;
           await db.insert(notifications).values({
-            userId: reminder.userId,
+            userId: user.id,
             type: 'reminder',
             priority: 'medium',
             title: msg.subject,
@@ -1117,23 +1289,39 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
             actionText: 'Open the event',
             metadata: { eventId: event.id, ruleType: reminder.ruleType, source: 'check_in_reminder' },
           });
+        } else {
+          await db.insert(notifications).values({
+            userId: user.id,
+            type: 'reminder',
+            priority: 'medium',
+            title: combinedSubject(events.length),
+            message: events.map(e => `• ${e.event.organizationName || 'Unknown Organization'}: ${e.detail}`).join('\n'),
+            category: 'events',
+            relatedType: 'event_request_summary',
+            actionUrl: '/dashboard?section=event-requests&tab=all',
+            actionText: 'Open events',
+            metadata: { eventIds: events.map(e => e.event.id), source: 'check_in_reminder' },
+          });
         }
 
         let emailSent = false;
         let smsSent = false;
 
-        if (reminder.channel === 'email' || reminder.channel === 'both') {
+        if (channel === 'email' || channel === 'both') {
           const email = user.preferredEmail || user.email;
           if (email) {
-            emailSent = await sendReminderEmail(email, userName, event, msg);
+            emailSent = single
+              ? await sendReminderEmail(email, userName, single.event, single.msg)
+              : await sendCombinedReminderEmail(email, userName, items);
           }
         }
 
-        if (reminder.channel === 'sms' || reminder.channel === 'both') {
-          const metadata = getUserMetadata(user);
-          const smsConsent = metadata.smsConsent;
+        if (channel === 'sms' || channel === 'both') {
+          const smsConsent = getUserMetadata(user).smsConsent;
           if (smsConsent?.enabled && smsConsent.phoneNumber) {
-            smsSent = await sendReminderSMS(smsConsent.phoneNumber, event, msg);
+            smsSent = single
+              ? await sendReminderSMS(smsConsent.phoneNumber, single.event, single.msg)
+              : await sendCombinedReminderSMS(smsConsent.phoneNumber, events.length);
           }
         }
 
@@ -1141,20 +1329,21 @@ export async function processCheckInReminders(options: { dryRun?: boolean } = {}
           sent++;
         }
 
-        // Update lastSentAt; repeat at the user's chosen frequency (the sync
-        // has already copied their current setting onto this row).
-        const nextDue = calculateNextDue(reminder.frequency as ReminderFrequency);
-        await db
-          .update(eventCheckInReminders)
-          .set({
-            lastSentAt: new Date(),
-            nextDueAt: nextDue,
-            updatedAt: new Date(),
-          })
-          .where(eq(eventCheckInReminders.id, reminder.id));
+        // Update lastSentAt; each row repeats at the user's chosen frequency
+        // (the sync has already copied their current setting onto it).
+        for (const { reminder } of items) {
+          await db
+            .update(eventCheckInReminders)
+            .set({
+              lastSentAt: new Date(),
+              nextDueAt: calculateNextDue(reminder.frequency as ReminderFrequency),
+              updatedAt: new Date(),
+            })
+            .where(eq(eventCheckInReminders.id, reminder.id));
+        }
       } catch (error) {
         errors++;
-        logger.error(`Error processing reminder ${reminder.id} (type: ${reminder.ruleType}):`, error);
+        logger.error(`[CheckInReminders] Error sending reminders to user ${user.id}:`, error);
       }
     }
 
