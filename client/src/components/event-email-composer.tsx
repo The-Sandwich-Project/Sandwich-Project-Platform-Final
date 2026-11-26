@@ -42,6 +42,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { EditableEmailPreview } from '@/components/editable-email-preview';
+import { AiEmailHelper } from '@/components/ai-email-helper';
 
 interface EventRequest {
   id: number;
@@ -1927,6 +1928,22 @@ ${userEmail}`;
                 </p>
               </div>
             )}
+
+            <div className="mt-4">
+              <AiEmailHelper
+                eventRequestId={eventRequest.id}
+                format={emailFormat}
+                subject={subject}
+                content={content}
+                onApply={({ subject: nextSubject, content: nextContent }) => {
+                  setSubject(nextSubject);
+                  setContent(nextContent);
+                  // Counts as an edit: keeps the template from overwriting it
+                  // and shows "Reset to Template".
+                  setHasManualEdits(true);
+                }}
+              />
+            </div>
 
             <div className="mt-4">
               {hasManualEdits && (
