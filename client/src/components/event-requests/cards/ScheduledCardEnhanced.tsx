@@ -2577,7 +2577,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             </>
                           )}
                         </div>
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-1">
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-1">
                           {parsePostgresArray(request.assignedDriverIds).map((id) => {
                             const isCustom = id.startsWith('custom-');
                             // Check if the ID itself looks like a human name (not a system ID)
@@ -2599,7 +2599,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             const nameFieldKey = `driver-name-${id}`;
                             const isEditingName = isEditingThisCard && editingField === nameFieldKey;
                             return (
-                            <div key={id} className="bg-[#47B3CB]/20 rounded px-3 py-1.5 border border-[#47B3CB]/30 min-w-0 group">
+                            <div key={id} className={`bg-[#47B3CB]/20 rounded px-3 py-1.5 border border-[#47B3CB]/30 min-w-0 group${isEditingName || isEditingNotes ? ' col-span-full' : ''}`}>
                               <div className="flex items-start gap-2">
                                 <span className="text-base font-bold text-[#236383] flex-1 min-w-0 break-words leading-tight">{displayName}</span>
                                 {canEdit && (
@@ -2636,7 +2636,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 )}
                               </div>
                               {isEditingName && (
-                                <div className="mt-1.5 flex items-center gap-1">
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1">
                                   <Input
                                     value={editingValue}
                                     onChange={(e) => setEditingValue(e.target.value)}
@@ -2645,7 +2645,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     }}
                                     autoFocus
                                     placeholder="Name"
-                                    className="h-7 text-sm flex-1"
+                                    className="h-7 text-sm flex-1 min-w-[8rem]"
                                   />
                                   <Button
                                     size="sm"
@@ -2685,7 +2685,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     className="text-sm min-h-[60px] resize-none"
                                     autoFocus
                                   />
-                                  <div className="flex items-center gap-1 justify-end">
+                                  <div className="flex flex-wrap items-center gap-1 justify-end">
                                     {driverPersonNotes && (
                                       <Button
                                         size="sm"
@@ -2760,7 +2760,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             const tDriverNameFieldKey = `tdriver-name-${id}`;
                             const isEditingTDriverName = isEditingThisCard && editingField === tDriverNameFieldKey;
                             return (
-                            <div key={`tentative-${id}`} className="bg-amber-100 rounded px-3 py-1.5 border border-amber-300 min-w-0 group">
+                            <div key={`tentative-${id}`} className={`bg-amber-100 rounded px-3 py-1.5 border border-amber-300 min-w-0 group${isEditingTDriverName || isEditingTDriverNotes ? ' col-span-full' : ''}`}>
                               <div className="flex items-start gap-2">
                                 <span className="text-base font-bold text-amber-700 flex-1 min-w-0 break-words leading-tight flex items-center gap-1">
                                   <HelpCircle className="w-4 h-4 text-amber-500 shrink-0" />
@@ -2801,7 +2801,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 )}
                               </div>
                               {isEditingTDriverName && (
-                                <div className="mt-1.5 flex items-center gap-1">
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1">
                                   <Input
                                     value={editingValue}
                                     onChange={(e) => setEditingValue(e.target.value)}
@@ -2810,7 +2810,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     }}
                                     autoFocus
                                     placeholder="Name"
-                                    className="h-7 text-sm flex-1"
+                                    className="h-7 text-sm flex-1 min-w-[8rem]"
                                   />
                                   <Button
                                     size="sm"
@@ -2850,7 +2850,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     className="text-sm min-h-[60px] resize-none"
                                     autoFocus
                                   />
-                                  <div className="flex items-center gap-1 justify-end">
+                                  <div className="flex flex-wrap items-center gap-1 justify-end">
                                     {tDriverPersonNotes && (
                                       <Button
                                         size="sm"
@@ -3040,7 +3040,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         </>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-1">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-1">
                       {parsePostgresArray(request.assignedVolunteerIds).map((id) => {
                         const detailName = (request.volunteerDetails as Record<string, { name?: string }>)?.[id]?.name;
                         const resolvedName = resolveUserName(id);
@@ -3056,7 +3056,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         const volunteerNameFieldKey = `volunteer-name-${id}`;
                         const isEditingVolunteerName = isEditingThisCard && editingField === volunteerNameFieldKey;
                         return (
-                        <div key={id} className="bg-[#47B3CB]/20 rounded px-3 py-1.5 border border-[#47B3CB]/30 min-w-0 group">
+                        <div key={id} className={`bg-[#47B3CB]/20 rounded px-3 py-1.5 border border-[#47B3CB]/30 min-w-0 group${isEditingVolunteerName || isEditingVolunteerNotes ? ' col-span-full' : ''}`}>
                           <div className="flex items-start gap-2">
                             <span className="text-base font-bold text-[#236383] flex-1 min-w-0 break-words leading-tight">{displayName}</span>
                             {canEdit && (
@@ -3100,7 +3100,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             )}
                           </div>
                           {isEditingVolunteerName && (
-                            <div className="mt-1.5 flex items-center gap-1">
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1">
                               <Input
                                 value={editingValue}
                                 onChange={(e) => setEditingValue(e.target.value)}
@@ -3109,7 +3109,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 }}
                                 autoFocus
                                 placeholder="Name"
-                                className="h-7 text-sm flex-1"
+                                className="h-7 text-sm flex-1 min-w-[8rem]"
                               />
                               <Button
                                 size="sm"
@@ -3149,7 +3149,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 className="text-sm min-h-[60px] resize-none"
                                 autoFocus
                               />
-                              <div className="flex items-center gap-1 justify-end">
+                              <div className="flex flex-wrap items-center gap-1 justify-end">
                                 {volunteerPersonNotes && (
                                   <Button
                                     size="sm"
@@ -3215,7 +3215,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         const tVolunteerNameFieldKey = `tvolunteer-name-${id}`;
                         const isEditingTVolunteerName = isEditingThisCard && editingField === tVolunteerNameFieldKey;
                         return (
-                        <div key={`tentative-${id}`} className="bg-amber-100 rounded px-3 py-1.5 border border-amber-300 min-w-0 group">
+                        <div key={`tentative-${id}`} className={`bg-amber-100 rounded px-3 py-1.5 border border-amber-300 min-w-0 group${isEditingTVolunteerName || isEditingTVolunteerNotes ? ' col-span-full' : ''}`}>
                           <div className="flex items-start gap-2">
                             <span className="text-base font-bold text-amber-700 flex-1 min-w-0 break-words leading-tight flex items-center gap-1">
                               <HelpCircle className="w-4 h-4 text-amber-500 shrink-0" />
@@ -3256,7 +3256,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             )}
                           </div>
                           {isEditingTVolunteerName && (
-                            <div className="mt-1.5 flex items-center gap-1">
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1">
                               <Input
                                 value={editingValue}
                                 onChange={(e) => setEditingValue(e.target.value)}
@@ -3265,7 +3265,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 }}
                                 autoFocus
                                 placeholder="Name"
-                                className="h-7 text-sm flex-1"
+                                className="h-7 text-sm flex-1 min-w-[8rem]"
                               />
                               <Button
                                 size="sm"
@@ -3305,7 +3305,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 className="text-sm min-h-[60px] resize-none"
                                 autoFocus
                               />
-                              <div className="flex items-center gap-1 justify-end">
+                              <div className="flex flex-wrap items-center gap-1 justify-end">
                                 {tVolunteerPersonNotes && (
                                   <Button
                                     size="sm"
