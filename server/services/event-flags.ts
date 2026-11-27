@@ -14,11 +14,40 @@ export interface EventFlag {
   createdAt: Date;
 }
 
-/** Statuses where flags can still be added (the card thread is editable). */
+/**
+ * Statuses where the thread can still be written (add, edit, delete). Once an
+ * event leaves New its comments are "Earlier comments": read-only, on every
+ * write path (HTTP create/edit/delete and the socket create).
+ */
 export const FLAG_STATUSES = new Set(['new']);
 
-export function canAddFlag(status: string | null | undefined): boolean {
+export function canWriteFlags(status: string | null | undefined): boolean {
   return FLAG_STATUSES.has(String(status || 'new'));
+}
+
+export const FLAGS_READ_ONLY_ERROR = {
+  error: 'Flags can only be added or changed while an event is New',
+  details: 'Team comments were retired; comments on events past New are read-only. Use the event notes or Log Contact instead.',
+};
+
+/**
+ * The event a comment really belongs to, and that event's status (null when
+ * the comment doesn't exist). Write routes check this, not the event id in the
+ * URL, so a mismatched URL can't get around the read-only rule.
+ */
+export async function loadCommentEvent(
+  commentId: number,
+): Promise<{ eventRequestId: number; status: string | null } | null> {
+  const { db } = await import('../db');
+  const { eventCollaborationComments, eventRequests } = await import('@shared/schema');
+  const { eq } = await import('drizzle-orm');
+  const [row] = await db
+    .select({ eventRequestId: eventCollaborationComments.eventRequestId, status: eventRequests.status })
+    .from(eventCollaborationComments)
+    .innerJoin(eventRequests, eq(eventRequests.id, eventCollaborationComments.eventRequestId))
+    .where(eq(eventCollaborationComments.id, commentId))
+    .limit(1);
+  return row ?? null;
 }
 
 function escapeHtml(s: string): string {

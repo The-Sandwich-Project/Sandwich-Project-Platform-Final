@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { logger } from '../utils/production-safe-logger';
 import type { RouterDependencies } from '../types';
 import { EmailNotificationService } from '../services/email-notification-service';
-import { canAddFlag } from '../services/event-flags';
+import { canWriteFlags, FLAGS_READ_ONLY_ERROR, loadCommentEvent } from '../services/event-flags';
 
 /**
  * Event Collaboration API Routes
@@ -176,11 +176,8 @@ export function createEventCollaborationRouter(deps: RouterDependencies) {
       // "Team Comments" was retired: the thread is New Event Flags, which can
       // only be added while the event is New. Earlier comments on other events
       // stay visible, read-only.
-      if (!canAddFlag(eventExists.status)) {
-        return res.status(409).json({
-          error: 'Flags can only be added while an event is New',
-          details: 'Team comments were retired. Use the event notes or Log Contact instead.',
-        });
+      if (!canWriteFlags(eventExists.status)) {
+        return res.status(409).json(FLAGS_READ_ONLY_ERROR);
       }
 
       const validatedData = createCommentSchema.parse(req.body);
@@ -254,6 +251,15 @@ export function createEventCollaborationRouter(deps: RouterDependencies) {
 
       const validatedData = updateCommentSchema.parse(req.body);
 
+      // Earlier comments (event past New) are read-only.
+      const owner = await loadCommentEvent(commentId);
+      if (!owner || owner.eventRequestId !== eventId) {
+        return res.status(404).json({ error: 'Comment not found or unauthorized' });
+      }
+      if (!canWriteFlags(owner.status)) {
+        return res.status(409).json(FLAGS_READ_ONLY_ERROR);
+      }
+
       const comment = await storage.updateEventCollaborationComment(
         commentId,
         validatedData.content,
@@ -297,6 +303,15 @@ export function createEventCollaborationRouter(deps: RouterDependencies) {
 
       if (!req.user) {
         return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Earlier comments (event past New) are read-only.
+      const owner = await loadCommentEvent(commentId);
+      if (!owner || owner.eventRequestId !== eventId) {
+        return res.status(404).json({ error: 'Comment not found or unauthorized' });
+      }
+      if (!canWriteFlags(owner.status)) {
+        return res.status(409).json(FLAGS_READ_ONLY_ERROR);
       }
 
       const success = await storage.deleteEventCollaborationComment(commentId, req.user.id);

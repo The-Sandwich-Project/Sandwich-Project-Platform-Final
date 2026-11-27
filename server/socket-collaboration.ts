@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AuditLogger } from './audit-logger';
 import { extractMentions } from '@shared/mention-utils';
 import { checkPermission } from '@shared/unified-auth-utils';
+import { canWriteFlags, FLAGS_READ_ONLY_ERROR } from './services/event-flags';
 
 /**
  * Event Collaboration Socket.IO Module
@@ -973,6 +974,18 @@ export function setupSocketCollaboration(httpServer: HttpServer, io: SocketServe
         if (!commentPermission.granted) {
           socket.emit('error', { message: 'Insufficient permissions to comment on events' });
           logger.error(`[Collaboration] Permission denied for user ${authenticatedUser.email}: EVENT_REQUESTS_VIEW (comment)`);
+          return;
+        }
+
+        // Same rule as the HTTP routes: flags can only be written while the
+        // event is New; comments on later events are read-only.
+        const event = await storage.getEventRequest(eventRequestId);
+        if (!event) {
+          socket.emit('error', { message: 'Event request not found' });
+          return;
+        }
+        if (!canWriteFlags(event.status)) {
+          socket.emit('error', { message: FLAGS_READ_ONLY_ERROR.error });
           return;
         }
 

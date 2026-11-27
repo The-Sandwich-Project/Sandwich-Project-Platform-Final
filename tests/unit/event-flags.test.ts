@@ -1,4 +1,4 @@
-import { canAddFlag, flagsEmailHtml, flagsEmailText, flagsSmsSuffix } from '../../server/services/event-flags';
+import { canWriteFlags, flagsEmailHtml, flagsEmailText, flagsSmsSuffix } from '../../server/services/event-flags';
 
 const flag = (content: string, userName = 'Christine') => ({ content, userName, createdAt: new Date('2026-11-20T15:00:00Z') });
 
@@ -28,7 +28,7 @@ describe('New Event Flags in the assignment alert', () => {
   });
 
   it('flags can only be added while the event is New', () => {
-    expect(canAddFlag('new')).toBe(true);
-    for (const s of ['in_process', 'standby', 'scheduled', 'completed', 'declined', 'stalled']) expect(canAddFlag(s)).toBe(false);
+    expect(canWriteFlags('new')).toBe(true);
+    for (const s of ['in_process', 'standby', 'scheduled', 'completed', 'declined', 'stalled']) expect(canWriteFlags(s)).toBe(false);
   });
 });
