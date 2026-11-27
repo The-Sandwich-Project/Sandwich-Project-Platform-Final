@@ -1524,7 +1524,7 @@ const EventRequestsManagementContent: React.FC = () => {
 
             if (replacingId && replacement) {
               // Also write the list it didn't add to, and keep the spot's note.
-              updateData = finishReplacement(updateData, replacement, assignmentType as AssignmentKind, replacingId, assignees);
+              updateData = finishReplacement(updateData, replacement, assignmentType as AssignmentKind, replacingId, assignees, isTentative);
             }
 
             try {

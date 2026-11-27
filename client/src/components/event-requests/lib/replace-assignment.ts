@@ -63,13 +63,21 @@ export function finishReplacement(
   replacement: Replacement,
   kind: AssignmentKind,
   personId: string,
-  picked: string[]
+  picked: string[],
+  /** Whether the picked people were saved as tentative (else confirmed). */
+  asTentative: boolean
 ): Record<string, any> {
   const k = KEYS[kind];
   const out = { ...updateData };
   for (const key of [k.assigned, k.tentative, k.details]) {
     if (!(key in out)) out[key] = replacement.event[key];
   }
+  // A picked person who was already on the event in the other list (e.g.
+  // tentative B chosen to replace confirmed A, saved as confirmed) leaves that
+  // list, so nobody ends up both confirmed and tentative.
+  const otherKey = asTentative ? k.assigned : k.tentative;
+  const pickedSet = new Set(picked);
+  out[otherKey] = toIdList(out[otherKey]).filter((id) => !pickedSet.has(id));
   const newId = picked.length === 1 ? picked[0] : null;
   const note = replacement.replacedDetails?.notes;
   if (newId && newId !== personId && note) {

@@ -35,6 +35,41 @@ function idList(value: string[] | string | null | undefined): string[] {
   return (cleaned.match(/"[^"]*"|[^",]+/g) || []).map((s) => s.replace(/"/g, '').trim()).filter(Boolean);
 }
 
+/** Tentative driver ids (either storage format). */
+export function getTentativeDriverIds(event: EventWithAssignments): string[] {
+  return idList(event.tentativeDriverIds);
+}
+
+/** Tentative volunteer ids (either storage format). */
+export function getTentativeVolunteerIds(event: EventWithAssignments): string[] {
+  return idList(event.tentativeVolunteerIds);
+}
+
+/**
+ * Rebuild a details map (driverDetails / volunteerDetails) for a new confirmed
+ * selection without losing tentative people's entries (their notes live in the
+ * same map). Returns the new map, plus the tentative list with anyone now
+ * confirmed removed (`null` when it doesn't change).
+ */
+export function rebuildDetailsForSelection(
+  details: Record<string, any> | string | null | undefined,
+  selected: string[],
+  tentativeIds: string[]
+): { details: Record<string, any>; tentativeIds: string[] | null } {
+  const existing = parseDetails(details) || {};
+  const next: Record<string, any> = {};
+  for (const id of selected) next[id] = existing[id] || {};
+  const selectedSet = new Set(selected);
+  const stillTentative = tentativeIds.filter((id) => !selectedSet.has(id));
+  for (const id of stillTentative) {
+    if (existing[id] !== undefined && next[id] === undefined) next[id] = existing[id];
+  }
+  return {
+    details: next,
+    tentativeIds: stillTentative.length === tentativeIds.length ? null : stillTentative,
+  };
+}
+
 function withoutTentative(ids: string[], tentative: string[] | string | null | undefined): string[] {
   const t = new Set(idList(tentative));
   return t.size ? ids.filter((id) => !t.has(String(id))) : ids;
@@ -134,7 +169,8 @@ export function getTotalDriverCount(event: EventWithAssignments): number {
  * Check if a specific person is assigned as a driver
  */
 export function hasDriver(event: EventWithAssignments, personId: string): boolean {
-  return !!(event.driverDetails?.[personId]);
+  // Confirmed only: a tentative driver can still have a details entry (a note).
+  return getDriverIds(event).includes(personId);
 }
 
 /**
@@ -200,7 +236,8 @@ export function getVolunteerCount(event: EventWithAssignments): number {
  * Check if a specific person is assigned as a volunteer
  */
 export function hasVolunteer(event: EventWithAssignments, personId: string): boolean {
-  return !!(event.volunteerDetails?.[personId]);
+  // Confirmed only: a tentative volunteer can still have a details entry (a note).
+  return getVolunteerIds(event).includes(personId);
 }
 
 /**
@@ -211,12 +248,14 @@ export function getVolunteerDetail(event: EventWithAssignments, personId: string
 }
 
 /**
- * Check if a person is assigned in any role
+ * Check if a person is on the event in any role, confirmed or tentative
  */
 export function isPersonAssigned(event: EventWithAssignments, personId: string): boolean {
   return hasDriver(event, personId) ||
          hasSpeaker(event, personId) ||
          hasVolunteer(event, personId) ||
+         getTentativeDriverIds(event).includes(personId) ||
+         getTentativeVolunteerIds(event).includes(personId) ||
          event.assignedVanDriverId === personId;
 }
 

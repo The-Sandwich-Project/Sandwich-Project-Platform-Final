@@ -25,7 +25,7 @@ function addLikeSaveHandler(event: Record<string, any>, kind: AssignmentKind, pi
 function change(event: Record<string, any>, kind: AssignmentKind, personId: string, picked: string[], tentative: boolean) {
   const replacement = withoutPerson(event, kind, personId, picked);
   const update = addLikeSaveHandler(replacement.event, kind, picked, tentative);
-  return finishReplacement(update, replacement, kind, personId, picked);
+  return finishReplacement(update, replacement, kind, personId, picked, tentative);
 }
 
 describe('Change person on an event card', () => {
@@ -79,6 +79,21 @@ describe('Change person on an event card', () => {
     const update = change(event, 'volunteer', 'custom-1-Irv-G', ['u42', 'u43'], false);
     expect(update.volunteerDetails.u42.notes).toBeUndefined();
     expect(update.volunteerDetails.u43.notes).toBeUndefined();
+  });
+
+  it('picking a tentative person to replace a confirmed one moves them out of tentative', () => {
+    // Confirmed A (u3) replaced by tentative B (u6), "Mark as tentative" unticked.
+    const update = change(event, 'volunteer', 'u3', ['u6'], false);
+    expect(update.assignedVolunteerIds).toEqual(['custom-1-Irv-G', 'u5', 'u6']);
+    expect(update.tentativeVolunteerIds).toEqual([]);
+    expect(update.volunteerDetails.u6.notes).toBe('Might be late');
+  });
+
+  it('picking a confirmed person and ticking tentative moves them out of confirmed', () => {
+    // Tentative B (u6) replaced by confirmed u5, saved as tentative.
+    const update = change(event, 'volunteer', 'u6', ['u5'], true);
+    expect(update.assignedVolunteerIds).toEqual(['u3', 'custom-1-Irv-G']);
+    expect(update.tentativeVolunteerIds).toEqual(['u5']);
   });
 
   it('keeps both notes when the picked person is already on the event', () => {
