@@ -14,6 +14,7 @@ import {
   assignmentLabelForUnknownId,
   formatStaffingColumn,
   parseStaffingColumn,
+  staffingInfoForEvent,
 } from '../../server/planning-sheet-sync-service';
 
 describe('parseStaffingColumn (reading the sheet)', () => {
@@ -42,6 +43,103 @@ describe('parseStaffingColumn (reading the sheet)', () => {
   it('reads "&" name lists and blank cells', () => {
     expect(parseStaffingColumn('V: Ann & Bo').volunteer).toEqual({ needed: true, assigned: 'Ann, Bo' });
     expect(parseStaffingColumn('').driver).toEqual({ needed: false, assigned: null, isVanDriver: false });
+  });
+});
+
+describe('formatStaffingColumn (app -> sheet push)', () => {
+  const role = (needed: boolean, names: string[], count: number) => ({
+    needed,
+    assigned: names.length ? names.join(', ') : null,
+    count,
+    names,
+  });
+
+  it("writes names with a colon and open spots as a colon-less count (the sheet's convention)", () => {
+    expect(
+      formatStaffingColumn({
+        driver: { ...role(true, ['Karen'], 2), isVanDriver: false },
+        speaker: { needed: false, assigned: null },
+        volunteer: role(true, ['Jane'], 3),
+      })
+    ).toBe('D: Karen, D1, V: Jane, V2');
+  });
+
+  it('writes an open need with no names as a count, and a full role as just the names', () => {
+    expect(
+      formatStaffingColumn({
+        driver: { ...role(true, [], 1), isVanDriver: false },
+        speaker: { needed: false, assigned: null },
+        volunteer: role(true, ['Jane'], 1),
+      })
+    ).toBe('D1, V: Jane');
+  });
+
+  it('lists every assigned person, even past the count, with no open spots', () => {
+    expect(
+      formatStaffingColumn({
+        driver: { ...role(true, ['Luz', 'Bo'], 1), isVanDriver: true },
+        speaker: { needed: false, assigned: null },
+        volunteer: role(false, [], 0),
+      })
+    ).toBe('VD: Luz, Bo');
+  });
+});
+
+describe('staffingInfoForEvent (what the push puts in Staffing)', () => {
+  it('writes two different people who share a name', () => {
+    const info = staffingInfoForEvent({ volunteersNeeded: 2 }, [], ['Jane Doe', 'Jane Doe']);
+    expect(formatStaffingColumn(info)).toBe('V: Jane Doe, Jane Doe');
+  });
+
+  it('keeps a leftover unfilled speaker need as an open volunteer spot', () => {
+    const info = staffingInfoForEvent({ volunteersNeeded: 0, speakersNeeded: 1 }, [], []);
+    expect(formatStaffingColumn(info)).toBe('V1');
+  });
+
+  it("doesn't grow when a speaker need is read back into volunteers", () => {
+    // Push: 1 volunteer + 1 unfilled speaker -> one open spot. Reading the row
+    // back sets volunteersNeeded to 1; speakersNeeded is never changed. The
+    // next push must write the same cell.
+    const first = formatStaffingColumn(staffingInfoForEvent({ volunteersNeeded: 1, speakersNeeded: 1 }, [], []));
+    const second = formatStaffingColumn(staffingInfoForEvent({ volunteersNeeded: 1, speakersNeeded: 1 }, [], []));
+    expect(first).toBe('V1');
+    expect(second).toBe(first);
+  });
+
+  it('writes drivers with the van prefix and open spots', () => {
+    const info = staffingInfoForEvent({ driversNeeded: 2, vanDriverNeeded: true }, ['Luz'], []);
+    expect(formatStaffingColumn(info)).toBe('VD: Luz, VD1');
+  });
+});
+
+describe('push -> sheet -> app round trip keeps staffing counts', () => {
+  // Imported lazily so this file's DB mock is in place first.
+  const { buildRowUpdatePlan } = require('../../server/services/planning-sheet-row-update');
+  const USERS = [
+    { id: 'u-karen', firstName: 'Karen', lastName: 'Ray', displayName: null },
+    { id: 'u-jane', firstName: 'Jane', lastName: 'Doe', displayName: null },
+  ];
+  const event = {
+    id: 1, organizationName: 'G', status: 'scheduled', scheduledEventDate: '2026-11-14T12:00:00',
+    desiredEventDate: null, eventStartTime: null, eventEndTime: null, pickupTime: null,
+    estimatedSandwichCount: null, actualSandwichCount: null, sandwichTypes: null,
+    firstName: null, lastName: null, email: null, phone: null, eventAddress: null, deliveryDestination: null,
+    driversNeeded: 2, speakersNeeded: 0, volunteersNeeded: 3, vanDriverNeeded: false,
+    assignedDriverIds: ['u-karen'], assignedSpeakerIds: null, assignedVolunteerIds: ['u-jane'],
+    driverDetails: null, speakerDetails: null, volunteerDetails: null,
+  };
+
+  it('reading back what the push wrote changes nothing', () => {
+    const cell = formatStaffingColumn({
+      driver: { needed: true, assigned: 'Karen Ray', isVanDriver: false, count: 2, names: ['Karen Ray'] },
+      speaker: { needed: false, assigned: null },
+      volunteer: { needed: true, assigned: 'Jane Doe', count: 3, names: ['Jane Doe'] },
+    });
+    const plan = buildRowUpdatePlan(event, { date: '2026-11-14', 'Group Name': 'G', Staffing: cell }, USERS);
+    expect(plan.updates.driversNeeded).toBeUndefined();
+    expect(plan.updates.volunteersNeeded).toBeUndefined();
+    expect(plan.updates.assignedDriverIds).toBeUndefined();
+    expect(plan.updates.assignedVolunteerIds).toBeUndefined();
   });
 });
 

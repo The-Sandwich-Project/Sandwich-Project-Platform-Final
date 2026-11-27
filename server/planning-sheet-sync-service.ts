@@ -139,6 +139,9 @@ export function formatVanNeededForCell(
  * Format specifications:
  * - The staffing column contains role assignments separated by role prefixes
  * - Format: "D: Name1, Name2, S: Name3, V: Name4, VD: Name5"
+ * - A code with no colon is an open need, its number is how many:
+ *   "V: Ann, V2" = Ann assigned, 2 more volunteers still needed (3 in all).
+ *   This is the sheet's convention, read by its Apps Scripts.
  * - Each role can have multiple people assigned (comma-separated names)
  * - Each role can be:
  *   - Assigned with name(s): "D: John Doe, Jane Smith" (role needed, assigned to John and Jane)
@@ -163,9 +166,9 @@ export function formatVanNeededForCell(
  * Note: Comma-separated names within a role are preserved as a single string.
  */
 export interface StaffingInfo {
-  driver: { needed: boolean; assigned: string | null; isVanDriver: boolean };
-  speaker: { needed: boolean; assigned: string | null };
-  volunteer: { needed: boolean; assigned: string | null };
+  driver: { needed: boolean; assigned: string | null; isVanDriver: boolean; count?: number; names?: string[] };
+  speaker: { needed: boolean; assigned: string | null; count?: number; names?: string[] };
+  volunteer: { needed: boolean; assigned: string | null; count?: number; names?: string[] };
 }
 
 /** user_<ms>_<rand> (current), UUIDs, or bare numbers (legacy) are IDs; anything else is a typed name. */
@@ -201,47 +204,86 @@ export function parseStaffingColumn(staffingStr: string): StaffingInfo {
 
 /**
  * Format a StaffingInfo object into the string format for the Planning Sheet.
- * 
- * Trailing space behavior:
- * - When a role is needed but unassigned, the format includes a trailing space after the colon.
- * - Examples: "D: ", "S: ", "V: ", "VD: "
- * - This is intentional to indicate the position is open/needed but not yet filled.
- * - The parser handles both "D:" and "D: " as unassigned positions.
- * 
+ *
+ * Uses the sheet's own convention, which its Apps Scripts (weekly volunteer
+ * email, needs email, calendar) and the red "still needed" formatting read:
+ * - "V: Jane, Kim": who's filling the role (code WITH a colon)
+ * - "V2": open spots still needed (code with NO colon, number = how many)
+ * So 3 volunteers needed with Jane assigned is "V: Jane, V2"; 2 needed with
+ * nobody yet is "V2"; fully staffed is just the names.
+ *
+ * Open spots = the role's `count` minus the assigned `names`. A role that's
+ * needed with no names and no count gets one open spot ("V1"). Without
+ * `count`/`names` (older callers) `assigned` is written as typed.
+ *
  * See StaffingInfo documentation for complete format specification.
  */
 export function formatStaffingColumn(staffing: StaffingInfo): string {
   const parts: string[] = [];
 
+  const writeRole = (
+    prefix: string,
+    role: { needed: boolean; assigned: string | null; count?: number; names?: string[] }
+  ) => {
+    if (!role.needed) return;
+    const names = role.names ?? (role.assigned ? [role.assigned] : []);
+    let open = Math.max((role.count ?? 0) - names.length, 0);
+    if (names.length === 0 && open === 0) open = 1;
+    if (names.length > 0) parts.push(`${prefix}: ${names.join(', ')}`);
+    if (open > 0) parts.push(`${prefix}${open}`);
+  };
+
   // Driver or Van Driver
-  if (staffing.driver.needed) {
-    const prefix = staffing.driver.isVanDriver ? 'VD' : 'D';
-    if (staffing.driver.assigned) {
-      parts.push(`${prefix}: ${staffing.driver.assigned}`);
-    } else {
-      parts.push(`${prefix}: `); // Unassigned but needed
-    }
-  }
-
-  // Speaker
-  if (staffing.speaker.needed) {
-    if (staffing.speaker.assigned) {
-      parts.push(`S: ${staffing.speaker.assigned}`);
-    } else {
-      parts.push(`S: `); // Unassigned but needed
-    }
-  }
-
+  writeRole(staffing.driver.isVanDriver ? 'VD' : 'D', staffing.driver);
+  // Speaker (retired role; still written for old rows that have one)
+  writeRole('S', staffing.speaker);
   // Volunteer
-  if (staffing.volunteer.needed) {
-    if (staffing.volunteer.assigned) {
-      parts.push(`V: ${staffing.volunteer.assigned}`);
-    } else {
-      parts.push(`V: `); // Unassigned but needed
-    }
-  }
+  writeRole('V', staffing.volunteer);
 
   return parts.join(', ');
+}
+
+/**
+ * The Staffing cell's content for an event, given the display names of its
+ * assigned drivers and of its assigned volunteers plus leftover speakers.
+ *
+ * - Speakers (a retired role) are written as volunteers: the sheet reads an
+ *   "S" as a volunteer, so a separate "S" would add an extra volunteer on
+ *   every sheet -> app -> sheet round trip. The caller merges volunteer and
+ *   speaker assignments by ID, never by name: two different people can share
+ *   a name and both must be written.
+ * - A leftover unfilled speaker need (old completed events keep
+ *   speakersNeeded) still shows as an open volunteer spot. It's max, not sum:
+ *   reading the row back sets volunteersNeeded to the cell's total and never
+ *   touches the speaker columns, so a sum would grow on every round trip.
+ */
+export function staffingInfoForEvent(
+  e: {
+    driversNeeded?: number | null;
+    volunteersNeeded?: number | null;
+    speakersNeeded?: number | null;
+    vanDriverNeeded?: boolean | null;
+  },
+  driverNames: string[],
+  volunteerNames: string[]
+): StaffingInfo {
+  const volunteerCount = Math.max(e.volunteersNeeded || 0, e.speakersNeeded || 0);
+  return {
+    driver: {
+      needed: (e.driversNeeded || 0) > 0 || driverNames.length > 0,
+      assigned: driverNames.length > 0 ? driverNames.join(', ') : null,
+      isVanDriver: e.vanDriverNeeded || false,
+      count: e.driversNeeded || 0,
+      names: driverNames,
+    },
+    speaker: { needed: false, assigned: null },
+    volunteer: {
+      needed: volunteerCount > 0 || volunteerNames.length > 0,
+      assigned: volunteerNames.length > 0 ? volunteerNames.join(', ') : null,
+      count: volunteerCount,
+      names: volunteerNames,
+    },
+  };
 }
 
 /**
@@ -965,8 +1007,6 @@ export class PlanningSheetSyncService {
 
     // Get assigned driver/speaker/volunteer names
     const driverNames = await this.getAssignedNames(e.assignedDriverIds || []);
-    const speakerNames = await this.getAssignedNames(e.assignedSpeakerIds || []);
-    const volunteerNames = await this.getAssignedNames(e.assignedVolunteerIds || []);
 
     // Resolve TSP contact - either customTspContact (free text) or
     // tspContact (user ID). The planning sheet TSP Contact column only
@@ -989,22 +1029,16 @@ export class PlanningSheetSyncService {
       tspContactName = toFirstName(names[0] || e.tspContact);
     }
 
-    // Build staffing string
-    const staffing: StaffingInfo = {
-      driver: {
-        needed: (e.driversNeeded || 0) > 0 || driverNames.length > 0,
-        assigned: driverNames.length > 0 ? driverNames.join(', ') : null,
-        isVanDriver: e.vanDriverNeeded || false,
-      },
-      speaker: {
-        needed: (e.speakersNeeded || 0) > 0 || speakerNames.length > 0,
-        assigned: speakerNames.length > 0 ? speakerNames.join(', ') : null,
-      },
-      volunteer: {
-        needed: (e.volunteersNeeded || 0) > 0 || volunteerNames.length > 0,
-        assigned: volunteerNames.length > 0 ? volunteerNames.join(', ') : null,
-      },
-    };
+    // Build staffing string. Leftover speakers (a retired role) are merged
+    // into volunteers by ID; see staffingInfoForEvent.
+    const staffVolunteerIds = Array.from(
+      new Set([...(e.assignedVolunteerIds || []), ...(e.assignedSpeakerIds || [])].filter(Boolean))
+    );
+    const staffing = staffingInfoForEvent(
+      e,
+      driverNames,
+      staffVolunteerIds.length ? await this.getAssignedNames(staffVolunteerIds) : []
+    );
 
     // Format date with 2-digit year (M/D/YY)
     const eventDate = getEffectiveEventDate(e);
