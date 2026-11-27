@@ -127,11 +127,23 @@ export const SandwichEstimateEditor: React.FC<SandwichEstimateEditorProps> = ({
             className={`w-44 ${inputClass}`}
             data-testid={`${idPrefix}-total`}
           />
-          <p className={`text-xs ${hintClass}`}>
-            {state.rest.length > 0
-              ? 'Part of this total is still type TBD.'
-              : 'For when the group knows roughly how many but not the split yet.'}
-          </p>
+          {state.rest.length > 0 ? (
+            <div className={`text-xs ${hintClass} flex flex-wrap items-center gap-2`}>
+              <span>Part of this total is still type TBD.</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => update({ ...state, rest: [] })}
+                data-testid={`${idPrefix}-clear-rest`}
+              >
+                No other types (the split above is complete)
+              </Button>
+            </div>
+          ) : (
+            <p className={`text-xs ${hintClass}`}>For when the group knows roughly how many but not the split yet.</p>
+          )}
         </div>
       ) : (
         <p className={`text-sm ${labelClass}`} data-testid={`${idPrefix}-computed-total`}>

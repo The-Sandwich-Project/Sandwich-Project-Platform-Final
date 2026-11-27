@@ -44,6 +44,8 @@ interface RescheduleDialogProps {
     status: string;
     scheduledEventDate: string;
     originalScheduledDate?: string | Date | null;
+    wasPostponed?: boolean;
+    postponementCount?: number;
     postponementNotes?: string;
   }) => Promise<void>;
 }
@@ -73,10 +75,14 @@ export const RescheduleDialog: React.FC<RescheduleDialogProps> = ({
     try {
       const formattedDate = format(data.newScheduledDate, 'yyyy-MM-dd');
       await onConfirm(request.id, {
-        // "Rescheduled" was retired: a new date keeps the event Scheduled.
+        // "Rescheduled" was retired: a new date keeps the event Scheduled. The
+        // move is still recorded, so the card's "Rescheduled" history badge
+        // (wasPostponed) and "originally scheduled" date keep working.
         status: 'scheduled',
         scheduledEventDate: formattedDate,
-        originalScheduledDate: request.scheduledEventDate || request.originalScheduledDate || null,
+        originalScheduledDate: request.originalScheduledDate || request.scheduledEventDate || null,
+        wasPostponed: true,
+        postponementCount: (request.postponementCount || 0) + 1,
         postponementNotes: data.rescheduleNotes || undefined,
       });
       form.reset();

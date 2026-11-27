@@ -370,6 +370,8 @@ export const ScheduledTab: React.FC = () => {
     status: string;
     scheduledEventDate: string;
     originalScheduledDate?: string | Date | null;
+    wasPostponed?: boolean;
+    postponementCount?: number;
     postponementNotes?: string;
   }) => {
     await updateEventRequestMutation.mutateAsync({ id: eventId, data });

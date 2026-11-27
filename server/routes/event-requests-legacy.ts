@@ -1,5 +1,5 @@
 import { normalizeToolkitPatch, isToolkitSent } from '@shared/toolkit-state';
-import { normalizeIncomingStatus, statusTransitionEffects } from '../utils/status-transition-effects';
+import { normalizeIncomingStatus, rescheduleMoveFields, statusTransitionEffects } from '../utils/status-transition-effects';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage-wrapper';
@@ -117,6 +117,7 @@ const EVENT_REQUEST_TIMESTAMP_FIELDS = [
   'statusChangedAt',
   'standbyExpectedDate',
   'standbyMarkedAt',
+  'originalScheduledDate',
   'scheduledEventDate',
   'socialMediaPostRequestedDate',
   'socialMediaPostCompletedDate',
@@ -2882,8 +2883,14 @@ router.patch(
         }
       });
 
-      // "Rescheduled" was retired; treat it as "scheduled".
+      // "Rescheduled" was retired; treat it as "scheduled", but still record
+      // the date move (old clients): the "Rescheduled" history badge reads
+      // wasPostponed, and originalScheduledDate keeps the first date.
       if (processedUpdates.status) {
+        Object.assign(
+          processedUpdates,
+          rescheduleMoveFields(processedUpdates.status, originalEvent, processedUpdates as Record<string, unknown>)
+        );
         processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
       }
 
@@ -3032,14 +3039,7 @@ router.patch(
           })
         );
 
-        // Track metadata for rescheduled status
-        if (processedUpdates.status === 'rescheduled') {
-          // Preserve the original scheduled date if not already set
-          if (originalEvent.scheduledEventDate && !processedUpdates.originalScheduledDate) {
-            processedUpdates.originalScheduledDate = originalEvent.scheduledEventDate;
-          }
-          processedUpdates.wasPostponed = true;
-        }
+        // (A date move is recorded where 'rescheduled' is normalized, above.)
 
       }
 
@@ -3626,8 +3626,14 @@ router.put(
 
       }
 
-      // "Rescheduled" was retired; treat it as "scheduled".
+      // "Rescheduled" was retired; treat it as "scheduled", but still record
+      // the date move (old clients): the "Rescheduled" history badge reads
+      // wasPostponed, and originalScheduledDate keeps the first date.
       if (processedUpdates.status) {
+        Object.assign(
+          processedUpdates,
+          rescheduleMoveFields(processedUpdates.status, originalEvent, processedUpdates as Record<string, unknown>)
+        );
         processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
       }
 

@@ -78,4 +78,30 @@ describe('Sandwich estimate editor (Deli / PB&J rows)', () => {
     expect((screen.getByLabelText('Deli amount') as HTMLInputElement).value).toBe('200');
     expect(screen.getByText('200 Deli')).toBeTruthy();
   });
+
+  it('an older split with a type-TBD remainder can be finished, and the total is then worked out', () => {
+    const onSave = jest.fn();
+    render(
+      <CardSandwichEstimateEdit
+        request={{
+          id: 9,
+          estimatedSandwichCount: 300,
+          sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 150 }],
+        }}
+        onSave={onSave}
+        onCancel={jest.fn()}
+      />
+    );
+    if (!(screen.getByLabelText('PB&J') as HTMLInputElement).checked) fireEvent.click(screen.getByLabelText('PB&J'));
+    fireEvent.change(screen.getByLabelText('PB&J amount'), { target: { value: '100' } });
+    // Still part TBD, so the typed 300 stands until the user says the split is complete.
+    expect(screen.getByText('Part of this total is still type TBD.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /split above is complete/ }));
+    expect(screen.queryByText('Part of this total is still type TBD.')).toBeNull();
+    expect(screen.queryByLabelText('Total, if known')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const body = onSave.mock.calls[0][0];
+    expect(body.estimatedSandwichCount).toBe(250);
+    expect(JSON.parse(body.sandwichTypes)).toEqual([{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 100 }]);
+  });
 });

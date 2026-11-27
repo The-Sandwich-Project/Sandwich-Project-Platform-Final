@@ -15,6 +15,25 @@ export function normalizeIncomingStatus<T extends string | null | undefined>(sta
   return (status === 'rescheduled' ? 'scheduled' : status) as T;
 }
 
+/**
+ * Fields recording a date move when an old client still sends "rescheduled"
+ * (the status itself is normalized to "scheduled"). The card's "Rescheduled"
+ * history badge reads wasPostponed; originalScheduledDate keeps the FIRST
+ * date, so it's only filled when neither the request nor the event has one.
+ */
+export function rescheduleMoveFields(
+  incomingStatus: string | null | undefined,
+  original: { scheduledEventDate?: unknown; originalScheduledDate?: unknown },
+  updates: Record<string, unknown>,
+): Record<string, unknown> {
+  if (incomingStatus !== 'rescheduled') return {};
+  const out: Record<string, unknown> = { wasPostponed: true };
+  if (!updates.originalScheduledDate && !original.originalScheduledDate && original.scheduledEventDate) {
+    out.originalScheduledDate = original.scheduledEventDate;
+  }
+  return out;
+}
+
 /** Days until the default standby check-back reminder. */
 export const DEFAULT_STANDBY_CHECK_BACK_DAYS = 7;
 
