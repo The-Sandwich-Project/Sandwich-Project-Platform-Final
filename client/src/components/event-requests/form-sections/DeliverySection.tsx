@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { MapPin, RotateCw } from 'lucide-react';
 import type { EventFormData } from './types';
+import { NEXT_DAY_PICKUP_LABELS, NEXT_DAY_PICKUP_VALUES, effectiveNextDayPickup } from '@shared/next-day-pickup';
 
 interface DeliverySectionProps {
   formData: EventFormData;
@@ -93,35 +94,50 @@ export const DeliverySection: React.FC<DeliverySectionProps> = ({
           </p>
         </div>
 
-        {/* Overnight Holding Checkbox */}
-        <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <input
-            type="checkbox"
-            id="holdingOvernight"
-            checked={formData.holdingOvernight}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              setFormData((prev: any) => ({
-                ...prev,
-                holdingOvernight: checked,
-                ...(checked ? {} : {
-                  overnightHoldingLocation: '',
-                  overnightPickupTime: '',
-                  deliveryTimeWindow: '',
-                  deliveryParkingAccess: ''
-                })
-              }));
-            }}
-            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            data-testid="checkbox-holding-overnight"
-          />
-          <Label htmlFor="holdingOvernight" className="text-sm font-medium text-blue-900 cursor-pointer">
-            This group will hold sandwiches overnight
-          </Label>
+        {/* Next-day pickup: No / It's an option / Yes, planned */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2" data-testid="next-day-pickup">
+          <Label className="text-sm font-medium text-blue-900">Next-day pickup</Label>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Next-day pickup">
+            {NEXT_DAY_PICKUP_VALUES.map((value) => {
+              const selected = effectiveNextDayPickup(formData as any) === value;
+              return (
+                <Button
+                  key={value}
+                  type="button"
+                  size="sm"
+                  role="radio"
+                  aria-checked={selected}
+                  variant={selected ? 'default' : 'outline'}
+                  className={selected ? 'bg-[#236383] hover:bg-[#1d5270]' : 'bg-white'}
+                  onClick={() =>
+                    setFormData((prev: any) => ({
+                      ...prev,
+                      nextDayPickup: value,
+                      holdingOvernight: value === 'planned',
+                      // Only a planned next-day pickup keeps the overnight details.
+                      ...(value === 'planned'
+                        ? {}
+                        : { overnightHoldingLocation: '', overnightPickupTime: '', deliveryTimeWindow: '', deliveryParkingAccess: '' }),
+                    }))
+                  }
+                  data-testid={`next-day-pickup-${value}`}
+                >
+                  {NEXT_DAY_PICKUP_LABELS[value]}
+                </Button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-blue-900/80">
+            {effectiveNextDayPickup(formData as any) === 'option'
+              ? 'The group can hold the sandwiches overnight if needed (handy when the van is busy that day).'
+              : effectiveNextDayPickup(formData as any) === 'planned'
+                ? 'The group holds the sandwiches overnight; they are picked up the next day.'
+                : 'Sandwiches are picked up the same day.'}
+          </p>
         </div>
 
         {/* Overnight Holding Location */}
-        {formData.holdingOvernight && (
+        {effectiveNextDayPickup(formData as any) === 'planned' && (
           <div className="space-y-2">
             <Label htmlFor="overnightHoldingLocation">Overnight Holding Location</Label>
             <Input

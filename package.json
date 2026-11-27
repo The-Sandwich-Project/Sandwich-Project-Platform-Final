@@ -19,6 +19,7 @@
     "volunteers:sync": "tsx scripts/sync-volunteer-sheet.ts",
     "alerts:backfill": "tsx scripts/backfill-last-human-update.ts",
     "statuses:retire-rescheduled": "tsx scripts/retire-rescheduled-status.ts",
+    "tsp-shopping:not-null": "tsx scripts/tsp-shopped-not-null.ts",
     "email:test": "tsx scripts/send-test-email.ts",
     "email:import-sendgrid-suppressions": "tsx scripts/import-sendgrid-suppressions.ts",
     "db:compare": "tsx scripts/compare-db-schemas.ts",

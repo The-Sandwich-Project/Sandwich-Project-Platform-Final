@@ -21,6 +21,10 @@ export interface EventFormData {
   eventAddress: string;
   deliveryDestination: string;
   holdingOvernight: boolean;
+  /** 'no' | 'option' | 'planned' (shared/next-day-pickup.ts). */
+  nextDayPickup?: 'no' | 'option' | 'planned';
+  /** true = TSP is buying the food; false = the group shops. */
+  isTspShopped?: boolean;
   overnightHoldingLocation: string;
   overnightPickupTime: string;
   sandwichTypes: Array<{ type: string; quantity: number }>;
@@ -53,6 +57,11 @@ export interface EventFormData {
    * to form state.
    */
   estimatedAttendance: number;
+  /** Expected attendees range ends; 0 for a single number. */
+  estimatedAttendanceMin?: number;
+  estimatedAttendanceMax?: number;
+  /** Text the attendees box can't read; blocks saving. */
+  attendanceError?: string;
   adultCount: number;
   childrenCount: number;
   status: string;

@@ -60,6 +60,9 @@ import {
   DeleteConfirmDialog,
   type EventFormData,
 } from './form-sections';
+import { TspShoppingCheckbox } from './TspShopping';
+import { effectiveNextDayPickup } from '@shared/next-day-pickup';
+import { ExpectedAttendeesField } from './form-sections/ExpectedAttendeesField';
 import {
   buildEventDataForServer,
   findMismatchedSavedFields,
@@ -114,7 +117,8 @@ function buildFormDataFromEventRequest(
     })(),
     eventAddress: eventRequest?.eventAddress || '',
     deliveryDestination: eventRequest?.deliveryDestination || '',
-    holdingOvernight: !!(eventRequest?.overnightHoldingLocation),
+    holdingOvernight: effectiveNextDayPickup(eventRequest as any) === 'planned',
+    nextDayPickup: effectiveNextDayPickup(eventRequest as any),
     overnightHoldingLocation: eventRequest?.overnightHoldingLocation || '',
     overnightPickupTime: eventRequest?.overnightPickupTime || '',
     sandwichTypes: existingSandwichTypes,
@@ -126,6 +130,8 @@ function buildFormDataFromEventRequest(
       ? (eventRequest as any).vanNeededFor
       : '',
     vanNeededLikely: (eventRequest as any)?.vanNeededLikely || false,
+    // TSP shopping: strictly true/false (checked = TSP buys the food).
+    isTspShopped: (eventRequest as any)?.isTspShopped === true,
     volunteersNeeded: eventRequest?.volunteersNeeded || 0,
     tspContact: eventRequest?.tspContact || '',
     customTspContact: (eventRequest as any)?.customTspContact || '',
@@ -142,6 +148,8 @@ function buildFormDataFromEventRequest(
     // Single home for estimated attendance. Legacy records that only populated
     // the old volunteerCount column still open with their count.
     estimatedAttendance: resolveEstimatedAttendance(eventRequest as any),
+    estimatedAttendanceMin: (eventRequest as any)?.estimatedAttendanceMin || 0,
+    estimatedAttendanceMax: (eventRequest as any)?.estimatedAttendanceMax || 0,
     adultCount: (eventRequest as any)?.adultCount || 0,
     childrenCount: (eventRequest as any)?.childrenCount || 0,
     kidsAgeRange: (eventRequest as any)?.kidsAgeRange || '',
@@ -250,16 +258,16 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   const [formData, setFormData] = useState<Record<string, any>>({
     eventDate: '', backupDates: [] as string[], eventStartTime: '', eventEndTime: '',
     pickupTime: '', pickupDateTime: '', pickupDate: '', pickupTimeSeparate: '',
-    eventAddress: '', deliveryDestination: '', holdingOvernight: false,
+    eventAddress: '', deliveryDestination: '', holdingOvernight: false, nextDayPickup: 'no',
     overnightHoldingLocation: '', overnightPickupTime: '',
     sandwichTypes: [] as Array<{type: string, quantity: number}>,
     hasRefrigeration: '', driversNeeded: 0, selfTransport: false, vanDriverNeeded: false, vanNeededLikely: false, vanNeededFor: '',
-    assignedVanDriverId: '', isDhlVan: false, volunteersNeeded: 0,
+    assignedVanDriverId: '', isDhlVan: false, volunteersNeeded: 0, isTspShopped: false,
     tspContact: '', customTspContact: '', message: '', schedulingNotes: '',
     planningNotes: '', nextAction: '', driverInstructions: '', volunteerInstructions: '',
     totalSandwichCount: 0, estimatedSandwichCountMin: 0,
     estimatedSandwichCountMax: 0, rangeSandwichType: '',
-    estimatedAttendance: 0, adultCount: 0, childrenCount: 0, kidsAgeRange: '',
+    estimatedAttendance: 0, estimatedAttendanceMin: 0, estimatedAttendanceMax: 0, adultCount: 0, childrenCount: 0, kidsAgeRange: '',
     status: 'new', toolkitSent: false, toolkitSentDate: '', toolkitStatus: 'not_sent',
     socialMediaPostRequested: false, socialMediaPostRequestedDate: '',
     socialMediaPostCompleted: false, socialMediaPostCompletedDate: '',
@@ -387,7 +395,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       // sandwichEstimateError is a temporary flag for text the editor can't
       // read; the editor itself isn't saved in the draft, so a restored error
       // would block saving a valid estimate. Leave it out.
-      const { sandwichEstimateError: _transientEstimateError, ...draftFormData } = formData as any;
+      const { sandwichEstimateError: _transientEstimateError, attendanceError: _transientAttendanceError, ...draftFormData } = formData as any;
       localStorage.setItem(getAutoSaveKey(), JSON.stringify({
         formData: draftFormData, sandwichMode, actualSandwichMode, attendeeMode,
         savedAt: new Date().toISOString(),
@@ -963,6 +971,17 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       return;
     }
 
+    // Same for expected attendees ("about 40" can't be stored).
+    if (formData.attendanceError) {
+      setIsSubmitting(false);
+      toast({
+        title: 'Check expected attendees',
+        description: formData.attendanceError,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Block saving a partial record (e.g. opened from the map). A full-form save
     // from a partial record would overwrite columns the partial source omitted
     // (notes, backup contacts, toolkit, etc.) with empty/default values.
@@ -1511,6 +1530,16 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 sandwichMode={sandwichMode}
                 setSandwichMode={setSandwichMode}
                 isComplete={sectionStatus.sandwiches}
+              />
+
+              {/* Expected attendees: a number or a range, rough is fine */}
+              <ExpectedAttendeesField formData={formData as any} setFormData={setFormData} />
+
+              {/* TSP shopping: who buys the food (asks to confirm every change) */}
+              <TspShoppingCheckbox
+                checked={formData.isTspShopped === true}
+                organizationName={formData.organizationName}
+                onChange={(next) => setFormData((prev: any) => ({ ...prev, isTspShopped: next }))}
               />
 
               {/* Delivery — destination picker only shows once scheduled/completed */}
