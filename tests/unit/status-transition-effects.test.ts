@@ -54,3 +54,12 @@ describe('status transition side effects', () => {
     expect(statusTransitionEffects({ fromStatus: 'standby', toStatus: 'standby', updates: {}, now: NOW })).toEqual({});
   });
 });
+
+describe('admin status endpoint check-back date', () => {
+  it('a supplied date or null is kept; the default only applies when omitted', () => {
+    const chosen = new Date('2026-12-20T12:00:00Z');
+    expect(statusTransitionEffects({ fromStatus: 'in_process', toStatus: 'standby', updates: { standbyExpectedDate: chosen }, now: NOW })).not.toHaveProperty('standbyExpectedDate');
+    expect(statusTransitionEffects({ fromStatus: 'in_process', toStatus: 'standby', updates: { standbyExpectedDate: null }, now: NOW })).not.toHaveProperty('standbyExpectedDate');
+    expect(statusTransitionEffects({ fromStatus: 'in_process', toStatus: 'standby', updates: {}, now: NOW })).toHaveProperty('standbyExpectedDate');
+  });
+});

@@ -104,6 +104,11 @@ export interface EventFormData {
   // What the group is waiting on (Budget, Date/time, ...), plus details
   standbyReason: string;
   standbyNotes: string;
+  // The check-back choice shown in the Standby details. Kept with the form
+  // data (not separate state) so draft recovery and Discard include it. Not
+  // sent to the server directly: on save it becomes standbyExpectedDate.
+  standbyCheckBackMode: 'one_week' | 'specific' | 'none';
+  standbyCheckBackDate: string;
   // Reason fields for cancelled / declined (filled by StatusReasonDialog
   // when the status dropdown is used in the edit form)
   cancelledReason: string;

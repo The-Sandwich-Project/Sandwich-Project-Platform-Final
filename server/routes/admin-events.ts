@@ -195,6 +195,23 @@ export function createAdminEventsRouter(deps: { isAuthenticated: any }) {
       const { reason } = req.body;
       // "Rescheduled" was retired; treat it as "scheduled".
       const status = normalizeIncomingStatus(req.body.status);
+
+      // Optional Standby check-back date: a date (YYYY-MM-DD or ISO) or null
+      // for "No reminder". Omitted = the default (a week out) applies.
+      let standbyExpectedDate: Date | null | undefined;
+      if (Object.prototype.hasOwnProperty.call(req.body, 'standbyExpectedDate')) {
+        const raw = req.body.standbyExpectedDate;
+        if (raw === null || raw === '') {
+          standbyExpectedDate = null;
+        } else {
+          const text = String(raw);
+          const parsed = /^\d{4}-\d{2}-\d{2}$/.test(text) ? new Date(`${text}T12:00:00Z`) : new Date(text);
+          if (Number.isNaN(parsed.getTime())) {
+            return res.status(400).json({ message: 'Invalid standbyExpectedDate' });
+          }
+          standbyExpectedDate = parsed;
+        }
+      }
       const validStatuses = ['new', 'in_process', 'scheduled', 'completed', 'declined', 'cancelled', 'stalled', 'standby', 'non_event'];
 
       if (!status || !validStatuses.includes(status)) {
@@ -225,7 +242,13 @@ export function createAdminEventsRouter(deps: { isAuthenticated: any }) {
         .set({
           status,
           ...(status !== oldStatus ? { statusChangedAt: now } : {}),
-          ...statusTransitionEffects({ fromStatus: oldStatus, toStatus: status, updates: {}, now }),
+          ...(status === 'standby' && standbyExpectedDate !== undefined ? { standbyExpectedDate } : {}),
+          ...statusTransitionEffects({
+            fromStatus: oldStatus,
+            toStatus: status,
+            updates: standbyExpectedDate !== undefined ? { standbyExpectedDate } : {},
+            now,
+          }),
           updatedAt: now,
         })
         .where(eq(eventRequests.id, eventId));

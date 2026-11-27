@@ -52,3 +52,25 @@ describe('Standby check-back date', () => {
     expect(isStandbyCheckBackComplete('one_week', '')).toBe(true);
   });
 });
+
+describe('when a save sends the Standby check-back date', () => {
+  const { shouldSendStandbyCheckBack } = require('../form-sections/StandbyDetailsSection');
+  const original = { standbyCheckBackMode: 'specific', standbyCheckBackDate: '2026-12-10' };
+
+  it('always when entering Standby', () => {
+    expect(shouldSendStandbyCheckBack({ enteringStandby: true, original, mode: 'specific', date: '2026-12-10' })).toBe(true);
+  });
+
+  it('not on an unrelated save of an event already on Standby', () => {
+    expect(shouldSendStandbyCheckBack({ enteringStandby: false, original, mode: 'specific', date: '2026-12-10' })).toBe(false);
+    expect(
+      shouldSendStandbyCheckBack({ enteringStandby: false, original: { standbyCheckBackMode: 'none', standbyCheckBackDate: '' }, mode: 'none', date: '' })
+    ).toBe(false);
+  });
+
+  it('when the user changed the date or the choice', () => {
+    expect(shouldSendStandbyCheckBack({ enteringStandby: false, original, mode: 'specific', date: '2026-12-20' })).toBe(true);
+    expect(shouldSendStandbyCheckBack({ enteringStandby: false, original, mode: 'none', date: '' })).toBe(true);
+    expect(shouldSendStandbyCheckBack({ enteringStandby: false, original, mode: 'one_week', date: '' })).toBe(true);
+  });
+});

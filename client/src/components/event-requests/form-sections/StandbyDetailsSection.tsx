@@ -53,6 +53,24 @@ export function isStandbyCheckBackComplete(mode: StandbyCheckBackMode, specificD
   return mode !== 'specific' || /^\d{4}-\d{2}-\d{2}$/.test(specificDate.trim());
 }
 
+/**
+ * Whether a save should send the check-back date: when entering Standby, or
+ * when the user changed the check-back choice since the form was opened.
+ * Otherwise it's left out, so an unrelated save (e.g. editing notes) can't
+ * overwrite a reminder someone else set in the meantime.
+ */
+export function shouldSendStandbyCheckBack(args: {
+  enteringStandby: boolean;
+  original: { standbyCheckBackMode?: string; standbyCheckBackDate?: string } | null | undefined;
+  mode: StandbyCheckBackMode;
+  date: string;
+}): boolean {
+  const { enteringStandby, original, mode, date } = args;
+  if (enteringStandby || !original) return true;
+  if (original.standbyCheckBackMode !== mode) return true;
+  return mode === 'specific' && (original.standbyCheckBackDate || '') !== date;
+}
+
 /** A reason is required; "Other" also needs a note. */
 export function isStandbyReasonComplete(reason: string, notes: string): boolean {
   if (!reason) return false;

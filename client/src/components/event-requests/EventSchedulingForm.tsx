@@ -54,6 +54,7 @@ import {
   standbyCheckBackValue,
   isStandbyReasonComplete,
   isStandbyCheckBackComplete,
+  shouldSendStandbyCheckBack,
   type StandbyCheckBackMode,
   DeleteConfirmDialog,
   type EventFormData,
@@ -226,6 +227,14 @@ function buildFormDataFromEventRequest(
     standbyExpectedDate: (eventRequest as any)?.standbyExpectedDate ? formatDateForInput((eventRequest as any).standbyExpectedDate) : '',
     standbyReason: (eventRequest as any)?.standbyReason || '',
     standbyNotes: (eventRequest as any)?.standbyNotes || '',
+    // Already on Standby: start from its saved check-back date (or "No
+    // reminder"). Anything else: a new Standby episode defaults to a week out.
+    ...(() => {
+      const saved = (eventRequest as any)?.standbyExpectedDate ? formatDateForInput((eventRequest as any).standbyExpectedDate) : '';
+      return eventRequest?.status === 'standby'
+        ? { standbyCheckBackMode: (saved ? 'specific' : 'none') as StandbyCheckBackMode, standbyCheckBackDate: saved }
+        : { standbyCheckBackMode: 'one_week' as StandbyCheckBackMode, standbyCheckBackDate: '' };
+    })(),
     socialMediaPostRequested: (eventRequest as any)?.socialMediaPostRequested || false,
     socialMediaPostRequestedDate: (eventRequest as any)?.socialMediaPostRequestedDate ? formatDateForInput((eventRequest as any).socialMediaPostRequestedDate) : '',
     socialMediaPostCompleted: (eventRequest as any)?.socialMediaPostCompleted || false,
@@ -323,6 +332,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     backupContactPhone: '', backupContactRole: '', previouslyHosted: 'i_dont_know',
     deliveryTimeWindow: '',
     deliveryParkingAccess: '', standbyExpectedDate: '', standbyReason: '', standbyNotes: '',
+    standbyCheckBackMode: 'one_week' as StandbyCheckBackMode, standbyCheckBackDate: '',
     cancelledReason: '', cancelledNotes: '', declinedReason: '', declinedNotes: '',
     dateFlexible: null as boolean | null,
   });
@@ -356,27 +366,11 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   const [standbyReasonError, setStandbyReasonError] = useState(false);
   const [showStatusReasonDialog, setShowStatusReasonDialog] = useState(false);
   const [pendingReasonStatus, setPendingReasonStatus] = useState<'cancelled' | 'declined' | null>(null);
-  const [standbyFollowUpDate, setStandbyFollowUpDate] = useState('');
-  const [standbyFollowUpMode, setStandbyFollowUpMode] = useState<StandbyCheckBackMode>('one_week');
-
-  // When the status becomes Standby, set up the check-back choice shown in the
-  // inline Standby details: a week out for a new Standby episode, or the
-  // event's existing check-back date (or none) if it was already on Standby.
+  // The check-back choice lives in formData (standbyCheckBackMode / Date), so
+  // draft recovery and Discard include it. Clear the "missing" hints when the
+  // status moves off Standby.
   useEffect(() => {
-    if (formData.status !== 'standby') {
-      setStandbyReasonError(false);
-      return;
-    }
-    const wasStandby = (eventRequest?.status || 'new') === 'standby';
-    if (wasStandby) {
-      const existing = formData.standbyExpectedDate;
-      setStandbyFollowUpMode(existing ? 'specific' : 'none');
-      setStandbyFollowUpDate(existing || '');
-    } else {
-      setStandbyFollowUpMode('one_week');
-      setStandbyFollowUpDate('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (formData.status !== 'standby') setStandbyReasonError(false);
   }, [formData.status]);
   const [hasRecoveredData, setHasRecoveredData] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1275,10 +1269,14 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     }
 
     // Standby: what they're waiting on and the check-back date are asked right
-    // in the form (StandbyDetailsSection), not in a popup. Require a reason,
-    // then always send the chosen check-back date ('' = no reminder) so the
-    // choice is saved even when it equals what was there before.
+    // in the form (StandbyDetailsSection), not in a popup. Require a reason.
+    // The check-back date is sent only when entering Standby or when the user
+    // changed the choice in this session; otherwise the normal changed-fields
+    // save applies, so an unrelated save (e.g. notes) can't overwrite a
+    // reminder someone else set since this form was opened.
     if (formData.status === 'standby') {
+      const checkBackMode = formData.standbyCheckBackMode;
+      const checkBackDate = formData.standbyCheckBackDate;
       if (!isStandbyReasonComplete(formData.standbyReason || '', formData.standbyNotes || '')) {
         setStandbyReasonError(true);
         setIsSubmitting(false);
@@ -1292,7 +1290,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       }
       // "On a specific date" needs a date: a blank one must not silently turn
       // the reminder off (only "No reminder" does that).
-      if (!isStandbyCheckBackComplete(standbyFollowUpMode, standbyFollowUpDate)) {
+      if (!isStandbyCheckBackComplete(checkBackMode, checkBackDate)) {
         setStandbyReasonError(true);
         setIsSubmitting(false);
         toast({
@@ -1303,9 +1301,22 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         document.querySelector('[data-testid="standby-details"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
-      const checkBack = standbyCheckBackValue(standbyFollowUpMode, standbyFollowUpDate);
-      setFormData((prev) => ({ ...prev, standbyExpectedDate: checkBack }));
-      await performSubmit(false, { standbyExpectedDate: checkBack || null });
+      if (
+        shouldSendStandbyCheckBack({
+          enteringStandby: (eventRequest?.status || 'new') !== 'standby',
+          original: originalFormDataRef.current,
+          mode: checkBackMode,
+          date: checkBackDate,
+        })
+      ) {
+        const checkBack = standbyCheckBackValue(checkBackMode, checkBackDate);
+        setFormData((prev) => ({ ...prev, standbyExpectedDate: checkBack }));
+        // Sent even when equal to the stored value, so the choice ('' = no
+        // reminder) is saved and the server's one-week default doesn't apply.
+        await performSubmit(false, { standbyExpectedDate: checkBack || null });
+        return;
+      }
+      await performSubmit(false);
       return;
     }
 
@@ -1488,10 +1499,10 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 <StandbyDetailsSection
                   formData={formData as EventFormData}
                   setFormData={setFormData}
-                  checkBackMode={standbyFollowUpMode}
-                  setCheckBackMode={setStandbyFollowUpMode}
-                  checkBackDate={standbyFollowUpDate}
-                  setCheckBackDate={setStandbyFollowUpDate}
+                  checkBackMode={formData.standbyCheckBackMode}
+                  setCheckBackMode={(mode) => setFormData((prev) => ({ ...prev, standbyCheckBackMode: mode }))}
+                  checkBackDate={formData.standbyCheckBackDate}
+                  setCheckBackDate={(date) => setFormData((prev) => ({ ...prev, standbyCheckBackDate: date }))}
                   showReasonError={standbyReasonError}
                 />
               )}
