@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,12 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useAuth } from '@/hooks/useAuth';
 import { EditableEmailPreview } from '@/components/editable-email-preview';
+import {
+  TOOLKIT_EMAIL_TEMPLATE_TYPE,
+  buildToolkitEmailHtml,
+  canOfferCallMe,
+  type ToolkitNextStep,
+} from '@shared/toolkit-email-template';
 import { AiEmailHelper } from '@/components/ai-email-helper';
 
 interface EventRequest {
@@ -91,7 +97,6 @@ interface EmailTemplateSection {
 const SUBJECT_SUGGESTIONS = [
   'Your Sandwich-Making Event Toolkit + Next Steps',
   'Let’s Plan Your Event! [Action Required]',
-  'Everything You Need to Make 200+ Sandwiches',
   '{organizationName} - Ready to Get Started?',
   'Quick Call to Finalize Your Sandwich Event',
   'Re: {organizationName} Event',
@@ -117,11 +122,13 @@ export function EventEmailComposer({
   const [content, setContent] = useState('');
   const [selectedAttachments, setSelectedAttachments] = useState<string[]>([]);
   const [isDraft, setIsDraft] = useState(false);
-  const [includeSchedulingLink, setIncludeSchedulingLink] = useState(false);
-  const [requestPhoneCall, setRequestPhoneCall] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
-  const [emailFormat, setEmailFormat] = useState<'html' | 'plaintext'>('html'); // User's choice: HTML template or plain text
-  const [templateStyle, setTemplateStyle] = useState<'classic' | 'optimized'>('optimized'); // Template version: Classic or Optimized
+  // Next step the email asks for. "Call me" needs the sender's phone number.
+  const [nextStep, setNextStep] = useState<ToolkitNextStep>('availability');
+  const [customNextStep, setCustomNextStep] = useState('');
+  // The request came in without a phone number: offer (and default to) asking for one.
+  const requestHasNoPhone = !(eventRequest.phone && eventRequest.phone.trim());
+  const [askForPhone, setAskForPhone] = useState(requestHasNoPhone);
 
   // Smart regeneration state management
   const [hasManualEdits, setHasManualEdits] = useState(false);
@@ -152,1209 +159,55 @@ export function EventEmailComposer({
   });
   const availableDrafts = Array.isArray(availableDraftsData) ? availableDraftsData : [];
 
-  // Fetch customizable email template sections
+  // Saved wording for the toolkit email (Email Templates admin page). Any
+  // section without a saved change uses the default in toolkit-email-template.
   const { data: templateSections } = useQuery<EmailTemplateSection[]>({
-    queryKey: ['/api/email-templates/sections', 'follow_up_email'],
+    queryKey: ['/api/email-templates/sections'],
     enabled: isOpen,
   });
-
-  // Helper to get section content (uses currentContent if set, otherwise defaultContent)
-  const getSectionContent = (sectionKey: string, fallback: string = ''): string => {
-    if (!templateSections) return fallback;
-    const section = templateSections.find(s => s.sectionKey === sectionKey);
-    if (!section) return fallback;
-    return section.currentContent ?? section.defaultContent;
-  };
-
-  // Helper to substitute placeholders in template text
-  const substitutePlaceholders = (text: string, eventReq: EventRequest): string => {
-    return text
-      .replace(/\{\{firstName\}\}/g, eventReq.firstName || '')
-      .replace(/\{\{organizationName\}\}/g, eventReq.organizationName || '');
-  };
-
-  // Check if current content has been manually edited
-  const isContentManuallyEdited = () => {
-    // If we don't have a last generated content, assume it's manual
-    if (!lastGeneratedContentRef.current) return true;
-
-    // Compare current content with last generated template (ignore whitespace differences)
-    const currentContentNormalized = content.trim().replace(/\s+/g, ' ');
-    const lastGeneratedNormalized = lastGeneratedContentRef.current
-      .trim()
-      .replace(/\s+/g, ' ');
-
-    return currentContentNormalized !== lastGeneratedNormalized;
-  };
-
-  // Smart regenerate - only regenerate if content hasn't been manually edited
-  const smartRegenerateEmailContent = (
-    includeScheduling: boolean,
-    requestPhone: boolean,
-    force: boolean = false
-  ) => {
-    // If hasManualEdits is true, never regenerate (unless forced)
-    if (hasManualEdits && !force) {
-      return false; // Content was not regenerated
+  const savedToolkitSections = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    for (const section of templateSections || []) {
+      if (section.templateType === TOOLKIT_EMAIL_TEMPLATE_TYPE) {
+        map[section.sectionKey] = section.currentContent ?? null;
+      }
     }
+    return map;
+  }, [templateSections]);
 
-    // If forced (Reset to Template) or content hasn't been manually edited, regenerate
-    if (force || !isContentManuallyEdited()) {
-      regenerateEmailContent(includeScheduling, requestPhone);
-      setHasManualEdits(false);
-      return true; // Content was regenerated
-    }
-    return false; // Content was not regenerated
-  };
+  const senderPhone = user?.phoneNumber || '';
+  const callMeAvailable = canOfferCallMe(senderPhone);
 
-  // Regenerate email content based on selected options
-  const regenerateEmailContent = (
-    includeScheduling: boolean,
-    requestPhone: boolean,
-    templateStyleOverride?: 'classic' | 'optimized',
-    emailFormatOverride?: 'html' | 'plaintext'
-  ) => {
-    const userName =
+  // Build the email from the template with the current choices.
+  const regenerateEmailContent = () => {
+    const senderName =
       user?.firstName && user?.lastName
         ? `${user.firstName} ${user.lastName}`
         : user?.email || 'The Sandwich Project Team';
-
-    const userPhone = user?.phoneNumber || '';
-    const userEmail =
+    const senderEmail =
       user?.preferredEmail || user?.email || 'info@thesandwichproject.org';
-
-    // Use overrides if provided, otherwise use state
-    const activeTemplateStyle = templateStyleOverride ?? templateStyle;
-    const activeEmailFormat = emailFormatOverride ?? emailFormat;
-
-    // Generate plain text email if user selected plaintext format
-    if (activeEmailFormat === 'plaintext') {
-      // Get customizable sections for plain text with fallbacks
-      const plainGreeting = substitutePlaceholders(
-        getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-        eventRequest
-      );
-      const plainIntro = substitutePlaceholders(
-        getSectionContent('intro', "Thank you for your interest in hosting a sandwich-making event with The Sandwich Project!"),
-        eventRequest
-      );
-      const plainCta = substitutePlaceholders(
-        getSectionContent('cta_subtitle', "To get started, please reply to this email with your phone number and best times to call you. We'll reach out within 1-2 business days."),
-        eventRequest
-      );
-
-      let plainTextContent = `${plainGreeting}
-
-${plainIntro}
-
-`;
-
-      if (includeScheduling || requestPhone) {
-        plainTextContent += `${plainCta}
-
-`;
-      } else {
-        // Non-scheduling, non-phone path - use a distinct general CTA section
-        const generalCta = substitutePlaceholders(
-          getSectionContent('cta_subtitle_general', "I'd love to discuss your event and answer any questions you may have."),
-          eventRequest
-        );
-        plainTextContent += `${generalCta}
-
-`;
-      }
-
-      plainTextContent += `In the meantime, here are some helpful resources:
-
-- Event Toolkit (food safety guides, labels, instructions): https://the-sandwich-project.github.io/sandwichinventory/toolkit.html
-- Inventory Calculator: https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html
-- We typically serve groups of 50-200 people
-- Events usually last 1-2 hours
-
-Looking forward to working with you!
-
-Warmly,
-${userName}
-${userEmail}${userPhone ? `\n${userPhone}` : ''}`;
-
-      setContent(plainTextContent);
-      lastGeneratedContentRef.current = plainTextContent;
-      return;
-    }
-
-    // Use styled HTML template when includeScheduling is true
-    if (includeScheduling) {
-      // Choose template based on style selection
-      const htmlTemplate = activeTemplateStyle === 'optimized'
-        ? generateOptimizedSchedulingTemplate(eventRequest, userName, userEmail, userPhone)
-        : generateClassicSchedulingTemplate(eventRequest, userName, userEmail, userPhone);
-
-      setContent(htmlTemplate);
-      lastGeneratedContentRef.current = htmlTemplate;
-      return;
-    }
-
-    // Use styled HTML template for non-scheduling version (unless requesting phone)
-    if (!requestPhone) {
-      // Choose template based on style selection
-      const htmlTemplate = activeTemplateStyle === 'optimized'
-        ? generateOptimizedNonSchedulingTemplate(eventRequest, userName, userEmail, userPhone)
-        : generateClassicNonSchedulingTemplate(eventRequest, userName, userEmail, userPhone);
-
-      setContent(htmlTemplate);
-      lastGeneratedContentRef.current = htmlTemplate;
-      return;
-    }
-
-    // Phone call request - respect email format setting
-    if (activeEmailFormat === 'html') {
-      // Generate HTML template for phone call request
-      const htmlTemplate = activeTemplateStyle === 'optimized'
-        ? generateOptimizedPhoneRequestTemplate(eventRequest, userName, userEmail, userPhone)
-        : generateClassicPhoneRequestTemplate(eventRequest, userName, userEmail, userPhone);
-
-      setContent(htmlTemplate);
-      lastGeneratedContentRef.current = htmlTemplate;
-      return;
-    }
-
-    // Plain text template for phone request (only when emailFormat is plaintext)
-    // Get customizable sections for plain text with fallbacks
-    const plainGreeting = substitutePlaceholders(
-      getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-      eventRequest
-    );
-    const plainIntro = substitutePlaceholders(
-      getSectionContent('intro', "Thank you for reaching out and for your interest in making sandwiches with us! We are so glad you want to get involved. Attached you'll find a toolkit (everything you need to plan a sandwich-making event), plus a link to our interactive planning guide with an inventory calculator and food safety tips."),
-      eventRequest
-    );
-    const schedulingCallText = substitutePlaceholders(
-      getSectionContent('cta_subtitle', "Once you have reviewed everything, we would love to connect! Please reply to this email with your phone number and best times to call you. We'll reach out within 1-2 business days."),
-      eventRequest
-    );
-
-    const template = `${plainGreeting}
-
-${plainIntro}
-
-
-**Event Scheduling**
-
-• Groups may host events on any day of the week if making 200+ sandwiches.
-
-• If you have some flexibility with dates, let us know! We can suggest times when sandwiches are especially needed.
-
-• Once you have set a date, we ask for at least two weeks' notice so we can add you to our schedule.
-
-
-**Transportation**
-
-• We provide transportation for 200+ deli sandwiches and for larger amounts of PBJs (based on volunteer driver availability).
-
-• If you're located outside our host home radius, we would be happy to discuss delivery options with you.
-
-
-**Food Safety Reminders**
-
-• A refrigerator is required to make deli sandwiches so that meat, cheese, and sandwiches are always cold.
-
-• Food-safe gloves must be worn.
-
-• Hair should be tied back or in a hairnet.
-
-• Sandwiches must be made indoors.
-
-• We provide food to vulnerable populations, so please read and follow all safety rules.
-
-
-${schedulingCallText}
-
-
-We look forward to working with you!
-
-Warmly,
-${userName}${userPhone ? '\n' + userPhone : ''}
-${userEmail}`;
-
-    setContent(template);
-    // Store the generated content for comparison
-    lastGeneratedContentRef.current = template;
+    const html = buildToolkitEmailHtml({
+      firstName: eventRequest.firstName,
+      organizationName: eventRequest.organizationName,
+      senderName,
+      senderEmail,
+      senderPhone,
+      nextStep: nextStep === 'call' && !callMeAvailable ? 'availability' : nextStep,
+      customNextStep,
+      askForPhone,
+      sections: savedToolkitSections,
+    });
+    setContent(html);
+    lastGeneratedContentRef.current = html;
   };
 
-  // Generate optimized scheduling template
-  const generateOptimizedSchedulingTemplate = (
-    eventRequest: EventRequest,
-    userName: string,
-    userEmail: string,
-    userPhone: string
-  ) => {
-    // Get customizable section content with fallbacks
-    const greeting = substitutePlaceholders(
-      getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-      eventRequest
-    );
-    const intro = substitutePlaceholders(
-      getSectionContent('intro', "Thank you for reaching out! We're excited to help you plan a sandwich-making event."),
-      eventRequest
-    );
-    const ctaText = substitutePlaceholders(
-      getSectionContent('call_to_action', '📞 Next Step: Share Your Phone Number'),
-      eventRequest
-    );
-    const ctaSubtitle = substitutePlaceholders(
-      getSectionContent('cta_subtitle', "Please reply to this email with your phone number and a few times that work for you this week, and we'll give you a call!"),
-      eventRequest
-    );
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Sandwich Project - Event Information</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f5f5f5;">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
-                            <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
-                        </td>
-                    </tr>
-
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 30px; color: #333333; line-height: 1.7;">
-                            <p style="font-size: 18px; margin: 0 0 15px 0;">${greeting}</p>
-                            <p style="font-size: 18px; margin: 0 0 20px 0;">${intro}</p>
-
-                            <!-- TL;DR Quick Start Box -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 20px 0 30px 0;">
-                                <tr>
-                                    <td style="background-color: #fff7e6; border-left: 5px solid #FBAD3F; padding: 25px;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">⚡ Quick Start (3 Simple Steps)</h2>
-                                        <ol style="margin: 10px 0; padding-left: 25px; font-size: 17px; line-height: 1.8;">
-                                            <li style="margin: 8px 0; color: #333333;"><strong>Review the attached toolkit</strong> (everything you need is included)</li>
-                                            <li style="margin: 8px 0; color: #333333;"><strong>Schedule a quick planning call</strong> using the button below</li>
-                                            <li style="margin: 8px 0; color: #333333;"><strong>We'll finalize details together</strong> and get you on the calendar</li>
-                                        </ol>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Primary CTA -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td style="background-color: #FBAD3F; color: #333333; padding: 25px; text-align: center; border-radius: 8px;">
-                                        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">${ctaText}</p>
-                                        <p style="margin: 0 0 15px 0; font-size: 16px;">${ctaSubtitle}</p>
-                                        <p style="margin: 0; font-size: 14px; font-style: italic; color: #666666;">We'll reach out within 1-2 business days.</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- What's Included Section -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #007E8C;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📦 What's in Your Toolkit</h2>
-                                        <p style="margin: 10px 0; color: #444444; font-size: 16px;">You'll find everything attached to this email:</p>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Step-by-step event planning guide</li>
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Food safety requirements checklist</li>
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Loaf bag labels (print & use)</li>
-                                        </ul>
-                                        <p style="margin: 15px 0 0 0; font-size: 16px;">
-                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #007E8C; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Key Things to Know (Collapsed) -->
-                            <h2 style="margin: 30px 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">💡 Key Things to Know</h2>
-
-                            <!-- Section: Event Scheduling -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">📅 Scheduling</h3>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">We host group events if you are going to make over 200 sandwiches on days other than our normal Wednesday collections</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Flexible on dates? We can suggest high-need times</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">We appreciate 2+ weeks notice when possible</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Transportation -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">🚗 Transportation</h3>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">You just need refrigeration at your sandwich-making location, our drivers will bring coolers for transportation</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Outside our area? We'll try to work with you on finding a recipient in your area</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Food Safety -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">🧤 Food Safety Essentials</h3>
-                                        <p style="margin: 5px 0 10px 0; color: #444444; font-size: 15px;">Quick requirements (full details in toolkit):</p>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Refrigerator required for deli sandwiches</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Food-safe gloves & hair restraints must be worn</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Indoor preparation only</li>
-                                        </ul>
-                                        <p style="margin: 10px 0 0 0; padding: 12px; background-color: #fff7e6; border-left: 3px solid #FBAD3F; font-size: 14px; color: #333333;">
-                                            <strong>💡 Tip:</strong> Place the attached labels on the <strong>outside of each loaf bag</strong> containing 10-12 sandwiches.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Secondary CTA -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 35px 0 20px 0;">
-                                <tr>
-                                    <td style="background-color: #236383; color: #ffffff; padding: 25px; text-align: center; border-radius: 6px;">
-                                        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">Ready to Make a Difference?</p>
-                                        <p style="margin: 0 0 20px 0; font-size: 16px;">Please reply to this email with your phone number and best times to call you, and we'll get you on the calendar!</p>
-                                        <p style="margin: 0; font-size: 14px; font-style: italic; color: #666666;">We'll reach out within 1-2 business days.</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <p style="margin-top: 25px; text-align: center; font-size: 16px; color: #666666;">Questions? Just reply to this email—we're here to help!</p>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #236383; color: #ffffff; padding: 30px; text-align: center;">
-                            <p style="margin: 5px 0;"><strong>Warmly,</strong></p>
-                            <p style="margin: 10px 0;">●</p>
-                            <p style="margin: 5px 0;"><strong>${userName}</strong></p>
-                            <p style="margin: 5px 0;"><a href="mailto:${userEmail}" style="color: #47B3CB; text-decoration: none;">${userEmail}</a></p>
-                            ${userPhone ? `<p style="margin: 5px 0;">${userPhone}</p>` : ''}
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-  };
-
-  // Generate optimized non-scheduling template
-  const generateOptimizedNonSchedulingTemplate = (
-    eventRequest: EventRequest,
-    userName: string,
-    userEmail: string,
-    userPhone: string
-  ) => {
-    // Get customizable section content with fallbacks
-    const greeting = substitutePlaceholders(
-      getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-      eventRequest
-    );
-    const intro = substitutePlaceholders(
-      getSectionContent('intro', "Thank you for reaching out! We're excited to help you plan a sandwich-making event."),
-      eventRequest
-    );
-    const ctaText = substitutePlaceholders(
-      getSectionContent('call_to_action', '📞 Next Step: Share Your Phone Number'),
-      eventRequest
-    );
-    const ctaSubtitle = substitutePlaceholders(
-      getSectionContent('cta_subtitle_general', "I'd love to discuss your event and answer any questions you may have."),
-      eventRequest
-    );
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Sandwich Project - Event Information</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f5f5f5;">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
-                            <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
-                        </td>
-                    </tr>
-
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 30px; color: #333333; line-height: 1.7;">
-                            <p style="font-size: 18px; margin: 0 0 15px 0;">${greeting}</p>
-                            <p style="font-size: 18px; margin: 0 0 20px 0;">${intro}</p>
-
-                            <!-- TL;DR Quick Start Box -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 20px 0 30px 0;">
-                                <tr>
-                                    <td style="background-color: #fff7e6; border-left: 5px solid #FBAD3F; padding: 25px;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">⚡ Quick Start (3 Simple Steps)</h2>
-                                        <ol style="margin: 10px 0; padding-left: 25px; font-size: 17px; line-height: 1.8;">
-                                            <li style="margin: 8px 0; color: #333333;"><strong>Review the attached toolkit</strong> (everything you need is included)</li>
-                                            <li style="margin: 8px 0; color: #333333;"><strong>Reply with your availability</strong> for a quick planning call</li>
-                                            <li style="margin: 8px 0; color: #333333;"><strong>We'll finalize details together</strong> and get you on the calendar</li>
-                                        </ol>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Primary CTA -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td style="background-color: #FBAD3F; color: #333333; padding: 25px; text-align: center; border-radius: 8px;">
-                                        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">${ctaText}</p>
-                                        <p style="margin: 0 0 15px 0; font-size: 16px;">${ctaSubtitle}</p>
-                                        <p style="margin: 0; font-size: 14px; font-style: italic; color: #666666;">We look forward to scheduling your planning call soon.</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- What's Included Section -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #007E8C;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📦 What's in Your Toolkit</h2>
-                                        <p style="margin: 10px 0; color: #444444; font-size: 16px;">You'll find everything attached to this email:</p>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Step-by-step event planning guide</li>
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Food safety requirements checklist</li>
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Loaf bag labels (print & use)</li>
-                                        </ul>
-                                        <p style="margin: 15px 0 0 0; font-size: 16px;">
-                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #007E8C; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Key Things to Know (Collapsed) -->
-                            <h2 style="margin: 30px 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">💡 Key Things to Know</h2>
-
-                            <!-- Section: Event Scheduling -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">📅 Scheduling</h3>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">We host group events if you are going to make over 200 sandwiches on days other than our normal Wednesday collections</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Flexible on dates? We can suggest high-need times</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">We appreciate 2+ weeks notice when possible</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Transportation -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">🚗 Transportation</h3>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">You just need refrigeration at your sandwich-making location, our drivers will bring coolers for transportation</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Outside our area? We'll try to work with you on finding a recipient in your area</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Food Safety -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">🧤 Food Safety Essentials</h3>
-                                        <p style="margin: 5px 0 10px 0; color: #444444; font-size: 15px;">Quick requirements (full details in toolkit):</p>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Refrigerator required for deli sandwiches</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Food-safe gloves & hair restraints must be worn</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Indoor preparation only</li>
-                                        </ul>
-                                        <p style="margin: 10px 0 0 0; padding: 12px; background-color: #fff7e6; border-left: 3px solid #FBAD3F; font-size: 14px; color: #333333;">
-                                            <strong>💡 Tip:</strong> Place the attached labels on the <strong>outside of each loaf bag</strong> containing 10-12 sandwiches.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Secondary CTA -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 35px 0 20px 0;">
-                                <tr>
-                                    <td style="background-color: #236383; color: #ffffff; padding: 25px; text-align: center; border-radius: 6px;">
-                                        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">Ready to Make a Difference?</p>
-                                        <p style="margin: 0; font-size: 16px;">Reply with your availability and let's get started!</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <p style="margin-top: 25px; text-align: center; font-size: 16px; color: #666666;">Questions? Just reply to this email—we're here to help!</p>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #236383; color: #ffffff; padding: 30px; text-align: center;">
-                            <p style="margin: 5px 0;"><strong>Warmly,</strong></p>
-                            <p style="margin: 10px 0;">●</p>
-                            <p style="margin: 5px 0;"><strong>${userName}</strong></p>
-                            <p style="margin: 5px 0;"><a href="mailto:${userEmail}" style="color: #47B3CB; text-decoration: none;">${userEmail}</a></p>
-                            ${userPhone ? `<p style="margin: 5px 0;">${userPhone}</p>` : ''}
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-  };
-
-  // Generate classic scheduling template (original version)
-  const generateClassicSchedulingTemplate = (
-    eventRequest: EventRequest,
-    userName: string,
-    userEmail: string,
-    userPhone: string
-  ) => {
-    // Get customizable section content with fallbacks
-    const greeting = substitutePlaceholders(
-      getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-      eventRequest
-    );
-    const intro = substitutePlaceholders(
-      getSectionContent('intro', "Thank you for reaching out and for your interest in making sandwiches with us! We are so glad you want to get involved. Attached you'll find a toolkit (everything you need to plan a sandwich-making event), plus a link to our interactive planning guide with food safety tips and helpful resources."),
-      eventRequest
-    );
-    const ctaText = substitutePlaceholders(
-      getSectionContent('call_to_action', '📞 Next Step: Share Your Phone Number'),
-      eventRequest
-    );
-    const ctaSubtitle = substitutePlaceholders(
-      getSectionContent('cta_subtitle', "Please reply to this email with your phone number and a few times that work for you this week, and we'll give you a call!"),
-      eventRequest
-    );
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Sandwich Project - Event Information</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f5f5f5;">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
-                            <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
-                        </td>
-                    </tr>
-
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 30px; color: #333333; line-height: 1.7;">
-                            <p style="font-size: 18px; margin: 0 0 15px 0;">${greeting}</p>
-                            <p style="font-size: 18px; margin: 0 0 30px 0;">${intro}</p>
-
-                            <!-- CTA Button -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center" style="padding: 20px 0;">
-                                        <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="display: inline-block; background-color: #47B3CB; color: #ffffff; padding: 14px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px; font-size: 16px;">🧮 Budget & Shopping Planner</a>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Event Scheduling -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📅 Event Scheduling</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>Groups may host events on any day of the week</strong> if making 200+ sandwiches.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>If you have flexibility with your date</strong>, let us know! We can suggest times when sandwiches are especially needed.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>We appreciate at least two weeks' notice when possible</strong>—it helps us coordinate drivers and resources.</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Transportation -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">🚗 Transportation</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">We provide transportation for <strong>200+ deli sandwiches</strong> and for larger amounts of PBJs (based on volunteer driver availability).</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">If you're located outside our host home radius, we would be happy to discuss delivery options with you.</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Food Safety -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">🧤 Food Safety Reminders</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">A <strong>refrigerator is required</strong> to make deli sandwiches so that meat, cheese, and sandwiches are always cold.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Food-safe gloves must be worn.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Hair should be tied back or in a hairnet.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Sandwiches must be made indoors.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">We provide food to vulnerable populations, so please read and follow all safety rules.</li>
-                                        </ul>
-                                        <p style="margin-top: 15px; padding: 15px; background-color: #fff7e6; border-left: 3px solid #FBAD3F; font-size: 15px; color: #333333;">
-                                            <strong>📝 Labeling Tip:</strong> The attached PDF for labels are intended to go on the <strong>outside of each bag</strong> containing a loaf of sandwiches.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Highlight Box -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 25px 0;">
-                                <tr>
-                                    <td style="background-color: #236383; color: #ffffff; padding: 20px; text-align: center;">
-                                        <p style="margin: 5px 0; font-size: 17px;"><strong>Ready to get started?</strong></p>
-                                        <p style="margin: 5px 0; font-size: 17px;">Once you have reviewed everything, we would love to connect!</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Phone Number Request -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td style="background-color: #FBAD3F; color: #333333; padding: 25px; text-align: center; border-radius: 8px;">
-                                        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">${ctaText}</p>
-                                        <p style="margin: 0 0 15px 0; font-size: 16px;">${ctaSubtitle}</p>
-                                        <p style="margin: 0; font-size: 14px; font-style: italic; color: #666666;">We'll reach out within 1-2 business days.</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <p style="margin-top: 30px; text-align: center; font-size: 16px;">We look forward to working with you!</p>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #236383; color: #ffffff; padding: 30px; text-align: center;">
-                            <p style="margin: 5px 0;"><strong>Warmly,</strong></p>
-                            <p style="margin: 10px 0;">●</p>
-                            <p style="margin: 5px 0;"><strong>${userName}</strong></p>
-                            <p style="margin: 5px 0;"><a href="mailto:${userEmail}" style="color: #47B3CB; text-decoration: none;">${userEmail}</a></p>
-                            ${userPhone ? `<p style="margin: 5px 0;">${userPhone}</p>` : ''}
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-  };
-
-  // Generate classic non-scheduling template (original version)
-  const generateClassicNonSchedulingTemplate = (
-    eventRequest: EventRequest,
-    userName: string,
-    userEmail: string,
-    userPhone: string
-  ) => {
-    // Get customizable section content with fallbacks
-    const greeting = substitutePlaceholders(
-      getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-      eventRequest
-    );
-    const intro = substitutePlaceholders(
-      getSectionContent('intro', "Thank you for reaching out and for your interest in making sandwiches with us! We are so glad you want to get involved. Attached you'll find a toolkit (everything you need to plan a sandwich-making event), plus a link to our interactive planning guide with food safety tips and helpful resources."),
-      eventRequest
-    );
-    const ctaText = substitutePlaceholders(
-      getSectionContent('call_to_action', '📞 Next Step: Share Your Phone Number'),
-      eventRequest
-    );
-    const ctaSubtitle = substitutePlaceholders(
-      getSectionContent('cta_subtitle_general', "I'd love to discuss your event and answer any questions you may have."),
-      eventRequest
-    );
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Sandwich Project - Event Information</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f5f5f5;">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
-                            <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
-                        </td>
-                    </tr>
-
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 30px; color: #333333; line-height: 1.7;">
-                            <p style="font-size: 18px; margin: 0 0 15px 0;">${greeting}</p>
-                            <p style="font-size: 18px; margin: 0 0 30px 0;">${intro}</p>
-
-                            <!-- CTA Button -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center" style="padding: 20px 0;">
-                                        <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="display: inline-block; background-color: #47B3CB; color: #ffffff; padding: 14px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px; font-size: 16px;">🧮 Budget & Shopping Planner</a>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Event Scheduling -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📅 Event Scheduling</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>Groups may host events on any day of the week</strong> if making 200+ sandwiches.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>If you have flexibility with your date</strong>, let us know! We can suggest times when sandwiches are especially needed.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>We appreciate at least two weeks' notice when possible</strong>—it helps us coordinate drivers and resources.</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Transportation -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">🚗 Transportation</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">We provide transportation for <strong>200+ deli sandwiches</strong> and for larger amounts of PBJs (based on volunteer driver availability).</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">If you're located outside our host home radius, we would be happy to discuss delivery options with you.</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Food Safety -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">🧤 Food Safety Reminders</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">A <strong>refrigerator is required</strong> to make deli sandwiches so that meat, cheese, and sandwiches are always cold.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Food-safe gloves must be worn.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Hair should be tied back or in a hairnet.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Sandwiches must be made indoors.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">We provide food to vulnerable populations, so please read and follow all safety rules.</li>
-                                        </ul>
-                                        <p style="margin-top: 15px; padding: 15px; background-color: #fff7e6; border-left: 3px solid #FBAD3F; font-size: 15px; color: #333333;">
-                                            <strong>📝 Labeling Tip:</strong> The attached PDF for labels are intended to go on the <strong>outside of each bag</strong> containing a loaf of sandwiches.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Highlight Box -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 25px 0;">
-                                <tr>
-                                    <td style="background-color: #236383; color: #ffffff; padding: 20px; text-align: center;">
-                                        <p style="margin: 5px 0; font-size: 17px;"><strong>Ready to get started?</strong></p>
-                                        <p style="margin: 5px 0; font-size: 17px;">Once you have reviewed everything, please reply to this email with a few times that work for you and we'll schedule a planning call.</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <p style="margin-top: 30px; text-align: center; font-size: 16px;">We look forward to working with you!</p>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #236383; color: #ffffff; padding: 30px; text-align: center;">
-                            <p style="margin: 5px 0;"><strong>Warmly,</strong></p>
-                            <p style="margin: 10px 0;">●</p>
-                            <p style="margin: 5px 0;"><strong>${userName}</strong></p>
-                            <p style="margin: 5px 0;"><a href="mailto:${userEmail}" style="color: #47B3CB; text-decoration: none;">${userEmail}</a></p>
-                            ${userPhone ? `<p style="margin: 5px 0;">${userPhone}</p>` : ''}
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-  };
-
-  // Generate optimized phone request template
-  const generateOptimizedPhoneRequestTemplate = (
-    eventRequest: EventRequest,
-    userName: string,
-    userEmail: string,
-    userPhone: string
-  ) => {
-    // Get customizable section content with fallbacks
-    const greeting = substitutePlaceholders(
-      getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-      eventRequest
-    );
-    const intro = substitutePlaceholders(
-      getSectionContent('intro', "Thank you for reaching out! We're excited to help you plan a sandwich-making event."),
-      eventRequest
-    );
-    const ctaText = substitutePlaceholders(
-      getSectionContent('call_to_action', '📞 Next Step: Share Your Phone Number'),
-      eventRequest
-    );
-    const ctaSubtitle = substitutePlaceholders(
-      getSectionContent('cta_subtitle', "Reply to this email with your phone number and a few times that work for you this week, and we'll give you a call!"),
-      eventRequest
-    );
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Sandwich Project - Event Information</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f5f5f5;">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
-                            <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
-                        </td>
-                    </tr>
-
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 30px; color: #333333; line-height: 1.7;">
-                            <p style="font-size: 18px; margin: 0 0 15px 0;">${greeting}</p>
-                            <p style="font-size: 18px; margin: 0 0 20px 0;">${intro}</p>
-
-                            <!-- TL;DR Quick Start Box -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 20px 0 30px 0;">
-                                <tr>
-                                    <td style="background-color: #fff7e6; border-left: 5px solid #FBAD3F; padding: 25px;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">⚡ Quick Start (3 Simple Steps)</h2>
-                                        <ol style="margin: 10px 0; padding-left: 25px; font-size: 17px; line-height: 1.8;">
-                                            <li style="margin: 8px 0; color: #333333;"><strong>Review the attached toolkit</strong> (everything you need is included)</li>
-                                            <li style="margin: 8px 0; color: #333333;"><strong>Reply with your phone number</strong> and best times for a quick call</li>
-                                            <li style="margin: 8px 0; color: #333333;"><strong>We'll call you</strong> to finalize details and get you on the calendar</li>
-                                        </ol>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Primary CTA -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td style="background-color: #FBAD3F; color: #333333; padding: 25px; text-align: center; border-radius: 8px;">
-                                        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">${ctaText}</p>
-                                        <p style="margin: 0 0 15px 0; font-size: 16px;">${ctaSubtitle}</p>
-                                        <p style="margin: 0; font-size: 14px; font-style: italic; color: #666666;">We'll reach out within 1-2 business days.</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- What's Included Section -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f0f9fa; border-left: 4px solid #007E8C;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📦 What's in Your Toolkit</h2>
-                                        <p style="margin: 10px 0; color: #444444; font-size: 16px;">You'll find everything attached to this email:</p>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Step-by-step event planning guide</li>
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Food safety requirements checklist</li>
-                                            <li style="margin: 8px 0; color: #444444; font-size: 16px;">Loaf bag labels (print & use)</li>
-                                        </ul>
-                                        <p style="margin: 15px 0 0 0; font-size: 16px;">
-                                            <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="color: #007E8C; text-decoration: underline; font-weight: bold;">🧮 Use our Budget & Shopping Planner</a>
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Key Things to Know (Collapsed) -->
-                            <h2 style="margin: 30px 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">💡 Key Things to Know</h2>
-
-                            <!-- Section: Event Scheduling -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">📅 Scheduling</h3>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">We host group events if you are going to make over 200 sandwiches on days other than our normal Wednesday collections</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Flexible on dates? We can suggest high-need times</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">We appreciate 2+ weeks notice when possible</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Transportation -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">🚗 Transportation</h3>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">You just need refrigeration at your sandwich-making location, our drivers will bring coolers for transportation</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Outside our area? We'll try to work with you on finding a recipient in your area</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Food Safety -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 15px 0;">
-                                <tr>
-                                    <td style="padding: 20px; background-color: #f9f9f9; border-left: 3px solid #FBAD3F;">
-                                        <h3 style="margin: 0 0 10px 0; color: #236383; font-size: 18px; font-weight: bold;">🧤 Food Safety Essentials</h3>
-                                        <p style="margin: 5px 0 10px 0; color: #444444; font-size: 15px;">Quick requirements (full details in toolkit):</p>
-                                        <ul style="margin: 5px 0; padding-left: 20px;">
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Refrigerator required for deli sandwiches</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Food-safe gloves & hair restraints must be worn</li>
-                                            <li style="margin: 6px 0; color: #444444; font-size: 15px;">Indoor preparation only</li>
-                                        </ul>
-                                        <p style="margin: 10px 0 0 0; padding: 12px; background-color: #fff7e6; border-left: 3px solid #FBAD3F; font-size: 14px; color: #333333;">
-                                            <strong>💡 Tip:</strong> Place the attached labels on the <strong>outside of each loaf bag</strong> containing 10-12 sandwiches.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Secondary CTA -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 35px 0 20px 0;">
-                                <tr>
-                                    <td style="background-color: #236383; color: #ffffff; padding: 25px; text-align: center; border-radius: 6px;">
-                                        <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold;">Ready to Make a Difference?</p>
-                                        <p style="margin: 0; font-size: 16px;">Reply with your phone number and we'll connect soon!</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <p style="margin-top: 25px; text-align: center; font-size: 16px; color: #666666;">Questions? Just reply to this email—we're here to help!</p>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #236383; color: #ffffff; padding: 30px; text-align: center;">
-                            <p style="margin: 5px 0;"><strong>Warmly,</strong></p>
-                            <p style="margin: 10px 0;">●</p>
-                            <p style="margin: 5px 0;"><strong>${userName}</strong></p>
-                            <p style="margin: 5px 0;"><a href="mailto:${userEmail}" style="color: #47B3CB; text-decoration: none;">${userEmail}</a></p>
-                            ${userPhone ? `<p style="margin: 5px 0;">${userPhone}</p>` : ''}
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-  };
-
-  // Generate classic phone request template
-  const generateClassicPhoneRequestTemplate = (
-    eventRequest: EventRequest,
-    userName: string,
-    userEmail: string,
-    userPhone: string
-  ) => {
-    // Get customizable section content with fallbacks
-    const greeting = substitutePlaceholders(
-      getSectionContent('greeting', `Hi ${eventRequest.firstName},`),
-      eventRequest
-    );
-    const intro = substitutePlaceholders(
-      getSectionContent('intro', "Thank you for reaching out and for your interest in making sandwiches with us! We are so glad you want to get involved. Attached you'll find a toolkit (everything you need to plan a sandwich-making event), plus a link to our interactive planning guide with food safety tips and helpful resources."),
-      eventRequest
-    );
-    const ctaText = substitutePlaceholders(
-      getSectionContent('call_to_action', '📞 Next Step: Share Your Phone Number'),
-      eventRequest
-    );
-    const ctaSubtitle = substitutePlaceholders(
-      getSectionContent('cta_subtitle', "Please reply to this email with your phone number and a few times that work for you this week, and we'll give you a call!"),
-      eventRequest
-    );
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Sandwich Project - Event Information</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f5f5f5;">
-        <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
-                    <!-- Header -->
-                    <tr>
-                        <td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
-                            <img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
-                        </td>
-                    </tr>
-
-                    <!-- Content -->
-                    <tr>
-                        <td style="padding: 40px 30px; color: #333333; line-height: 1.7;">
-                            <p style="font-size: 18px; margin: 0 0 15px 0;">${greeting}</p>
-                            <p style="font-size: 18px; margin: 0 0 30px 0;">${intro}</p>
-
-                            <!-- CTA Button -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-                                <tr>
-                                    <td align="center" style="padding: 20px 0;">
-                                        <a href="https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html" style="display: inline-block; background-color: #47B3CB; color: #ffffff; padding: 14px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px; font-size: 16px;">🧮 Budget & Shopping Planner</a>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Event Scheduling -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">📅 Event Scheduling</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>Groups may host events on any day of the week</strong> if making 200+ sandwiches.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>If you have flexibility with your date</strong>, let us know! We can suggest times when sandwiches are especially needed.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;"><strong>We appreciate at least two weeks' notice when possible</strong>—it helps us coordinate drivers and resources.</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Transportation -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">🚗 Transportation</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">We provide transportation for <strong>200+ deli sandwiches</strong> and for larger amounts of PBJs (based on volunteer driver availability).</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">If you're located outside our host home radius, we would be happy to discuss delivery options with you.</li>
-                                        </ul>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Section: Food Safety -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
-                                <tr>
-                                    <td style="padding: 25px; background-color: #f9f9f9; border-left: 4px solid #FBAD3F;">
-                                        <h2 style="margin: 0 0 15px 0; color: #236383; font-size: 20px; font-weight: bold;">🧤 Food Safety Reminders</h2>
-                                        <ul style="margin: 10px 0; padding-left: 20px;">
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">A <strong>refrigerator is required</strong> to make deli sandwiches so that meat, cheese, and sandwiches are always cold.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Food-safe gloves must be worn.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Hair should be tied back or in a hairnet.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">Sandwiches must be made indoors.</li>
-                                            <li style="margin: 10px 0; color: #444444; font-size: 16px;">We provide food to vulnerable populations, so please read and follow all safety rules.</li>
-                                        </ul>
-                                        <p style="margin-top: 15px; padding: 15px; background-color: #fff7e6; border-left: 3px solid #FBAD3F; font-size: 15px; color: #333333;">
-                                            <strong>📝 Labeling Tip:</strong> The attached PDF for labels are intended to go on the <strong>outside of each bag</strong> containing a loaf of sandwiches.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <!-- Highlight Box -->
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 25px 0;">
-                                <tr>
-                                    <td style="background-color: #236383; color: #ffffff; padding: 20px; text-align: center;">
-                                        <p style="margin: 5px 0; font-size: 17px;"><strong>Ready to get started?</strong></p>
-                                        <p style="margin: 5px 0; font-size: 17px;">Once you have reviewed everything, please reply to this email with your phone number and best times to call you. We'll reach out within 1-2 business days.</p>
-                                    </td>
-                                </tr>
-                            </table>
-
-                            <p style="margin-top: 30px; text-align: center; font-size: 16px;">We look forward to working with you!</p>
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background-color: #236383; color: #ffffff; padding: 30px; text-align: center;">
-                            <p style="margin: 5px 0;"><strong>Warmly,</strong></p>
-                            <p style="margin: 10px 0;">●</p>
-                            <p style="margin: 5px 0;"><strong>${userName}</strong></p>
-                            <p style="margin: 5px 0;"><a href="mailto:${userEmail}" style="color: #47B3CB; text-decoration: none;">${userEmail}</a></p>
-                            ${userPhone ? `<p style="margin: 5px 0;">${userPhone}</p>` : ''}
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
-  };
-
-  // Format event details for template insertion.
-  // Prefer the actual scheduled date once it exists — `desiredEventDate` is
-  // only the originally requested date and may be stale after scheduling.
-  const formatEventDetails = () => {
-    const details = [];
-    const effectiveDateStr = getEffectiveEventDate(eventRequest as any);
-    if (effectiveDateStr) {
-      const date = new Date(effectiveDateStr + 'T12:00:00');
-      details.push(
-        `Date: ${date.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })}`
-      );
-    }
-    if (eventRequest.eventStartTime && eventRequest.eventEndTime) {
-      details.push(
-        `Time: ${eventRequest.eventStartTime} - ${eventRequest.eventEndTime}`
-      );
-    }
-    if (eventRequest.eventAddress) {
-      details.push(`Location: ${eventRequest.eventAddress}`);
-    }
-    if (eventRequest.estimatedSandwichCount) {
-      details.push(
-        `Estimated Sandwiches: ${eventRequest.estimatedSandwichCount}`
-      );
-    }
-
-    return details.length > 0 ? `\n${details.join('\n')}\n` : '';
+  // Rebuild unless the sender has edited the email (or always, when forced by
+  // "Reset to Template").
+  const smartRegenerateEmailContent = (force: boolean = false) => {
+    if (hasManualEdits && !force) return false;
+    regenerateEmailContent();
+    setHasManualEdits(false);
+    return true;
   };
 
   // Apply subject suggestion when selected
@@ -1368,46 +221,27 @@ ${userEmail}`;
     }
   }, [selectedSubjectSuggestion, eventRequest]);
 
-  // Effect to handle option changes with smart regeneration
+  // Rebuild the email when a choice changes or the saved wording loads,
+  // unless the sender has edited it. The panel tells them their edits are kept
+  // and to use "Reset to Template" to apply the new choices.
   useEffect(() => {
-    // Skip on initial load or when resetting to template
     if (isInitialLoad.current || isResettingToTemplate) return;
-
-    // Skip if dialog is not open
-    if (!isOpen) return;
-
-    // Skip if no content exists yet
-    if (!content) return;
-
-    // Keep the sender's edits. The panel tells them their custom content is
-    // preserved and to use "Reset to Template" to apply the new options.
+    if (!isOpen || !content || aiBusy) return;
     if (hasManualEdits) return;
+    regenerateEmailContent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextStep, customNextStep, askForPhone, savedToolkitSections]);
 
-    regenerateEmailContent(includeSchedulingLink, requestPhoneCall);
-  }, [includeSchedulingLink, requestPhoneCall]);
-
-  // Initialize with comprehensive template when component opens
+  // Build the email when the composer opens.
   useEffect(() => {
     if (isOpen && !content) {
-      // Just call regenerateEmailContent to avoid duplicating template logic
-      regenerateEmailContent(includeSchedulingLink, requestPhoneCall);
-
-      // Mark as not having manual edits initially
+      regenerateEmailContent();
       setHasManualEdits(false);
-
       setSubject(`Your Sandwich-Making Event Toolkit + Next Steps`);
-
-      // Clear initial load flag after first template generation
       isInitialLoad.current = false;
     }
-  }, [
-    isOpen,
-    eventRequest,
-    formatEventDetails,
-    includeSchedulingLink,
-    requestPhoneCall,
-    user,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, eventRequest, user]);
 
   // Separate effect to handle default attachment selection after documents load
   useEffect(() => {
@@ -1554,8 +388,8 @@ ${userEmail}`;
       content: content.trim(),
       isDraft: asDraft,
       attachments: selectedAttachments,
-      includeSchedulingLink: includeSchedulingLink,
-      requestPhoneCall: requestPhoneCall,
+      includeSchedulingLink: false,
+      requestPhoneCall: askForPhone,
     });
   };
 
@@ -1566,14 +400,6 @@ ${userEmail}`;
         : [...prev, fileUrl]
     );
   };
-
-  // Switching format or template style rebuilds the email from the template.
-  // Ask first when that would throw away the sender's edits.
-  const confirmDiscardEdits = () =>
-    !hasManualEdits ||
-    window.confirm(
-      'This will replace your edits with the template. Continue?'
-    );
 
   // Handle content changes to track manual edits
   const handleContentChange = (newContent: string) => {
@@ -1594,7 +420,7 @@ ${userEmail}`;
   // Reset to template functionality
   const resetToTemplate = () => {
     setIsResettingToTemplate(true);
-    smartRegenerateEmailContent(includeSchedulingLink, requestPhoneCall, true);
+    smartRegenerateEmailContent(true);
     setIsResettingToTemplate(false);
 
     toast({
@@ -1624,9 +450,8 @@ ${userEmail}`;
       }
     }
 
-    // Load explicit boolean preferences from the draft data
-    setIncludeSchedulingLink(draft.includeSchedulingLink || false);
-    setRequestPhoneCall(draft.requestPhoneCall || false);
+    // The draft remembers whether it asked for a phone number.
+    setAskForPhone(!!draft.requestPhoneCall);
 
     // Clear the subject suggestion since we're loading a custom draft
     setSelectedSubjectSuggestion('custom');
@@ -1842,103 +667,89 @@ ${userEmail}`;
 
           {/* Content */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Message Format</Label>
-
-            <RadioGroup
-              disabled={aiBusy}
-              value={emailFormat}
-              onValueChange={(value: 'html' | 'plaintext') => {
-                if (!confirmDiscardEdits()) return;
-                setEmailFormat(value);
-                // Regenerate content in the new format (pass value directly to avoid race condition)
-                regenerateEmailContent(includeSchedulingLink, requestPhoneCall, undefined, value);
-                setHasManualEdits(false);
-              }}
-              className="flex gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="html"
-                  id="format-html"
-                  data-testid="radio-html"
-                />
-                <Label
-                  htmlFor="format-html"
-                  className="cursor-pointer font-normal"
-                >
-                  Use prebuilt HTML template
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="plaintext"
-                  id="format-plaintext"
-                  data-testid="radio-plaintext"
-                />
-                <Label
-                  htmlFor="format-plaintext"
-                  className="cursor-pointer font-normal"
-                >
-                  Write plain text email
-                </Label>
-              </div>
-            </RadioGroup>
-
-            {/* Template Style Selection (only for HTML format) */}
-            {emailFormat === 'html' && (
-              <div className="mt-4">
-                <Label className="text-sm font-medium mb-2 block">Template Style</Label>
-                <RadioGroup
-                  disabled={aiBusy}
-                  value={templateStyle}
-                  onValueChange={(value: 'classic' | 'optimized') => {
-                    if (!confirmDiscardEdits()) return;
-                    setTemplateStyle(value);
-                    // Regenerate content with new template style (pass value directly to avoid race condition)
-                    regenerateEmailContent(includeSchedulingLink, requestPhoneCall, value);
-                    setHasManualEdits(false);
-                  }}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="optimized"
-                      id="style-optimized"
-                      data-testid="radio-optimized"
-                    />
-                    <Label
-                      htmlFor="style-optimized"
-                      className="cursor-pointer font-normal"
-                    >
-                      ⚡ Optimized (Engagement-focused)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="classic"
-                      id="style-classic"
-                      data-testid="radio-classic"
-                    />
-                    <Label
-                      htmlFor="style-classic"
-                      className="cursor-pointer font-normal"
-                    >
-                      📋 Classic (Original)
-                    </Label>
-                  </div>
-                </RadioGroup>
-                <p className="text-xs text-gray-500 mt-2">
-                  {templateStyle === 'optimized'
-                    ? '✓ Optimized template: Quick Start summary, prominent CTA, condensed details'
-                    : '✓ Classic template: Traditional format with full information sections'}
+            {/* Next step */}
+            <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200" data-testid="toolkit-next-step">
+              <div>
+                <Label className="text-sm font-medium text-gray-700">Next step</Label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Finishes the sentence "Once you've had a chance to look it over, …"
                 </p>
               </div>
-            )}
+              <RadioGroup
+                disabled={aiBusy}
+                value={nextStep}
+                onValueChange={(value: ToolkitNextStep) => setNextStep(value)}
+                className="space-y-2"
+              >
+                <div className="flex items-start space-x-2">
+                  <RadioGroupItem value="availability" id="next-step-availability" data-testid="radio-next-availability" />
+                  <Label htmlFor="next-step-availability" className="cursor-pointer font-normal leading-snug">
+                    <span className="font-medium">Request availability</span>
+                    <span className="block text-xs text-gray-500">"I'd love to set up a time to chat. Just reply with a few dates and times that work for you."</span>
+                  </Label>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <RadioGroupItem
+                    value="call"
+                    id="next-step-call"
+                    disabled={!callMeAvailable}
+                    data-testid="radio-next-call"
+                  />
+                  <Label
+                    htmlFor="next-step-call"
+                    className={`font-normal leading-snug ${callMeAvailable ? 'cursor-pointer' : 'text-gray-400'}`}
+                  >
+                    <span className="font-medium">Call me</span>
+                    <span className="block text-xs text-gray-500">
+                      {callMeAvailable
+                        ? `"…please feel free to give me a call at ${senderPhone} whenever it's convenient."`
+                        : 'Add your phone number in your profile to use this.'}
+                    </span>
+                  </Label>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <RadioGroupItem value="custom" id="next-step-custom" data-testid="radio-next-custom" />
+                  <Label htmlFor="next-step-custom" className="cursor-pointer font-normal leading-snug">
+                    <span className="font-medium">Custom</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+              {nextStep === 'custom' && (
+                <Input
+                  value={customNextStep}
+                  onChange={(e) => setCustomNextStep(e.target.value)}
+                  placeholder="e.g. let's find a time to talk later this week."
+                  disabled={aiBusy}
+                  data-testid="input-custom-next-step"
+                />
+              )}
+
+              {requestHasNoPhone && (
+                <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-2">
+                  <Checkbox
+                    id="ask-for-phone"
+                    checked={askForPhone}
+                    disabled={aiBusy}
+                    onCheckedChange={(checked) => setAskForPhone(checked === true)}
+                    data-testid="checkbox-ask-for-phone"
+                  />
+                  <Label htmlFor="ask-for-phone" className="cursor-pointer text-sm font-normal text-amber-900 leading-snug">
+                    No phone number on file. Ask them to share one?
+                  </Label>
+                </div>
+              )}
+
+              {hasManualEdits && (
+                <p className="text-xs text-brand-primary-muted italic bg-brand-primary-lighter p-2 rounded border border-brand-primary-border">
+                  💡 Your edits are kept. Use "Reset to Template" below to apply these choices.
+                </p>
+              )}
+            </div>
 
             <div className="mt-4">
               <AiEmailHelper
                 eventRequestId={eventRequest.id}
-                format={emailFormat}
+                format="html"
                 subject={subject}
                 content={content}
                 onApply={({ subject: nextSubject, content: nextContent }) => {
@@ -1984,16 +795,7 @@ ${userEmail}`;
                 </div>
               )}
 
-              {emailFormat === 'plaintext' && (
-                <div className="text-xs text-gray-500 mb-2 p-2 bg-blue-50 rounded border border-blue-200">
-                  💡 <strong>Quick Links:</strong> Inventory Calculator:
-                  https://the-sandwich-project.github.io/sandwichinventory/inventorycalculator.html
-                  | Please reply with your phone number and best times to call
-                </div>
-              )}
-
-              {emailFormat === 'html' ? (
-                <div className="border rounded-lg overflow-hidden bg-white">
+              <div className="border rounded-lg overflow-hidden bg-white">
                   <div className="bg-gray-100 px-3 py-2 text-xs text-gray-600 border-b">
                     <strong>Click any text below to edit it.</strong> This is
                     how the recipient will see it.
@@ -2005,80 +807,7 @@ ${userEmail}`;
                     data-testid="email-preview"
                   />
                 </div>
-              ) : (
-                <Textarea
-                  id="content"
-                  value={content}
-                  onChange={(e) => handleContentChange(e.target.value)}
-                  readOnly={aiBusy}
-                  placeholder="Write your message here..."
-                  className="min-h-[300px] w-full resize-none"
-                  data-testid="textarea-email-content"
-                />
-              )}
             </div>
-          </div>
-
-          {/* Next Step Options */}
-          <div className="space-y-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <Label className="text-sm font-medium text-gray-700">
-              Next Steps for Event Scheduling (select at least one):
-            </Label>
-
-            {/* Scheduling Link Option */}
-            <div className="flex items-center space-x-3">
-              <Checkbox
-                id="include-scheduling"
-                checked={includeSchedulingLink}
-                onCheckedChange={(checked) => {
-                  setIncludeSchedulingLink(checked as boolean);
-                  if (checked) {
-                    setRequestPhoneCall(false); // Make them mutually exclusive
-                  }
-                }}
-              />
-              <Label
-                htmlFor="include-scheduling"
-                className="flex items-center gap-2 cursor-pointer text-sm"
-              >
-                <Calendar className="w-4 h-4 text-teal-600" />
-                Include self-service scheduling link
-              </Label>
-            </div>
-
-            {/* Phone Call Request Option */}
-            <div className="flex items-center space-x-3">
-              <Checkbox
-                id="request-phone"
-                checked={requestPhoneCall}
-                onCheckedChange={(checked) => {
-                  setRequestPhoneCall(checked as boolean);
-                  if (checked) {
-                    setIncludeSchedulingLink(false); // Make them mutually exclusive
-                  }
-                }}
-              />
-              <Label
-                htmlFor="request-phone"
-                className="flex items-center gap-2 cursor-pointer text-sm"
-              >
-                <Users className="w-4 h-4 text-orange-600" />
-                Request they reply with phone number for follow-up call
-              </Label>
-            </div>
-
-            {!includeSchedulingLink && !requestPhoneCall && (
-              <p className="text-xs text-amber-600 italic">
-                ⚠️ At least one follow-up method should be selected
-              </p>
-            )}
-
-            {hasManualEdits && (includeSchedulingLink || requestPhoneCall) && (
-              <p className="text-xs text-brand-primary-muted italic bg-brand-primary-lighter p-2 rounded border border-brand-primary-border">
-                💡 Your custom content is preserved. Use "Reset to Template"
-                above to apply these new options.
-              </p>
-            )}
           </div>
 
           {/* Attachments */}

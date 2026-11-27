@@ -117,7 +117,12 @@ export default function EmailTemplatesAdmin() {
     );
   }
 
-  const groupedSections = sections.reduce((acc, section) => {
+  // "follow_up_email" was the old toolkit email's sections; the composer no
+  // longer reads them (it uses "toolkit_email"), so they aren't shown.
+  const RETIRED_TEMPLATE_TYPES = new Set(['follow_up_email']);
+  const groupedSections = sections
+    .filter((section) => !RETIRED_TEMPLATE_TYPES.has(section.templateType))
+    .reduce((acc, section) => {
     if (!acc[section.templateType]) {
       acc[section.templateType] = [];
     }
