@@ -383,13 +383,19 @@ export function resolveEstimatePatch(
 // Display (shared so every screen says the same thing)
 // ---------------------------------------------------------------------------
 
+// The choices are Deli and PB&J only. Older events tagged with a meat
+// (turkey, ham, chicken) show as Deli; the stored value isn't changed.
 const DISPLAY_LABELS: Record<string, string> = {
-  pbj: 'PBJ',
+  pbj: 'PB&J',
   deli: 'Deli',
-  deli_turkey: 'Turkey',
-  deli_ham: 'Ham',
-  chicken: 'Chicken',
+  deli_turkey: 'Deli',
+  deli_ham: 'Deli',
+  chicken: 'Deli',
+  unknown: 'type TBD',
 };
+
+/** Deli and the older meat-specific types that count as deli. */
+export const DELI_FAMILY_TYPES = new Set(['deli', 'deli_turkey', 'deli_ham', 'chicken']);
 
 export function sandwichTypeLabel(key: string): string {
   return DISPLAY_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
@@ -399,7 +405,8 @@ const fmtAmount = (a: Amount) => (a.min === a.max ? `${a.min}` : `${a.min}–${a
 
 /**
  * One line for cards and lists, e.g. "200 Turkey", "200–300 Turkey",
- * "200 (150 Deli, 50 PBJ)", "300–400, Deli & PBJ (split TBD)", "200, type TBD",
+ * "200 (150 Deli, 50 PB&J)", "300 (150 Deli, PB&J TBD)",
+ * "300–400, Deli & PB&J (split TBD)", "200, type TBD", "Deli, amount TBD",
  * or "" when there's no estimate at all.
  */
 export function formatEstimate(f: Partial<Record<EstimateFieldName, unknown>>): string {
@@ -407,14 +414,197 @@ export function formatEstimate(f: Partial<Record<EstimateFieldName, unknown>>): 
   const state = estimateStateFromFields(s);
   const total = state.total;
   const lines = state.lines;
+  const named = lines.filter((l) => l.type !== 'unknown');
   if (!total && lines.length === 0) return '';
-  if (!total) return `${lines.map((l) => sandwichTypeLabel(l.type)).join(' & ')}, amount TBD`;
-  if (lines.length === 0) return `${fmtAmount(total)}, type TBD`;
+  if (!total) return `${named.map((l) => sandwichTypeLabel(l.type)).join(' & ') || 'Type'}, amount TBD`;
+  if (named.length === 0) return `${fmtAmount(total)}, type TBD`;
   if (lines.length === 1) return `${fmtAmount(total)} ${sandwichTypeLabel(lines[0].type)}`;
-  if (lines.every((l) => l.amount)) {
+  const known = lines.filter((l) => l.amount);
+  if (known.length === lines.length) {
     return `${fmtAmount(total)} (${lines.map((l) => `${fmtAmount(l.amount!)} ${sandwichTypeLabel(l.type)}`).join(', ')})`;
   }
-  const names = lines.map((l) => sandwichTypeLabel(l.type));
-  const joined = names.length === 2 ? names.join(' & ') : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
-  return `${fmtAmount(total)}, ${joined} (split TBD)`;
+  if (known.length === 0) {
+    const names = named.map((l) => sandwichTypeLabel(l.type));
+    const joined = names.length === 1 ? names[0] : names.length === 2 ? names.join(' & ') : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
+    return lines.length > named.length
+      ? `${fmtAmount(total)} (${joined}, rest type TBD)`
+      : `${fmtAmount(total)}, ${joined} (split TBD)`;
+  }
+  // Some amounts known, some TBD.
+  const parts = lines.map((l) =>
+    l.amount
+      ? `${fmtAmount(l.amount)} ${sandwichTypeLabel(l.type)}`
+      : l.type === 'unknown'
+        ? 'rest type TBD'
+        : `${sandwichTypeLabel(l.type)} TBD`
+  );
+  return `${fmtAmount(total)} (${parts.join(', ')})`;
+}
+
+// ---------------------------------------------------------------------------
+// Editor draft (the shared estimate editor's text boxes <-> stored fields)
+// ---------------------------------------------------------------------------
+
+/**
+ * What the estimate editor shows: one total box and type rows, as typed.
+ * Amount text is "" (not known yet), a number ("300") or a range ("200-300").
+ */
+export interface EstimateDraft {
+  total: string;
+  lines: Array<{ type: string; amount: string }>;
+}
+
+/** Parse "300", "200-300", "200 to 300", "1,000"; "" is not known. */
+export function parseAmountText(text: string): { amount: Amount | null; error: string | null } {
+  const t = String(text ?? '').trim();
+  if (!t) return { amount: null, error: null };
+  const m = t.replace(/,/g, '').match(/^(\d+)\s*(?:-|–|—|to)\s*(\d+)$/i);
+  if (m) {
+    const lo = Number(m[1]);
+    const hi = Number(m[2]);
+    if (lo <= 0 || hi <= 0) return { amount: null, error: `"${t}" isn't a number of sandwiches` };
+    return { amount: amountOf(lo, hi), error: null };
+  }
+  if (/^\d+$/.test(t.replace(/,/g, ''))) {
+    const n = Number(t.replace(/,/g, ''));
+    if (n <= 0) return { amount: null, error: null }; // 0 = not known
+    return { amount: { min: n, max: n }, error: null };
+  }
+  return { amount: null, error: `"${t}" isn't a number or a range like 200-300` };
+}
+
+const amountText = (a: Amount | null) => (!a ? '' : a.min === a.max ? `${a.min}` : `${a.min}-${a.max}`);
+
+/** The editor's starting text for stored fields. */
+export function draftFromFields(f: Partial<Record<EstimateFieldName, unknown>>): EstimateDraft {
+  const state = estimateStateFromFields(normalizeEstimate(estimateStateFromFields(f)));
+  return {
+    total: amountText(state.total),
+    lines: state.lines.map((l) => ({ type: l.type, amount: amountText(l.amount) })),
+  };
+}
+
+export interface DraftResult {
+  /** The stored fields this draft saves as (consistent, normalized). */
+  fields: EstimateFields;
+  /** Problems that block saving (unreadable numbers). */
+  errors: string[];
+  /** Things the rule changed, worth showing before saving. */
+  notes: string[];
+  /** How it will read on cards. */
+  preview: string;
+}
+
+/** Read the editor's text into stored fields, with errors and notes. */
+export function resolveDraft(draft: EstimateDraft): DraftResult {
+  const errors: string[] = [];
+  const notes: string[] = [];
+  const t = parseAmountText(draft.total);
+  if (t.error) errors.push(`Total: ${t.error}`);
+  const lines: EstimateLine[] = [];
+  for (const row of draft.lines) {
+    const type = normalizeSandwichTypeKey(row.type) ?? (row.type ? 'unknown' : null);
+    if (!type) continue;
+    const a = parseAmountText(row.amount);
+    if (a.error) errors.push(`${sandwichTypeLabel(type)}: ${a.error}`);
+    lines.push({ type, amount: a.amount });
+  }
+  const fields = normalizeEstimate({ total: t.amount, lines });
+  const out = estimateStateFromFields(fields);
+  if (t.amount && out.total && (out.total.min !== t.amount.min || out.total.max !== t.amount.max)) {
+    notes.push(`The type amounts add up to ${fmtAmount(out.total)}, so that's the total that will be saved.`);
+  }
+  if (!t.amount && out.total && lines.length > 0) {
+    notes.push(`Total worked out from the types: ${fmtAmount(out.total)}.`);
+  }
+  return { fields, errors, notes, preview: formatEstimate(fields) };
+}
+
+// ---------------------------------------------------------------------------
+// Two-row editor (Deli / PB&J) <-> draft
+// ---------------------------------------------------------------------------
+
+/** One fixed row of the editor: whether the type is being made, and how many. */
+export interface TypeRow {
+  checked: boolean;
+  /** "" (not known yet), "300" or "200-300". */
+  amount: string;
+}
+
+/**
+ * What the editor shows: a Deli row, a PB&J row, and the total box (used
+ * while the split isn't fully known).
+ */
+export interface TwoTypeState {
+  deli: TypeRow;
+  pbj: TypeRow;
+  total: string;
+  /**
+   * Lines that are neither Deli nor PB&J, e.g. an "unknown" remainder
+   * ("300 (150 Deli, rest type TBD)"). Not shown as rows, but kept so editing
+   * the other rows doesn't drop them, and they keep the total box open.
+   */
+  rest: EstimateDraft['lines'];
+}
+
+/** Add amounts written as text; "" if any is blank or unreadable. */
+function sumAmountTexts(texts: string[]): string {
+  let min = 0;
+  let max = 0;
+  for (const t of texts) {
+    const a = parseAmountText(t).amount;
+    if (!a) return '';
+    min += a.min;
+    max += a.max;
+  }
+  return amountText({ min, max });
+}
+
+/**
+ * The two-row view of a draft. Older meat-specific deli lines (turkey, ham,
+ * chicken) fold into the Deli row; their amounts are added when every one is
+ * known, otherwise the Deli amount is left blank (not known).
+ */
+export function twoTypeStateFromDraft(draft: EstimateDraft): TwoTypeState {
+  const deliLines = draft.lines.filter((l) => DELI_FAMILY_TYPES.has(normalizeSandwichTypeKey(l.type) ?? ''));
+  const pbjLines = draft.lines.filter((l) => normalizeSandwichTypeKey(l.type) === 'pbj');
+  // Anything else (a type-TBD remainder) is "whatever's left of the total":
+  // its own amount is dropped so the typed total stays the number, and the
+  // remainder follows when Deli or PB&J change (300 total, Deli 150 -> 160
+  // reads "300 (160 Deli, rest type TBD)", not 310).
+  const rest = draft.lines
+    .filter((l) => !deliLines.includes(l) && !pbjLines.includes(l))
+    .map((l) => ({ type: l.type, amount: '' }));
+  const rowFrom = (rows: typeof draft.lines): TypeRow =>
+    rows.length === 0
+      ? { checked: false, amount: '' }
+      : { checked: true, amount: rows.length === 1 ? rows[0].amount : sumAmountTexts(rows.map((r) => r.amount)) };
+  return { deli: rowFrom(deliLines), pbj: rowFrom(pbjLines), total: draft.total, rest };
+}
+
+/** Whether the total box is something to type in (vs. worked out from the rows). */
+export function totalIsTyped(state: TwoTypeState): boolean {
+  // Part of the total is a type-TBD remainder: the split isn't fully known.
+  if ((state.rest ?? []).length > 0) return true;
+  const checked = [state.deli, state.pbj].filter((r) => r.checked);
+  if (checked.length === 0) return true;
+  return checked.some((r) => !r.amount.trim());
+}
+
+/**
+ * The draft for a two-row state. While the split isn't fully known (no type
+ * picked, a picked type without an amount, or a type-TBD remainder) the
+ * typed total is used. Once every picked type has an amount, the total is
+ * the sum of the rows, so the two can never disagree; that worked-out total
+ * is kept in the draft, so unticking the types afterward keeps the number
+ * (as "type TBD") instead of losing it.
+ */
+export function draftFromTwoTypeState(state: TwoTypeState): EstimateDraft {
+  const lines: EstimateDraft['lines'] = [];
+  if (state.deli.checked) lines.push({ type: 'deli', amount: state.deli.amount });
+  if (state.pbj.checked) lines.push({ type: 'pbj', amount: state.pbj.amount });
+  lines.push(...(state.rest ?? []));
+  if (totalIsTyped(state)) return { total: state.total, lines };
+  const checkedAmounts = [state.deli, state.pbj].filter((r) => r.checked).map((r) => r.amount);
+  return { total: sumAmountTexts(checkedAmounts) || state.total, lines };
 }

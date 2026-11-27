@@ -68,6 +68,13 @@ import {
   getVolunteerIds, getVolunteerCount
 } from '@/lib/assignment-utils';
 import { SANDWICH_TYPES } from '../constants';
+import {
+  SandwichEstimateEditor,
+  draftFromFields,
+  estimateFieldsFromDraft,
+  estimateRequestBody,
+  type EstimateDraft,
+} from '../SandwichEstimateEditor';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { compareEventsByDateThenTime } from '@/lib/event-sort';
 import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
@@ -458,7 +465,7 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
   // Sandwich types dialog state
   const [showSandwichDialog, setShowSandwichDialog] = useState(false);
   const [sandwichDialogEventId, setSandwichDialogEventId] = useState<number | null>(null);
-  const [dialogSandwichTypes, setDialogSandwichTypes] = useState<Array<{ type: string; quantity: number }>>([]);
+  const [sandwichDraft, setSandwichDraft] = useState<EstimateDraft>({ total: '', lines: [] });
 
   // Time editing state for AM/PM
   const [timePeriod, setTimePeriod] = useState<'AM' | 'PM'>('AM');
@@ -900,48 +907,28 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
     setTimePeriod('AM');
   };
   
-  // Sandwich types dialog handlers
+  // Sandwich estimate dialog: the same editor as the event form and the
+  // Scheduled card quick edit (Deli / PB&J rows, total when the split isn't known).
   const openSandwichDialog = (event: EventRequest) => {
-    const existingTypes = parseSandwichTypes(event.sandwichTypes) || [];
-    setDialogSandwichTypes(existingTypes.length > 0 ? existingTypes : [{ type: 'deli', quantity: 0 }]);
+    setSandwichDraft(draftFromFields(event as any));
     setSandwichDialogEventId(event.id);
     setShowSandwichDialog(true);
   };
-  
+
   const closeSandwichDialog = () => {
     setShowSandwichDialog(false);
     setSandwichDialogEventId(null);
-    setDialogSandwichTypes([]);
+    setSandwichDraft({ total: '', lines: [] });
   };
-  
-  const addSandwichType = () => {
-    setDialogSandwichTypes([...dialogSandwichTypes, { type: 'deli', quantity: 0 }]);
-  };
-  
-  const updateSandwichType = (index: number, field: 'type' | 'quantity', value: string | number) => {
-    const updated = [...dialogSandwichTypes];
-    updated[index] = { ...updated[index], [field]: value };
-    setDialogSandwichTypes(updated);
-  };
-  
-  const removeSandwichType = (index: number) => {
-    setDialogSandwichTypes(dialogSandwichTypes.filter((_, i) => i !== index));
-  };
-  
-  const saveSandwichTypes = () => {
-    if (!sandwichDialogEventId) return;
-    
-    // Keep every row that has a type. A type with no quantity is valid: the
-    // server's estimate rule treats it as "amount TBD" (one type takes the
-    // total; several are "split TBD"). Dropping it used to lose the type.
-    const validTypes = dialogSandwichTypes.filter(st => st.type);
-    
-    updateScheduledFieldMutation.mutate({
+
+  const sandwichFields = estimateFieldsFromDraft(sandwichDraft);
+
+  const saveSandwichEstimate = () => {
+    if (!sandwichDialogEventId || !sandwichFields) return;
+    updateEventRequestMutation.mutate({
       id: sandwichDialogEventId,
-      field: 'sandwichTypes',
-      value: validTypes.length > 0 ? validTypes : null,
+      data: estimateRequestBody(sandwichFields),
     });
-    
     closeSandwichDialog();
   };
 
@@ -1857,9 +1844,10 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
       }
     };
 
-    // Special handling for sandwich type - use dialog instead of inline edit
-    if (column.id === 'sandwichType' && !isEditing(event.id, column.id)) {
-      const displayValue = getSandwichTypeDisplay(event);
+    // The sandwich count and type columns both open the shared estimate editor
+    if ((column.id === 'sandwichType' || column.id === 'estimatedSandwiches') && !isEditing(event.id, column.id)) {
+      const rendered = column.id === 'sandwichType' ? getSandwichTypeDisplay(event) : column.render ? column.render(event) : '';
+      const displayValue = typeof rendered === 'string' || typeof rendered === 'number' ? String(rendered) : '';
       return (
         <div 
           className="flex items-center gap-0.5 group min-h-[20px]"
@@ -2987,84 +2975,25 @@ export const ScheduledSpreadsheetView: React.FC<ScheduledSpreadsheetViewProps> =
         </>
       )}
 
-      {/* Sandwich Types Dialog */}
-      <Dialog open={showSandwichDialog} onOpenChange={setShowSandwichDialog}>
-        <DialogContent className="w-[95vw] max-w-2xl p-4 sm:p-6">
+      {/* Sandwich estimate dialog (shared editor) */}
+      <Dialog open={showSandwichDialog} onOpenChange={(open) => { if (!open) closeSandwichDialog(); }}>
+        <DialogContent className="w-[95vw] max-w-lg p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Edit Sandwich Types</DialogTitle>
+            <DialogTitle>Edit sandwich estimate</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {dialogSandwichTypes.map((sandwichType, index) => (
-              <div key={index} className="flex items-center gap-3 p-3 bg-[#47B3CB]/10 rounded-lg">
-                <div className="flex-1 grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-[#236383]">Type</label>
-                    <Select
-                      value={sandwichType.type}
-                      onValueChange={(value) => updateSandwichType(index, 'type', value)}
-                    >
-                      <SelectTrigger className="w-full" data-testid={`select-sandwich-type-${index}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pbj">PB&J</SelectItem>
-                        <SelectItem value="deli">Deli</SelectItem>
-                        <SelectItem value="deli_turkey">Turkey</SelectItem>
-                        <SelectItem value="deli_ham">Ham</SelectItem>
-                        <SelectItem value="unknown">Unknown</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium text-[#236383]">Quantity</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={sandwichType.quantity}
-                      onChange={(e) => updateSandwichType(index, 'quantity', parseInt(e.target.value) || 0)}
-                      className="w-full"
-                      data-testid={`input-sandwich-quantity-${index}`}
-                    />
-                  </div>
-                </div>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeSandwichType(index)}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 mt-6"
-                  disabled={dialogSandwichTypes.length === 1}
-                  data-testid={`button-remove-sandwich-type-${index}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            
-            <Button
-              variant="outline"
-              onClick={addSandwichType}
-              className="w-full border-dashed border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
-              data-testid="button-add-sandwich-type"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Another Type
-            </Button>
-          </div>
-          
+          <SandwichEstimateEditor
+            value={sandwichDraft}
+            onChange={setSandwichDraft}
+            idPrefix="spreadsheet-sandwich"
+          />
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={closeSandwichDialog}
-              data-testid="button-cancel-sandwich-dialog"
-            >
+            <Button variant="outline" onClick={closeSandwichDialog} data-testid="button-cancel-sandwich-dialog">
               Cancel
             </Button>
             <Button
-              onClick={saveSandwichTypes}
-              className="bg-[#007E8C] hover:bg-[#236383] text-white"
+              onClick={saveSandwichEstimate}
+              disabled={!sandwichFields}
+              className="bg-[#236383] hover:bg-[#1d5270] text-white"
               data-testid="button-save-sandwich-types"
             >
               Save Changes

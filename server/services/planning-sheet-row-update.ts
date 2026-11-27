@@ -3,7 +3,7 @@ import { extractNameFromAssignmentId } from '@shared/assignment-ids';
 import { parseDateOnly, toDateOnlyString } from '@shared/date-utils';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
-import { estimateStateFromFields } from '@shared/sandwich-estimate';
+import { DELI_FAMILY_TYPES, estimateStateFromFields } from '@shared/sandwich-estimate';
 
 /**
  * Planning sheet → app UPDATE ("send row to app" on a row that already exists).
@@ -440,6 +440,12 @@ export function parseSheetSandwichTypes(raw: unknown): string[] {
 }
 
 
+/** "deli" for every deli-family type (deli, turkey, ham, chicken); otherwise the type itself. */
+export function sandwichTypeFamily(type: string): string {
+  const key = SANDWICH_TYPE_KEYS[type.trim().toLowerCase()] ?? type.trim().toLowerCase();
+  return DELI_FAMILY_TYPES.has(key) ? 'deli' : key;
+}
+
 const TYPE_LABELS: Record<string, string> = {
   pbj: 'PBJ',
   deli: 'Deli',
@@ -705,10 +711,15 @@ export function buildRowUpdatePlan(
   const sheetTypes = parseSheetSandwichTypes(row['Deli or PBJ?']);
   if (sheetTypes.length > 0) {
     // Compare named types the way the sheet lists them: once each, without
-    // "unknown" (the sheet export never writes it).
+    // "unknown" (the sheet export never writes it), and by family: the sheet
+    // export writes every deli-family type (older Turkey / Ham / Chicken) as
+    // "Deli", so an unchanged row coming back must not count as a type change
+    // (which would wipe the stored per-type amounts).
     const appTypes = Array.from(new Set(appEstimate.lines.map((l) => l.type).filter((t) => t !== 'unknown')));
+    const sheetFamilies = new Set(sheetTypes.map(sandwichTypeFamily));
+    const appFamilies = new Set(appTypes.map(sandwichTypeFamily));
     const same =
-      sheetTypes.length === appTypes.length && sheetTypes.every((t) => appTypes.includes(t));
+      sheetFamilies.size === appFamilies.size && Array.from(sheetFamilies).every((f) => appFamilies.has(f));
     if (!same) {
       set('sandwichTypes', 'sandwichTypes', sheetTypes.map((type) => ({ type, quantity: 0 })));
       changes.push({
