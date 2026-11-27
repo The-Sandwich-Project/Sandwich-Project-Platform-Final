@@ -115,6 +115,9 @@ import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
 import { CardActionRow, ActionRowSpacer, InfoBadge } from './card-ui';
 import { CardSandwichEstimateEdit } from '../SandwichEstimateEditor';
 import { EventNotesSection } from './EventNotesSection';
+import { TspShoppingBadge } from '../TspShopping';
+import { ExpectedAttendeesInline } from '../ExpectedAttendees';
+import { NextDayPickupBadge } from '../NextDayPickupBadge';
 
 interface ScheduledCardEnhancedProps {
   request: EventRequest;
@@ -1211,6 +1214,14 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               {(request as any).showOnVolunteerHub ? 'On Volunteer Hub' : 'Not on Hub'}
             </Badge>
 
+            <NextDayPickupBadge event={request} />
+            <TspShoppingBadge
+              eventRequestId={request.id}
+              isTspShopped={(request as any).isTspShopped}
+              organizationName={request.organizationName}
+              canEdit={!!canEdit}
+            />
+
             {request.isMlkDayEvent && <MlkDayBadge />}
 
             <RefrigerationWarningBadge
@@ -2219,6 +2230,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                     <span className="text-lg">🥪</span>
                     <span>{sandwichInfo}</span>
                   </Badge>
+                  <ExpectedAttendeesInline event={request} />
                   {canEdit && (
                     <Button
                       size="sm"

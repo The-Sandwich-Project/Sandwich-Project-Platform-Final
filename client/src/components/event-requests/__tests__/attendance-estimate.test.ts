@@ -486,9 +486,19 @@ describe('normalizeDraftAttendance', () => {
     expect(normalizeDraftAttendance({ estimatedAttendance: 50, volunteerCount: 15 }).estimatedAttendance).toBe(50);
   });
 
-  it('is a no-op for drafts saved after the change', () => {
-    const draft = { estimatedAttendance: 40, adultCount: 0 };
-    expect(normalizeDraftAttendance(draft)).toBe(draft);
+  it('leaves a draft already in the current shape unchanged', () => {
+    const draft = {
+      estimatedAttendance: 40, adultCount: 0,
+      estimatedAttendanceMin: 0, estimatedAttendanceMax: 0, nextDayPickup: 'no', isTspShopped: false,
+    };
+    expect(normalizeDraftAttendance(draft)).toEqual(draft);
+  });
+
+  it("fills in fields an older draft didn't have, the way the form opens an event", () => {
+    expect(normalizeDraftAttendance({ estimatedAttendance: 40, overnightHoldingLocation: 'Church' })).toMatchObject({
+      estimatedAttendance: 40, estimatedAttendanceMin: 0, estimatedAttendanceMax: 0,
+      nextDayPickup: 'planned', holdingOvernight: true, isTspShopped: false,
+    });
   });
 
   it('passes through a missing snapshot', () => {

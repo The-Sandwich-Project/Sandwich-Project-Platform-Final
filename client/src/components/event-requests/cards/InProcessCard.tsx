@@ -85,6 +85,9 @@ import { InfoBadge, CardActionRow, ActionRowSpacer } from './card-ui';
 import { needsNewDate } from '../lib/inProcessFilters';
 import { parseEventDate } from '@/lib/date-utils';
 import { EventNotesSection } from './EventNotesSection';
+import { TspShoppingBadge } from '../TspShopping';
+import { ExpectedAttendeesInline } from '../ExpectedAttendees';
+import { NextDayPickupBadge } from '../NextDayPickupBadge';
 
 interface InProcessCardProps {
   request: EventRequest;
@@ -605,6 +608,13 @@ const CardHeader: React.FC<CardHeaderProps> = ({
             eventDate={displayDate}
             canEdit={!!canEdit}
             mode="badge"
+          />
+          <NextDayPickupBadge event={request} />
+          <TspShoppingBadge
+            eventRequestId={request.id}
+            isTspShopped={(request as any).isTspShopped}
+            organizationName={request.organizationName}
+            canEdit={!!canEdit}
           />
           {/* Add Action — freeform escape hatch; only when no nextAction exists */}
           {onAddNextAction && !request.nextAction && (
@@ -1520,6 +1530,8 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                 </div>
               );
             })()}
+            {/* Expected attendees show whether or not there's sandwich info yet. */}
+            <ExpectedAttendeesInline event={request} />
           </div>
 
           {/* Right Column - Contact Info & TSP Contact */}

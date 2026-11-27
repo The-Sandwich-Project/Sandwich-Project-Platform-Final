@@ -2943,7 +2943,7 @@ export const eventRequests = pgTable(
 
     // TSP-shopped events: TSP purchases the supplies for the group for a fee + admin/donation
     // (instead of the group shopping). Designation + tracking checklist + shopping plan.
-    isTspShopped: boolean('is_tsp_shopped').default(false), // Marks this as a TSP-shopped event
+    isTspShopped: boolean('is_tsp_shopped').notNull().default(false), // true = TSP is buying the food for this event; false = the group does its own shopping. Strictly true/false (NOT NULL).
     tspShopFeeAgreed: boolean('tsp_shop_fee_agreed').default(false), // Group notified of the fee and agreed
     tspShopEstimateProvided: boolean('tsp_shop_estimate_provided').default(false), // Group given a budget/estimate
     tspShopEstimateAmount: decimal('tsp_shop_estimate_amount', { precision: 10, scale: 2 }), // Estimated supplies + fee total
@@ -2968,6 +2968,7 @@ export const eventRequests = pgTable(
     deliveryDestination: text('delivery_destination'), // Organization/host location where sandwiches will be delivered (final destination)
     overnightHoldingLocation: text('overnight_holding_location'), // Location where sandwiches will be stored overnight before final delivery
     overnightPickupTime: time('overnight_pickup_time'), // Time to pick up sandwiches from overnight location
+    nextDayPickup: varchar('next_day_pickup'), // 'no' | 'option' (group CAN hold overnight) | 'planned'; NULL on older events = derived (shared/next-day-pickup.ts). CHECK in migration.
     // Driver, speaker, and volunteer requirements
     driversNeeded: integer('drivers_needed').default(0), // How many drivers this event needs
     selfTransport: boolean('self_transport').default(false), // Organization is transporting sandwiches themselves (no TSP driver needed)
@@ -3030,7 +3031,9 @@ export const eventRequests = pgTable(
 
     // Event attendance tracking for completed events
     actualAttendance: integer('actual_attendance'), // Actual number of people who attended the event
-    estimatedAttendance: integer('estimated_attendance'), // Estimated number of people expected to attend
+    estimatedAttendance: integer('estimated_attendance'), // Estimated number of people expected to attend (the middle of the range when a range is given)
+    estimatedAttendanceMin: integer('estimated_attendance_min'), // Expected attendees range, low end; NULL for a single number (shared/attendance-estimate.ts)
+    estimatedAttendanceMax: integer('estimated_attendance_max'), // Expected attendees range, high end; NULL for a single number
     // Attendance breakdown by age group (for more detailed tracking)
     attendanceAdults: integer('attendance_adults'), // Number of adults who attended
     attendanceTeens: integer('attendance_teens'), // Number of teens who attended
@@ -3671,6 +3674,7 @@ export const insertEventRequestSchema = createInsertSchema(eventRequests)
     deliveryDestination: z.string().nullable().optional(),
     overnightHoldingLocation: z.string().nullable().optional(),
     overnightPickupTime: z.string().nullable().optional(),
+    nextDayPickup: z.enum(['no', 'option', 'planned']).nullable().optional(),
     estimatedSandwichCount: z.number().nullable().optional(),
     estimatedSandwichCountMin: z.number().nullable().optional(),
     estimatedSandwichCountMax: z.number().nullable().optional(),
@@ -3678,6 +3682,8 @@ export const insertEventRequestSchema = createInsertSchema(eventRequests)
     // Attendance tracking fields
     actualAttendance: z.number().nullable().optional(),
     estimatedAttendance: z.number().nullable().optional(),
+    estimatedAttendanceMin: z.number().int().nonnegative().nullable().optional(),
+    estimatedAttendanceMax: z.number().int().nonnegative().nullable().optional(),
     attendanceAdults: z.number().nullable().optional(),
     attendanceTeens: z.number().nullable().optional(),
     attendanceKids: z.number().nullable().optional(),
@@ -3741,7 +3747,7 @@ export const insertEventRequestSchema = createInsertSchema(eventRequests)
       .nullable()
       .optional(),
     // TSP-shopped event fields
-    isTspShopped: z.boolean().nullable().optional(),
+    isTspShopped: z.boolean().optional(), // strictly true/false, never null
     tspShopFeeAgreed: z.boolean().nullable().optional(),
     tspShopEstimateProvided: z.boolean().nullable().optional(),
     tspShopEstimateAmount: z.union([z.string(), z.number(), z.null()]).optional(),
