@@ -219,10 +219,23 @@ export interface ParsedStaffing {
    * drivers as "VD: ..." on van events, so VD names ARE drivers.
    * `vanNames` is just the VD ones; `plainListed` is whether a plain "D" appeared.
    */
-  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number };
+  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number; open: number; emptySlots: number; countStated: boolean };
   /** Always empty: "S" is read as a volunteer. Kept so callers' shapes don't change. */
-  speaker: { listed: boolean; names: string[]; slots: number };
-  volunteer: { listed: boolean; names: string[]; slots: number };
+  speaker: { listed: boolean; names: string[]; slots: number; open: number; emptySlots: number; countStated: boolean };
+  /**
+   * The sheet's convention (what its Apps Scripts and the red "still needed"
+   * formatting read): a code with NO colon is an open need, its number is how
+   * many ("V2" = 2 volunteers still needed, a bare "V" = 1); a code WITH a
+   * colon lists who's filling the role ("V: Jane").
+   * - `open`: open spots from colon-less codes.
+   * - `emptySlots`: codes with a colon but nobody after it ("D1:", "V: "),
+   *   the older way of writing an open spot. Each is one open spot.
+   * - `countStated`: a colon-less code carried a number and the role has no
+   *   older-style slots ("D1:", "V2: Ann"), so the cell states the count
+   *   exactly. A bare "V", the old "V: Jane" form, or a mix of old and new
+   *   styles doesn't.
+   */
+  volunteer: { listed: boolean; names: string[]; slots: number; open: number; emptySlots: number; countStated: boolean };
   /** Parts of the cell that weren't under any role code (shown to the person, never applied). */
   unread: string[];
 }
@@ -245,9 +258,9 @@ export interface ParsedStaffing {
  */
 export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const out: ParsedStaffing = {
-    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0 },
-    speaker: { listed: false, names: [], slots: 0 },
-    volunteer: { listed: false, names: [], slots: 0 },
+    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0, open: 0, emptySlots: 0, countStated: false },
+    speaker: { listed: false, names: [], slots: 0, open: 0, emptySlots: 0, countStated: false },
+    volunteer: { listed: false, names: [], slots: 0, open: 0, emptySlots: 0, countStated: false },
     unread: [],
   };
   const s = clean(raw);
@@ -309,7 +322,11 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     return (cut > 0 ? t.slice(0, cut) : t).trim();
   };
 
-  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean };
+  // `open` > 0 only for a colon-less code ("V2" = 2 open, "V" = 1 open);
+  // `openNumbered` when that code carried a number.
+  // `colon`: written with a colon ("V: Jane", "D1:"), i.e. a filled or
+  // older-style slot rather than an open-need count.
+  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean; open: number; openNumbered: boolean; colon: boolean };
   const segments: Segment[] = [];
   let current: Segment | null = null;
   const addTo = (seg: Segment, raw: string) => {
@@ -330,7 +347,17 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     const head = colon >= 0 ? token.slice(0, colon) : token;
     const hit = roleFor(head);
     if (hit) {
-      current = { role: hit.role, van: hit.van, names: [], head: head.trim(), fromParen };
+      const digits = colon < 0 ? head.trim().match(/(\d+)$/) : null;
+      current = {
+        role: hit.role,
+        van: hit.van,
+        names: [],
+        head: head.trim(),
+        fromParen,
+        open: colon < 0 ? (digits ? parseInt(digits[1], 10) : 1) : 0,
+        openNumbered: !!digits,
+        colon: colon >= 0,
+      };
       segments.push(current);
       addTo(current, colon >= 0 ? token.slice(colon + 1) : '');
     } else if (colon > 0) {
@@ -354,11 +381,18 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   });
   const rolesOf = (seg: Segment): Array<'driver' | 'volunteer'> =>
     seg.role === 'both' ? ['volunteer', 'driver'] : [seg.role];
+  // Older-style slots in a role ("D1:", "V2: Ann"): the cell mixes styles,
+  // so it can't be trusted to state the count exactly.
+  const legacySlots = { driver: false, volunteer: false };
   for (const seg of merged) {
     for (const role of rolesOf(seg)) {
       const r = out[role];
       r.listed = true;
       r.slots += 1;
+      r.open += seg.open;
+      if (seg.colon && seg.names.length === 0) r.emptySlots += 1;
+      if (seg.colon && (seg.names.length === 0 || /\d\s*$/.test(seg.head))) legacySlots[role] = true;
+      if (seg.openNumbered) r.countStated = true;
       r.names.push(...seg.names);
       if (role === 'driver') {
         if (seg.van) {
@@ -369,6 +403,9 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
         }
       }
     }
+  }
+  for (const role of ['driver', 'volunteer'] as const) {
+    if (legacySlots[role]) out[role].countStated = false;
   }
   // A code with nothing at all (a label merged away) still means the role is listed.
   for (const seg of segments) for (const role of rolesOf(seg)) out[role].listed = true;
@@ -735,7 +772,7 @@ export function buildRowUpdatePlan(
     // Something is in the cell but no role code could be read from it. Never
     // treat that as "roles removed": leave staffing alone and say so.
     notes.push(
-      `Couldn't read the staffing cell ("${clean(staffingCell)}"), so drivers and volunteers were left alone. Use codes like D: / V: (numbered D1: / V2: is fine).`
+      `Couldn't read the staffing cell ("${clean(staffingCell)}"), so drivers and volunteers were left alone. Use codes like D: Katie / V: Ann, and D1 / V2 for spots still needed.`
     );
   } else if (staffingRead) {
     const staffing = staffingRead;
@@ -774,12 +811,26 @@ export function buildRowUpdatePlan(
           }
           return resolveSheetName(name, users, role);
         });
+        // Distinct people the sheet names. Two names that resolve to the same
+        // person ("Kim", "Kim Lee") are one; two different people who share a
+        // name were already matched to different IDs above.
         newIds = Array.from(new Set(newIds));
+        const sheetFilled = newIds.length;
         // Part of the cell couldn't be read: only add people, never drop
         // someone already assigned (they may be in the unread part).
         if (partlyUnread) newIds = Array.from(new Set([...appIds, ...newIds]));
-        // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned).
-        newNeeded = Math.max(appNeeded, sheet.slots, newIds.length, 1);
+        // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned),
+        // and open-need codes add to the people ("V: Jane, V2" = 3).
+        const sheetNeeded = staffingNeeded(sheet, sheetFilled);
+        // "V: Jane, V2" states the count exactly, so the sheet can lower it
+        // as well as raise it (someone changed V2 to V1). Anything else
+        // ("V: Jane" is how the push used to write ANY count, a bare "V",
+        // older "V1:/V2:" slots) can only raise it; same when part of the
+        // cell couldn't be read.
+        const sheetStatesCount = sheet.countStated && !partlyUnread;
+        newNeeded = sheetStatesCount
+          ? Math.max(sheetNeeded, newIds.length, 1)
+          : Math.max(appNeeded, sheetNeeded, newIds.length, 1);
       }
 
       const changeField = role === 'driver' ? 'drivers' : 'volunteers';
@@ -1023,10 +1074,29 @@ export function staffingCellOf(row: {
  * an event created from a row and then updated from the same row shows no
  * staffing changes.
  */
+/**
+ * How many people a parsed role says are needed. With open-need codes
+ * ("V: Jane, V2") it's the people filling it plus the open spots, counting an
+ * older-style empty slot ("D1:") as one more. Otherwise (only
+ * "V: names", or older numbered slots like "V1: Ann, V2:") it's the larger of
+ * the slots and names, at least 1.
+ */
+export function staffingNeeded(
+  r: { listed: boolean; slots: number; names: string[]; open: number; emptySlots: number },
+  /** How many distinct people fill the role. Defaults to the names written; the
+   *  update passes its resolved, distinct assignees ("Kim" and "Kim Lee" can be
+   *  one person). */
+  filled: number = r.names.length
+): number {
+  if (!r.listed) return 0;
+  // Open-need codes plus any older-style empty slots ("D1:, VD1" = 2 open).
+  if (r.open > 0) return filled + r.open + r.emptySlots;
+  return Math.max(1, r.slots, filled);
+}
+
 export function staffingForNewEvent(raw: unknown) {
   const s = parsePlanningStaffing(raw);
-  const need = (r: { listed: boolean; slots: number; names: string[] }) =>
-    r.listed ? Math.max(1, r.slots, r.names.length) : 0;
+  const need = (r: ParsedStaffing['driver'] | ParsedStaffing['volunteer']) => staffingNeeded(r);
   return {
     driversNeeded: need(s.driver),
     speakersNeeded: 0, // retired role; "S" is counted under volunteers
