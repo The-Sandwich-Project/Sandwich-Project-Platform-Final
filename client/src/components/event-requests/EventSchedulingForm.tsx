@@ -68,71 +68,12 @@ import {
   determineActualSandwichMode,
   resolveEstimatedAttendance,
   normalizeDraftAttendance,
+  intelligentMergeFormData,
 } from './form-utils';
 
 // ────────────────────────────────────────────────────────────────────────
 // Helpers (kept in this file because they reference component-level state)
 // ────────────────────────────────────────────────────────────────────────
-
-/**
- * Intelligent merge of cached form data with current server data.
- * Preserves user's intentional changes while accepting server updates.
- * When both user and server changed the same field, server wins.
- */
-function intelligentMergeFormData(
-  cachedFormData: Record<string, any>,
-  originalServerData: Record<string, any> | null | undefined,
-  currentServerData: Record<string, any>
-): {
-  mergedData: Record<string, any>;
-  conflicts: string[];
-  serverUpdates: string[];
-  userChangesPreserved: string[];
-} {
-  const mergedData: Record<string, any> = { ...currentServerData };
-  const conflicts: string[] = [];
-  const serverUpdates: string[] = [];
-  const userChangesPreserved: string[] = [];
-
-  if (!originalServerData) {
-    logger.log('⚠️ No original server data in cache - using CURRENT SERVER DATA (discarding stale cache)');
-    return { mergedData: currentServerData, conflicts: [], serverUpdates: [], userChangesPreserved: [] };
-  }
-
-  const valuesEqual = (a: any, b: any): boolean => {
-    const normalize = (v: any) => {
-      if (v === null || v === undefined || v === '') return null;
-      if (typeof v === 'object') return JSON.stringify(v);
-      return v;
-    };
-    return normalize(a) === normalize(b);
-  };
-
-  for (const key of Object.keys(cachedFormData)) {
-    const cachedValue = cachedFormData[key];
-    const originalValue = originalServerData[key];
-    const currentValue = currentServerData[key];
-    const userChangedField = !valuesEqual(cachedValue, originalValue);
-    const serverChangedField = !valuesEqual(currentValue, originalValue);
-
-    if (userChangedField && serverChangedField) {
-      conflicts.push(key);
-      mergedData[key] = currentValue;
-    } else if (userChangedField) {
-      userChangesPreserved.push(key);
-      mergedData[key] = cachedValue;
-    } else if (serverChangedField) {
-      serverUpdates.push(key);
-      mergedData[key] = currentValue;
-    }
-  }
-
-  if (!mergedData.status) {
-    mergedData.status = currentServerData.status || 'new';
-  }
-
-  return { mergedData, conflicts, serverUpdates, userChangesPreserved };
-}
 
 /**
  * Build form data object from an EventRequest.
@@ -1310,12 +1251,16 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         })
       ) {
         const checkBack = standbyCheckBackValue(checkBackMode, checkBackDate);
-        setFormData((prev) => ({ ...prev, standbyExpectedDate: checkBack }));
-        // Sent even when equal to the stored value, so the choice ('' = no
-        // reminder) is saved and the server's one-week default doesn't apply.
+        // Sent as an override only (formData.standbyExpectedDate isn't
+        // touched), even when equal to the stored value, so the choice
+        // ('' = no reminder) is saved and the server's one-week default
+        // doesn't apply. Leaving formData alone means a failed attempt's date
+        // can't leak into a later save.
         await performSubmit(false, { standbyExpectedDate: checkBack || null });
         return;
       }
+      // Choice unchanged: standbyExpectedDate still equals what was loaded, so
+      // the changed-fields save leaves it out and the saved reminder stays.
       await performSubmit(false);
       return;
     }
