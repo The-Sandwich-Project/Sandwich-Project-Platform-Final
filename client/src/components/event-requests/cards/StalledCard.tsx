@@ -255,7 +255,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
           {/* Contact and request notes sit side by side on wide screens */}
           <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
             {/* Contact Info */}
-            <div className="bg-white/70 rounded-lg p-3">
+            <div className="min-w-0 break-words bg-white/70 rounded-lg p-3">
               <p className="text-sm font-medium mb-1">Contact:</p>
               <p className="text-sm">{request.firstName} {request.lastName}</p>
               <p className="text-sm text-gray-600">{request.email}</p>
@@ -264,7 +264,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
 
             {/* Event Notes if any */}
             {request.message && (
-              <div className="bg-gray-100 rounded-lg p-3">
+              <div className="min-w-0 break-words bg-gray-100 rounded-lg p-3">
                 <p className="text-sm font-medium mb-1">Original Request Notes:</p>
                 <p className="text-sm text-gray-600">{request.message}</p>
               </div>

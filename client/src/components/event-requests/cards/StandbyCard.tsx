@@ -231,7 +231,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
           {/* Request info and contact sit side by side on wide screens */}
           <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
             {/* Original Request Info */}
-            <div className="bg-white/70 rounded-lg p-3 space-y-2">
+            <div className="min-w-0 break-words bg-white/70 rounded-lg p-3 space-y-2">
               <div>
                 <p className="text-sm text-gray-500">Originally Requested Date</p>
                 <p className="font-medium flex items-center gap-1 flex-wrap">
@@ -249,7 +249,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
             </div>
 
             {/* Contact Info */}
-            <div className="bg-white/70 rounded-lg p-3">
+            <div className="min-w-0 break-words bg-white/70 rounded-lg p-3">
               <p className="text-sm font-medium mb-1">Contact:</p>
               <p className="text-sm">{request.firstName} {request.lastName}</p>
               <p className="text-sm text-gray-600">{request.email}</p>

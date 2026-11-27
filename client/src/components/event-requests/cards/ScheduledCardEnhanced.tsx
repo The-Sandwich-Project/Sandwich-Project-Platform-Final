@@ -104,8 +104,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { PreEventFlagsBanner, PreEventFlagsDialog } from '@/components/pre-event-flags';
-import { Flag } from 'lucide-react';
 import { ProposeToSheetButton } from '@/components/propose-to-sheet-button';
 import { InlineRecipientAllocationEditor } from '../InlineRecipientAllocationEditor';
 import { useReturningOrganization } from '@/hooks/use-returning-organization';
@@ -213,7 +211,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   const [showSendSmsDialog, setShowSendSmsDialog] = useState(false);
   const [showSendCorrectionDialog, setShowSendCorrectionDialog] = useState(false);
   const [showAllocationEditor, setShowAllocationEditor] = useState(false);
-  const [showFlagsDialog, setShowFlagsDialog] = useState(false);
   const [showContactLog, setShowContactLog] = useState(false);
 
   const { user } = useAuth();
@@ -688,16 +685,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
       style={{ borderLeftColor: '#236383' }}
     >
       <CardContent className="p-3">
-        {/* Pre-Event Flags Banner */}
-        {request.preEventFlags && Array.isArray(request.preEventFlags) && request.preEventFlags.length > 0 && (
-          <PreEventFlagsBanner
-            flags={request.preEventFlags}
-            eventId={request.id}
-            eventName={request.organizationName || 'Event'}
-            compact={false}
-          />
-        )}
-        
         {/* Header Row - Organization & Status.
             Tightened to mirror InProcessCard density: removed the thick teal
             divider and heavy pb-3 in favor of a single mb-3 bottom margin. */}
@@ -4036,33 +4023,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
           currentUserName={(user as any)?.fullName || user?.email || ''}
         />
 
-        {/* Pre-Event Flags Button */}
-        <div className="border-t-2 border-[#007E8C]/10 pt-1 mb-0">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowFlagsDialog(true);
-              }}
-              className="flex-1 justify-between text-[#236383] hover:text-[#236383] hover:bg-[#007E8C]/5 font-medium h-8 md:min-h-0 md:h-8"
-              type="button"
-            >
-              <div className="flex items-center gap-2">
-                <Flag className="w-4 h-4" aria-hidden="true" />
-                <span>Pre-Event Flags</span>
-                {request.preEventFlags && Array.isArray(request.preEventFlags) && 
-                 request.preEventFlags.filter((f: any) => !f.resolvedAt).length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
-                    {request.preEventFlags.filter((f: any) => !f.resolvedAt).length}
-                  </Badge>
-                )}
-              </div>
-            </Button>
-          </div>
-        </div>
-
         {/* Contact Log Toggle — shows the full history of Log Contact entries for
             this scheduled event. Read-only here; use the "Log Contact" button in the
             action row above to add a new entry. */}
@@ -4279,15 +4239,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         isOpen={showSendCorrectionDialog}
         onClose={() => setShowSendCorrectionDialog(false)}
         eventRequest={request}
-      />
-
-      {/* Pre-Event Flags Dialog */}
-      <PreEventFlagsDialog
-        flags={request.preEventFlags || []}
-        eventId={request.id}
-        eventName={request.organizationName || 'Event'}
-        isOpen={showFlagsDialog}
-        onClose={() => setShowFlagsDialog(false)}
       />
     </Card>
   );
