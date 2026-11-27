@@ -174,6 +174,8 @@ interface CardHeaderProps {
   presentUsers?: Array<{ userId: string; userName: string; joinedAt: Date; lastHeartbeat: Date; socketId: string }>;
   currentUserId?: string;
   canEditTspContact?: boolean;
+  /** Shown at the right end of the header's top row (e.g. "Add Action"). */
+  headerAction?: React.ReactNode;
 }
 
 const CardHeader: React.FC<CardHeaderProps> = ({
@@ -207,6 +209,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   presentUsers = [],
   currentUserId = '',
   canEditTspContact = false,
+  headerAction,
 }) => {
   const StatusIcon = statusIcons[request.status as keyof typeof statusIcons] || statusIcons.new;
   
@@ -287,7 +290,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   const isEditingDepartment = isEditingThisCard && editingField === 'department';
 
   return (
-    <div className="flex items-start justify-between mb-3">
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-3">
       <div className="flex items-start space-x-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -753,6 +756,8 @@ const CardHeader: React.FC<CardHeaderProps> = ({
           </div>
         </div>
       </div>
+      {/* Top-right on wider screens; on phones it drops below the header so the name keeps the full width. */}
+      {headerAction && <div className="shrink-0 self-end sm:self-auto">{headerAction}</div>}
     </div>
   );
 };
@@ -2401,10 +2406,25 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
           presentUsers={collaboration.presentUsers}
           currentUserId={user?.id}
           canEditTspContact={canEditTspContact}
+          headerAction={
+            !request.nextAction && onAddNextAction ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onAddNextAction}
+                className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100 md:min-h-0 md:h-7"
+                data-testid="button-add-action-completed"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Action
+              </Button>
+            ) : null
+          }
         />
 
-        {/* Next Action - shown when one exists; otherwise an "Add Action" affordance
-            is offered below. Mirrors the InProcessCard pattern so behavior is
+        {/* Next Action - shown when one exists; otherwise the "Add Action" button
+            sits at the right end of the header row (it used to take a row of its
+            own here). Mirrors the InProcessCard pattern so behavior is
             consistent across statuses. */}
         {request.nextAction ? (
           <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg">
@@ -2441,19 +2461,6 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 )}
               </div>
             </div>
-          </div>
-        ) : onAddNextAction ? (
-          <div className="mb-3 flex justify-end">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onAddNextAction}
-              className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100 md:min-h-0 md:h-7"
-              data-testid="button-add-action-completed"
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add Action
-            </Button>
           </div>
         ) : null}
 
