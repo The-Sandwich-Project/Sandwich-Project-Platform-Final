@@ -13,6 +13,7 @@ import { estimateStateFromFields, normalizeEstimate } from '@shared/sandwich-est
 import type { EventFormData } from './form-sections/types';
 import { effectiveNextDayPickup } from '@shared/next-day-pickup';
 import { hasAttendanceRange } from '@shared/attendance-estimate';
+import { usesTspVan } from '@shared/van-rules';
 export { findMismatchedSavedFields, getDroppedServerFields } from '@/lib/event-save-verification';
 
 /**
@@ -111,6 +112,8 @@ export function normalizeDraftNewFields(snapshot: any): any {
     out.holdingOvernight = out.nextDayPickup === 'planned';
   }
   if (!('isTspShopped' in out)) out.isTspShopped = false;
+  if (!('vanReason' in out)) out.vanReason = '';
+  if (!('vanTeamOk' in out)) out.vanTeamOk = false;
   return out;
 }
 
@@ -196,6 +199,10 @@ export function buildEventDataForServer(
         : null;
     })(),
     volunteersNeeded: parseInt(formData.volunteersNeeded?.toString() || '0') || 0,
+
+    // Van rules: the reason and the "team OK'd" only apply while TSP's van is needed.
+    vanReason: usesTspVan(formData as any) ? String((formData as any).vanReason ?? '').trim() || null : null,
+    vanTeamOk: usesTspVan(formData as any) ? (formData as any).vanTeamOk === true : false,
 
     // TSP shopping: strictly true/false (the column is NOT NULL)
     isTspShopped: formData.isTspShopped === true,
@@ -499,7 +506,16 @@ export const ATTENDANCE_SAVE_KEYS = [
   'estimatedAttendanceMax',
 ] as const;
 
-const SAVE_TOGETHER: readonly (readonly string[])[] = [ESTIMATE_SAVE_KEYS, ATTENDANCE_SAVE_KEYS];
+/**
+ * A changed date and "Events team OK'd sharing the van": the OK is about one
+ * day's conflict, and the server clears it on a new day unless the save says
+ * otherwise. An OK ticked for the new day can equal the old day's value, so
+ * it must still be sent with the new date (the date keys are only in the
+ * payload when the date box changed).
+ */
+export const VAN_DAY_SAVE_KEYS = ['scheduledEventDate', 'desiredEventDate', 'vanTeamOk'] as const;
+
+const SAVE_TOGETHER: readonly (readonly string[])[] = [ESTIMATE_SAVE_KEYS, ATTENDANCE_SAVE_KEYS, VAN_DAY_SAVE_KEYS];
 
 export function dropUnchangedFields(
   eventData: Record<string, any>,
@@ -533,6 +549,10 @@ const MERGE_TOGETHER: string[][] = [
   // The next-day choice and the overnight details it keeps or drops (choosing
   // No / It's an option clears the delivery window and parking too).
   ['nextDayPickup', 'holdingOvernight', 'overnightHoldingLocation', 'overnightPickupTime', 'deliveryTimeWindow', 'deliveryParkingAccess'],
+  // Whether the van is needed, and the reason / "team OK'd" that only apply then.
+  ['vanDriverNeeded', 'vanNeededFor', 'isDhlVan', 'vanReason', 'vanTeamOk'],
+  // The date box and the day the van is booked for (they move together).
+  ['eventDate', 'vanDay'],
 ];
 
 /**
@@ -570,14 +590,39 @@ export function intelligentMergeFormData(
   };
 
   const grouped = new Set(MERGE_TOGETHER.flat());
+  let vanGroupSource: Record<string, any> = currentServerData;
   for (const group of MERGE_TOGETHER) {
     const keys = group.filter((k) => k in cachedFormData || k in currentServerData);
     if (keys.length === 0) continue;
-    const userChanged = keys.some((k) => !valuesEqual(cachedFormData[k], originalServerData[k]));
-    const serverChanged = keys.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
+    // A field newer than the draft (e.g. vanDay, added after it was saved) is
+    // in neither snapshot, so it can't be compared directly.
+    const newerThanDraft = (k: string) => !(k in cachedFormData) && !(k in originalServerData);
+    const compared = keys.filter((k) => !newerThanDraft(k));
+    const userChanged = compared.some((k) => !valuesEqual(cachedFormData[k], originalServerData[k]));
+    // vanDay is the booked day (scheduled date, else requested). A reschedule
+    // changes only that, not the date box, so an older draft's snapshot can't
+    // show it. Its best record of the day is the date it started from: if the
+    // server's booked day differs, treat the date as changed on the server so
+    // the draft can't overwrite a confirmed date. (If the event was already
+    // rescheduled before the draft, the drafted date gives way too, shown as a
+    // conflict, which is the safe direction.)
+    const bookedDayMoved =
+      newerThanDraft('vanDay') &&
+      keys.includes('vanDay') &&
+      'eventDate' in originalServerData &&
+      !valuesEqual(currentServerData.vanDay, originalServerData.eventDate);
+    const serverChanged =
+      bookedDayMoved || compared.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
     // Same rule as single fields: both changed -> the server wins.
     const source = userChanged && !serverChanged ? cachedFormData : currentServerData;
-    for (const k of keys) mergedData[k] = source[k];
+    if (group.includes('vanTeamOk')) vanGroupSource = source;
+    for (const k of keys) {
+      if (!newerThanDraft(k)) mergedData[k] = source[k];
+      // The draft moved the date: the van's day is that new date (as
+      // withEventDate sets it). Otherwise the server's value stands.
+      else if (k === 'vanDay' && source === cachedFormData) mergedData[k] = cachedFormData.eventDate;
+      else mergedData[k] = currentServerData[k];
+    }
     if (userChanged && serverChanged) conflicts.push(...keys);
     else if (userChanged) userChangesPreserved.push(...keys);
     else if (serverChanged) serverUpdates.push(...keys);
@@ -600,6 +645,17 @@ export function intelligentMergeFormData(
     } else if (serverChangedField) {
       serverUpdates.push(key);
       mergedData[key] = currentValue;
+    }
+  }
+
+  // "Events team OK'd sharing the van" belongs to the day it was ticked for:
+  // the draft's day if the van group came from the draft, else the server's.
+  // If the recovered form ends up on another day, the OK doesn't carry over.
+  if ('vanTeamOk' in mergedData && mergedData.vanTeamOk === true) {
+    const dayOf = (d: Record<string, any>) => d.vanDay || d.eventDate;
+    if (!valuesEqual(dayOf(vanGroupSource), dayOf(mergedData))) {
+      mergedData.vanTeamOk = false;
+      if (!conflicts.includes('vanTeamOk')) conflicts.push('vanTeamOk');
     }
   }
 

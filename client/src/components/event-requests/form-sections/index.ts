@@ -32,6 +32,5 @@ export {
 // Dialogs
 export {
   DateChangeDialog,
-  VanConflictDialog,
   DeleteConfirmDialog,
 } from './FormDialogs';

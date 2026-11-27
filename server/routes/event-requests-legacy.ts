@@ -3,6 +3,7 @@ import { normalizeIncomingStatus, rescheduleMoveFields, statusTransitionEffects 
 import { strictBooleanFieldError } from '../utils/strict-boolean-fields';
 import { normalizeAttendancePatch } from '@shared/attendance-estimate';
 import { normalizeNextDayPickupPatch } from '@shared/next-day-pickup';
+import { normalizeVanPatch } from '@shared/van-rules';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage-wrapper';
@@ -2589,7 +2590,7 @@ router.patch(
       }
 
       // Process pickup time fields for data migration
-      const processedUpdates = normalizeToolkitPatch(normalizeNextDayPickupPatch(normalizeAttendancePatch(processPickupTimeFields(updates, originalEvent))), originalEvent);
+      const processedUpdates = normalizeToolkitPatch(normalizeVanPatch(normalizeNextDayPickupPatch(normalizeAttendancePatch(processPickupTimeFields(updates, originalEvent))), originalEvent), originalEvent);
 
       // Automatically assign the current user as TSP contact if toolkit is being marked as sent
       // This auto-assignment happens silently (no email) since toolkit sending happens later in workflow
@@ -2876,7 +2877,7 @@ router.patch(
       const pickupProcessedUpdates = processPickupTimeFields(updates, originalEvent);
 
       // Process timestamp fields to ensure they're proper Date objects
-      const processedUpdates = normalizeToolkitPatch(normalizeNextDayPickupPatch(normalizeAttendancePatch({ ...pickupProcessedUpdates })), originalEvent);
+      const processedUpdates = normalizeToolkitPatch(normalizeVanPatch(normalizeNextDayPickupPatch(normalizeAttendancePatch({ ...pickupProcessedUpdates })), originalEvent), originalEvent);
 
       // Convert timestamp fields that might come as strings to Date objects
       // (shared list — see EVENT_REQUEST_TIMESTAMP_FIELDS at the top of this file)
@@ -3449,7 +3450,7 @@ router.put(
       const pickupProcessedUpdates = processPickupTimeFields(updates, originalEvent);
 
       // Process ALL date/timestamp fields to ensure they're proper Date objects
-      const processedUpdates = normalizeToolkitPatch(normalizeNextDayPickupPatch(normalizeAttendancePatch({ ...pickupProcessedUpdates })), originalEvent);
+      const processedUpdates = normalizeToolkitPatch(normalizeVanPatch(normalizeNextDayPickupPatch(normalizeAttendancePatch({ ...pickupProcessedUpdates })), originalEvent), originalEvent);
 
       // Convert timestamp fields that might come as strings to Date objects
       // (shared list — see EVENT_REQUEST_TIMESTAMP_FIELDS at the top of this file)

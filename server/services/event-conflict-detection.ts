@@ -566,6 +566,11 @@ export interface SameDayVanRequest {
   vanDriverNeeded: boolean;
   vanNeededLikely: boolean;
   eventStartTime: string | null;
+  eventEndTime: string | null;
+  vanNeededFor: string | null;
+  /** "Events team OK'd sharing the van" (shared/van-rules.ts). */
+  vanTeamOk: boolean;
+  vanTimeOverride: string | null;
 }
 
 /**
@@ -609,6 +614,10 @@ export async function getOtherVanRequestsOnDate(
         vanDriverNeeded: eventRequests.vanDriverNeeded,
         vanNeededLikely: eventRequests.vanNeededLikely,
         eventStartTime: eventRequests.eventStartTime,
+        eventEndTime: eventRequests.eventEndTime,
+        vanNeededFor: eventRequests.vanNeededFor,
+        vanTeamOk: eventRequests.vanTeamOk,
+        vanTimeOverride: eventRequests.vanTimeOverride,
         selfTransport: eventRequests.selfTransport,
         isDhlVan: eventRequests.isDhlVan,
       })

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Car, CheckCircle2 } from 'lucide-react';
 import type { FormSectionProps } from './types';
+import { VanDetailsPanel } from './VanDetailsPanel';
 
 interface VanDriver {
   id: number | string;
@@ -33,6 +34,12 @@ interface ResourceRequirementsSectionProps extends FormSectionProps {
   vanDrivers: VanDriver[];
   /** Whether section is complete (shows checkmark) */
   isComplete?: boolean;
+  /** The event being edited (to find other van events that day). */
+  eventRequestId?: number | null;
+  /** The saved event (for the planning sheet's van time override). */
+  storedEvent?: { vanTimeOverride?: string | null; eventStartTime?: string | null; eventEndTime?: string | null } | null;
+  /** Show "reason required" for the van (after a save attempt). */
+  showVanReasonError?: boolean;
 }
 
 export const ResourceRequirementsSection: React.FC<ResourceRequirementsSectionProps> = ({
@@ -40,6 +47,9 @@ export const ResourceRequirementsSection: React.FC<ResourceRequirementsSectionPr
   setFormData,
   vanDrivers,
   isComplete,
+  eventRequestId,
+  storedEvent,
+  showVanReasonError,
 }) => {
   return (
     <div className="space-y-4 border rounded-lg p-4 bg-white">
@@ -131,6 +141,17 @@ export const ResourceRequirementsSection: React.FC<ResourceRequirementsSectionPr
                 )}
               </>
             )}
+
+            {/* Van time, under-800 reason, same-day conflict + "team OK'd" */}
+            <div className="mt-3">
+              <VanDetailsPanel
+                formData={formData}
+                setFormData={setFormData}
+                eventRequestId={eventRequestId}
+                storedEvent={storedEvent}
+                showReasonError={showVanReasonError}
+              />
+            </div>
 
             {/* Van Driver Selection - Only show when van driver is needed and NOT self-transport */}
             {formData.vanDriverNeeded && !formData.selfTransport && (

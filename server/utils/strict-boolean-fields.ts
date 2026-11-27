@@ -4,13 +4,15 @@
  * message rather than reaching the database as a constraint error.
  */
 import { NEXT_DAY_PICKUP_VALUES } from '@shared/next-day-pickup';
+import { VAN_TIMES } from '@shared/van-rules';
 
 /** Strictly true or false (NOT NULL). */
-export const STRICT_BOOLEAN_FIELDS = ['isTspShopped'] as const;
+export const STRICT_BOOLEAN_FIELDS = ['isTspShopped', 'vanTeamOk'] as const;
 
 /** One of a fixed list (null allowed where the column allows it). */
 export const STRICT_ENUM_FIELDS: Record<string, { values: readonly string[]; nullable: boolean }> = {
   nextDayPickup: { values: NEXT_DAY_PICKUP_VALUES, nullable: true },
+  vanTimeOverride: { values: VAN_TIMES, nullable: true },
 };
 
 /** An error message when `updates` sends a constrained field with a value it can't hold. */
