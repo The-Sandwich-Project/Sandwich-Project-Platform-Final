@@ -253,7 +253,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
 
   return {
     header: (
-      <div className="mb-4">
+      <div className="mb-3">
         <div className="flex items-center gap-2 flex-wrap">
           {/* Real-time Presence Indicator */}
           {presentUsers && presentUsers.length > 0 && currentUserId && (
@@ -290,7 +290,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                   size="sm"
                   variant="ghost"
                   onClick={() => startEditing('organizationName', request.organizationName || '')}
-                  className="h-6 px-2 hidden group-hover:inline-flex"
+                  className="h-6 px-2 hidden group-hover:inline-flex md:min-h-0 md:h-6"
                   title="Edit organization name"
                   data-testid="button-edit-org-name"
                 >
@@ -345,7 +345,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => startEditing('department', request.department || '')}
-                      className="h-6 px-2 hidden group-hover:inline-flex"
+                      className="h-6 px-2 hidden group-hover:inline-flex md:min-h-0 md:h-6"
                       title={request.department ? "Edit department" : "Add department"}
                       data-testid="button-edit-department"
                     >
@@ -611,7 +611,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               size="sm"
               variant="outline"
               onClick={onAddNextAction}
-              className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100 ml-auto"
+              className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100 ml-auto md:min-h-0 md:h-7"
               data-testid="button-add-action"
             >
               <Plus className="w-3 h-3 mr-1" />
@@ -743,7 +743,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                     formatDateForInput(displayDate?.toString() || '')
                   )
                 }
-                className="h-6 px-2 text-white hover:bg-white/20 transition-colors opacity-0 group-hover:opacity-100"
+                className="h-6 px-2 text-white hover:bg-white/20 transition-colors opacity-0 group-hover:opacity-100 md:min-h-0 md:h-6"
                 title={`Edit ${dateLabel}`}
                 data-testid="button-edit-date"
               >
@@ -993,7 +993,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
           if (!formattedDate) return null;
 
           return (
-            <div className="mb-4">
+            <div className="mb-3">
               <div className="inline-flex items-center gap-2 rounded-md border border-[#007E8C]/25 bg-[#00CED1]/10 text-[#007E8C] px-3 py-2 text-sm font-medium">
                 <Package className="w-4 h-4" />
                 <span>Toolkit sent {formattedDate}</span>
@@ -1010,7 +1010,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
         {/* Next Action - Prominent display when one exists.
             (When no next action, the "Add Action" affordance lives in the header pills row.) */}
         {request.nextAction && (
-          <div className="mb-4 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg">
+          <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -1025,7 +1025,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onEditNextAction}
-                    className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100"
+                    className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100 md:min-h-0 md:h-7"
                   >
                     <Edit className="w-3 h-3 mr-1" />
                     Edit
@@ -1036,7 +1036,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                     size="sm"
                     variant="default"
                     onClick={onCompleteNextAction}
-                    className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                    className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white md:min-h-0 md:h-7"
                   >
                     <CheckCircle className="w-3 h-3 mr-1" />
                     Complete
@@ -1048,7 +1048,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
         )}
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3 mb-3">
           {/* Left Column - Event Details */}
           <div className="space-y-3">
             {/* Event Date + Location (location lives inside the teal date box) */}
@@ -1077,7 +1077,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowContactAttempts(!showContactAttempts)}
-                      className="h-7 text-xs flex items-center gap-1 text-amber-800 hover:bg-amber-100"
+                      className="h-7 text-xs flex items-center gap-1 text-amber-800 hover:bg-amber-100 md:min-h-0 md:h-7"
                     >
                       {showContactAttempts ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                       {showContactAttempts ? 'Hide Full' : 'Show Full'} Details
@@ -1087,7 +1087,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={onLogContact}
-                    className="h-7 text-xs flex items-center gap-1 border-amber-300 hover:bg-amber-100"
+                    className="h-7 text-xs flex items-center gap-1 border-amber-300 hover:bg-amber-100 md:min-h-0 md:h-7"
                   >
                     <Phone className="w-3 h-3" />
                     Log Contact
@@ -1196,7 +1196,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-5 w-5 p-0 text-amber-700 hover:text-amber-900 hover:bg-amber-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="h-5 w-5 p-0 text-amber-700 hover:text-amber-900 hover:bg-amber-100 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onEditContactAttempt(attempt.attemptNumber);
@@ -1210,7 +1210,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-5 w-5 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    className="h-5 w-5 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 md:min-h-0 md:min-w-0 md:h-5"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onDeleteContactAttempt(attempt.attemptNumber);
@@ -1364,7 +1364,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="h-6 w-6 p-0 text-amber-700 hover:text-amber-900 hover:bg-amber-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      className="h-6 w-6 p-0 text-amber-700 hover:text-amber-900 hover:bg-amber-100 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-6"
                                       onClick={() => onEditContactAttempt(attempt.attemptNumber)}
                                       title="Edit contact attempt"
                                     >
@@ -1375,7 +1375,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 md:min-h-0 md:min-w-0 md:h-6"
                                       onClick={() => onDeleteContactAttempt(attempt.attemptNumber)}
                                       title="Delete contact attempt"
                                     >
@@ -1533,7 +1533,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
 
             {/* TSP Contact Section - Prominent display */}
             {(request.tspContact || request.customTspContact) && (
-              <div className="p-4 bg-gradient-to-r from-[#FBAD3F]/10 to-[#D68319]/10 border-2 border-[#FBAD3F]/30 rounded-lg">
+              <div className="p-3 bg-gradient-to-r from-[#FBAD3F]/10 to-[#D68319]/10 border-2 border-[#FBAD3F]/30 rounded-lg">
                 <div className="flex items-center gap-3 group">
                   <div className="bg-[#FBAD3F] p-2 rounded-full">
                     <Building className="w-6 h-6 text-white" />
@@ -1558,7 +1558,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                           size="sm"
                           variant="ghost"
                           onClick={onEditTspContact}
-                          className="h-8 w-8 p-0 text-[#D68319] hover:bg-[#FBAD3F]/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-8 w-8 p-0 text-[#D68319] hover:bg-[#FBAD3F]/20 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-8"
                         >
                           <Edit2 className="w-4 h-4" />
                         </Button>
@@ -1576,7 +1576,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
 
         {/* Notes & Requirements Section */}
         {(request.message || request.schedulingNotes || request.planningNotes || request.additionalRequirements) && (
-          <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+          <div className="bg-white rounded-lg p-3 mb-3 border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Notes & Requirements
@@ -1906,7 +1906,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-red-600 hover:text-red-700 h-8"
+                          className="text-red-600 hover:text-red-700 h-8 md:min-h-0 md:h-8"
                           data-testid="button-delete-request"
                         >
                           <Trash2 className="w-4 h-4 mr-1.5 sm:mr-0" />
@@ -1931,7 +1931,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
         </TooltipProvider>
 
         {/* Audit Log Section */}
-        <div className="mt-4 border-t border-gray-200 pt-4">
+        <div className="mt-3 border-t border-gray-200 pt-3">
           <Button
             variant="ghost"
             size="sm"

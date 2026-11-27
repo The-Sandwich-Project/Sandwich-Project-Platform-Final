@@ -57,7 +57,7 @@ export const NonEventCard: React.FC<NonEventCardProps> = ({
               size="sm"
               variant="outline"
               onClick={onView}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 md:min-h-0 md:min-w-0 md:h-8"
               title="View details"
             >
               <Eye className="h-4 w-4" />
@@ -66,7 +66,7 @@ export const NonEventCard: React.FC<NonEventCardProps> = ({
               size="sm"
               variant="outline"
               onClick={onEdit}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 md:min-h-0 md:min-w-0 md:h-8"
               title="Edit event"
             >
               <Edit2 className="h-4 w-4" />
@@ -76,7 +76,7 @@ export const NonEventCard: React.FC<NonEventCardProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={onDuplicate}
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 md:min-h-0 md:min-w-0 md:h-8"
                 title="Duplicate event"
                 aria-label="Duplicate event"
               >
@@ -87,7 +87,7 @@ export const NonEventCard: React.FC<NonEventCardProps> = ({
               size="sm"
               variant="outline"
               onClick={onDelete}
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 md:min-h-0 md:min-w-0 md:h-8"
               title="Delete"
             >
               <Trash2 className="h-4 w-4" />

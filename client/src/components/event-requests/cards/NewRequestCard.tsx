@@ -300,7 +300,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   const isEditingDate = isEditingThisCard && editingField === dateFieldToEdit;
 
   return (
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex items-start justify-between mb-3">
       <div className="flex items-start space-x-3 min-w-0 flex-1">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -601,7 +601,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => startEditing(dateFieldToEdit, formatDateForInput(displayDate?.toString() || ''))}
-                      className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-6"
                       title={`Edit ${dateLabel}`}
                       data-testid="button-edit-date"
                     >
@@ -933,7 +933,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
 
         {/* Next Action - Prominent display for intake tracking */}
         {request.nextAction ? (
-          <div className="mb-4 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg min-w-0">
+          <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-2 min-w-0">
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -970,12 +970,12 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
           </div>
         ) : (
           onAddNextAction && (
-            <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={onAddNextAction}
-                className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100"
+                className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100 md:min-h-0 md:h-7"
               >
                 <AlertTriangle className="w-3 h-3 mr-1" />
                 Add Action
@@ -986,7 +986,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
 
         {/* Scheduled Call Info */}
         {request.scheduledCallDate && (
-          <div className="mb-4 bg-brand-primary-lighter rounded-lg p-3">
+          <div className="mb-3 bg-brand-primary-lighter rounded-lg p-3">
             <div className="flex items-center gap-2">
               <Phone className="w-4 h-4 text-brand-primary-muted" />
               <span className="text-sm font-medium">Call scheduled:</span>
@@ -1007,7 +1007,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
         )}
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3 mb-3">
           {/* Left Column - Event Details */}
           <div className="space-y-3">
             {/* Submitted Info */}
@@ -1050,7 +1050,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={onLogContact}
-                      className="h-7 text-xs flex items-center gap-1"
+                      className="h-7 text-xs flex items-center gap-1 md:min-h-0 md:h-7"
                     >
                       <Phone className="w-3 h-3" />
                       Log Contact
@@ -1144,7 +1144,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={onEditTspContact}
-                      className="h-7 px-2 text-[#D68319] hover:bg-[#FBAD3F]/20 flex-shrink-0"
+                      className="h-7 px-2 text-[#D68319] hover:bg-[#FBAD3F]/20 flex-shrink-0 md:min-h-0 md:h-7"
                       data-testid="button-edit-tsp-contact"
                     >
                       <Edit className="w-3 h-3" />
@@ -1248,7 +1248,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={onAiSuggest}
-                      className="h-8 text-[#236383] hover:bg-[#236383]/10"
+                      className="h-8 text-[#236383] hover:bg-[#236383]/10 md:min-h-0 md:h-8"
                       data-testid="button-ai-suggest-date"
                     >
                       <Sparkles className="w-4 h-4 mr-1.5" />
@@ -1269,7 +1269,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={onAiIntakeAssist}
-                      className="h-8 text-[#47B3CB] hover:bg-[#47B3CB]/10"
+                      className="h-8 text-[#47B3CB] hover:bg-[#47B3CB]/10 md:min-h-0 md:h-8"
                       data-testid="button-ai-intake-assist"
                     >
                       <Sparkles className="w-4 h-4 mr-1.5" />
@@ -1331,7 +1331,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-red-600 hover:text-red-700 h-8"
+                    className="text-red-600 hover:text-red-700 h-8 md:min-h-0 md:h-8"
                     data-testid="button-delete-request"
                     title="Delete this event request"
                   >
@@ -1351,7 +1351,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
         </TooltipProvider>
 
         {/* Audit Log Section */}
-        <div className="mt-4 border-t border-gray-200 pt-4">
+        <div className="mt-3 border-t border-gray-200 pt-3">
           <Button
             variant="ghost"
             size="sm"
@@ -1359,7 +1359,7 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
               e.stopPropagation();
               setShowAuditLog(!showAuditLog);
             }}
-            className="w-full justify-between text-gray-600 hover:text-gray-800 p-2 h-8"
+            className="w-full justify-between text-gray-600 hover:text-gray-800 p-2 h-8 md:min-h-0 md:h-8"
             data-testid="button-toggle-audit-log"
             type="button"
           >

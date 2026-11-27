@@ -86,7 +86,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   const dateInfo = displayDate ? formatEventDate(displayDate.toString()) : null;
 
   return (
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex items-start justify-between mb-3">
       <div className="flex items-start space-x-3 min-w-0 flex-1">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -184,7 +184,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
         />
 
         {/* Standby Info - Prominent Display */}
-        <div className="space-y-3 mb-4">
+        <div className="space-y-3 mb-3">
           <div className={`rounded-lg p-4 border-2 ${isExpectedDatePast ? 'bg-red-100 border-red-300' : 'bg-purple-100 border-purple-300'}`}>
             <div className="flex items-center gap-2 mb-2">
               <Hourglass className={`w-5 h-5 ${isExpectedDatePast ? 'text-red-700' : 'text-purple-700'}`} />
@@ -228,30 +228,33 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
           </div>
 
-          {/* Original Request Info */}
-          <div className="bg-white/70 rounded-lg p-3 space-y-2">
-            <div>
-              <p className="text-sm text-gray-500">Originally Requested Date</p>
-              <p className="font-medium flex items-center gap-1 flex-wrap">
-                <Calendar className="w-4 h-4" />
-                {dateInfo.text}
-                <TrafficConflictBadge dates={[request.desiredEventDate]} compact />
-              </p>
-            </div>
-            {request.estimatedSandwichCount && (
+          {/* Request info and contact sit side by side on wide screens */}
+          <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+            {/* Original Request Info */}
+            <div className="bg-white/70 rounded-lg p-3 space-y-2">
               <div>
-                <p className="text-sm text-gray-500">Sandwich Count Requested</p>
-                <p className="font-medium">{request.estimatedSandwichCount}</p>
+                <p className="text-sm text-gray-500">Originally Requested Date</p>
+                <p className="font-medium flex items-center gap-1 flex-wrap">
+                  <Calendar className="w-4 h-4" />
+                  {dateInfo.text}
+                  <TrafficConflictBadge dates={[request.desiredEventDate]} compact />
+                </p>
               </div>
-            )}
-          </div>
+              {request.estimatedSandwichCount && (
+                <div>
+                  <p className="text-sm text-gray-500">Sandwich Count Requested</p>
+                  <p className="font-medium">{request.estimatedSandwichCount}</p>
+                </div>
+              )}
+            </div>
 
-          {/* Contact Info */}
-          <div className="bg-white/70 rounded-lg p-3">
-            <p className="text-sm font-medium mb-1">Contact:</p>
-            <p className="text-sm">{request.firstName} {request.lastName}</p>
-            <p className="text-sm text-gray-600">{request.email}</p>
-            {request.phone && <p className="text-sm text-gray-600">{request.phone}</p>}
+            {/* Contact Info */}
+            <div className="bg-white/70 rounded-lg p-3">
+              <p className="text-sm font-medium mb-1">Contact:</p>
+              <p className="text-sm">{request.firstName} {request.lastName}</p>
+              <p className="text-sm text-gray-600">{request.email}</p>
+              {request.phone && <p className="text-sm text-gray-600">{request.phone}</p>}
+            </div>
           </div>
         </div>
 
@@ -302,7 +305,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                   size="sm"
                   variant="default"
                   onClick={onReactivate}
-                  className="bg-[#9333EA] hover:bg-[#7e22ce] text-white h-8"
+                  className="bg-[#9333EA] hover:bg-[#7e22ce] text-white h-8 md:min-h-0 md:h-8"
                   data-testid="button-reactivate"
                 >
                   <RefreshCw className="w-4 h-4 mr-1" />
@@ -320,7 +323,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onMoveToStalled}
-                  className="border-gray-400 text-gray-600 hover:bg-gray-100 h-8"
+                  className="border-gray-400 text-gray-600 hover:bg-gray-100 h-8 md:min-h-0 md:h-8"
                   data-testid="button-move-to-stalled"
                 >
                   Move to Stalled
@@ -333,7 +336,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onView} data-testid="button-view" className="h-8">
+                <Button size="sm" variant="outline" onClick={onView} data-testid="button-view" className="h-8 md:min-h-0 md:h-8">
                   <Eye className="w-4 h-4 mr-1" />
                   View
                 </Button>
@@ -345,7 +348,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onEdit} data-testid="button-edit" className="h-8">
+                <Button size="sm" variant="outline" onClick={onEdit} data-testid="button-edit" className="h-8 md:min-h-0 md:h-8">
                   <Edit2 className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
@@ -358,7 +361,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
             {onDuplicate && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={onDuplicate} data-testid="button-duplicate" className="h-8">
+                  <Button size="sm" variant="outline" onClick={onDuplicate} data-testid="button-duplicate" className="h-8 md:min-h-0 md:h-8">
                     <Copy className="w-4 h-4 mr-1" />
                     Duplicate
                   </Button>
@@ -372,7 +375,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
             {request.phone && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={onCall} data-testid="button-call" className="h-8">
+                  <Button size="sm" variant="outline" onClick={onCall} data-testid="button-call" className="h-8 md:min-h-0 md:h-8">
                     <Phone className="w-4 h-4 mr-1" />
                     Call
                   </Button>
@@ -385,7 +388,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onContact} data-testid="button-contact" className="h-8">
+                <Button size="sm" variant="outline" onClick={onContact} data-testid="button-contact" className="h-8 md:min-h-0 md:h-8">
                   <Mail className="w-4 h-4 mr-1" />
                   Email
                 </Button>
@@ -401,7 +404,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onLogContact}
-                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8 md:min-h-0 md:h-8"
                   data-testid="button-log-contact"
                 >
                   <FileText className="w-4 h-4 mr-1" />
@@ -421,7 +424,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                   size="sm"
                   onClick={messageAboutEvent}
                   variant="ghost"
-                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8 md:min-h-0 md:h-8"
                   data-testid="button-message"
                 >
                   <MessageSquare className="w-4 h-4" />
@@ -441,7 +444,7 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-red-600 hover:text-red-700 h-8"
+                          className="text-red-600 hover:text-red-700 h-8 md:min-h-0 md:h-8"
                           data-testid="button-delete-request"
                         >
                           <Trash2 className="w-4 h-4" />

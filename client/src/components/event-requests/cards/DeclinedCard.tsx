@@ -164,7 +164,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   const isEditingDate = isEditingThisCard && editingField === dateFieldToEdit;
 
   return (
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex items-start justify-between mb-3">
       <div className="flex items-start space-x-3 min-w-0 flex-1">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -269,7 +269,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => startEditing(dateFieldToEdit, formatDateForInput(displayDate?.toString() || ''))}
-                      className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-6"
                       title={`Edit ${dateLabel}`}
                       data-testid="button-edit-date"
                     >
@@ -319,7 +319,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
         />
 
         {/* Decline Info */}
-        <div className="space-y-3 mb-4">
+        <div className="space-y-3 mb-3">
           <div className="bg-red-50 rounded-lg p-3">
             <div className="flex items-center gap-2">
               <XCircle className="w-4 h-4 text-red-600" />
@@ -344,35 +344,38 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
             )}
           </div>
 
-          {/* Original Request Info */}
-          <div className="bg-white/70 rounded-lg p-3 space-y-2">
-            <div>
-              <p className="text-sm text-gray-500">Originally Requested Date</p>
-              <p className="font-medium flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {dateInfo.display}
-              </p>
+          {/* Request info and contact sit side by side on wide screens */}
+          <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+            {/* Original Request Info */}
+            <div className="bg-white/70 rounded-lg p-3 space-y-2">
+              <div>
+                <p className="text-sm text-gray-500">Originally Requested Date</p>
+                <p className="font-medium flex items-center gap-1">
+                  <Calendar className="w-4 h-4" />
+                  {dateInfo.display}
+                </p>
+              </div>
+              {request.estimatedAttendance && (
+                <div>
+                  <p className="text-sm text-gray-500">Estimated Attendance</p>
+                  <p className="font-medium">{request.estimatedAttendance}</p>
+                </div>
+              )}
+              {request.estimatedSandwichCount && (
+                <div>
+                  <p className="text-sm text-gray-500">Sandwich Count Requested</p>
+                  <p className="font-medium">{request.estimatedSandwichCount}</p>
+                </div>
+              )}
             </div>
-            {request.estimatedAttendance && (
-              <div>
-                <p className="text-sm text-gray-500">Estimated Attendance</p>
-                <p className="font-medium">{request.estimatedAttendance}</p>
-              </div>
-            )}
-            {request.estimatedSandwichCount && (
-              <div>
-                <p className="text-sm text-gray-500">Sandwich Count Requested</p>
-                <p className="font-medium">{request.estimatedSandwichCount}</p>
-              </div>
-            )}
-          </div>
 
-          {/* Contact Info */}
-          <div className="bg-white/70 rounded-lg p-3">
-            <p className="text-sm font-medium mb-1">Contact:</p>
-            <p className="text-sm">{request.firstName} {request.lastName}</p>
-            <p className="text-sm text-gray-600">{request.email}</p>
-            {request.phone && <p className="text-sm text-gray-600">{request.phone}</p>}
+            {/* Contact Info */}
+            <div className="bg-white/70 rounded-lg p-3">
+              <p className="text-sm font-medium mb-1">Contact:</p>
+              <p className="text-sm">{request.firstName} {request.lastName}</p>
+              <p className="text-sm text-gray-600">{request.email}</p>
+              {request.phone && <p className="text-sm text-gray-600">{request.phone}</p>}
+            </div>
           </div>
 
           {/* Notes */}
@@ -434,7 +437,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
                   size="sm"
                   variant="default"
                   onClick={onReactivate}
-                  className="bg-[#FBAD3F] hover:bg-[#e89a2d] text-white h-8"
+                  className="bg-[#FBAD3F] hover:bg-[#e89a2d] text-white h-8 md:min-h-0 md:h-8"
                 >
                   <RefreshCw className="w-4 h-4 mr-1" />
                   Reactivate Request
@@ -447,7 +450,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onView} className="h-8">
+                <Button size="sm" variant="outline" onClick={onView} className="h-8 md:min-h-0 md:h-8">
                   <Eye className="w-4 h-4 mr-1" />
                   View Details
                 </Button>
@@ -459,7 +462,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onEdit} data-testid="button-edit" className="h-8">
+                <Button size="sm" variant="outline" onClick={onEdit} data-testid="button-edit" className="h-8 md:min-h-0 md:h-8">
                   <Edit2 className="w-4 h-4 mr-1" />
                   Edit Event
                 </Button>
@@ -472,7 +475,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
             {onDuplicate && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={onDuplicate} data-testid="button-duplicate" className="h-8">
+                  <Button size="sm" variant="outline" onClick={onDuplicate} data-testid="button-duplicate" className="h-8 md:min-h-0 md:h-8">
                     <Copy className="w-4 h-4 mr-1" />
                     Duplicate
                   </Button>
@@ -486,7 +489,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
             {request.phone && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={onCall} className="h-8">
+                  <Button size="sm" variant="outline" onClick={onCall} className="h-8 md:min-h-0 md:h-8">
                     <Phone className="w-4 h-4 mr-1" />
                     Call
                   </Button>
@@ -499,7 +502,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onContact} className="h-8">
+                <Button size="sm" variant="outline" onClick={onContact} className="h-8 md:min-h-0 md:h-8">
                   <Mail className="w-4 h-4 mr-1" />
                   Email
                 </Button>
@@ -515,7 +518,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onLogContact}
-                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8 md:min-h-0 md:h-8"
                 >
                   <FileText className="w-4 h-4 mr-1" />
                   Log Contact
@@ -534,7 +537,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
                   size="sm"
                   onClick={messageAboutEvent}
                   variant="ghost"
-                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8 md:min-h-0 md:h-8"
                   aria-label="Message about this event"
                 >
                   <MessageSquare className="w-4 h-4" aria-hidden="true" />
@@ -554,7 +557,7 @@ export const DeclinedCard: React.FC<DeclinedCardProps> = ({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-red-600 hover:text-red-700 h-8"
+                          className="text-red-600 hover:text-red-700 h-8 md:min-h-0 md:h-8"
                           data-testid="button-delete-request"
                         >
                           <Trash2 className="w-4 h-4" />
