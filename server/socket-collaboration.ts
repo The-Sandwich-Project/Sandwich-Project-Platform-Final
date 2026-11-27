@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { AuditLogger } from './audit-logger';
 import { extractMentions } from '@shared/mention-utils';
 import { checkPermission } from '@shared/unified-auth-utils';
-import { canWriteFlags, FLAGS_READ_ONLY_ERROR } from './services/event-flags';
+import { canWriteFlags, FLAGS_READ_ONLY_ERROR, loadCommentEvent } from './services/event-flags';
 
 /**
  * Event Collaboration Socket.IO Module
@@ -987,6 +987,14 @@ export function setupSocketCollaboration(httpServer: HttpServer, io: SocketServe
         if (!canWriteFlags(event.status)) {
           socket.emit('error', { message: FLAGS_READ_ONLY_ERROR.error });
           return;
+        }
+        // A reply must be to a comment on THIS event.
+        if (parentCommentId) {
+          const parent = await loadCommentEvent(parentCommentId);
+          if (!parent || parent.eventRequestId !== eventRequestId) {
+            socket.emit('error', { message: 'Reply is to a comment on a different event' });
+            return;
+          }
         }
 
         const comment = await storage.createEventCollaborationComment({

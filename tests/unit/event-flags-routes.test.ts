@@ -72,6 +72,16 @@ describe('comment write routes follow the New-only rule', () => {
     expect(storage.deleteEventCollaborationComment).not.toHaveBeenCalled();
   });
 
+  it('a reply to a comment on another event is refused', async () => {
+    storage.getEventRequestById.mockResolvedValue({ id: 1, status: 'new' });
+    mockLoadCommentEvent.mockResolvedValue({ eventRequestId: 2, status: 'new' });
+    const res = await request(app()).post('/api/event-requests/1/collaboration/comments').send({ content: 'hi', parentCommentId: 9 });
+    expect(res.status).toBe(400);
+    expect(storage.createEventCollaborationComment).not.toHaveBeenCalled();
+    mockLoadCommentEvent.mockResolvedValue({ eventRequestId: 1, status: 'new' });
+    expect((await request(app()).post('/api/event-requests/1/collaboration/comments').send({ content: 'hi', parentCommentId: 9 })).status).toBe(201);
+  });
+
   it('create is refused past New', async () => {
     storage.getEventRequestById.mockResolvedValue({ id: 1, status: 'scheduled' });
     expect((await request(app()).post('/api/event-requests/1/collaboration/comments').send({ content: 'hi' })).status).toBe(409);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -311,10 +311,14 @@ export function CommentThread({
     }
   };
 
+  // This thread's own box. Several threads can be on screen at once (New
+  // cards open their flags by default), so never look the box up by selector:
+  // that focused the FIRST card's box and saved the reply on the wrong event.
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const handleReply = (parentId: number) => {
     setReplyToId(parentId);
-    const textarea = document.querySelector('[data-testid="new-comment-textarea"]') as HTMLTextAreaElement;
-    textarea?.focus();
+    textareaRef.current?.focus();
   };
 
   return (
@@ -396,7 +400,8 @@ export function CommentThread({
 
         <div className={cn(compact ? "space-y-1" : "space-y-2")}>
           <Textarea
-                        placeholder={labels.placeholder}
+            ref={textareaRef}
+            placeholder={labels.placeholder}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             className={cn("resize-none", compact ? "min-h-[60px] text-sm" : "min-h-[100px]")}

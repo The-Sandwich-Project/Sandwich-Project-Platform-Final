@@ -182,6 +182,14 @@ export function createEventCollaborationRouter(deps: RouterDependencies) {
 
       const validatedData = createCommentSchema.parse(req.body);
 
+      // A reply must be to a comment on THIS event.
+      if (validatedData.parentCommentId) {
+        const parent = await loadCommentEvent(validatedData.parentCommentId);
+        if (!parent || parent.eventRequestId !== eventId) {
+          return res.status(400).json({ error: 'Reply is to a comment on a different event' });
+        }
+      }
+
       const comment = await storage.createEventCollaborationComment({
         eventRequestId: eventId,
         userId: req.user.id,

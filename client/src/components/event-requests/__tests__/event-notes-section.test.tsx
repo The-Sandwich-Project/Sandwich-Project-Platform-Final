@@ -50,6 +50,24 @@ describe('Event card notes section', () => {
     expect(screen.queryByTestId('like-button-1')).toBeNull();
   });
 
+  it("Reply focuses that card's own box when several cards' flags are open", () => {
+    const one = { comments: [comment(1, 'Flag on event one')], commentsLoading: false, addComment: jest.fn(), updateComment: jest.fn(), deleteComment: jest.fn() };
+    const two = { comments: [comment(2, 'Flag on event two')], commentsLoading: false, addComment: jest.fn(), updateComment: jest.fn(), deleteComment: jest.fn() };
+    render(
+      <>
+        <EventNotesSection eventId={1} mode="flags" collaboration={one} currentUserId="u1" currentUserName="C" />
+        <EventNotesSection eventId={2} mode="flags" collaboration={two} currentUserId="u1" currentUserName="C" />
+      </>
+    );
+    const boxes = screen.getAllByTestId('new-comment-textarea');
+    fireEvent.click(screen.getByTestId('reply-button-2'));
+    expect(document.activeElement).toBe(boxes[1]);
+    fireEvent.change(boxes[1], { target: { value: 'reply' } });
+    fireEvent.keyDown(boxes[1], { key: 'Enter', ctrlKey: true });
+    expect(two.addComment).toHaveBeenCalledWith('reply', 2);
+    expect(one.addComment).not.toHaveBeenCalled();
+  });
+
   it('other cards with no comments show nothing', () => {
     setup('earlier', []);
     expect(screen.queryByTestId('earlier-comments')).toBeNull();
