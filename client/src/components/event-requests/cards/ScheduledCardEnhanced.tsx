@@ -104,6 +104,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { PreEventFlagsBanner } from '@/components/pre-event-flags';
 import { ProposeToSheetButton } from '@/components/propose-to-sheet-button';
 import { InlineRecipientAllocationEditor } from '../InlineRecipientAllocationEditor';
 import { useReturningOrganization } from '@/hooks/use-returning-organization';
@@ -685,6 +686,18 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
       style={{ borderLeftColor: '#236383' }}
     >
       <CardContent className="p-3">
+        {/* Existing Pre-Event Flags. New flags can no longer be added from the
+            card, but any unresolved ones still show here so they can be read
+            and resolved (the banner renders nothing once all are resolved). */}
+        {Array.isArray(request.preEventFlags) && request.preEventFlags.length > 0 && (
+          <PreEventFlagsBanner
+            flags={request.preEventFlags}
+            eventId={request.id}
+            eventName={request.organizationName || 'Event'}
+            allowAdd={false}
+          />
+        )}
+
         {/* Header Row - Organization & Status.
             Tightened to mirror InProcessCard density: removed the thick teal
             divider and heavy pb-3 in favor of a single mb-3 bottom margin. */}
