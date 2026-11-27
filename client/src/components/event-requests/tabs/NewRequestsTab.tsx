@@ -12,6 +12,7 @@ import { DuplicateEventDialog } from '../dialogs/DuplicateEventDialog';
 import { EventListSkeleton } from '../EventCardSkeleton';
 import { EventListBatchProviders } from '../EventListBatchProviders';
 import type { EventRequest } from '@shared/schema';
+import { emailOrganizer } from '../lib/emailOrganizer';
 
 export const NewRequestsTab: React.FC = () => {
   const { toast } = useToast();
@@ -44,7 +45,6 @@ export const NewRequestsTab: React.FC = () => {
     setLogContactEventRequest,
     setAiSuggestionEventRequest,
     setAiIntakeAssistantEventRequest,
-    setIntakeCallEventRequest,
     setNextActionEventRequest,
     setNextActionMode,
     setReasonDialogEventRequest,
@@ -242,10 +242,12 @@ export const NewRequestsTab: React.FC = () => {
               }}
               onDelete={() => deleteEventRequestMutation.mutate(request.id)}
               onCall={() => handleCall(request)}
-              onContact={() => {
-                setContactEventRequest(request);
-                openDialog('contactOrganizer');
-              }}
+              onContact={() =>
+                emailOrganizer(request, () => {
+                  setContactEventRequest(request);
+                  openDialog('contactOrganizer');
+                })
+              }
               onToolkit={() => {
                 setSelectedEventRequest(request);
                 setToolkitEventRequest(request);
@@ -270,13 +272,6 @@ export const NewRequestsTab: React.FC = () => {
                 if (result === 'needs_reason') {
                   setReasonDialogEventRequest(request);
                   openDialog('decline');
-                }
-              }}
-              onNonEvent={async () => {
-                const result = await handleStatusChange(request.id, 'non_event');
-                if (result === 'needs_reason') {
-                  setNonEventDialogEventRequest(request);
-                  openDialog('nonEvent');
                 }
               }}
               onLogContact={() => {

@@ -122,13 +122,13 @@ export const previouslyHostedOptions = [
 export const statusOptions = [
   { value: 'new', label: 'New Request' },
   { value: 'in_process', label: 'In Process' },
+  { value: 'standby', label: 'Standby' },
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'rescheduled', label: 'Rescheduled' },
   { value: 'completed', label: 'Completed' },
   { value: 'declined', label: 'Declined' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'non_event', label: 'Non-Event' },
-  { value: 'standby', label: 'Standby' },
   { value: 'stalled', label: 'Stalled' },
 ];
 

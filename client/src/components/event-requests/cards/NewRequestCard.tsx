@@ -38,8 +38,6 @@ import {
   Sparkles,
   CheckCircle,
   RefreshCw,
-  Lock,
-  Unlock,
   Ban,
   Globe,
   FileText,
@@ -78,7 +76,6 @@ interface NewRequestCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onCall?: () => void;
-  onIntakeCall?: () => void;
   onContact: () => void;
   /** Opens the LOGGING dialog — record that the toolkit was already
    *  sent (date/time + optional call notes) and move event to In Process. */
@@ -92,7 +89,6 @@ interface NewRequestCardProps {
   onEditTspContact: () => void;
   onApprove: () => void;
   onDecline: () => void;
-  onNonEvent?: () => void;
   onDuplicate?: () => void;
   onLogContact: () => void;
   onAiSuggest?: () => void;
@@ -600,38 +596,6 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       </TooltipContent>
                     </Tooltip>
                   )}
-                  {/* Date Flexibility Indicator - only show when explicitly set */}
-                  {displayDate && request.dateFlexible !== null && request.dateFlexible !== undefined && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Badge
-                          variant="outline"
-                          className={`flex items-center gap-1 text-xs px-2 py-0.5 cursor-help ${
-                            request.dateFlexible === false
-                              ? 'border-red-300 bg-red-50 text-red-700'
-                              : 'border-green-300 bg-green-50 text-green-700'
-                          }`}
-                        >
-                          {request.dateFlexible === false ? (
-                            <>
-                              <Lock className="w-3 h-3" />
-                              Fixed date
-                            </>
-                          ) : (
-                            <>
-                              <Unlock className="w-3 h-3" />
-                              Flexible
-                            </>
-                          )}
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {request.dateFlexible === false
-                          ? 'This organization has a pre-planned event and cannot change the date'
-                          : 'This organization is flexible and can adjust their date if needed'}
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
                   {canEdit && startEditing && (
                     <Button
                       size="sm"
@@ -658,7 +622,6 @@ const CardHeader: React.FC<CardHeaderProps> = ({
 interface CardContactInfoProps {
   request: EventRequest;
   onCall?: () => void;
-  onIntakeCall?: () => void;
   onContact?: () => void;
   /** "Mark as sent" — opens the LOGGING dialog for previously-sent toolkits. */
   onToolkit?: () => void;
@@ -669,7 +632,6 @@ interface CardContactInfoProps {
 const CardContactInfo: React.FC<CardContactInfoProps> = ({
   request,
   onCall,
-  onIntakeCall,
   onContact,
   onToolkit,
   onSendToolkit,
@@ -729,18 +691,6 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
         <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-col sm:w-auto sm:flex-shrink-0">
           {request.phone && (
             <>
-              {onIntakeCall && (
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={onIntakeCall}
-                  className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-[#007E8C] hover:bg-[#236383] text-white"
-                >
-                  <Phone className="w-4 h-4 mr-1" />
-                  <span className="sm:hidden">Intake Call</span>
-                  <span className="hidden sm:inline">Intake Call Notes Form</span>
-                </Button>
-              )}
               {onCall && (
                 <Button
                   size="sm"
@@ -854,7 +804,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
   onEdit,
   onDelete,
   onCall,
-  onIntakeCall,
   onContact,
   onToolkit,
   onSendToolkit,
@@ -863,7 +812,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
   onEditTspContact,
   onApprove,
   onDecline,
-  onNonEvent,
   onDuplicate,
   onLogContact,
   onAiSuggest,
@@ -1173,7 +1121,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
             <CardContactInfo
               request={request}
               onCall={onCall}
-              onIntakeCall={onIntakeCall}
               onContact={onContact}
               onToolkit={onToolkit}
               onSendToolkit={onSendToolkit}
@@ -1341,26 +1288,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
               )}
 
 
-              {/* Non-Event */}
-              {onNonEvent && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={onNonEvent}
-                      className="h-8 text-stone-500 hover:bg-stone-100"
-                      data-testid="button-non-event"
-                    >
-                      <Ban className="w-4 h-4 mr-1.5" />
-                      Non-Event
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Mark as non-event (not a real event request)</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
             </div>
 
             <ActionRowSpacer />

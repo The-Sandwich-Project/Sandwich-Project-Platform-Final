@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { EventRequest } from '@shared/schema';
+import { emailOrganizer } from '../lib/emailOrganizer';
 
 export const MyAssignmentsTab: React.FC = () => {
   const { toast } = useToast();
@@ -69,7 +70,6 @@ export const MyAssignmentsTab: React.FC = () => {
     setTspContactEventRequest,
     setCollectionLogEventRequest,
     setLogContactEventRequest,
-    setIntakeCallEventRequest,
     setNextActionEventRequest,
     setNextActionMode,
     editingScheduledId,
@@ -180,12 +180,16 @@ export const MyAssignmentsTab: React.FC = () => {
         openDialog('contactOrganizer');
       },
     };
+    // Cards whose button reads "Email" open the mail app, like their own tabs
+    // do; Scheduled and Completed keep the Contact Organizer popup.
+    const emailContact = () => emailOrganizer(request, commonProps.onContact);
 
     switch (request.status) {
       case 'new':
         return (
           <NewRequestCard
             {...commonProps}
+            onContact={emailContact}
             onToolkit={() => {
               setSelectedEventRequest(request);
               setToolkitEventRequest(request);
@@ -212,13 +216,6 @@ export const MyAssignmentsTab: React.FC = () => {
                   openDialog('decline');
                 }
               }}
-            onNonEvent={async () => {
-                const result = await handleStatusChange(request.id, 'non_event');
-                if (result === 'needs_reason') {
-                  setNonEventDialogEventRequest(request);
-                  openDialog('nonEvent');
-                }
-              }}
             onLogContact={() => {
               setLogContactEventRequest(request);
               openDialog('logContact');
@@ -240,6 +237,7 @@ export const MyAssignmentsTab: React.FC = () => {
         return (
           <InProcessCard
             {...commonProps}
+            onContact={emailContact}
             resolveUserName={resolveUserName}
             onSchedule={() => {
               setSelectedEventRequest(request);
@@ -453,6 +451,7 @@ export const MyAssignmentsTab: React.FC = () => {
         return (
           <DeclinedCard
             {...commonProps}
+            onContact={emailContact}
             onView={() => {
               setSelectedEventRequest(request);
               setIsEditing(false);
@@ -484,6 +483,7 @@ export const MyAssignmentsTab: React.FC = () => {
         return (
           <NewRequestCard
             {...commonProps}
+            onContact={emailContact}
             onToolkit={() => {
               setSelectedEventRequest(request);
               setToolkitEventRequest(request);
@@ -508,13 +508,6 @@ export const MyAssignmentsTab: React.FC = () => {
                 if (result === 'needs_reason') {
                   setReasonDialogEventRequest(request);
                   openDialog('decline');
-                }
-              }}
-            onNonEvent={async () => {
-                const result = await handleStatusChange(request.id, 'non_event');
-                if (result === 'needs_reason') {
-                  setNonEventDialogEventRequest(request);
-                  openDialog('nonEvent');
                 }
               }}
             onLogContact={() => {

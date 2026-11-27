@@ -11,6 +11,7 @@ import { DuplicateEventDialog } from '../dialogs/DuplicateEventDialog';
 import { EventListSkeleton } from '../EventCardSkeleton';
 import { EventListBatchProviders } from '../EventListBatchProviders';
 import type { EventRequest } from '@shared/schema';
+import { emailOrganizer } from '../lib/emailOrganizer';
 
 export const DeclinedTab: React.FC = () => {
   const { toast } = useToast();
@@ -104,10 +105,12 @@ export const DeclinedTab: React.FC = () => {
                       deleteEventRequestMutation.mutate(request.id);
                     }
                   }}
-                  onContact={() => {
-                    setContactEventRequest(request);
-                    openDialog('contactOrganizer');
-                  }}
+                  onContact={() =>
+                    emailOrganizer(request, () => {
+                      setContactEventRequest(request);
+                      openDialog('contactOrganizer');
+                    })
+                  }
                   onCall={() => handleCall(request)}
                   onReactivate={() => {
                     if (window.confirm('Do you want to reactivate this event request?')) {
@@ -154,10 +157,12 @@ export const DeclinedTab: React.FC = () => {
                       deleteEventRequestMutation.mutate(request.id);
                     }
                   }}
-                  onContact={() => {
-                    setContactEventRequest(request);
-                    openDialog('contactOrganizer');
-                  }}
+                  onContact={() =>
+                    emailOrganizer(request, () => {
+                      setContactEventRequest(request);
+                      openDialog('contactOrganizer');
+                    })
+                  }
                   onCall={() => handleCall(request)}
                   onReactivate={() => {
                     if (window.confirm('Do you want to reactivate this event request?')) {

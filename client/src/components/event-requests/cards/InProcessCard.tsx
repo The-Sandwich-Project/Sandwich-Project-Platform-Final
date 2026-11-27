@@ -36,8 +36,6 @@ import {
   MapPin,
   FileText,
   MessageCircle,
-  Lock,
-  Unlock,
   Copy,
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -93,7 +91,6 @@ interface InProcessCardProps {
   onDelete: () => void;
   onSchedule: () => void;
   onCall: () => void;
-  onIntakeCall?: () => void;
   onDuplicate?: () => void;
   onContact: () => void;
   onScheduleCall?: () => void;
@@ -717,38 +714,6 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 </TooltipContent>
               </Tooltip>
             )}
-            {/* Date Flexibility Indicator - only show when explicitly set */}
-            {displayDate && request.dateFlexible !== null && request.dateFlexible !== undefined && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className={`flex items-center gap-1 text-xs px-2 py-0.5 cursor-help ${
-                      request.dateFlexible === false
-                        ? 'border-red-300 bg-red-500/20 text-white'
-                        : 'border-green-300 bg-green-500/20 text-white'
-                    }`}
-                  >
-                    {request.dateFlexible === false ? (
-                      <>
-                        <Lock className="w-3 h-3" />
-                        Fixed
-                      </>
-                    ) : (
-                      <>
-                        <Unlock className="w-3 h-3" />
-                        Flexible
-                      </>
-                    )}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {request.dateFlexible === false
-                    ? 'This organization has a pre-planned event and cannot change the date'
-                    : 'This organization is flexible and can adjust their date if needed'}
-                </TooltipContent>
-              </Tooltip>
-            )}
             {canEdit && startEditing && (
               <Button
                 size="sm"
@@ -793,14 +758,12 @@ const CardHeader: React.FC<CardHeaderProps> = ({
 interface CardContactInfoProps {
   request: EventRequest;
   onCall?: () => void;
-  onIntakeCall?: () => void;
   onContact?: () => void;
 }
 
 const CardContactInfo: React.FC<CardContactInfoProps> = ({
   request,
   onCall,
-  onIntakeCall,
   onContact,
 }) => {
   const hasBackupContact = (request as any).backupContactFirstName || (request as any).backupContactLastName || (request as any).backupContactEmail || (request as any).backupContactPhone;
@@ -831,17 +794,6 @@ const CardContactInfo: React.FC<CardContactInfoProps> = ({
           )}
         </div>
         <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-col sm:w-auto sm:flex-shrink-0">
-          {request.phone && onIntakeCall && (
-            <Button
-              size="sm"
-              variant="default"
-              onClick={onIntakeCall}
-              className="text-sm h-10 sm:h-8 w-full sm:w-auto bg-[#007E8C] hover:bg-[#236383] text-white"
-            >
-              <Phone className="w-4 h-4 mr-1" />
-              Intake Call
-            </Button>
-          )}
           {request.phone && onCall && (
             <Button
               size="sm"
@@ -920,7 +872,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
   onDelete,
   onSchedule,
   onCall,
-  onIntakeCall,
   onDuplicate,
   onContact,
   onScheduleCall,
@@ -1561,7 +1512,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
             <CardContactInfo
               request={request}
               onCall={onCall}
-              onIntakeCall={onIntakeCall}
               onContact={onContact}
             />
 

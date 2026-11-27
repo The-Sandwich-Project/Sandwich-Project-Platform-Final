@@ -61,7 +61,6 @@ export type ActiveDialog =
   | 'editContact'
   | 'aiDateSuggestion'
   | 'aiIntakeAssistant'
-  | 'intakeCall'
   | 'decline'
   | 'cancel'
   | 'nonEvent'
@@ -111,8 +110,6 @@ export interface EventDialogContextType {
   setAiSuggestionEventRequest: (event: EventRequest | null) => void;
   aiIntakeAssistantEventRequest: EventRequest | null;
   setAiIntakeAssistantEventRequest: (event: EventRequest | null) => void;
-  intakeCallEventRequest: EventRequest | null;
-  setIntakeCallEventRequest: (event: EventRequest | null) => void;
   reasonDialogEventRequest: EventRequest | null;
   setReasonDialogEventRequest: (event: EventRequest | null) => void;
   nonEventDialogEventRequest: EventRequest | null;
@@ -238,7 +235,6 @@ export const EventDialogProvider: React.FC<{ children: ReactNode }> = ({
   const [editContactAttemptData, setEditContactAttemptData] = useState<any | null>(null);
   const [aiSuggestionEventRequest, setAiSuggestionEventRequest] = useState<EventRequest | null>(null);
   const [aiIntakeAssistantEventRequest, setAiIntakeAssistantEventRequest] = useState<EventRequest | null>(null);
-  const [intakeCallEventRequest, setIntakeCallEventRequest] = useState<EventRequest | null>(null);
   const [reasonDialogEventRequest, setReasonDialogEventRequest] = useState<EventRequest | null>(null);
   const [nonEventDialogEventRequest, setNonEventDialogEventRequest] = useState<EventRequest | null>(null);
   const [rescheduleDialogEventRequest, setRescheduleDialogEventRequest] = useState<EventRequest | null>(null);
@@ -331,8 +327,6 @@ export const EventDialogProvider: React.FC<{ children: ReactNode }> = ({
       setAiSuggestionEventRequest,
       aiIntakeAssistantEventRequest,
       setAiIntakeAssistantEventRequest,
-      intakeCallEventRequest,
-      setIntakeCallEventRequest,
       reasonDialogEventRequest,
       setReasonDialogEventRequest,
       nonEventDialogEventRequest,
@@ -411,7 +405,7 @@ export const EventDialogProvider: React.FC<{ children: ReactNode }> = ({
       schedulingEventRequest, toolkitEventRequest, collectionLogEventRequest,
       contactEventRequest, tspContactEventRequest, logContactEventRequest,
       editContactEventRequest, editContactAttemptData, aiSuggestionEventRequest,
-      aiIntakeAssistantEventRequest, intakeCallEventRequest,
+      aiIntakeAssistantEventRequest,
       reasonDialogEventRequest, nonEventDialogEventRequest, rescheduleDialogEventRequest,
       nextActionEventRequest, nextActionMode,
       assignmentType, assignmentEventId, selectedAssignees, isEditingAssignment,
