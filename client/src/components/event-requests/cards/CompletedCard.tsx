@@ -59,7 +59,7 @@ import type { EventRequest } from '@shared/schema';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
 import { useMessageAboutEvent } from '@/components/chat/chat-dock-context';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
-import { CommentThread, CompactPresenceBadge } from '@/components/collaboration';
+import { CompactPresenceBadge } from '@/components/collaboration';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -95,6 +95,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
+import { EventNotesSection } from './EventNotesSection';
 
 /**
  * Only http(s) links are allowed for the social-media post link. Guards against
@@ -1656,7 +1657,6 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
   const messageAboutEvent = useMessageAboutEvent(request);
   const [showInstagramDialog, setShowInstagramDialog] = useState(false);
   const [instagramLink, setInstagramLink] = useState('');
-  const [showComments, setShowComments] = useState(false);
   const [showRecipientAllocationDialog, setShowRecipientAllocationDialog] = useState(false);
 
   // Collaboration hook for comments
@@ -2890,47 +2890,14 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
           </div>
         </div>
 
-        {/* Communication & Notes Section */}
-        {request.id && (
-          <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowComments(!showComments)}
-              className="w-full justify-between text-gray-700 hover:text-gray-700 hover:bg-gray-50 font-medium p-2 h-auto mb-2"
-            >
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-gray-600" />
-                <h3 className="text-sm font-semibold">Team Comments</h3>
-                {collaboration.comments && collaboration.comments.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
-                    {collaboration.comments.length}
-                  </Badge>
-                )}
-              </div>
-              {showComments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </Button>
-
-            {showComments && (
-              <div className="mt-3 max-h-[500px]">
-                <CommentThread
-                  comments={collaboration.comments || []}
-                  currentUserId={user?.id || ''}
-                  currentUserName={
-                    user?.displayName ||
-                    getDisplayName(user?.firstName ?? undefined, user?.lastName ?? undefined, user?.email ?? undefined)
-                  }
-                  eventId={request.id}
-                  onAddComment={collaboration.addComment}
-                  onEditComment={collaboration.updateComment}
-                  onDeleteComment={collaboration.deleteComment}
-                  isLoading={collaboration.commentsLoading || false}
-                />
-              </div>
-            )}
-
-          </div>
-        )}
+        {/* Notes: New Event Flags on New cards, read-only earlier comments elsewhere */}
+        <EventNotesSection
+          eventId={request.id}
+          mode="earlier"
+          collaboration={collaboration}
+          currentUserId={user?.id || ''}
+          currentUserName={(user as any)?.fullName || user?.email || ''}
+        />
 
         {/* Action Buttons */}
         <TooltipProvider>

@@ -65,7 +65,7 @@ import { EventRequestAuditLog } from '@/components/event-request-audit-log';
 import { getMissingIntakeInfo } from '@/lib/event-request-validation';
 import { getPrimaryContextualAction, getContextualTooltip } from '@/lib/contextual-actions';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
-import { CommentThread, CompactPresenceBadge } from '@/components/collaboration';
+import { CompactPresenceBadge } from '@/components/collaboration';
 import { useAuth } from '@/hooks/useAuth';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
@@ -84,6 +84,7 @@ import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { InfoBadge, CardActionRow, ActionRowSpacer } from './card-ui';
 import { needsNewDate } from '../lib/inProcessFilters';
 import { parseEventDate } from '@/lib/date-utils';
+import { EventNotesSection } from './EventNotesSection';
 
 interface InProcessCardProps {
   request: EventRequest;
@@ -919,7 +920,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
 }) => {
   const { setViewMode } = useEventRequestContext();
   const [showAuditLog, setShowAuditLog] = useState(false);
-  const [showComments, setShowComments] = useState(false);
   const [showContactAttempts, setShowContactAttempts] = useState(false);
   // Whether to expand the condensed contact-log list past the most-recent entry
   const [showAllAttempts, setShowAllAttempts] = useState(false);
@@ -1625,55 +1625,14 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
           </div>
         )}
 
-        {/* Communication & Notes Section */}
-        {request.id && (
-          <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowComments(!showComments)}
-                className="flex-1 justify-between text-gray-700 hover:text-gray-700 hover:bg-gray-50 font-medium p-2 h-auto min-w-0"
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-gray-600" />
-                  <h3 className="text-sm font-semibold">Team Comments</h3>
-                  {collaboration.comments && collaboration.comments.length > 0 && (
-                    <Badge variant="secondary" className="ml-1">
-                      {collaboration.comments.length}
-                    </Badge>
-                  )}
-                </div>
-                {showComments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowComments(true)}
-                className="sm:ml-2 w-full sm:w-auto border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
-              >
-                <MessageSquare className="w-4 h-4 mr-1" />
-                Add Comment
-              </Button>
-            </div>
-
-            {showComments && (
-              <div className="mt-3 max-h-[500px]">
-                <CommentThread
-                  comments={collaboration.comments || []}
-                  currentUserId={user?.id || ''}
-                  currentUserName={user?.fullName || user?.email || ''}
-                  eventId={request.id}
-                  onAddComment={collaboration.addComment}
-                  onEditComment={collaboration.updateComment}
-                  onDeleteComment={collaboration.deleteComment}
-                  isLoading={collaboration.commentsLoading || false}
-                />
-              </div>
-            )}
-
-          </div>
-        )}
+        {/* Notes: New Event Flags on New cards, read-only earlier comments elsewhere */}
+        <EventNotesSection
+          eventId={request.id}
+          mode="earlier"
+          collaboration={collaboration}
+          currentUserId={user?.id || ''}
+          currentUserName={(user as any)?.fullName || user?.email || ''}
+        />
 
         {/* Action Buttons */}
         <TooltipProvider>

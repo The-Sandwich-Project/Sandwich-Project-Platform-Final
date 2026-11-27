@@ -21,7 +21,27 @@ interface CommentThreadProps {
   isLoading?: boolean;
   className?: string;
   compact?: boolean;
+  /** Show the comments only: no composer, reply, edit, delete or like. */
+  readOnly?: boolean;
+  /** Wording, for threads that aren't called "comments" (e.g. New Event Flags). */
+  labels?: Partial<CommentThreadLabels>;
 }
+
+export interface CommentThreadLabels {
+  title: string;
+  empty: string;
+  emptyHint: string;
+  placeholder: string;
+  submit: string;
+}
+
+const DEFAULT_LABELS: CommentThreadLabels = {
+  title: 'Comments',
+  empty: 'No comments yet',
+  emptyHint: 'Be the first to comment!',
+  placeholder: 'Add a comment...',
+  submit: 'Add Comment',
+};
 
 interface CommentItemProps {
   comment: EventCollaborationComment;
@@ -33,6 +53,7 @@ interface CommentItemProps {
   onReply: (parentId: number) => void;
   getReplies: (parentId: number) => EventCollaborationComment[];
   depth?: number;
+  readOnly?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -68,7 +89,8 @@ function CommentItem({
   onDelete,
   onReply,
   getReplies,
-  depth = 0
+  depth = 0,
+  readOnly = false,
 }: CommentItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
@@ -201,6 +223,7 @@ function CommentItem({
                 {comment.content}
               </p>
 
+              {!readOnly && (
               <div className="flex items-center gap-2 mt-2">
                 {/* Like button - always visible */}
                 <Button
@@ -259,6 +282,7 @@ function CommentItem({
                   )}
                 </div>
               </div>
+              )}
             </>
           )}
         </div>
@@ -278,6 +302,7 @@ function CommentItem({
               onReply={onReply}
               getReplies={getReplies}
               depth={depth + 1}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -298,7 +323,10 @@ export function CommentThread({
   isLoading = false,
   className,
   compact = false,
+  readOnly = false,
+  labels: labelOverrides,
 }: CommentThreadProps) {
+  const labels = { ...DEFAULT_LABELS, ...labelOverrides };
   const [newComment, setNewComment] = useState("");
   const [replyToId, setReplyToId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -336,7 +364,7 @@ export function CommentThread({
         <div className="flex items-center gap-2 mb-4 pb-3 border-b">
           <MessageSquare className="h-5 w-5 text-muted-foreground" />
           <h3 className="text-lg font-semibold">
-            Comments
+            {labels.title}
           </h3>
           <span className="text-sm text-muted-foreground">
             ({comments.length})
@@ -354,12 +382,12 @@ export function CommentThread({
             {!compact && (
               <>
                 <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">No comments yet</p>
-                <p className="text-xs mt-1">Be the first to comment!</p>
+                <p className="text-sm">{labels.empty}</p>
+                {!readOnly && <p className="text-xs mt-1">{labels.emptyHint}</p>}
               </>
             )}
             {compact && (
-              <p className="text-xs opacity-60">No comments yet</p>
+              <p className="text-xs opacity-60">{labels.empty}</p>
             )}
           </div>
         ) : (
@@ -375,6 +403,7 @@ export function CommentThread({
                 onDelete={onDeleteComment}
                 onReply={handleReply}
                 getReplies={getReplies}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -388,6 +417,7 @@ export function CommentThread({
         )}
       </ScrollArea>
 
+      {!readOnly && (
       <div className={cn("border-t", compact ? "pt-2 mt-2" : "pt-4 mt-4")}>
         {replyToId && (
           <div className="flex items-center justify-between mb-2 px-3 py-2 bg-muted rounded-md">
@@ -407,7 +437,7 @@ export function CommentThread({
 
         <div className={cn(compact ? "space-y-1" : "space-y-2")}>
           <Textarea
-            placeholder="Add a comment..."
+                        placeholder={labels.placeholder}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             className={cn("resize-none", compact ? "min-h-[60px] text-sm" : "min-h-[100px]")}
@@ -433,11 +463,12 @@ export function CommentThread({
               size={compact ? "sm" : "default"}
             >
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Add Comment
+              {labels.submit}
             </Button>
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
