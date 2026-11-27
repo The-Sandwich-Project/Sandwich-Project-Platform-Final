@@ -84,7 +84,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   const dateInfo = displayDate ? formatEventDate(displayDate.toString()) : null;
 
   return (
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex items-start justify-between mb-3">
       <div className="flex items-start space-x-3 min-w-0 flex-1">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -190,7 +190,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
         />
 
         {/* Stalled Info - Prominent Display */}
-        <div className="space-y-3 mb-4">
+        <div className="space-y-3 mb-3">
           <div className={`rounded-lg p-4 border-2 ${isNextOutreachDue ? 'bg-amber-100 border-amber-300' : 'bg-gray-100 border-gray-300'}`}>
             <div className="flex items-center gap-2 mb-2">
               <AlertCircle className={`w-5 h-5 ${isNextOutreachDue ? 'text-amber-700' : 'text-gray-700'}`} />
@@ -252,21 +252,24 @@ export const StalledCard: React.FC<StalledCardProps> = ({
             )}
           </div>
 
-          {/* Contact Info */}
-          <div className="bg-white/70 rounded-lg p-3">
-            <p className="text-sm font-medium mb-1">Contact:</p>
-            <p className="text-sm">{request.firstName} {request.lastName}</p>
-            <p className="text-sm text-gray-600">{request.email}</p>
-            {request.phone && <p className="text-sm text-gray-600">{request.phone}</p>}
-          </div>
-
-          {/* Event Notes if any */}
-          {request.message && (
-            <div className="bg-gray-100 rounded-lg p-3">
-              <p className="text-sm font-medium mb-1">Original Request Notes:</p>
-              <p className="text-sm text-gray-600">{request.message}</p>
+          {/* Contact and request notes sit side by side on wide screens */}
+          <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+            {/* Contact Info */}
+            <div className="min-w-0 break-words bg-white/70 rounded-lg p-3">
+              <p className="text-sm font-medium mb-1">Contact:</p>
+              <p className="text-sm">{request.firstName} {request.lastName}</p>
+              <p className="text-sm text-gray-600">{request.email}</p>
+              {request.phone && <p className="text-sm text-gray-600">{request.phone}</p>}
             </div>
-          )}
+
+            {/* Event Notes if any */}
+            {request.message && (
+              <div className="min-w-0 break-words bg-gray-100 rounded-lg p-3">
+                <p className="text-sm font-medium mb-1">Original Request Notes:</p>
+                <p className="text-sm text-gray-600">{request.message}</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Notes: New Event Flags on New cards, read-only earlier comments elsewhere */}
@@ -287,7 +290,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
                   size="sm"
                   variant="default"
                   onClick={onReactivate}
-                  className="bg-[#6B7280] hover:bg-[#4B5563] text-white h-8"
+                  className="bg-[#6B7280] hover:bg-[#4B5563] text-white h-8 md:min-h-0 md:h-8"
                   data-testid="button-reactivate"
                 >
                   <RefreshCw className="w-4 h-4 mr-1" />
@@ -305,7 +308,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onDecline}
-                  className="border-red-400 text-red-600 hover:bg-red-50 h-8"
+                  className="border-red-400 text-red-600 hover:bg-red-50 h-8 md:min-h-0 md:h-8"
                   data-testid="button-decline"
                 >
                   <XCircle className="w-4 h-4 mr-1" />
@@ -319,7 +322,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onView} data-testid="button-view" className="h-8">
+                <Button size="sm" variant="outline" onClick={onView} data-testid="button-view" className="h-8 md:min-h-0 md:h-8">
                   <Eye className="w-4 h-4 mr-1" />
                   View
                 </Button>
@@ -331,7 +334,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onEdit} data-testid="button-edit" className="h-8">
+                <Button size="sm" variant="outline" onClick={onEdit} data-testid="button-edit" className="h-8 md:min-h-0 md:h-8">
                   <Edit2 className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
@@ -344,7 +347,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
             {onDuplicate && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={onDuplicate} data-testid="button-duplicate" className="h-8">
+                  <Button size="sm" variant="outline" onClick={onDuplicate} data-testid="button-duplicate" className="h-8 md:min-h-0 md:h-8">
                     <Copy className="w-4 h-4 mr-1" />
                     Duplicate
                   </Button>
@@ -358,7 +361,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
             {request.phone && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button size="sm" variant="outline" onClick={onCall} data-testid="button-call" className="h-8">
+                  <Button size="sm" variant="outline" onClick={onCall} data-testid="button-call" className="h-8 md:min-h-0 md:h-8">
                     <Phone className="w-4 h-4 mr-1" />
                     Call
                   </Button>
@@ -371,7 +374,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={onContact} data-testid="button-contact" className="h-8">
+                <Button size="sm" variant="outline" onClick={onContact} data-testid="button-contact" className="h-8 md:min-h-0 md:h-8">
                   <Mail className="w-4 h-4 mr-1" />
                   Email
                 </Button>
@@ -387,7 +390,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={onLogContact}
-                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10 h-8 md:min-h-0 md:h-8"
                   data-testid="button-log-contact"
                 >
                   <FileText className="w-4 h-4 mr-1" />
@@ -408,7 +411,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
                   size="sm"
                   onClick={messageAboutEvent}
                   variant="ghost"
-                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8"
+                  className="text-[#007E8C] hover:text-[#007E8C] hover:bg-[#007E8C]/10 h-8 md:min-h-0 md:h-8"
                   data-testid="button-message"
                 >
                   <MessageSquare className="w-4 h-4" />
@@ -428,7 +431,7 @@ export const StalledCard: React.FC<StalledCardProps> = ({
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-red-600 hover:text-red-700 h-8"
+                          className="text-red-600 hover:text-red-700 h-8 md:min-h-0 md:h-8"
                           data-testid="button-delete-request"
                         >
                           <Trash2 className="w-4 h-4" />

@@ -33,6 +33,8 @@ interface PreEventFlagsProps {
   eventId: number;
   eventName: string;
   compact?: boolean; // Compact mode for small cards
+  /** Show the "Add New Flag" form in the dialog. Defaults to true. */
+  allowAdd?: boolean;
   /**
    * @deprecated No longer needed - mutations now automatically invalidate queries.
    * Kept for backwards compatibility but can be safely removed.
@@ -61,7 +63,7 @@ const flagTypeConfig = {
   },
 };
 
-export function PreEventFlagsBanner({ flags, eventId, eventName, compact = false }: PreEventFlagsProps) {
+export function PreEventFlagsBanner({ flags, eventId, eventName, compact = false, allowAdd = true }: PreEventFlagsProps) {
   const [showDialog, setShowDialog] = useState(false);
   const { resolveFlagMutation } = usePreEventFlagMutations();
 
@@ -153,6 +155,7 @@ export function PreEventFlagsBanner({ flags, eventId, eventName, compact = false
         eventName={eventName}
         isOpen={showDialog}
         onClose={() => setShowDialog(false)}
+        allowAdd={allowAdd}
       />
     </>
   );
@@ -164,6 +167,8 @@ interface PreEventFlagsDialogProps {
   eventName: string;
   isOpen: boolean;
   onClose: () => void;
+  /** Show the "Add New Flag" form. Defaults to true. */
+  allowAdd?: boolean;
   /**
    * @deprecated No longer needed - mutations now automatically invalidate queries.
    * Kept for backwards compatibility but can be safely removed.
@@ -171,7 +176,7 @@ interface PreEventFlagsDialogProps {
   onUpdate?: () => void;
 }
 
-export function PreEventFlagsDialog({ flags, eventId, eventName, isOpen, onClose }: PreEventFlagsDialogProps) {
+export function PreEventFlagsDialog({ flags, eventId, eventName, isOpen, onClose, allowAdd = true }: PreEventFlagsDialogProps) {
   const [newFlagMessage, setNewFlagMessage] = useState('');
   const [newFlagType, setNewFlagType] = useState<'critical' | 'important' | 'attention'>('important');
 
@@ -210,6 +215,7 @@ export function PreEventFlagsDialog({ flags, eventId, eventName, isOpen, onClose
 
         <div className="space-y-4">
           {/* Add New Flag */}
+          {allowAdd && (
           <div className="border rounded-lg p-4 bg-gray-50">
             <h3 className="font-semibold text-sm mb-3">Add New Flag</h3>
             <div className="space-y-3">
@@ -247,6 +253,7 @@ export function PreEventFlagsDialog({ flags, eventId, eventName, isOpen, onClose
               </Button>
             </div>
           </div>
+          )}
 
           {/* Active Flags */}
           {activeFlags.length > 0 && (
@@ -315,7 +322,9 @@ export function PreEventFlagsDialog({ flags, eventId, eventName, isOpen, onClose
             <div className="text-center py-8 text-gray-500">
               <Flag className="w-12 h-12 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No flags yet</p>
-              <p className="text-xs mt-1">Add flags for critical items that need attention before this event</p>
+              {allowAdd && (
+                <p className="text-xs mt-1">Add flags for critical items that need attention before this event</p>
+              )}
             </div>
           )}
         </div>
