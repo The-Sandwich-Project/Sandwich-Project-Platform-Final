@@ -23,6 +23,14 @@ export const EVENT_STATUSES = [
 export type EventStatus = typeof EVENT_STATUSES[number];
 
 /**
+ * Statuses that may still appear on older records but can no longer be
+ * chosen. "rescheduled" was retired: an event with a new date is simply
+ * Scheduled, and one that loses its date goes back to In Process with a
+ * "needs new date" marker (event_requests.needs_new_date_since).
+ */
+export const RETIRED_STATUSES: readonly EventStatus[] = ['rescheduled'];
+
+/**
  * Return true if a status represents a scheduled event — either freshly
  * scheduled or rescheduled to a new date. `rescheduled` is semantically a
  * scheduled event whose date was moved; everywhere the UI/services care
@@ -69,18 +77,18 @@ export const STATUS_DEFINITIONS: Record<EventStatus, {
   },
   in_process: {
     label: 'In Process',
-    definition: 'Has received the toolkit and at least one contact attempt has been made.',
-    guidance: 'Work with the contact to finalize event details. Can move to Scheduled, Declined, Standby, Stalled, or Non-Event.',
+    definition: 'Has received the toolkit and at least one contact attempt has been made. Also where a scheduled event goes back to when it loses its date: it shows a "Needs new date" badge until it is scheduled again.',
+    guidance: 'Work with the contact to finalize event details. Can move to Standby, Scheduled, Declined, Stalled, or Non-Event.',
   },
   scheduled: {
     label: 'Scheduled',
     definition: 'Event is on our calendar and the majority of details are nailed down. All details should be finalized at least a few days before the event whenever possible.',
-    guidance: 'Assign drivers and volunteers. Can move to Completed, Cancelled, or Rescheduled. If the event needs to be rescheduled but no new date is available yet, move to Standby.',
+    guidance: 'Assign drivers and volunteers. If the date moves, just change the date. If the event loses its date and the group needs to pick a new one, move it back to In Process (it gets a "Needs new date" badge). Can also move to Completed or Cancelled.',
   },
   rescheduled: {
     label: 'Rescheduled',
-    definition: 'A previously scheduled event that has been assigned a new confirmed date.',
-    guidance: 'Treat like a scheduled event. Can move to Completed, Cancelled, or Standby.',
+    definition: 'Retired. A scheduled event with a new date is simply Scheduled; one that lost its date goes back to In Process with a "Needs new date" badge.',
+    guidance: 'No longer used for new changes.',
   },
   completed: {
     label: 'Completed',
@@ -104,8 +112,8 @@ export const STATUS_DEFINITIONS: Record<EventStatus, {
   },
   standby: {
     label: 'Standby',
-    definition: 'Events where the Group Contact is waiting on something specific (e.g., information or permission from someone in their organization) in order for us to move forward with the planning process. If a Scheduled event needs to be rescheduled and the group cannot provide a new date right away, that event can also be moved to Standby until we receive the new date.',
-    guidance: 'Follow closely. Move to In Process, Scheduled, Declined, or Stalled as appropriate.',
+    definition: 'The Group Contact is waiting on something specific before we can move forward: budget, date/time, volunteers, the number of sandwiches, or something else (e.g. permission from someone in their organization). Record what they are waiting on when moving the event to Standby.',
+    guidance: 'Every Standby event gets a check-back reminder (a week out unless you pick another date or turn it off). Follow closely. Move to Scheduled, In Process, Declined, or Stalled as appropriate.',
   },
   stalled: {
     label: 'Stalled',
@@ -147,7 +155,8 @@ export const VALID_STATUS_TRANSITIONS: Record<EventStatus, EventStatus[]> =
   Object.fromEntries(
     EVENT_STATUSES.map((from) => [
       from,
-      EVENT_STATUSES.filter((to) => to !== from),
+      // Retired statuses can't be chosen, but an old record can still move out of one.
+      EVENT_STATUSES.filter((to) => to !== from && !RETIRED_STATUSES.includes(to)),
     ])
   ) as Record<EventStatus, EventStatus[]>;
 

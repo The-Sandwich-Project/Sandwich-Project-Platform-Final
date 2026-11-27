@@ -144,7 +144,6 @@ export const statusOptions = [
   { value: 'in_process', label: 'In Process' },
   { value: 'standby', label: 'Standby' },
   { value: 'scheduled', label: 'Scheduled' },
-  { value: 'rescheduled', label: 'Rescheduled' },
   { value: 'completed', label: 'Completed' },
   { value: 'declined', label: 'Declined' },
   { value: 'cancelled', label: 'Cancelled' },

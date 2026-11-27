@@ -2880,6 +2880,10 @@ export const eventRequests = pgTable(
     standbyExpectedDate: timestamp('standby_expected_date'), // When we expect to hear back from them
     standbyNotes: text('standby_notes'), // Notes about the standby situation
     standbyMarkedAt: timestamp('standby_marked_at'), // When the event was marked as standby
+    // Set when a scheduled event goes back to In Process (it lost its date); the
+    // In Process card then shows "needs new date". Cleared once it's scheduled
+    // again or completed. Replaces the retired 'rescheduled' status.
+    needsNewDateSince: timestamp('needs_new_date_since'),
     standbyMarkedBy: varchar('standby_marked_by'), // User ID who marked it as standby
 
     // Stalled tracking (for 'stalled' status - no response after repeated outreach)

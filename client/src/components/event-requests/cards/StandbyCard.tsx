@@ -198,17 +198,21 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
               )}
             </div>
 
-            {request.standbyReason && (
-              <div className="mt-3">
-                <p className={`text-sm font-medium mb-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>Reason:</p>
-                <p className={`text-sm ${isExpectedDatePast ? 'text-red-800' : 'text-purple-800'}`}>{request.standbyReason}</p>
+            {(request.standbyReason || request.standbyNotes) && (
+              <div className="mt-3" data-testid="standby-waiting-on">
+                <p className={`text-sm font-medium mb-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>Waiting on:</p>
+                <p className={`text-sm ${isExpectedDatePast ? 'text-red-800' : 'text-purple-800'}`}>
+                  {request.standbyReason && <span className="font-semibold">{request.standbyReason}</span>}
+                  {request.standbyReason && request.standbyNotes && ' — '}
+                  {request.standbyNotes}
+                </p>
               </div>
             )}
 
             {request.standbyExpectedDate && (
               <div className={`mt-3 rounded p-2 ${isExpectedDatePast ? 'bg-red-50' : 'bg-white/50'}`}>
                 <p className={`text-sm font-medium mb-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>
-                  {isExpectedDatePast ? 'Expected Response (OVERDUE):' : 'Expected Response By:'}
+                  {isExpectedDatePast ? 'Check back (OVERDUE):' : 'Check back on:'}
                 </p>
                 <p className={`text-base font-semibold flex items-center gap-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>
                   <Clock className="w-4 h-4" />
@@ -222,12 +226,6 @@ export const StandbyCard: React.FC<StandbyCardProps> = ({
               </div>
             )}
 
-            {request.standbyNotes && (
-              <div className="mt-3">
-                <p className={`text-sm font-medium mb-1 ${isExpectedDatePast ? 'text-red-900' : 'text-purple-900'}`}>Notes:</p>
-                <p className={`text-sm whitespace-pre-wrap ${isExpectedDatePast ? 'text-red-800' : 'text-purple-800'}`}>{request.standbyNotes}</p>
-              </div>
-            )}
           </div>
 
           {/* Original Request Info */}

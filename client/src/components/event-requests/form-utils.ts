@@ -249,6 +249,13 @@ export function buildEventDataForServer(
         ? serializeDateToISO(typeof date === 'string' ? date : new Date(date).toISOString().split('T')[0])
         : null;
     })(),
+    // What a Standby event is waiting on (only while it's on Standby)
+    ...(formData.status === 'standby'
+      ? {
+          standbyReason: (formData.standbyReason || '').trim() || null,
+          standbyNotes: (formData.standbyNotes || '').trim() || null,
+        }
+      : {}),
   };
 
   // Sandwich estimate. The shared editor (SandwichEstimateEditor) keeps the
@@ -461,3 +468,86 @@ export function dropUnchangedFields(
   return omitted;
 }
 
+/**
+ * Fields that only make sense together and must merge as one unit, so a
+ * recovered draft can't pair one person's choice with another person's
+ * value (e.g. a drafted "No reminder" with someone else's newer date).
+ */
+const MERGE_TOGETHER: string[][] = [
+  ['standbyCheckBackMode', 'standbyCheckBackDate', 'standbyExpectedDate'],
+];
+
+/**
+ * Intelligent merge of cached form data (a recovered draft) with current
+ * server data. Preserves the user's intentional changes while accepting
+ * server updates. When both the user and the server changed the same field
+ * (or the same MERGE_TOGETHER group), the server wins.
+ */
+export function intelligentMergeFormData(
+  cachedFormData: Record<string, any>,
+  originalServerData: Record<string, any> | null | undefined,
+  currentServerData: Record<string, any>
+): {
+  mergedData: Record<string, any>;
+  conflicts: string[];
+  serverUpdates: string[];
+  userChangesPreserved: string[];
+} {
+  const mergedData: Record<string, any> = { ...currentServerData };
+  const conflicts: string[] = [];
+  const serverUpdates: string[] = [];
+  const userChangesPreserved: string[] = [];
+
+  if (!originalServerData) {
+    return { mergedData: currentServerData, conflicts: [], serverUpdates: [], userChangesPreserved: [] };
+  }
+
+  const valuesEqual = (a: any, b: any): boolean => {
+    const normalize = (v: any) => {
+      if (v === null || v === undefined || v === '') return null;
+      if (typeof v === 'object') return JSON.stringify(v);
+      return v;
+    };
+    return normalize(a) === normalize(b);
+  };
+
+  const grouped = new Set(MERGE_TOGETHER.flat());
+  for (const group of MERGE_TOGETHER) {
+    const keys = group.filter((k) => k in cachedFormData || k in currentServerData);
+    if (keys.length === 0) continue;
+    const userChanged = keys.some((k) => !valuesEqual(cachedFormData[k], originalServerData[k]));
+    const serverChanged = keys.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
+    // Same rule as single fields: both changed -> the server wins.
+    const source = userChanged && !serverChanged ? cachedFormData : currentServerData;
+    for (const k of keys) mergedData[k] = source[k];
+    if (userChanged && serverChanged) conflicts.push(...keys);
+    else if (userChanged) userChangesPreserved.push(...keys);
+    else if (serverChanged) serverUpdates.push(...keys);
+  }
+
+  for (const key of Object.keys(cachedFormData)) {
+    if (grouped.has(key)) continue;
+    const cachedValue = cachedFormData[key];
+    const originalValue = originalServerData[key];
+    const currentValue = currentServerData[key];
+    const userChangedField = !valuesEqual(cachedValue, originalValue);
+    const serverChangedField = !valuesEqual(currentValue, originalValue);
+
+    if (userChangedField && serverChangedField) {
+      conflicts.push(key);
+      mergedData[key] = currentValue;
+    } else if (userChangedField) {
+      userChangesPreserved.push(key);
+      mergedData[key] = cachedValue;
+    } else if (serverChangedField) {
+      serverUpdates.push(key);
+      mergedData[key] = currentValue;
+    }
+  }
+
+  if (!mergedData.status) {
+    mergedData.status = currentServerData.status || 'new';
+  }
+
+  return { mergedData, conflicts, serverUpdates, userChangesPreserved };
+}
