@@ -683,9 +683,9 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         {/* Header Row - Organization & Status.
             Tightened to mirror InProcessCard density: removed the thick teal
             divider and heavy pb-3 in favor of a single mb-3 bottom margin. */}
-        <div className="flex flex-col gap-1.5 mb-3">
+        <div className="flex flex-col gap-1.5 mb-3 lg:grid lg:grid-cols-2 lg:gap-x-4 lg:gap-y-1 lg:items-start">
           {/* Top: Date + Organization Name */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 lg:col-start-1 lg:row-start-1 lg:row-span-3">
             {/* Organization Name + Department (separate edit targets) */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -1117,7 +1117,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
           {/* Rescheduled Badge */}
           {request.status === 'rescheduled' && request.originalScheduledDate && (
-            <div className="mb-1">
+            <div className="mb-1 lg:col-start-1">
               <Badge className="bg-blue-100 text-blue-700 border border-blue-200 text-xs font-medium">
                 <RefreshCw className="w-3 h-3 mr-1" />
                 Rescheduled from {new Date(request.originalScheduledDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -1139,7 +1139,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               Volunteer Hub" with the same visual weight as warning
               chips, which is why the row looked flat — every chip was
               demanding attention equally. */}
-          <div className="flex flex-wrap items-center gap-1 xs:gap-1.5 sm:gap-2 min-w-0">
+          <div className="flex flex-wrap items-center gap-1 xs:gap-1.5 sm:gap-2 min-w-0 lg:col-start-2 lg:row-start-1 lg:justify-end">
             <Badge
               onClick={(e) => { e.stopPropagation(); canEdit && quickToggleBoolean('isConfirmed', request.isConfirmed); }}
               className={`cursor-pointer hover:opacity-90 transition-opacity text-xs sm:text-sm font-medium ${
@@ -1376,7 +1376,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
           {/* Add department/partner buttons - hidden on mobile, shown on hover on desktop */}
           {canEdit && (
-            <div className="hidden sm:flex items-center gap-2 mt-1">
+            <div className="hidden sm:flex items-center gap-2 mt-1 lg:mt-0 lg:col-start-2 lg:row-start-2 lg:justify-end">
               {!request.department && (
                 <Tooltip>
                   <TooltipTrigger asChild>
