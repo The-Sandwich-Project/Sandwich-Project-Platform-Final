@@ -530,8 +530,9 @@ export function dropUnchangedFields(
 const MERGE_TOGETHER: string[][] = [
   ['standbyCheckBackMode', 'standbyCheckBackDate', 'standbyExpectedDate'],
   ['estimatedAttendance', 'estimatedAttendanceMin', 'estimatedAttendanceMax'],
-  // The next-day choice and the overnight details it keeps or drops.
-  ['nextDayPickup', 'holdingOvernight', 'overnightHoldingLocation', 'overnightPickupTime'],
+  // The next-day choice and the overnight details it keeps or drops (choosing
+  // No / It's an option clears the delivery window and parking too).
+  ['nextDayPickup', 'holdingOvernight', 'overnightHoldingLocation', 'overnightPickupTime', 'deliveryTimeWindow', 'deliveryParkingAccess'],
 ];
 
 /**

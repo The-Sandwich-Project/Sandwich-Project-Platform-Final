@@ -163,4 +163,15 @@ describe('Greptile review fixes', () => {
     const { mergedData } = intelligentMergeFormData(draft, original, current);
     expect(mergedData).toMatchObject({ nextDayPickup: 'planned', overnightHoldingLocation: 'B' });
   });
+
+  it("the delivery window and parking details merge with the next-day choice", () => {
+    // The draft switched to "It's an option" (clearing the delivery details);
+    // meanwhile the server changed the pickup time: the server's whole plan wins,
+    // delivery details included.
+    const original = { status: 'in_process', nextDayPickup: 'planned', holdingOvernight: true, overnightHoldingLocation: 'A', overnightPickupTime: '09:00', deliveryTimeWindow: '11-12', deliveryParkingAccess: 'Rear lot' };
+    const draft = { ...original, nextDayPickup: 'option', holdingOvernight: false, overnightHoldingLocation: '', overnightPickupTime: '', deliveryTimeWindow: '', deliveryParkingAccess: '' };
+    const current = { ...original, overnightPickupTime: '10:00' };
+    const { mergedData } = intelligentMergeFormData(draft, original, current);
+    expect(mergedData).toMatchObject({ nextDayPickup: 'planned', overnightPickupTime: '10:00', deliveryTimeWindow: '11-12', deliveryParkingAccess: 'Rear lot' });
+  });
 });
