@@ -595,12 +595,24 @@ export function intelligentMergeFormData(
     const keys = group.filter((k) => k in cachedFormData || k in currentServerData);
     if (keys.length === 0) continue;
     // A field newer than the draft (e.g. vanDay, added after it was saved) is
-    // in neither snapshot. Its first appearance on the server isn't a change,
-    // so it can't outvote the user's edit to the rest of its group.
+    // in neither snapshot, so it can't be compared directly.
     const newerThanDraft = (k: string) => !(k in cachedFormData) && !(k in originalServerData);
     const compared = keys.filter((k) => !newerThanDraft(k));
     const userChanged = compared.some((k) => !valuesEqual(cachedFormData[k], originalServerData[k]));
-    const serverChanged = compared.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
+    // vanDay is the booked day (scheduled date, else requested). A reschedule
+    // changes only that, not the date box, so an older draft's snapshot can't
+    // show it. Its best record of the day is the date it started from: if the
+    // server's booked day differs, treat the date as changed on the server so
+    // the draft can't overwrite a confirmed date. (If the event was already
+    // rescheduled before the draft, the drafted date gives way too, shown as a
+    // conflict, which is the safe direction.)
+    const bookedDayMoved =
+      newerThanDraft('vanDay') &&
+      keys.includes('vanDay') &&
+      'eventDate' in originalServerData &&
+      !valuesEqual(currentServerData.vanDay, originalServerData.eventDate);
+    const serverChanged =
+      bookedDayMoved || compared.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
     // Same rule as single fields: both changed -> the server wins.
     const source = userChanged && !serverChanged ? cachedFormData : currentServerData;
     if (group.includes('vanTeamOk')) vanGroupSource = source;

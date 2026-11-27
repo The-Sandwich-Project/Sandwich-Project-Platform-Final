@@ -186,6 +186,13 @@ describe("a recovered draft's sharing OK stays with its day", () => {
         eventDate: '2026-12-05', vanDay: '2026-12-07',
       });
     });
+    it('give way to a later reschedule (only the booked day changed on the server)', () => {
+      const oldDraft = { ...oldOriginal, eventDate: '2026-12-09' };
+      const rescheduled = { ...server, vanDay: '2026-12-12' };
+      const { mergedData, conflicts } = intelligentMergeFormData(oldDraft, oldOriginal, rescheduled);
+      expect(mergedData).toMatchObject({ eventDate: '2026-12-05', vanDay: '2026-12-12' });
+      expect(conflicts).toEqual(expect.arrayContaining(['eventDate', 'vanDay']));
+    });
     it('still let the server win when both changed the date', () => {
       const oldDraft = { ...oldOriginal, eventDate: '2026-12-09' };
       const moved = { ...server, eventDate: '2026-12-11', vanDay: '2026-12-11' };
