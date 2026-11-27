@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Edit2, Trash2, Reply, Loader2, Heart } from "lucide-react";
+import { MessageSquare, Edit2, Trash2, Reply, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import type { EventCollaborationComment } from "@shared/schema";
@@ -21,7 +20,27 @@ interface CommentThreadProps {
   isLoading?: boolean;
   className?: string;
   compact?: boolean;
+  /** Show the comments only: no composer, reply, edit, delete or like. */
+  readOnly?: boolean;
+  /** Wording, for threads that aren't called "comments" (e.g. New Event Flags). */
+  labels?: Partial<CommentThreadLabels>;
 }
+
+export interface CommentThreadLabels {
+  title: string;
+  empty: string;
+  emptyHint: string;
+  placeholder: string;
+  submit: string;
+}
+
+const DEFAULT_LABELS: CommentThreadLabels = {
+  title: 'Comments',
+  empty: 'No comments yet',
+  emptyHint: 'Be the first to comment!',
+  placeholder: 'Add a comment...',
+  submit: 'Add Comment',
+};
 
 interface CommentItemProps {
   comment: EventCollaborationComment;
@@ -33,6 +52,7 @@ interface CommentItemProps {
   onReply: (parentId: number) => void;
   getReplies: (parentId: number) => EventCollaborationComment[];
   depth?: number;
+  readOnly?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -68,43 +88,20 @@ function CommentItem({
   onDelete,
   onReply,
   getReplies,
-  depth = 0
+  depth = 0,
+  readOnly = false,
 }: CommentItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const queryClient = useQueryClient();
 
   const isOwner = comment.userId === currentUserId;
   const maxDepth = 3;
   const replies = getReplies(comment.id);
 
-  // Fetch likes for this comment
-  const { data: likesData } = useQuery({
-    queryKey: [`/api/event-requests/${eventId}/collaboration/comments/${comment.id}/likes`],
-  });
-
-  const likes = likesData?.likes || [];
-  const likeCount = likes.length;
-  const isLikedByMe = likes.some((like: any) => like.userId === currentUserId);
-
-  // Like/unlike mutation
-  const likeMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/event-requests/${eventId}/collaboration/comments/${comment.id}/likes`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to toggle like');
-      return response.json();
-    },
-    onSuccess: () => {
-      // Refetch likes for this comment
-      queryClient.invalidateQueries({
-        queryKey: [`/api/event-requests/${eventId}/collaboration/comments/${comment.id}/likes`],
-      });
-    },
-  });
+  // Likes were never built on the server (GET always returned an empty list,
+  // POST saved nothing), so there's no like button and no per-comment
+  // request: with flags open by default, that was one useless request each.
 
   const handleSaveEdit = async () => {
     if (!editContent.trim() || isSubmitting) return;
@@ -201,23 +198,8 @@ function CommentItem({
                 {comment.content}
               </p>
 
+              {!readOnly && (
               <div className="flex items-center gap-2 mt-2">
-                {/* Like button - always visible */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={cn(
-                    "h-7 text-xs",
-                    isLikedByMe && "text-red-500 hover:text-red-600"
-                  )}
-                  onClick={() => likeMutation.mutate()}
-                  disabled={likeMutation.isPending}
-                  data-testid={`like-button-${comment.id}`}
-                >
-                  <Heart className={cn("h-3 w-3 mr-1", isLikedByMe && "fill-current")} />
-                  {likeCount > 0 && <span>{likeCount}</span>}
-                </Button>
-
                 {/* Other actions - shown on hover */}
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   {depth < maxDepth && (
@@ -259,6 +241,7 @@ function CommentItem({
                   )}
                 </div>
               </div>
+              )}
             </>
           )}
         </div>
@@ -278,6 +261,7 @@ function CommentItem({
               onReply={onReply}
               getReplies={getReplies}
               depth={depth + 1}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -298,7 +282,10 @@ export function CommentThread({
   isLoading = false,
   className,
   compact = false,
+  readOnly = false,
+  labels: labelOverrides,
 }: CommentThreadProps) {
+  const labels = { ...DEFAULT_LABELS, ...labelOverrides };
   const [newComment, setNewComment] = useState("");
   const [replyToId, setReplyToId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -324,10 +311,14 @@ export function CommentThread({
     }
   };
 
+  // This thread's own box. Several threads can be on screen at once (New
+  // cards open their flags by default), so never look the box up by selector:
+  // that focused the FIRST card's box and saved the reply on the wrong event.
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const handleReply = (parentId: number) => {
     setReplyToId(parentId);
-    const textarea = document.querySelector('[data-testid="new-comment-textarea"]') as HTMLTextAreaElement;
-    textarea?.focus();
+    textareaRef.current?.focus();
   };
 
   return (
@@ -336,7 +327,7 @@ export function CommentThread({
         <div className="flex items-center gap-2 mb-4 pb-3 border-b">
           <MessageSquare className="h-5 w-5 text-muted-foreground" />
           <h3 className="text-lg font-semibold">
-            Comments
+            {labels.title}
           </h3>
           <span className="text-sm text-muted-foreground">
             ({comments.length})
@@ -354,12 +345,12 @@ export function CommentThread({
             {!compact && (
               <>
                 <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p className="text-sm">No comments yet</p>
-                <p className="text-xs mt-1">Be the first to comment!</p>
+                <p className="text-sm">{labels.empty}</p>
+                {!readOnly && <p className="text-xs mt-1">{labels.emptyHint}</p>}
               </>
             )}
             {compact && (
-              <p className="text-xs opacity-60">No comments yet</p>
+              <p className="text-xs opacity-60">{labels.empty}</p>
             )}
           </div>
         ) : (
@@ -375,6 +366,7 @@ export function CommentThread({
                 onDelete={onDeleteComment}
                 onReply={handleReply}
                 getReplies={getReplies}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -388,6 +380,7 @@ export function CommentThread({
         )}
       </ScrollArea>
 
+      {!readOnly && (
       <div className={cn("border-t", compact ? "pt-2 mt-2" : "pt-4 mt-4")}>
         {replyToId && (
           <div className="flex items-center justify-between mb-2 px-3 py-2 bg-muted rounded-md">
@@ -407,7 +400,8 @@ export function CommentThread({
 
         <div className={cn(compact ? "space-y-1" : "space-y-2")}>
           <Textarea
-            placeholder="Add a comment..."
+            ref={textareaRef}
+            placeholder={labels.placeholder}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             className={cn("resize-none", compact ? "min-h-[60px] text-sm" : "min-h-[100px]")}
@@ -433,11 +427,12 @@ export function CommentThread({
               size={compact ? "sm" : "default"}
             >
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Add Comment
+              {labels.submit}
             </Button>
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

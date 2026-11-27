@@ -94,7 +94,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { PERMISSIONS } from '@shared/auth-utils';
 import { hasPermission } from '@shared/unified-auth-utils';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
-import { CommentThread } from '@/components/collaboration';
 import { useToast } from '@/hooks/use-toast';
 import { Sheet } from 'lucide-react';
 import { apiRequest, applyPatchResponseToCache } from '@/lib/queryClient';
@@ -116,6 +115,7 @@ import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
 import { CardActionRow, ActionRowSpacer, InfoBadge } from './card-ui';
 import { CardSandwichEstimateEdit } from '../SandwichEstimateEditor';
+import { EventNotesSection } from './EventNotesSection';
 
 interface ScheduledCardEnhancedProps {
   request: EventRequest;
@@ -212,7 +212,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   const [instructionsDraft, setInstructionsDraft] = useState({ driverInstructions: '', volunteerInstructions: '' });
   const [showSendSmsDialog, setShowSendSmsDialog] = useState(false);
   const [showSendCorrectionDialog, setShowSendCorrectionDialog] = useState(false);
-  const [showComments, setShowComments] = useState(false);
   const [showAllocationEditor, setShowAllocationEditor] = useState(false);
   const [showFlagsDialog, setShowFlagsDialog] = useState(false);
   const [showContactLog, setShowContactLog] = useState(false);
@@ -4027,45 +4026,15 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
           </CardActionRow>
         </TooltipProvider>
 
-        {/* Team Comments Section */}
-        {request.id && (
-          <div className="bg-white rounded-lg px-2 py-1 mb-2 border border-gray-200">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowComments(!showComments)}
-                className="flex-1 justify-between text-gray-700 hover:text-gray-700 hover:bg-gray-50 font-medium px-2 py-1 h-8 md:min-h-0 min-w-0 md:h-8"
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-gray-600" />
-                  <h3 className="text-sm font-semibold">Team Comments</h3>
-                  {collaboration.comments && collaboration.comments.length > 0 && (
-                    <Badge variant="secondary" className="ml-1">
-                      {collaboration.comments.length}
-                    </Badge>
-                  )}
-                </div>
-                {showComments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </Button>
-            </div>
-
-            {showComments && (
-              <div className="mt-2 max-h-[500px]">
-                <CommentThread
-                  comments={collaboration.comments || []}
-                  currentUserId={user?.id || ''}
-                  currentUserName={user?.fullName || user?.email || ''}
-                  eventId={request.id}
-                  onAddComment={collaboration.addComment}
-                  onEditComment={collaboration.updateComment}
-                  onDeleteComment={collaboration.deleteComment}
-                  isLoading={collaboration.commentsLoading || false}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        {/* Notes: New Event Flags on New cards, read-only earlier comments elsewhere */}
+        <EventNotesSection
+          eventId={request.id}
+          mode="earlier"
+          dense
+          collaboration={collaboration}
+          currentUserId={user?.id || ''}
+          currentUserName={(user as any)?.fullName || user?.email || ''}
+        />
 
         {/* Pre-Event Flags Button */}
         <div className="border-t-2 border-[#007E8C]/10 pt-1 mb-0">

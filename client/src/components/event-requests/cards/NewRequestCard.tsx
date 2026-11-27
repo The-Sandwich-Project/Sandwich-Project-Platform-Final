@@ -59,7 +59,7 @@ import { PERMISSIONS } from '@shared/auth-utils';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
 import { useToast } from '@/hooks/use-toast';
 import { useEventCollaboration } from '@/hooks/use-event-collaboration';
-import { CommentThread, CompactPresenceBadge } from '@/components/collaboration';
+import { CompactPresenceBadge } from '@/components/collaboration';
 import { applyPatchResponseToCache } from '@/lib/queryClient';
 import { patchEventRequestVerified } from '@/lib/event-save-verification';
 import {
@@ -70,6 +70,7 @@ import {
 } from '@/components/ui/tooltip';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { InfoBadge, CardActionRow, ActionRowSpacer } from './card-ui';
+import { EventNotesSection } from './EventNotesSection';
 
 interface NewRequestCardProps {
   request: EventRequest;
@@ -835,7 +836,6 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showConfirmToggle, setShowConfirmToggle] = useState(false);
   const [pendingConfirmValue, setPendingConfirmValue] = useState(false);
-  const [showComments, setShowComments] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1164,44 +1164,14 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
           </div>
         </div>
 
-        {/* Communication & Notes Section */}
-        {request.id && (
-          <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowComments(!showComments)}
-              className="w-full justify-between text-gray-700 hover:text-gray-700 hover:bg-gray-50 font-medium p-2 h-auto mb-2"
-            >
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-gray-600" />
-                <h3 className="text-sm font-semibold">Team Comments</h3>
-                {collaboration.comments && collaboration.comments.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">
-                    {collaboration.comments.length}
-                  </Badge>
-                )}
-              </div>
-              {showComments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </Button>
-
-            {showComments && (
-              <div className="mt-3 max-h-[500px]">
-                <CommentThread
-                  comments={collaboration.comments || []}
-                  currentUserId={user?.id || ''}
-                  currentUserName={user?.fullName || user?.email || ''}
-                  eventId={request.id}
-                  onAddComment={collaboration.addComment}
-                  onEditComment={collaboration.updateComment}
-                  onDeleteComment={collaboration.deleteComment}
-                  isLoading={collaboration.commentsLoading || false}
-                />
-              </div>
-            )}
-
-          </div>
-        )}
+        {/* Notes: New Event Flags on New cards, read-only earlier comments elsewhere */}
+        <EventNotesSection
+          eventId={request.id}
+          mode="flags"
+          collaboration={collaboration}
+          currentUserId={user?.id || ''}
+          currentUserName={(user as any)?.fullName || user?.email || ''}
+        />
 
         {/* Action Buttons
             Tiered layout:

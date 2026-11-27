@@ -17,6 +17,15 @@ describe('Sandwich estimate editor (Deli / PB&J rows)', () => {
     expect(screen.getByText('300, Deli & PB&J (split TBD)')).toBeTruthy();
   });
 
+  it('always says ranges are allowed, and uses a keyboard that has a dash', () => {
+    render(<CardSandwichEstimateEdit request={event} onSave={jest.fn()} onCancel={jest.fn()} />);
+    fireEvent.change(screen.getByLabelText('Deli amount'), { target: { value: '150' } });
+    expect(screen.getByTestId('card-7-sandwich-range-hint').textContent).toMatch(/single number or a range/);
+    for (const box of [screen.getByLabelText('Deli amount'), screen.getByLabelText('PB&J amount'), screen.getByLabelText('Total, if known')]) {
+      expect(box.getAttribute('inputmode')).not.toBe('numeric');
+    }
+  });
+
   it('blocks saving unreadable text', () => {
     const onSave = jest.fn();
     render(<CardSandwichEstimateEdit request={event} onSave={onSave} onCancel={jest.fn()} />);

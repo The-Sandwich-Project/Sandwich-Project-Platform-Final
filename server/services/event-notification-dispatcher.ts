@@ -27,6 +27,7 @@ import {
   ContactAttemptLogEntry,
 } from './notification-tiers';
 import { getEffectiveEventDate } from '../../shared/event-validation-utils';
+import { flagsEmailHtml, flagsEmailText, flagsSmsSuffix, loadEventFlags, type EventFlag } from './event-flags';
 
 // ============================================================================
 // SMS SENDING (URGENT TIER)
@@ -140,8 +141,17 @@ export async function sendTspAssignmentNotification(
     return false;
   }
 
+  // New Event Flags: intake's notes for the TSP contact. The email lists
+  // them; a text only says there are some (a full note won't fit).
+  let flags: EventFlag[] = [];
+  try {
+    flags = await loadEventFlags(eventId);
+  } catch (error) {
+    logger.error(`Could not load New Event Flags for event ${eventId}; sending the alert without them:`, error);
+  }
+
   // Build SMS/email message body
-  const smsMessage = `🎯 New event: You're assigned to ${organizationName} (${dateStr}). ${eventUrl}`;
+  const smsMessage = `🎯 New event: You're assigned to ${organizationName} (${dateStr}).${flagsSmsSuffix(flags)} ${eventUrl}`;
 
   const phoneNumber = prefs.smsEnabled ? await getUserSMSNumber(userId) : null;
 
@@ -159,7 +169,8 @@ export async function sendTspAssignmentNotification(
           userName,
           organizationName,
           dateStr,
-          eventUrl
+          eventUrl,
+          flags
         )
       );
     }
@@ -175,7 +186,8 @@ export async function sendTspAssignmentNotification(
           userName,
           organizationName,
           dateStr,
-          eventUrl
+          eventUrl,
+          flags
         )
       );
     }
@@ -192,7 +204,8 @@ async function sendTspAssignmentEmail(
   userName: string,
   organizationName: string,
   dateStr: string,
-  eventUrl: string
+  eventUrl: string,
+  flags: EventFlag[] = []
 ): Promise<boolean> {
   if (!isEmailConfigured()) return false;
 
@@ -230,7 +243,7 @@ async function sendTspAssignmentEmail(
                 <strong>Organization:</strong> ${organizationName}<br>
                 <strong>Event Date:</strong> ${dateStr}
               </div>
-
+${flagsEmailHtml(flags)}
               <p>Click below to view the event details and get started:</p>
               <a href="${eventUrl}" class="btn">View Event Details →</a>
 
@@ -240,7 +253,7 @@ async function sendTspAssignmentEmail(
         </body>
         </html>
       `,
-      text: `Hi ${userName}!\n\nYou've been assigned to ${organizationName} (${dateStr}).\n\nView details: ${eventUrl}`,
+      text: `Hi ${userName}!\n\nYou've been assigned to ${organizationName} (${dateStr}).${flagsEmailText(flags)}\n\nView details: ${eventUrl}`,
     };
 
     await sendEmailOrThrow({ ...msg, emailStream: 'operational' });
