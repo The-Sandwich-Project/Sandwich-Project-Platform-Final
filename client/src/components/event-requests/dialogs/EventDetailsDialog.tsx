@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import type { EventRequest } from '@shared/schema';
 import { formatEventDate } from '../utils';
-import { parseSandwichTypes, formatSandwichTypesDisplay } from '@/lib/sandwich-utils';
+import { parseSandwichTypes, formatSandwichTypesDisplay, formatEventEstimate } from '@/lib/sandwich-utils';
 import { RefrigerationWarningBadge } from '../RefrigerationWarningBadge';
 import EventEmailLogDisplay from '@/components/event-email-log-display';
 
@@ -83,7 +83,7 @@ export function EventDetailsDialog({
   if (!event) return null;
 
   const sandwichTypes = parseSandwichTypes(event.sandwichTypes);
-  const sandwichDisplay = formatSandwichTypesDisplay(sandwichTypes);
+  const sandwichDisplay = formatEventEstimate(event);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

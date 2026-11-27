@@ -1,3 +1,4 @@
+import { totalFromFields } from '@shared/sandwich-estimate';
 import * as React from 'react';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -68,6 +69,7 @@ import {
   determineActualSandwichMode,
   resolveEstimatedAttendance,
   normalizeDraftAttendance,
+  dropUnchangedFields,
   intelligentMergeFormData,
 } from './form-utils';
 
@@ -382,8 +384,12 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   const saveToLocalStorage = useCallback(() => {
     if (!formInitialized) return;
     try {
+      // sandwichEstimateError is a temporary flag for text the editor can't
+      // read; the editor itself isn't saved in the draft, so a restored error
+      // would block saving a valid estimate. Leave it out.
+      const { sandwichEstimateError: _transientEstimateError, ...draftFormData } = formData as any;
       localStorage.setItem(getAutoSaveKey(), JSON.stringify({
-        formData, sandwichMode, actualSandwichMode, attendeeMode,
+        formData: draftFormData, sandwichMode, actualSandwichMode, attendeeMode,
         savedAt: new Date().toISOString(),
         eventId: eventRequest?.id || null,
         originalServerData: originalFormDataRef.current,
@@ -890,9 +896,13 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
 
   const eventLikelyNeedsVan = (): boolean => {
     if ((formData.vanDriverNeeded || formData.isDhlVan) && !formData.selfTransport) return true;
-    const count = sandwichMode === 'total' ? formData.totalSandwichCount
-      : sandwichMode === 'range' ? (formData.estimatedSandwichCountMax || formData.estimatedSandwichCountMin || 0)
-      : formData.sandwichTypes.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    // Largest the estimate could be (a range's max).
+    const est = totalFromFields({
+      estimatedSandwichCount: formData.totalSandwichCount || null,
+      estimatedSandwichCountMin: formData.estimatedSandwichCountMin || null,
+      estimatedSandwichCountMax: formData.estimatedSandwichCountMax || null,
+    });
+    const count = est?.max ?? 0;
     if (count > 500) return true;
     const notes = `${formData.schedulingNotes || ''} ${formData.planningNotes || ''}`.toLowerCase();
     if (/\bvan\b/.test(notes) && !notes.includes('van-approved') && !notes.includes('van approved')) return true;
@@ -938,6 +948,18 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       setIsSubmitting(false);
       logger.log('⛔ Save blocked: form not initialized');
       toast({ title: 'Please wait', description: 'Form is still loading. Please try again in a moment.', variant: 'destructive' });
+      return;
+    }
+
+    // The sandwich estimate box has text it can't read ("lots", "2oo"). Don't
+    // save something other than what the person sees.
+    if (formData.sandwichEstimateError) {
+      setIsSubmitting(false);
+      toast({
+        title: 'Check the sandwich estimate',
+        description: formData.sandwichEstimateError,
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -1060,25 +1082,9 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
           sandwichMode: baselineSandwichMode,
           actualSandwichMode: baselineActualSandwichMode,
         });
-        const omittedFields: string[] = [];
-        for (const key of Object.keys(eventData)) {
-          // Never drop a key the caller explicitly overrode this save — an
-          // override is a deliberate write even when it equals the baseline.
-          // (e.g. "No reminder" sends standbyExpectedDate: null; the baseline
-          // also computes null because its status isn't 'standby' yet, so a
-          // plain diff would silently drop the clear and a stale follow-up
-          // date from a previous standby episode would survive.)
-          if (fieldOverrides && Object.prototype.hasOwnProperty.call(fieldOverrides, key)) {
-            continue;
-          }
-          if (
-            Object.prototype.hasOwnProperty.call(baselineData, key) &&
-            JSON.stringify(eventData[key]) === JSON.stringify(baselineData[key])
-          ) {
-            delete eventData[key];
-            omittedFields.push(key);
-          }
-        }
+        // Drop unchanged fields (keeping explicit overrides, and the whole
+        // estimate when any part of it changed); see dropUnchangedFields.
+        const omittedFields = dropUnchangedFields(eventData, baselineData, fieldOverrides);
         if (omittedFields.length > 0) {
           logger.log(`🧮 Diff-based save: omitted ${omittedFields.length} unchanged field(s):`, omittedFields.join(', '));
         }

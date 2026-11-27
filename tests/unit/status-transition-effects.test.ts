@@ -1,6 +1,7 @@
 import {
   easternDatePlusDays,
   normalizeIncomingStatus,
+  rescheduleMoveFields,
   statusTransitionEffects,
 } from '../../server/utils/status-transition-effects';
 
@@ -61,5 +62,23 @@ describe('admin status endpoint check-back date', () => {
     expect(statusTransitionEffects({ fromStatus: 'in_process', toStatus: 'standby', updates: { standbyExpectedDate: chosen }, now: NOW })).not.toHaveProperty('standbyExpectedDate');
     expect(statusTransitionEffects({ fromStatus: 'in_process', toStatus: 'standby', updates: { standbyExpectedDate: null }, now: NOW })).not.toHaveProperty('standbyExpectedDate');
     expect(statusTransitionEffects({ fromStatus: 'in_process', toStatus: 'standby', updates: {}, now: NOW })).toHaveProperty('standbyExpectedDate');
+  });
+});
+
+describe('rescheduleMoveFields (old clients sending "rescheduled")', () => {
+  const first = new Date('2026-12-05T12:00:00Z');
+  it('records the move and keeps the first date', () => {
+    expect(rescheduleMoveFields('rescheduled', { scheduledEventDate: first }, {})).toEqual({
+      wasPostponed: true,
+      originalScheduledDate: first,
+    });
+  });
+  it('never overwrites an existing original date', () => {
+    const older = new Date('2026-11-01T12:00:00Z');
+    expect(rescheduleMoveFields('rescheduled', { scheduledEventDate: first, originalScheduledDate: older }, {})).toEqual({ wasPostponed: true });
+    expect(rescheduleMoveFields('rescheduled', { scheduledEventDate: first }, { originalScheduledDate: older })).toEqual({ wasPostponed: true });
+  });
+  it('does nothing for other statuses', () => {
+    expect(rescheduleMoveFields('scheduled', { scheduledEventDate: first }, {})).toEqual({});
   });
 });

@@ -21,14 +21,34 @@ export {
 } from '@shared/event-status-workflow';
 export type { EventStatus } from '@shared/event-status-workflow';
 
-// Standardized sandwich types - only these 5 options allowed
+// Sandwich types: the choices are PB&J and Deli only. Older events may still
+// hold turkey/ham (shown as Deli) or unknown, so those stay here for lookups.
 export const SANDWICH_TYPES = [
   { value: 'pbj', label: 'PB&J' },
   { value: 'deli', label: 'Deli' },
-  { value: 'deli_turkey', label: 'Turkey' },
-  { value: 'deli_ham', label: 'Ham' },
+  { value: 'deli_turkey', label: 'Deli' },
+  { value: 'deli_ham', label: 'Deli' },
   { value: 'unknown', label: 'Unknown' },
 ] as const;
+
+/** What people can pick for a sandwich type. */
+export const SANDWICH_TYPE_CHOICES = [
+  { value: 'pbj', label: 'PB&J' },
+  { value: 'deli', label: 'Deli' },
+] as const;
+
+const LEGACY_DELI_TYPES = new Set(['deli_turkey', 'deli_ham', 'turkey', 'ham', 'chicken']);
+
+/**
+ * The picker value to SHOW for a stored type: older meat-specific types
+ * select "Deli", anything else not offered shows as nothing picked. Display
+ * only; the stored value changes only if someone picks a type.
+ */
+export function sandwichTypeChoiceValue(stored: string | null | undefined): string | undefined {
+  const v = (stored || '').toLowerCase();
+  if (LEGACY_DELI_TYPES.has(v)) return 'deli';
+  return SANDWICH_TYPE_CHOICES.some((c) => c.value === v) ? v : undefined;
+}
 
 // Status color scheme - VIBRANT BRAND COLORS: Using TSP brand palette with high saturation
 export const statusColors: Record<string, string> = {

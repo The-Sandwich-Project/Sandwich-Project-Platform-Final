@@ -240,51 +240,61 @@ describe('determineSandwichMode (sandwich count drift)', () => {
     ).toBe('range');
   });
 
-  it('clears types semantics in total-mode full-form save payload', () => {
+  // The full form uses the shared estimate editor; its fields are sent as one
+  // normalized estimate (shared/sandwich-estimate.ts), whatever the old mode.
+  const opts = { mode: 'edit' as const, hasEventRequest: true, eventRequestStatus: 'scheduled', actualSandwichMode: 'total' as const };
+
+  it('sends the estimate as one normalized estimate, keeping types with amounts TBD', () => {
     const payload = buildEventDataForServer(
-      {
-        ...baseFormData,
-        totalSandwichCount: 200,
-        sandwichTypes: [{ type: 'deli', quantity: 100 }, { type: 'pbj', quantity: 98 }],
-      },
-      {
-        mode: 'edit',
-        hasEventRequest: true,
-        eventRequestStatus: 'scheduled',
-        sandwichMode: 'total',
-        actualSandwichMode: 'total',
-      },
+      { ...baseFormData, totalSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }] },
+      opts,
     );
-    expect(payload.estimatedSandwichCount).toBe(200);
-    // Types are no longer deleted by a total-mode save: the server rule keeps
-    // them and drops amounts that don't add up to the new total.
-    expect(payload.sandwichTypes).toBeUndefined();
-    const saved = resolveEstimatePatch(
-      { estimatedSandwichCount: 198, sandwichTypes: [{ type: 'deli', quantity: 100 }, { type: 'pbj', quantity: 98 }] },
-      payload,
-    );
-    expect(saved.estimatedSandwichCount).toBe(200);
-    expect(saved.sandwichTypes).toEqual([{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
+    expect(payload).toMatchObject({
+      estimatedSandwichCount: 300,
+      estimatedSandwichCountMin: null,
+      estimatedSandwichCountMax: null,
+      estimatedSandwichRangeType: null,
+    });
+    expect(JSON.parse(payload.sandwichTypes)).toEqual([{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }]);
   });
 
-  it('derives estimatedSandwichCount from types in types-mode save', () => {
+  it('a complete breakdown sets the total', () => {
     const payload = buildEventDataForServer(
-      {
-        ...baseFormData,
-        totalSandwichCount: 200,
-        sandwichTypes: [{ type: 'deli', quantity: 100 }, { type: 'pbj', quantity: 98 }],
-      },
-      {
-        mode: 'edit',
-        hasEventRequest: true,
-        eventRequestStatus: 'scheduled',
-        sandwichMode: 'types',
-        actualSandwichMode: 'total',
-      },
+      // What the editor writes for Deli 100 + PB&J 98 with no total typed.
+      { ...baseFormData, totalSandwichCount: 198, sandwichTypes: [{ type: 'deli', quantity: 100 }, { type: 'pbj', quantity: 98 }] },
+      opts,
     );
     expect(payload.estimatedSandwichCount).toBe(198);
     expect(sumSandwichTypeQuantities(payload.sandwichTypes)).toBe(198);
   });
+
+  it('a range with one type, and per-type ranges, survive the request schema', () => {
+    const one = buildEventDataForServer(
+      // What the editor writes for "200-300" + Turkey (count = the midpoint).
+      { ...baseFormData, totalSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, rangeSandwichType: 'deli_turkey' },
+      opts,
+    );
+    expect(one).toMatchObject({ estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, estimatedSandwichRangeType: 'deli_turkey' });
+    const parsed = insertEventRequestSchema.partial().parse({ sandwichTypes: one.sandwichTypes });
+    expect(parsed.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
+    // Saving it over an old Deli/PB&J split replaces the split.
+    const saved = resolveEstimatePatch(
+      { estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }] },
+      { ...one, sandwichTypes: parsed.sandwichTypes },
+    );
+    expect(saved.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
+  });
+
+  it('keeps a partial split next to a known total', () => {
+    const payload = buildEventDataForServer(
+      { ...baseFormData, totalSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 0 }] },
+      opts,
+    );
+    expect(payload.estimatedSandwichCount).toBe(300);
+    expect(JSON.parse(payload.sandwichTypes)).toEqual([{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 0 }]);
+  });
+
+
 
   it('total-mode save nulls the range companions too (no stale range survives)', () => {
     const payload = buildEventDataForServer(
@@ -319,31 +329,7 @@ describe('determineSandwichMode (sandwich count drift)', () => {
     });
   });
 
-  it('types mode with some amounts blank keeps the existing total', () => {
-    const payload = buildEventDataForServer(
-      { ...baseFormData, totalSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'pbj', quantity: 0 }] },
-      { mode: 'edit', hasEventRequest: true, eventRequestStatus: 'scheduled', sandwichMode: 'types', actualSandwichMode: 'total' },
-    );
-    expect(payload.estimatedSandwichCount).toBeUndefined();
-    const saved = resolveEstimatePatch({ estimatedSandwichCount: 300 }, payload);
-    expect(saved.estimatedSandwichCount).toBe(300);
-  });
 
-  it('range mode with a picked type replaces existing types', () => {
-    const payload = buildEventDataForServer(
-      { ...baseFormData, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, rangeSandwichType: 'deli_turkey' },
-      { mode: 'edit', hasEventRequest: true, eventRequestStatus: 'scheduled', sandwichMode: 'range', actualSandwichMode: 'total' },
-    );
-    const saved = resolveEstimatePatch(
-      { estimatedSandwichCount: 250, estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'pbj', quantity: 0 }] },
-      payload,
-    );
-    expect(saved.estimatedSandwichRangeType).toBe('deli_turkey');
-    expect(saved.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 250, min: 200, max: 300 }]);
-    // The create/PATCH schema requires a numeric quantity on every line.
-    expect(payload.sandwichTypes).toEqual([{ type: 'deli_turkey', quantity: 0 }]);
-    expect(() => insertEventRequestSchema.partial().parse({ sandwichTypes: payload.sandwichTypes })).not.toThrow();
-  });
 
   it('includes cancelledReason when status is cancelled (edit-form MISSING_REASON bug)', () => {
     const payload = buildEventDataForServer(
@@ -462,10 +448,11 @@ describe('diff-based save clears stale range on Range -> Exact Count (500 -> 498
     expect(payload).not.toHaveProperty('estimatedSandwichCountMax');
   });
 
-  it('heals already-corrupted rows (exact 500 + stale 490-506) on the next Exact Count save', () => {
-    // Server still has BOTH from before the client fix. UI opens Exact Count
-    // (determineSandwichMode), but the baseline must still serialize as range
-    // so the companion clears are not diffed away.
+  it('an untouched estimate with stale bounds sends nothing (the server rule and migration clear them)', () => {
+    // Exact 500 next to stale 490-506: the shared rule reads it as exact 500
+    // on both sides, so nothing is sent for an untouched estimate. The bounds
+    // are cleared by migration 20261103 and by the server rule on any
+    // estimate save; display already ignores them (totalFromFields).
     const original = {
       ...baseFormData,
       totalSandwichCount: 500,
@@ -473,31 +460,14 @@ describe('diff-based save clears stale range on Range -> Exact Count (500 -> 498
       estimatedSandwichCountMax: 506,
       rangeSandwichType: 'deli',
     };
-    const current = {
-      ...baseFormData,
-      totalSandwichCount: 500,
-      estimatedSandwichCountMin: 0,
-      estimatedSandwichCountMax: 0,
-      rangeSandwichType: '',
-    };
-
-    expect(determineSandwichMode(
-      original.sandwichTypes,
-      original.estimatedSandwichCountMin,
-      original.estimatedSandwichCountMax,
-      original.totalSandwichCount,
-    )).toBe('total');
-    expect(determineBaselineSandwichMode(
-      original.sandwichTypes,
-      original.estimatedSandwichCountMin,
-      original.estimatedSandwichCountMax,
-      original.totalSandwichCount,
-    )).toBe('range');
-
-    const payload = diffSave(original, current, 'total');
-    expect(payload.estimatedSandwichCount).toBe(500);
-    expect(payload.estimatedSandwichCountMin).toBeNull();
-    expect(payload.estimatedSandwichCountMax).toBeNull();
+    const payload = diffSave(original, { ...original }, 'total');
+    expect(payload).not.toHaveProperty('estimatedSandwichCount');
+    expect(payload).not.toHaveProperty('estimatedSandwichCountMin');
+    const saved = resolveEstimatePatch(
+      { estimatedSandwichCount: 500, estimatedSandwichCountMin: 490, estimatedSandwichCountMax: 506 },
+      { estimatedSandwichCount: 600 },
+    );
+    expect(saved).toMatchObject({ estimatedSandwichCount: 600, estimatedSandwichCountMin: null, estimatedSandwichCountMax: null });
   });
 });
 
