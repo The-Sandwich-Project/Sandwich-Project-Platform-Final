@@ -193,6 +193,21 @@ describe('buildRowUpdatePlan', () => {
     expect(plan.changes).toEqual([]);
   });
 
+  it('an unchanged row keeps the amounts of an older Turkey + PB&J split (sheet says "Deli")', () => {
+    const event = makeEvent({
+      estimatedSandwichCount: 200,
+      sandwichTypes: [{ type: 'deli_turkey', quantity: 150 }, { type: 'pbj', quantity: 50 }],
+    });
+    const plan = buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '200', 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
+    expect(plan.updatesByField.sandwichTypes).toBeUndefined();
+    expect(plan.changes.map((c) => c.field)).not.toContain('sandwichTypes');
+    // Older Turkey + Ham both go out as "Deli" too.
+    const two = makeEvent({ sandwichTypes: [{ type: 'deli_turkey', quantity: 100 }, { type: 'deli_ham', quantity: 100 }] });
+    expect(buildRowUpdatePlan(two, makeRow({ 'Deli or PBJ?': 'Deli' }), USERS).updatesByField.sandwichTypes).toBeUndefined();
+    // A real change (PB&J dropped) is still offered.
+    expect(buildRowUpdatePlan(event, makeRow({ 'Estimate # sandwiches': '200', 'Deli or PBJ?': 'Deli' }), USERS).updatesByField.sandwichTypes).toBeDefined();
+  });
+
   it('assigns drivers, keeping existing assignees matched by first name', () => {
     const plan = buildRowUpdatePlan(
       makeEvent({
