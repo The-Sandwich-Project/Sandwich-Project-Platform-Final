@@ -50,7 +50,10 @@ import {
   TspContactSection,
   DateChangeDialog,
   VanConflictDialog,
-  StandbyFollowUpDialog,
+  StandbyDetailsSection,
+  standbyCheckBackValue,
+  isStandbyReasonComplete,
+  type StandbyCheckBackMode,
   DeleteConfirmDialog,
   type EventFormData,
 } from './form-sections';
@@ -220,6 +223,8 @@ function buildFormDataFromEventRequest(
     toolkitSentDate: eventRequest?.toolkitSentDate ? formatDateForInput(eventRequest.toolkitSentDate) : '',
     toolkitStatus: eventRequest?.toolkitStatus || 'not_sent',
     standbyExpectedDate: (eventRequest as any)?.standbyExpectedDate ? formatDateForInput((eventRequest as any).standbyExpectedDate) : '',
+    standbyReason: (eventRequest as any)?.standbyReason || '',
+    standbyNotes: (eventRequest as any)?.standbyNotes || '',
     socialMediaPostRequested: (eventRequest as any)?.socialMediaPostRequested || false,
     socialMediaPostRequestedDate: (eventRequest as any)?.socialMediaPostRequestedDate ? formatDateForInput((eventRequest as any).socialMediaPostRequestedDate) : '',
     socialMediaPostCompleted: (eventRequest as any)?.socialMediaPostCompleted || false,
@@ -316,7 +321,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     backupContactFirstName: '', backupContactLastName: '', backupContactEmail: '',
     backupContactPhone: '', backupContactRole: '', previouslyHosted: 'i_dont_know',
     deliveryTimeWindow: '',
-    deliveryParkingAccess: '', standbyExpectedDate: '',
+    deliveryParkingAccess: '', standbyExpectedDate: '', standbyReason: '', standbyNotes: '',
     cancelledReason: '', cancelledNotes: '', declinedReason: '', declinedNotes: '',
     dateFlexible: null as boolean | null,
   });
@@ -347,12 +352,31 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   } | null>(null);
   const [vanConflictChecked, setVanConflictChecked] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [showStandbyFollowUpDialog, setShowStandbyFollowUpDialog] = useState(false);
+  const [standbyReasonError, setStandbyReasonError] = useState(false);
   const [showStatusReasonDialog, setShowStatusReasonDialog] = useState(false);
   const [pendingReasonStatus, setPendingReasonStatus] = useState<'cancelled' | 'declined' | null>(null);
   const [standbyFollowUpDate, setStandbyFollowUpDate] = useState('');
-  const [standbyFollowUpMode, setStandbyFollowUpMode] = useState<'specific' | 'one_week' | 'none'>('one_week');
-  const standbySaveClickedRef = useRef(false);
+  const [standbyFollowUpMode, setStandbyFollowUpMode] = useState<StandbyCheckBackMode>('one_week');
+
+  // When the status becomes Standby, set up the check-back choice shown in the
+  // inline Standby details: a week out for a new Standby episode, or the
+  // event's existing check-back date (or none) if it was already on Standby.
+  useEffect(() => {
+    if (formData.status !== 'standby') {
+      setStandbyReasonError(false);
+      return;
+    }
+    const wasStandby = (eventRequest?.status || 'new') === 'standby';
+    if (wasStandby) {
+      const existing = formData.standbyExpectedDate;
+      setStandbyFollowUpMode(existing ? 'specific' : 'none');
+      setStandbyFollowUpDate(existing || '');
+    } else {
+      setStandbyFollowUpMode('one_week');
+      setStandbyFollowUpDate('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.status]);
   const [hasRecoveredData, setHasRecoveredData] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1249,47 +1273,25 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         .catch(() => { setVanConflictChecked(true); });
     }
 
-    // Standby follow-up date prompt — fires for EVERY transition into standby
-    // from another status, regardless of whether standbyExpectedDate already has
-    // a value. Previously this check skipped the dialog when standbyExpectedDate
-    // was truthy, which broke the flow when an event had a leftover date from a
-    // prior standby episode: the dialog never appeared, but the save sometimes
-    // landed in a state where the status reverted to scheduled without warning.
-    // Always confirming the follow-up date with the user keeps intent explicit
-    // for the current standby episode.
-    const originalStatus = eventRequest?.status || 'new';
-    if (formData.status === 'standby' && originalStatus !== 'standby') {
-      // Pre-fill: use the existing standbyExpectedDate if present (so users
-      // don't have to retype a date they already set), otherwise default to
-      // one week from today.
-      const existingDate = formData.standbyExpectedDate;
-      if (existingDate) {
-        setStandbyFollowUpDate(existingDate);
-        setStandbyFollowUpMode('specific');
-      } else {
-        const oneWeekFromNow = new Date();
-        oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
-        setStandbyFollowUpDate(oneWeekFromNow.toISOString().split('T')[0]);
-        setStandbyFollowUpMode('one_week');
+    // Standby: what they're waiting on and the check-back date are asked right
+    // in the form (StandbyDetailsSection), not in a popup. Require a reason,
+    // then always send the chosen check-back date ('' = no reminder) so the
+    // choice is saved even when it equals what was there before.
+    if (formData.status === 'standby') {
+      if (!isStandbyReasonComplete(formData.standbyReason || '', formData.standbyNotes || '')) {
+        setStandbyReasonError(true);
+        setIsSubmitting(false);
+        toast({
+          title: 'What are we waiting on?',
+          description: 'Pick a reason in the Standby details before saving.',
+          variant: 'destructive',
+        });
+        document.querySelector('[data-testid="standby-details"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
       }
-      logger.log('🟡 Standby transition detected: opening follow-up dialog', {
-        originalStatus,
-        targetStatus: formData.status,
-        existingDate,
-      });
-      // Defer opening to a settled tick instead of opening synchronously inside
-      // this click handler. The form lives in a non-modal parent Dialog
-      // (<Dialog modal={false} onOpenChange={onClose}>), whose dismissable layer
-      // watches for focus/pointer leaving its content. When the modal reminder
-      // AlertDialog mounted during the SAME click that opened it, the in-flight
-      // focus churn from that click could trip the parent's outside-interaction
-      // detection, firing the parent's onClose — which unmounts the whole form.
-      // That is the "popup flashes then disappears and the edit form refreshes"
-      // bug: the parent closed and re-rendered from server data, reverting the
-      // status. The van/speaker dialogs never hit this because they open after
-      // an awaited fetch (a later, settled tick). Matching that timing here lets
-      // the originating click fully resolve before the AlertDialog mounts.
-      setTimeout(() => setShowStandbyFollowUpDialog(true), 0);
+      const checkBack = standbyCheckBackValue(standbyFollowUpMode, standbyFollowUpDate);
+      setFormData((prev) => ({ ...prev, standbyExpectedDate: checkBack }));
+      await performSubmit(false, { standbyExpectedDate: checkBack || null });
       return;
     }
 
@@ -1329,7 +1331,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   const anyNestedDialogOpen =
     showDateConfirmation ||
     showVanConflictDialog ||
-    showStandbyFollowUpDialog ||
     showStatusReasonDialog ||
     showDeleteConfirmation;
 
@@ -1468,6 +1469,18 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 eventRequest={eventRequest}
                 onStatusChange={handleStatusChange}
               />
+
+              {formData.status === 'standby' && (
+                <StandbyDetailsSection
+                  formData={formData as EventFormData}
+                  setFormData={setFormData}
+                  checkBackMode={standbyFollowUpMode}
+                  setCheckBackMode={setStandbyFollowUpMode}
+                  checkBackDate={standbyFollowUpDate}
+                  setCheckBackDate={setStandbyFollowUpDate}
+                  showReasonError={standbyReasonError}
+                />
+              )}
 
               {/* Event Schedule */}
               <EventScheduleSection
@@ -1721,41 +1734,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         onAcknowledge={() => { setShowVanConflictDialog(false); setVanConflictChecked(true); }}
       />
 
-      <StandbyFollowUpDialog
-        open={showStandbyFollowUpDialog}
-        onOpenChange={(open) => {
-          if (!open && !standbySaveClickedRef.current) {
-            setShowStandbyFollowUpDialog(false);
-            setFormData(prev => ({ ...prev, status: eventRequest?.status || 'new' }));
-            setIsSubmitting(false);
-          }
-        }}
-        followUpDate={standbyFollowUpDate}
-        setFollowUpDate={setStandbyFollowUpDate}
-        followUpMode={standbyFollowUpMode}
-        setFollowUpMode={setStandbyFollowUpMode}
-        onSave={async () => {
-          // Keep the dialog OPEN while the save is in flight so it never
-          // visually disappears mid-flight. We close it only after the
-          // submit resolves; if the save throws/toasts an error, leaving
-          // the dialog open lets the user correct and retry instead of
-          // seeing the form silently refresh with no feedback.
-          standbySaveClickedRef.current = true;
-          // "No reminder" clears the follow-up date — the reminder is optional.
-          const dateToSave = standbyFollowUpMode === 'none' ? '' : standbyFollowUpDate;
-          setFormData(prev => ({ ...prev, standbyExpectedDate: dateToSave }));
-          try {
-            await performSubmit(false, { standbyExpectedDate: dateToSave || null });
-            setShowStandbyFollowUpDialog(false);
-          } catch (err) {
-            // performSubmit's mutation onError already toasts. We leave
-            // the dialog open so the user can adjust and try again.
-            logger.error('Standby save failed; keeping dialog open', err);
-          } finally {
-            standbySaveClickedRef.current = false;
-          }
-        }}
-      />
 
       {eventRequest && pendingReasonStatus && (
         <StatusReasonDialog

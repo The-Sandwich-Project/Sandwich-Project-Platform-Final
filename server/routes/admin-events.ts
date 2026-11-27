@@ -6,6 +6,7 @@
  */
 
 import { Router } from 'express';
+import { normalizeIncomingStatus, statusTransitionEffects } from '../utils/status-transition-effects';
 import { db } from '../db';
 import { eventRequests, users, tspContactFollowups } from '@shared/schema';
 import { eq, ilike, or, and, desc, sql } from 'drizzle-orm';
@@ -191,8 +192,10 @@ export function createAdminEventsRouter(deps: { isAuthenticated: any }) {
         return res.status(400).json({ message: 'Invalid event ID' });
       }
 
-      const { status, reason } = req.body;
-      const validStatuses = ['new', 'in_process', 'scheduled', 'rescheduled', 'completed', 'declined', 'cancelled', 'stalled', 'standby', 'non_event'];
+      const { reason } = req.body;
+      // "Rescheduled" was retired; treat it as "scheduled".
+      const status = normalizeIncomingStatus(req.body.status);
+      const validStatuses = ['new', 'in_process', 'scheduled', 'completed', 'declined', 'cancelled', 'stalled', 'standby', 'non_event'];
 
       if (!status || !validStatuses.includes(status)) {
         return res.status(400).json({
@@ -214,12 +217,16 @@ export function createAdminEventsRouter(deps: { isAuthenticated: any }) {
 
       const oldStatus = currentEvent.status;
 
-      // Update the event
+      // Update the event, with the same status side effects as the edit form
+      // (standby stamp + default check-back date, "needs new date" marker).
+      const now = new Date();
       await db
         .update(eventRequests)
         .set({
           status,
-          updatedAt: new Date(),
+          ...(status !== oldStatus ? { statusChangedAt: now } : {}),
+          ...statusTransitionEffects({ fromStatus: oldStatus, toStatus: status, updates: {}, now }),
+          updatedAt: now,
         })
         .where(eq(eventRequests.id, eventId));
 

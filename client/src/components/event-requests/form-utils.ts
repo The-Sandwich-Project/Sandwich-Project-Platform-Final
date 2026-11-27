@@ -247,6 +247,13 @@ export function buildEventDataForServer(
         ? serializeDateToISO(typeof date === 'string' ? date : new Date(date).toISOString().split('T')[0])
         : null;
     })(),
+    // What a Standby event is waiting on (only while it's on Standby)
+    ...(formData.status === 'standby'
+      ? {
+          standbyReason: (formData.standbyReason || '').trim() || null,
+          standbyNotes: (formData.standbyNotes || '').trim() || null,
+        }
+      : {}),
   };
 
   // Sandwich estimate, by mode. Each mode sends only what it edits; the
