@@ -51,6 +51,8 @@ import {
   Check,
   HelpCircle,
   User,
+  UserCog,
+  CheckCircle2,
   MessageCircle,
   ClipboardList,
 } from 'lucide-react';
@@ -141,6 +143,8 @@ interface ScheduledCardEnhancedProps {
   resolveUserName: (id: string) => string;
   resolveRecipientName?: (id: string) => string;
   openAssignmentDialog: (type: 'driver' | 'volunteer', isVanDriver?: boolean) => void;
+  /** Opens the assignment dialog to change one person (swap who it is, or tentative ↔ confirmed). */
+  openEditAssignmentDialog?: (type: 'driver' | 'volunteer', personId: string) => void;
   handleRemoveAssignment: (type: 'driver' | 'volunteer', personId: string) => void;
   quickUpdateField?: (field: string, value: any) => void;
   canEdit?: boolean;
@@ -192,6 +196,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   resolveUserName,
   resolveRecipientName,
   openAssignmentDialog,
+  openEditAssignmentDialog,
   handleRemoveAssignment,
   quickUpdateField,
   canEdit = true,
@@ -545,6 +550,20 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   })();
 
   // TSP Contact display (was lost in redesign; show under Event Details / Sandwiches)
+  // One-click tentative ↔ confirmed for an assigned driver or volunteer.
+  // Notes live in driverDetails / volunteerDetails for both lists, so only the
+  // two id lists change.
+  const setAssignmentTentative = (type: 'driver' | 'volunteer', id: string, tentative: boolean) => {
+    const [assignedKey, tentativeKey] =
+      type === 'driver'
+        ? (['assignedDriverIds', 'tentativeDriverIds'] as const)
+        : (['assignedVolunteerIds', 'tentativeVolunteerIds'] as const);
+    const assigned = parsePostgresArray((request as any)[assignedKey]).filter((x) => x !== id);
+    const tentativeIds = parsePostgresArray((request as any)[tentativeKey]).filter((x) => x !== id);
+    (tentative ? tentativeIds : assigned).push(id);
+    updateFieldsMutation.mutate({ [assignedKey]: assigned, [tentativeKey]: tentativeIds });
+  };
+
   const tspContactDisplay = useMemo(() => {
     const custom = (request.customTspContact || '').trim();
     if (custom) return custom;
@@ -2618,6 +2637,29 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     <Button
                                       size="sm"
                                       variant="ghost"
+                                      onClick={() => setAssignmentTentative('driver', id, true)}
+                                      className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
+                                      title="Mark as tentative"
+                                      aria-label="Mark as tentative"
+                                      disabled={updateFieldsMutation.isPending}
+                                    >
+                                      <HelpCircle className="w-3 h-3" />
+                                    </Button>
+                                    {openEditAssignmentDialog && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => openEditAssignmentDialog('driver', id)}
+                                        className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
+                                        title="Change person (pick from the database, or change tentative)"
+                                        aria-label="Change person"
+                                      >
+                                        <UserCog className="w-3 h-3" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
                                       onClick={() => startEditing(notesFieldKey, driverPersonNotes)}
                                       className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                                       title="Add/edit note"
@@ -2778,6 +2820,29 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                         title="Edit name"
                                       >
                                         <Edit2 className="w-3 h-3" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setAssignmentTentative('driver', id, false)}
+                                      className="h-5 w-5 p-0 text-green-600 hover:text-green-700 md:min-h-0 md:min-w-0 md:h-5"
+                                      title="Confirm (no longer tentative)"
+                                      aria-label="Confirm, no longer tentative"
+                                      disabled={updateFieldsMutation.isPending}
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" />
+                                    </Button>
+                                    {openEditAssignmentDialog && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => openEditAssignmentDialog('driver', id)}
+                                        className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700 md:min-h-0 md:min-w-0 md:h-5"
+                                        title="Change person (pick from the database, or change tentative)"
+                                        aria-label="Change person"
+                                      >
+                                        <UserCog className="w-3 h-3" />
                                       </Button>
                                     )}
                                     <Button
@@ -3075,6 +3140,29 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 <Button
                                   size="sm"
                                   variant="ghost"
+                                  onClick={() => setAssignmentTentative('volunteer', id, true)}
+                                  className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
+                                  title="Mark as tentative"
+                                  aria-label="Mark as tentative"
+                                  disabled={updateFieldsMutation.isPending}
+                                >
+                                  <HelpCircle className="w-3 h-3" />
+                                </Button>
+                                {openEditAssignmentDialog && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => openEditAssignmentDialog('volunteer', id)}
+                                    className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
+                                    title="Change person (pick from the database, or change tentative)"
+                                    aria-label="Change person"
+                                  >
+                                    <UserCog className="w-3 h-3" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
                                   onClick={() => startEditing(volunteerNotesFieldKey, volunteerPersonNotes)}
                                   className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                                   title="Add/edit note"
@@ -3233,6 +3321,29 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     title="Edit name"
                                   >
                                     <Edit2 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setAssignmentTentative('volunteer', id, false)}
+                                  className="h-5 w-5 p-0 text-green-600 hover:text-green-700 md:min-h-0 md:min-w-0 md:h-5"
+                                  title="Confirm (no longer tentative)"
+                                  aria-label="Confirm, no longer tentative"
+                                  disabled={updateFieldsMutation.isPending}
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                </Button>
+                                {openEditAssignmentDialog && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => openEditAssignmentDialog('volunteer', id)}
+                                    className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700 md:min-h-0 md:min-w-0 md:h-5"
+                                    title="Change person (pick from the database, or change tentative)"
+                                    aria-label="Change person"
+                                  >
+                                    <UserCog className="w-3 h-3" />
                                   </Button>
                                 )}
                                 <Button
