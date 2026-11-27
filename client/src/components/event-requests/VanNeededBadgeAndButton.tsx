@@ -35,6 +35,30 @@ import {
 import { Truck, HelpCircle, AlertTriangle } from 'lucide-react';
 import { apiRequest, queryClient, applyEventRequestSaveToCache } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { totalFromFields } from '@shared/sandwich-estimate';
+import { SAME_DAY_VAN_QUERY_KEY, VAN_REASON_THRESHOLD, describeVanEvent, vanIsPending, vanReasonRequired } from '@shared/van-rules';
+
+/** The fields of the event the van rules need (shared/van-rules.ts). */
+interface VanRuleEvent {
+  isDhlVan?: boolean | null;
+  selfTransport?: boolean | null;
+  vanTeamOk?: boolean | null;
+  vanReason?: string | null;
+  estimatedSandwichCount?: number | null;
+  estimatedSandwichCountMin?: number | null;
+  estimatedSandwichCountMax?: number | null;
+}
+
+function estimateMaxOf(event: VanRuleEvent | null | undefined): number | null {
+  const est = totalFromFields({
+    estimatedSandwichCount: event?.estimatedSandwichCount ?? null,
+    estimatedSandwichCountMin: event?.estimatedSandwichCountMin ?? null,
+    estimatedSandwichCountMax: event?.estimatedSandwichCountMax ?? null,
+  } as any);
+  return est?.max ?? null;
+}
 
 interface VanNeededBadgeAndButtonProps {
   eventRequestId: number;
@@ -42,6 +66,11 @@ interface VanNeededBadgeAndButtonProps {
   vanNeededLikely: boolean | null | undefined;
   /** Effective event date — used to show other same-day van requests on the badge. */
   eventDate?: Date | string | null;
+  /**
+   * The event itself, for the van rules: the under-800 reason asked for when
+   * marking the van needed, and "Van pending – discuss with team".
+   */
+  event?: VanRuleEvent | null;
   canEdit?: boolean;
   /**
    * When true, skip the Possibly/For sure dialog and the "likely" state entirely.
@@ -58,8 +87,12 @@ interface VanNeededBadgeAndButtonProps {
    *  - 'button' — only renders the "Needs Van?" / "Mark Van Needed" call-to-action
    *               button (the un-set state); renders nothing when a badge would
    *               otherwise show. Use in the bottom action row.
+   *  - 'pending' — only the "Van pending – discuss with team" warning; renders
+   *               nothing unless sharing the van that day is still unsettled.
+   *               For places that hide the Van Needed badge (e.g. once a van
+   *               driver is assigned), since a driver doesn't settle sharing.
    */
-  mode?: 'full' | 'badge' | 'button';
+  mode?: 'full' | 'badge' | 'button' | 'pending';
 }
 
 type VanChoice = 'likely' | 'confirmed';
@@ -71,6 +104,10 @@ interface SameDayVanRequest {
   vanDriverNeeded: boolean;
   vanNeededLikely: boolean;
   eventStartTime: string | null;
+  eventEndTime?: string | null;
+  vanNeededFor?: string | null;
+  vanTeamOk?: boolean | null;
+  vanTimeOverride?: string | null;
 }
 
 function normalizeDateStr(date: Date | string | null | undefined): string | null {
@@ -92,7 +129,7 @@ function useSameDayVanRequests(
   const dateStr = normalizeDateStr(eventDate);
 
   return useQuery<{ otherEvents: SameDayVanRequest[] }>({
-    queryKey: ['van-requests-for-date', dateStr, eventRequestId],
+    queryKey: [SAME_DAY_VAN_QUERY_KEY, dateStr, eventRequestId],
     queryFn: async () => {
       const params = new URLSearchParams({ date: dateStr! });
       params.set('excludeEventId', String(eventRequestId));
@@ -127,21 +164,94 @@ function SameDayVanTooltipLines({ otherEvents }: { otherEvents: SameDayVanReques
   );
 }
 
+/** Tooltip note on "Van pending – discuss with team": who else has the van and how to settle it. */
+function PendingVanNote({ otherEvents }: { otherEvents: SameDayVanRequest[] }) {
+  const booked = otherEvents.filter((e) => e.vanDriverNeeded);
+  return (
+    <p className="text-xs text-amber-800 mb-1">
+      The van is already booked that day: {booked.map((e) => describeVanEvent(e as any)).join('; ')}. Once the events team
+      agrees, tick "Events team OK'd sharing the van" in Edit.
+    </p>
+  );
+}
+
+/** Asks why the van is needed when the estimate is under 800 (or unknown). */
+function VanReasonDialog({
+  open,
+  onOpenChange,
+  value,
+  onChange,
+  onSave,
+  isSaving,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  isSaving: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>Why does this event need the van?</DialogTitle>
+          <DialogDescription>
+            The van is for events of {VAN_REASON_THRESHOLD} sandwiches or more, so a smaller (or unknown) estimate needs a reason.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-1 py-2">
+          <Label htmlFor="van-reason-card">Reason</Label>
+          <Input
+            id="van-reason-card"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="e.g. no fridge space on site"
+            data-testid="input-van-reason-card"
+          />
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving || !value.trim()}
+            className="bg-[#007E8C] hover:bg-[#006873] text-white"
+            data-testid="button-save-van-reason"
+          >
+            Mark van needed
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function VanNeededBadgeAndButton({
   eventRequestId,
   vanDriverNeeded,
   vanNeededLikely,
   eventDate,
+  event,
   canEdit = true,
   simpleToggle = false,
   mode = 'full',
 }: VanNeededBadgeAndButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Marking the van needed on an event under 800 (or with no estimate) asks why first.
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const [reasonText, setReasonText] = useState('');
   const { toast } = useToast();
   const showSameDayContext = !!(vanDriverNeeded || vanNeededLikely) && mode !== 'button';
   const { data: sameDayData } = useSameDayVanRequests(eventDate, eventRequestId, showSameDayContext);
   const otherVanEvents = sameDayData?.otherEvents ?? [];
   const hasSameDayVanRequests = otherVanEvents.length > 0;
+  const pending = vanIsPending(
+    { vanDriverNeeded, isDhlVan: event?.isDhlVan, selfTransport: event?.selfTransport, vanTeamOk: event?.vanTeamOk },
+    otherVanEvents as any,
+  );
 
   const updateMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
@@ -161,10 +271,40 @@ export function VanNeededBadgeAndButton({
     },
   });
 
+  /** Mark the van needed, asking for the under-800 reason first when one is required. */
+  const markVanNeeded = () => {
+    const needsReason =
+      vanReasonRequired({ vanDriverNeeded: true, isDhlVan: event?.isDhlVan, selfTransport: event?.selfTransport }, estimateMaxOf(event)) &&
+      !String(event?.vanReason ?? '').trim();
+    if (needsReason) {
+      setDialogOpen(false);
+      setReasonText('');
+      setReasonOpen(true);
+      return;
+    }
+    // Confirmed wins — clear the soft flag if it was set.
+    updateMutation.mutate({ vanDriverNeeded: true, vanNeededLikely: false });
+  };
+
+  const reasonDialog = (
+    <VanReasonDialog
+      open={reasonOpen}
+      onOpenChange={setReasonOpen}
+      value={reasonText}
+      onChange={setReasonText}
+      isSaving={updateMutation.isPending}
+      onSave={() =>
+        updateMutation.mutate(
+          { vanDriverNeeded: true, vanNeededLikely: false, vanReason: reasonText.trim() },
+          { onSuccess: () => setReasonOpen(false) },
+        )
+      }
+    />
+  );
+
   const applyChoice = (choice: VanChoice) => {
     if (choice === 'confirmed') {
-      // Confirmed wins — clear the soft flag if it was set.
-      updateMutation.mutate({ vanDriverNeeded: true, vanNeededLikely: false });
+      markVanNeeded();
     } else {
       updateMutation.mutate({ vanNeededLikely: true, vanDriverNeeded: false });
     }
@@ -173,6 +313,30 @@ export function VanNeededBadgeAndButton({
   const clearVan = () => {
     updateMutation.mutate({ vanDriverNeeded: false, vanNeededLikely: false, vanNeededFor: null });
   };
+
+  // ── Pending-only mode: just the sharing warning, read-only.
+  if (mode === 'pending') {
+    if (!pending) return null;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              className="inline-flex items-center gap-1 whitespace-nowrap bg-[#FBAD3F] text-[#114145] border border-[#D68319]"
+              data-testid="badge-van-pending"
+            >
+              <Truck className="w-3 h-3" />
+              Van pending – discuss with team
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <PendingVanNote otherEvents={otherVanEvents} />
+            <SameDayVanTooltipLines otherEvents={otherVanEvents} />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   // ── Simple toggle mode (scheduled cards): no dialog, no "likely" tier.
   // One click sets vanDriverNeeded=true; clicking the badge clears it.
@@ -186,12 +350,12 @@ export function VanNeededBadgeAndButton({
             <TooltipTrigger asChild>
               <Badge
                 onClick={() => canEdit && clearVan()}
-                className={`inline-flex items-center gap-1 whitespace-nowrap bg-[#007E8C] text-white border-transparent ${hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
-                data-testid="badge-van-needed"
+                className={`inline-flex items-center gap-1 whitespace-nowrap ${pending ? 'bg-[#FBAD3F] text-[#114145] border border-[#D68319]' : 'bg-[#007E8C] text-white border-transparent'} ${!pending && hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
+                data-testid={pending ? 'badge-van-pending' : 'badge-van-needed'}
               >
                 <Truck className="w-3 h-3" />
-                Van Needed
-                {hasSameDayVanRequests && (
+                {pending ? 'Van pending – discuss with team' : 'Van Needed'}
+                {!pending && hasSameDayVanRequests && (
                   <>
                     <AlertTriangle className="w-3 h-3 text-amber-200" />
                     <span className="text-[10px] font-semibold">+{otherVanEvents.length}</span>
@@ -200,6 +364,7 @@ export function VanNeededBadgeAndButton({
               </Badge>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
+              {pending && <PendingVanNote otherEvents={otherVanEvents} />}
               {canEdit ? <p>A van is needed for this event. Click to clear.</p> : <p>A van is needed for this event.</p>}
               <SameDayVanTooltipLines otherEvents={otherVanEvents} />
             </TooltipContent>
@@ -211,17 +376,20 @@ export function VanNeededBadgeAndButton({
     if (mode === 'badge') return null;
     if (!canEdit) return null;
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => updateMutation.mutate({ vanDriverNeeded: true, vanNeededLikely: false })}
-        disabled={updateMutation.isPending}
-        className="h-6 px-2 text-xs border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
-        data-testid="button-mark-van-needed"
-      >
-        <Truck className="w-3 h-3 mr-1" />
-        Mark Van Needed
-      </Button>
+      <>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={markVanNeeded}
+          disabled={updateMutation.isPending}
+          className="h-6 px-2 text-xs border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
+          data-testid="button-mark-van-needed"
+        >
+          <Truck className="w-3 h-3 mr-1" />
+          Mark Van Needed
+        </Button>
+        {reasonDialog}
+      </>
     );
   }
 
@@ -234,12 +402,12 @@ export function VanNeededBadgeAndButton({
           <TooltipTrigger asChild>
             <Badge
               onClick={() => canEdit && setDialogOpen(true)}
-              className={`inline-flex items-center gap-1 whitespace-nowrap bg-[#007E8C] text-white border-transparent ${hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
-              data-testid="badge-van-needed"
+              className={`inline-flex items-center gap-1 whitespace-nowrap ${pending ? 'bg-[#FBAD3F] text-[#114145] border border-[#D68319]' : 'bg-[#007E8C] text-white border-transparent'} ${!pending && hasSameDayVanRequests ? 'ring-2 ring-amber-400 ring-offset-1' : ''} ${canEdit ? 'cursor-pointer hover:opacity-80' : ''}`}
+              data-testid={pending ? 'badge-van-pending' : 'badge-van-needed'}
             >
               <Truck className="w-3 h-3" />
-              Van Needed
-              {hasSameDayVanRequests && (
+              {pending ? 'Van pending – discuss with team' : 'Van Needed'}
+              {!pending && hasSameDayVanRequests && (
                 <>
                   <AlertTriangle className="w-3 h-3 text-amber-200" />
                   <span className="text-[10px] font-semibold">+{otherVanEvents.length}</span>
@@ -248,6 +416,7 @@ export function VanNeededBadgeAndButton({
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
+            {pending && <PendingVanNote otherEvents={otherVanEvents} />}
             {canEdit ? <p>A van has been confirmed as needed. Click to change.</p> : <p>A van is needed for this event.</p>}
             <SameDayVanTooltipLines otherEvents={otherVanEvents} />
           </TooltipContent>
@@ -303,6 +472,7 @@ export function VanNeededBadgeAndButton({
           onClear={clearVan}
           isSaving={updateMutation.isPending}
         />
+        {reasonDialog}
       </TooltipProvider>
     );
   }
@@ -331,6 +501,7 @@ export function VanNeededBadgeAndButton({
         onClear={clearVan}
         isSaving={updateMutation.isPending}
       />
+      {reasonDialog}
     </>
   );
 }

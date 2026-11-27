@@ -2,6 +2,7 @@ import { normalizeEventContacts } from './services/event-contact-directory';
 import { ESTIMATE_FIELDS, resolveEstimatePatch, touchesEstimate } from '@shared/sandwich-estimate';
 import { hasEventContactPatch } from '@shared/event-contact-resolution';
 import { normalizeToolkitPatch } from '@shared/toolkit-state';
+import { normalizeVanPatch, touchesVanRules } from '@shared/van-rules';
 import {
   users,
   projects,
@@ -4379,6 +4380,14 @@ export class DatabaseStorage implements IStorage {
               return sql`${eventRequests[field]} IS NOT DISTINCT FROM ${was}`;
             });
         }
+      }
+      // Van rules (shared/van-rules.ts): a new day clears the "team OK'd
+      // sharing the van", new times clear the sheet's van-time override, and
+      // leaving TSP's van clears the OK and the under-800 reason. Enforced here
+      // so every writer gets it (sheet imports and syncs, not only PATCH/PUT).
+      if (touchesVanRules(rawUpdateData as Record<string, unknown>)) {
+        const vanBefore = await this.getEventRequest(id);
+        rawUpdateData = normalizeVanPatch(rawUpdateData as Record<string, any>, vanBefore ?? null) as Partial<EventRequest>;
       }
       const previousEvent = hasEventContactPatch(rawUpdateData) || (typeof rawUpdateData.toolkitSent === 'boolean' && !rawUpdateData.toolkitStatus)
         ? await this.getEventRequest(id)

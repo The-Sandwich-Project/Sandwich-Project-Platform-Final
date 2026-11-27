@@ -13,6 +13,7 @@ import { EventConflictWarnings } from '../EventConflictWarnings';
 import { useEventRequestContext } from '../context/EventRequestContext';
 import type { EventFormData } from './types';
 import { isScheduledOrRescheduled } from '@shared/event-status-workflow';
+import { withEventDate } from './VanDetailsPanel';
 
 interface EventScheduleSectionProps {
   formData: EventFormData;
@@ -20,7 +21,6 @@ interface EventScheduleSectionProps {
   isComplete: boolean;
   eventRequest: any | null;
   formatDateForInput: (date: any) => string;
-  onVanConflictReset: () => void;
   /** Called when user finishes editing the date on a scheduled event, to trigger confirmation dialog */
   onScheduledDateChange?: (newDate: string) => void;
 }
@@ -31,10 +31,17 @@ export const EventScheduleSection: React.FC<EventScheduleSectionProps> = ({
   isComplete,
   eventRequest,
   formatDateForInput,
-  onVanConflictReset,
   onScheduledDateChange,
 }) => {
   const { setViewMode } = useEventRequestContext();
+  // The saved day and its "team OK'd sharing the van" (reset on a new date).
+  const savedVanDay = eventRequest
+    ? {
+        date: formatDateForInput(eventRequest.desiredEventDate || eventRequest.scheduledEventDate),
+        vanDay: formatDateForInput(eventRequest.scheduledEventDate || eventRequest.desiredEventDate),
+        vanTeamOk: eventRequest.vanTeamOk === true,
+      }
+    : null;
 
   return (
     <div className="space-y-4 border rounded-lg p-4 bg-white">
@@ -71,8 +78,8 @@ export const EventScheduleSection: React.FC<EventScheduleSectionProps> = ({
             type="date"
             value={formData.eventDate}
             onChange={(e) => {
-              setFormData((prev: any) => ({ ...prev, eventDate: e.target.value }));
-              onVanConflictReset();
+              const newDate = e.target.value;
+              setFormData((prev: any) => withEventDate(prev, newDate, savedVanDay));
             }}
             onBlur={(e) => {
               const newDate = e.target.value;

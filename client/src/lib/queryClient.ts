@@ -1,3 +1,4 @@
+import { SAME_DAY_VAN_QUERY_KEY } from '@shared/van-rules';
 import { QueryClient, QueryFunction } from '@tanstack/react-query';
 import { logger } from '@/lib/logger';
 import { getSocketInstance } from '@/lib/socket-singleton';
@@ -236,6 +237,23 @@ const VOLUNTEER_HUB_TOUCH_FIELDS = new Set([
 ]);
 
 /** Fields whose change affects the event map — invalidate map only when touched. */
+/** Saved fields that change who has the van on which day (see invalidateSameDayVanQueries). */
+const SAME_DAY_VAN_TOUCH_FIELDS = new Set([
+  'vanDriverNeeded',
+  'vanNeededLikely',
+  'vanNeededFor',
+  'vanTeamOk',
+  'vanTimeOverride',
+  'isDhlVan',
+  'selfTransport',
+  'status',
+  'scheduledEventDate',
+  'desiredEventDate',
+  'eventStartTime',
+  'eventEndTime',
+  'organizationName',
+]);
+
 const EVENT_MAP_TOUCH_FIELDS = new Set([
   'status',
   'scheduledEventDate',
@@ -384,6 +402,20 @@ export async function applyEventRequestSaveToCache(
   if (touched.some((field) => EVENT_MAP_TOUCH_FIELDS.has(field))) {
     await qc.invalidateQueries({ queryKey: ['/api/event-map'] });
   }
+  if (touched.some((field) => SAME_DAY_VAN_TOUCH_FIELDS.has(field))) {
+    await invalidateSameDayVanQueries(qc);
+  }
+}
+
+/**
+ * The other van events on a day (badge + edit form). Each card reads the
+ * OTHER events' "team OK'd" and van flags from here, so a save to one event
+ * must refresh every cached day: ticking the OK on one event clears "Van
+ * pending" on the other. Covers saves from other users too, which arrive
+ * through `applyEventRequestUpdateById` with every field counted as touched.
+ */
+export async function invalidateSameDayVanQueries(qc: QueryClient): Promise<void> {
+  await qc.invalidateQueries({ queryKey: [SAME_DAY_VAN_QUERY_KEY] });
 }
 
 /**
@@ -481,6 +513,8 @@ export async function invalidateEventRequestQueries(qc: QueryClient) {
     }),
     // Also refetch event map since it depends on event data
     qc.invalidateQueries({ queryKey: ['/api/event-map'] }),
+    // And who else has the van each day (van badges, edit form)
+    invalidateSameDayVanQueries(qc),
   ]);
 }
 
