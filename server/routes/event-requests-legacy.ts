@@ -1,5 +1,7 @@
 import { normalizeToolkitPatch, isToolkitSent } from '@shared/toolkit-state';
 import { normalizeIncomingStatus, rescheduleMoveFields, statusTransitionEffects } from '../utils/status-transition-effects';
+import { strictBooleanFieldError } from '../utils/strict-boolean-fields';
+import { normalizeAttendancePatch } from '@shared/attendance-estimate';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage-wrapper';
@@ -2570,6 +2572,11 @@ router.patch(
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
+      const strictBooleanError = strictBooleanFieldError(updates);
+      if (strictBooleanError) {
+        return res.status(400).json({ message: strictBooleanError });
+      }
+
 
       // Strip optimistic locking field if accidentally included by client
       delete updates._expectedVersion;
@@ -2581,7 +2588,7 @@ router.patch(
       }
 
       // Process pickup time fields for data migration
-      const processedUpdates = normalizeToolkitPatch(processPickupTimeFields(updates, originalEvent), originalEvent);
+      const processedUpdates = normalizeToolkitPatch(normalizeAttendancePatch(processPickupTimeFields(updates, originalEvent)), originalEvent);
 
       // Automatically assign the current user as TSP contact if toolkit is being marked as sent
       // This auto-assignment happens silently (no email) since toolkit sending happens later in workflow
@@ -2733,6 +2740,11 @@ router.patch(
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
+      const strictBooleanError = strictBooleanFieldError(updates);
+      if (strictBooleanError) {
+        return res.status(400).json({ message: strictBooleanError });
+      }
+
 
       if (isNaN(id)) {
         logger.error(`[PATCH /:id] Invalid ID: ${req.params.id}`);
@@ -2863,7 +2875,7 @@ router.patch(
       const pickupProcessedUpdates = processPickupTimeFields(updates, originalEvent);
 
       // Process timestamp fields to ensure they're proper Date objects
-      const processedUpdates = normalizeToolkitPatch({ ...pickupProcessedUpdates }, originalEvent);
+      const processedUpdates = normalizeToolkitPatch(normalizeAttendancePatch({ ...pickupProcessedUpdates }), originalEvent);
 
       // Convert timestamp fields that might come as strings to Date objects
       // (shared list — see EVENT_REQUEST_TIMESTAMP_FIELDS at the top of this file)
@@ -3413,6 +3425,11 @@ router.put(
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
+      const strictBooleanError = strictBooleanFieldError(updates);
+      if (strictBooleanError) {
+        return res.status(400).json({ message: strictBooleanError });
+      }
+
 
 
       // Get original data for audit logging
@@ -3431,7 +3448,7 @@ router.put(
       const pickupProcessedUpdates = processPickupTimeFields(updates, originalEvent);
 
       // Process ALL date/timestamp fields to ensure they're proper Date objects
-      const processedUpdates = normalizeToolkitPatch({ ...pickupProcessedUpdates }, originalEvent);
+      const processedUpdates = normalizeToolkitPatch(normalizeAttendancePatch({ ...pickupProcessedUpdates }), originalEvent);
 
       // Convert timestamp fields that might come as strings to Date objects
       // (shared list — see EVENT_REQUEST_TIMESTAMP_FIELDS at the top of this file)

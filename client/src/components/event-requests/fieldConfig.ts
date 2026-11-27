@@ -77,6 +77,7 @@ export const DEFAULT_FORM_DATA = {
   eventAddress: '',
   deliveryDestination: '',
   holdingOvernight: false,
+  nextDayPickup: 'no',
   overnightHoldingLocation: '',
   overnightPickupTime: '',
 
@@ -92,6 +93,7 @@ export const DEFAULT_FORM_DATA = {
   driversNeeded: 0,
   selfTransport: false,
   vanDriverNeeded: false,
+  isTspShopped: false,
   vanNeededFor: '',
   assignedVanDriverId: '',
   isDhlVan: false,
@@ -101,6 +103,8 @@ export const DEFAULT_FORM_DATA = {
   // No volunteerCount here: the server column is derived from
   // estimatedAttendance by buildEventDataForServer, not held in form state.
   estimatedAttendance: 0,
+  estimatedAttendanceMin: 0,
+  estimatedAttendanceMax: 0,
   adultCount: 0,
   childrenCount: 0,
 

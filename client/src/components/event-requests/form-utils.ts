@@ -11,6 +11,7 @@ import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
 import { estimateStateFromFields, normalizeEstimate } from '@shared/sandwich-estimate';
 import type { EventFormData } from './form-sections/types';
+import { effectiveNextDayPickup } from '@shared/next-day-pickup';
 export { findMismatchedSavedFields, getDroppedServerFields } from '@/lib/event-save-verification';
 
 /**
@@ -147,8 +148,12 @@ export function buildEventDataForServer(
     // Location
     eventAddress: formData.eventAddress || null,
     deliveryDestination: formData.deliveryDestination || null,
-    overnightHoldingLocation: formData.overnightHoldingLocation || null,
-    overnightPickupTime: formData.overnightPickupTime || null,
+    // Next-day pickup: only a planned one keeps the overnight details. Form
+    // state from before the choice existed (a recovered draft) derives it the
+    // same way older events do, so its overnight location isn't dropped.
+    nextDayPickup: effectiveNextDayPickup(formData as any),
+    overnightHoldingLocation: effectiveNextDayPickup(formData as any) === 'planned' ? formData.overnightHoldingLocation || null : null,
+    overnightPickupTime: effectiveNextDayPickup(formData as any) === 'planned' ? formData.overnightPickupTime || null : null,
 
     // Refrigeration
     hasRefrigeration: formData.hasRefrigeration === 'true' ? true :
@@ -165,6 +170,9 @@ export function buildEventDataForServer(
         : null;
     })(),
     volunteersNeeded: parseInt(formData.volunteersNeeded?.toString() || '0') || 0,
+
+    // TSP shopping: strictly true/false (the column is NOT NULL)
+    isTspShopped: formData.isTspShopped === true,
 
     // Contacts
     tspContact: formData.tspContact || null,
@@ -290,6 +298,14 @@ export function buildEventDataForServer(
   // large-event logistics modal) and must never be written from an input —
   // that is what let the two columns drift apart.
   Object.assign(eventData, buildAttendancePatch(formData.estimatedAttendance));
+  // A range ("40-60") keeps its ends; a single number clears them.
+  {
+    const min = Number((formData as any).estimatedAttendanceMin) || 0;
+    const max = Number((formData as any).estimatedAttendanceMax) || 0;
+    const isRange = eventData.estimatedAttendance != null && min > 0 && max > min;
+    eventData.estimatedAttendanceMin = isRange ? min : null;
+    eventData.estimatedAttendanceMax = isRange ? max : null;
+  }
   eventData.adultCount = formData.adultCount || 0;
   eventData.childrenCount = formData.childrenCount || 0;
   eventData.kidsAgeRange = formData.kidsAgeRange || null;
@@ -448,6 +464,16 @@ export const ESTIMATE_SAVE_KEYS = [
  *   the editor previewed (sending only a cleared total would make it drop the
  *   per-type amounts that are still shown).
  */
+/** The expected-attendees number and its range travel together. */
+export const ATTENDANCE_SAVE_KEYS = [
+  'estimatedAttendance',
+  'volunteerCount',
+  'estimatedAttendanceMin',
+  'estimatedAttendanceMax',
+] as const;
+
+const SAVE_TOGETHER: readonly (readonly string[])[] = [ESTIMATE_SAVE_KEYS, ATTENDANCE_SAVE_KEYS];
+
 export function dropUnchangedFields(
   eventData: Record<string, any>,
   baselineData: Record<string, any>,
@@ -455,11 +481,12 @@ export function dropUnchangedFields(
 ): string[] {
   const has = (o: Record<string, any>, k: string) => Object.prototype.hasOwnProperty.call(o, k);
   const same = (k: string) => has(baselineData, k) && JSON.stringify(eventData[k]) === JSON.stringify(baselineData[k]);
-  const estimateChanged = ESTIMATE_SAVE_KEYS.some((k) => has(eventData, k) && !same(k));
+  // A group whose parts only make sense together is sent whole when any part changed.
+  const changedGroups = SAVE_TOGETHER.filter((group) => group.some((k) => has(eventData, k) && !same(k)));
   const omitted: string[] = [];
   for (const key of Object.keys(eventData)) {
     if (overrides && has(overrides, key)) continue;
-    if (estimateChanged && (ESTIMATE_SAVE_KEYS as readonly string[]).includes(key)) continue;
+    if (changedGroups.some((group) => group.includes(key))) continue;
     if (same(key)) {
       delete eventData[key];
       omitted.push(key);
@@ -475,6 +502,7 @@ export function dropUnchangedFields(
  */
 const MERGE_TOGETHER: string[][] = [
   ['standbyCheckBackMode', 'standbyCheckBackDate', 'standbyExpectedDate'],
+  ['estimatedAttendance', 'estimatedAttendanceMin', 'estimatedAttendanceMax'],
 ];
 
 /**
