@@ -139,9 +139,9 @@ export function formatVanNeededForCell(
  * Format specifications:
  * - The staffing column contains role assignments separated by role prefixes
  * - Format: "D: Name1, Name2, S: Name3, V: Name4, VD: Name5"
- * - Numbered slots state a count: "V1: Ann, V2: , V3: " = 3 volunteers needed,
- *   Ann assigned, 2 open. The push writes this form whenever more than one
- *   person is needed.
+ * - A code with no colon is an open need, its number is how many:
+ *   "V: Ann, V2" = Ann assigned, 2 more volunteers still needed (3 in all).
+ *   This is the sheet's convention, read by its Apps Scripts.
  * - Each role can have multiple people assigned (comma-separated names)
  * - Each role can be:
  *   - Assigned with name(s): "D: John Doe, Jane Smith" (role needed, assigned to John and Jane)
@@ -205,16 +205,16 @@ export function parseStaffingColumn(staffingStr: string): StaffingInfo {
 /**
  * Format a StaffingInfo object into the string format for the Planning Sheet.
  *
- * One slot per person needed, the way the team writes counts on the sheet:
- * - 1 needed: "V: Jane" or "V: " (open)
- * - 3 needed, 1 assigned: "V1: Jane, V2: , V3: " (two open spots stay visible)
- * The slot count is the larger of the role's `count` (how many the app says
- * are needed) and the number of assigned `names`. Without `count`/`names`
- * (older callers) the role is written as one slot with `assigned` as typed.
+ * Uses the sheet's own convention, which its Apps Scripts (weekly volunteer
+ * email, needs email, calendar) and the red "still needed" formatting read:
+ * - "V: Jane, Kim": who's filling the role (code WITH a colon)
+ * - "V2": open spots still needed (code with NO colon, number = how many)
+ * So 3 volunteers needed with Jane assigned is "V: Jane, V2"; 2 needed with
+ * nobody yet is "V2"; fully staffed is just the names.
  *
- * Trailing space behavior:
- * - An open slot keeps a trailing space after the colon ("D: ", "V2: ").
- * - The parser handles both "D:" and "D: " as unassigned positions.
+ * Open spots = the role's `count` minus the assigned `names`. A role that's
+ * needed with no names and no count gets one open spot ("V1"). Without
+ * `count`/`names` (older callers) `assigned` is written as typed.
  *
  * See StaffingInfo documentation for complete format specification.
  */
@@ -227,14 +227,10 @@ export function formatStaffingColumn(staffing: StaffingInfo): string {
   ) => {
     if (!role.needed) return;
     const names = role.names ?? (role.assigned ? [role.assigned] : []);
-    const slots = Math.max(role.count ?? 0, names.length, 1);
-    if (slots === 1) {
-      parts.push(`${prefix}: ${names[0] ?? ''}`);
-      return;
-    }
-    for (let i = 0; i < slots; i++) {
-      parts.push(`${prefix}${i + 1}: ${names[i] ?? ''}`);
-    }
+    let open = Math.max((role.count ?? 0) - names.length, 0);
+    if (names.length === 0 && open === 0) open = 1;
+    if (names.length > 0) parts.push(`${prefix}: ${names.join(', ')}`);
+    if (open > 0) parts.push(`${prefix}${open}`);
   };
 
   // Driver or Van Driver

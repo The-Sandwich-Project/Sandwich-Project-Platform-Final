@@ -53,34 +53,34 @@ describe('formatStaffingColumn (app -> sheet push)', () => {
     names,
   });
 
-  it('writes one numbered slot per person needed, keeping open spots visible', () => {
+  it("writes names with a colon and open spots as a colon-less count (the sheet's convention)", () => {
     expect(
       formatStaffingColumn({
         driver: { ...role(true, ['Karen'], 2), isVanDriver: false },
         speaker: { needed: false, assigned: null },
         volunteer: role(true, ['Jane'], 3),
       })
-    ).toBe('D1: Karen, D2: , V1: Jane, V2: , V3: ');
+    ).toBe('D: Karen, D1, V: Jane, V2');
   });
 
-  it('keeps the plain form when one person is needed', () => {
+  it('writes an open need with no names as a count, and a full role as just the names', () => {
     expect(
       formatStaffingColumn({
         driver: { ...role(true, [], 1), isVanDriver: false },
         speaker: { needed: false, assigned: null },
         volunteer: role(true, ['Jane'], 1),
       })
-    ).toBe('D: , V: Jane');
+    ).toBe('D1, V: Jane');
   });
 
-  it('writes a slot for every assigned person, even past the count', () => {
+  it('lists every assigned person, even past the count, with no open spots', () => {
     expect(
       formatStaffingColumn({
         driver: { ...role(true, ['Luz', 'Bo'], 1), isVanDriver: true },
         speaker: { needed: false, assigned: null },
         volunteer: role(false, [], 0),
       })
-    ).toBe('VD1: Luz, VD2: Bo');
+    ).toBe('VD: Luz, Bo');
   });
 });
 

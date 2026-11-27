@@ -219,15 +219,20 @@ export interface ParsedStaffing {
    * drivers as "VD: ..." on van events, so VD names ARE drivers.
    * `vanNames` is just the VD ones; `plainListed` is whether a plain "D" appeared.
    */
-  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number; numbered: boolean };
+  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number; open: number; countStated: boolean };
   /** Always empty: "S" is read as a volunteer. Kept so callers' shapes don't change. */
-  speaker: { listed: boolean; names: string[]; slots: number; numbered: boolean };
+  speaker: { listed: boolean; names: string[]; slots: number; open: number; countStated: boolean };
   /**
-   * `numbered` is true when the role was written with numbered slots
-   * ("V1:", "V2:"), which states a count. A lone "V: Jane" doesn't: the push
-   * used to write any count that way.
+   * The sheet's convention (what its Apps Scripts and the red "still needed"
+   * formatting read): a code with NO colon is an open need, its number is how
+   * many ("V2" = 2 volunteers still needed, a bare "V" = 1); a code WITH a
+   * colon lists who's filling the role ("V: Jane").
+   * - `open`: open spots from colon-less codes.
+   * - `countStated`: a colon-less code carried a number, so the cell states
+   *   the count exactly (filled names + open). A bare "V" or the old
+   *   "V: Jane" form doesn't.
    */
-  volunteer: { listed: boolean; names: string[]; slots: number; numbered: boolean };
+  volunteer: { listed: boolean; names: string[]; slots: number; open: number; countStated: boolean };
   /** Parts of the cell that weren't under any role code (shown to the person, never applied). */
   unread: string[];
 }
@@ -250,9 +255,9 @@ export interface ParsedStaffing {
  */
 export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const out: ParsedStaffing = {
-    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0, numbered: false },
-    speaker: { listed: false, names: [], slots: 0, numbered: false },
-    volunteer: { listed: false, names: [], slots: 0, numbered: false },
+    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0, open: 0, countStated: false },
+    speaker: { listed: false, names: [], slots: 0, open: 0, countStated: false },
+    volunteer: { listed: false, names: [], slots: 0, open: 0, countStated: false },
     unread: [],
   };
   const s = clean(raw);
@@ -314,7 +319,9 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     return (cut > 0 ? t.slice(0, cut) : t).trim();
   };
 
-  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean; numbered: boolean };
+  // `open` > 0 only for a colon-less code ("V2" = 2 open, "V" = 1 open);
+  // `openNumbered` when that code carried a number.
+  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean; open: number; openNumbered: boolean };
   const segments: Segment[] = [];
   let current: Segment | null = null;
   const addTo = (seg: Segment, raw: string) => {
@@ -335,7 +342,16 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     const head = colon >= 0 ? token.slice(0, colon) : token;
     const hit = roleFor(head);
     if (hit) {
-      current = { role: hit.role, van: hit.van, names: [], head: head.trim(), fromParen, numbered: /\d\s*$/.test(head) };
+      const digits = colon < 0 ? head.trim().match(/(\d+)$/) : null;
+      current = {
+        role: hit.role,
+        van: hit.van,
+        names: [],
+        head: head.trim(),
+        fromParen,
+        open: colon < 0 ? (digits ? parseInt(digits[1], 10) : 1) : 0,
+        openNumbered: !!digits,
+      };
       segments.push(current);
       addTo(current, colon >= 0 ? token.slice(colon + 1) : '');
     } else if (colon > 0) {
@@ -364,7 +380,8 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
       const r = out[role];
       r.listed = true;
       r.slots += 1;
-      if (seg.numbered) r.numbered = true;
+      r.open += seg.open;
+      if (seg.openNumbered) r.countStated = true;
       r.names.push(...seg.names);
       if (role === 'driver') {
         if (seg.van) {
@@ -741,7 +758,7 @@ export function buildRowUpdatePlan(
     // Something is in the cell but no role code could be read from it. Never
     // treat that as "roles removed": leave staffing alone and say so.
     notes.push(
-      `Couldn't read the staffing cell ("${clean(staffingCell)}"), so drivers and volunteers were left alone. Use codes like D: / V: (numbered D1: / V2: is fine).`
+      `Couldn't read the staffing cell ("${clean(staffingCell)}"), so drivers and volunteers were left alone. Use codes like D: Katie / V: Ann, and D1 / V2 for spots still needed.`
     );
   } else if (staffingRead) {
     const staffing = staffingRead;
@@ -784,15 +801,18 @@ export function buildRowUpdatePlan(
         // Part of the cell couldn't be read: only add people, never drop
         // someone already assigned (they may be in the unread part).
         if (partlyUnread) newIds = Array.from(new Set([...appIds, ...newIds]));
-        // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned).
-        // Numbered slots state the count, so the sheet can lower it as well as
-        // raise it (someone deleted "V3:"). A lone unnumbered code ("V: Jane")
-        // is how the push used to write ANY count, so it can only raise it;
-        // same when part of the cell couldn't be read.
-        const sheetStatesCount = sheet.numbered && !partlyUnread;
+        // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned),
+        // and open-need codes add to the names ("V: Jane, V2" = 3).
+        const sheetNeeded = staffingNeeded(sheet);
+        // "V: Jane, V2" states the count exactly, so the sheet can lower it
+        // as well as raise it (someone changed V2 to V1). Anything else
+        // ("V: Jane" is how the push used to write ANY count, a bare "V",
+        // older "V1:/V2:" slots) can only raise it; same when part of the
+        // cell couldn't be read.
+        const sheetStatesCount = sheet.countStated && !partlyUnread;
         newNeeded = sheetStatesCount
-          ? Math.max(sheet.slots, newIds.length, 1)
-          : Math.max(appNeeded, sheet.slots, newIds.length, 1);
+          ? Math.max(sheetNeeded, newIds.length, 1)
+          : Math.max(appNeeded, sheetNeeded, newIds.length, 1);
       }
 
       const changeField = role === 'driver' ? 'drivers' : 'volunteers';
@@ -1036,10 +1056,21 @@ export function staffingCellOf(row: {
  * an event created from a row and then updated from the same row shows no
  * staffing changes.
  */
+/**
+ * How many people a parsed role says are needed. With open-need codes
+ * ("V: Jane, V2") it's the filled names plus the open spots. Otherwise (only
+ * "V: names", or older numbered slots like "V1: Ann, V2:") it's the larger of
+ * the slots and names, at least 1.
+ */
+export function staffingNeeded(r: { listed: boolean; slots: number; names: string[]; open: number }): number {
+  if (!r.listed) return 0;
+  if (r.open > 0) return r.names.length + r.open;
+  return Math.max(1, r.slots, r.names.length);
+}
+
 export function staffingForNewEvent(raw: unknown) {
   const s = parsePlanningStaffing(raw);
-  const need = (r: { listed: boolean; slots: number; names: string[] }) =>
-    r.listed ? Math.max(1, r.slots, r.names.length) : 0;
+  const need = staffingNeeded;
   return {
     driversNeeded: need(s.driver),
     speakersNeeded: 0, // retired role; "S" is counted under volunteers
