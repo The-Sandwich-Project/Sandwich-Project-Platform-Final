@@ -4,7 +4,8 @@ import { extractNameFromAssignmentId } from '@shared/assignment-ids';
  * Centralized utilities for reading assignment data.
  *
  * These functions use the JSONB fields (driverDetails, speakerDetails, volunteerDetails)
- * as the source of truth, rather than the legacy array columns.
+ * as the source of truth, rather than the legacy array columns. People on the
+ * tentative lists are left out of the confirmed driver/volunteer ids and counts.
  *
  * This consolidates the dual-storage pattern where both arrays and JSONB exist.
  */
@@ -19,7 +20,60 @@ type EventWithAssignments = {
   assignedDriverIds?: string[] | null;
   assignedSpeakerIds?: string[] | null;
   assignedVolunteerIds?: string[] | null;
+  // Tentative people can have a details entry too (a note, or a confirmed
+  // person marked tentative), so they must be excluded from confirmed counts.
+  tentativeDriverIds?: string[] | string | null;
+  tentativeVolunteerIds?: string[] | string | null;
 };
+
+/** Reads an id list stored as a JS array or a Postgres array string ("{a,b}"). */
+function idList(value: string[] | string | null | undefined): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String);
+  const cleaned = value.replace(/^{|}$/g, '');
+  if (!cleaned) return [];
+  return (cleaned.match(/"[^"]*"|[^",]+/g) || []).map((s) => s.replace(/"/g, '').trim()).filter(Boolean);
+}
+
+/** Tentative driver ids (either storage format). */
+export function getTentativeDriverIds(event: EventWithAssignments): string[] {
+  return idList(event.tentativeDriverIds);
+}
+
+/** Tentative volunteer ids (either storage format). */
+export function getTentativeVolunteerIds(event: EventWithAssignments): string[] {
+  return idList(event.tentativeVolunteerIds);
+}
+
+/**
+ * Rebuild a details map (driverDetails / volunteerDetails) for a new confirmed
+ * selection without losing tentative people's entries (their notes live in the
+ * same map). Returns the new map, plus the tentative list with anyone now
+ * confirmed removed (`null` when it doesn't change).
+ */
+export function rebuildDetailsForSelection(
+  details: Record<string, any> | string | null | undefined,
+  selected: string[],
+  tentativeIds: string[]
+): { details: Record<string, any>; tentativeIds: string[] | null } {
+  const existing = parseDetails(details) || {};
+  const next: Record<string, any> = {};
+  for (const id of selected) next[id] = existing[id] || {};
+  const selectedSet = new Set(selected);
+  const stillTentative = tentativeIds.filter((id) => !selectedSet.has(id));
+  for (const id of stillTentative) {
+    if (existing[id] !== undefined && next[id] === undefined) next[id] = existing[id];
+  }
+  return {
+    details: next,
+    tentativeIds: stillTentative.length === tentativeIds.length ? null : stillTentative,
+  };
+}
+
+function withoutTentative(ids: string[], tentative: string[] | string | null | undefined): string[] {
+  const t = new Set(idList(tentative));
+  return t.size ? ids.filter((id) => !t.has(String(id))) : ids;
+}
 
 function parseDetails(details?: Record<string, any> | string | null): Record<string, any> | null {
   if (!details) return null;
@@ -87,9 +141,9 @@ export function resolveAssignmentDisplayName(
  */
 export function getDriverIds(event: EventWithAssignments): string[] {
   const parsed = parseDetails(event.driverDetails);
-  if (parsed) return Object.keys(parsed);
+  if (parsed) return withoutTentative(Object.keys(parsed), event.tentativeDriverIds);
   if (event.assignedDriverIds && event.assignedDriverIds.length > 0) {
-    return event.assignedDriverIds;
+    return withoutTentative(event.assignedDriverIds, event.tentativeDriverIds);
   }
   return [];
 }
@@ -115,7 +169,8 @@ export function getTotalDriverCount(event: EventWithAssignments): number {
  * Check if a specific person is assigned as a driver
  */
 export function hasDriver(event: EventWithAssignments, personId: string): boolean {
-  return !!(event.driverDetails?.[personId]);
+  // Confirmed only: a tentative driver can still have a details entry (a note).
+  return getDriverIds(event).includes(personId);
 }
 
 /**
@@ -163,9 +218,9 @@ export function getSpeakerDetail(event: EventWithAssignments, personId: string):
  */
 export function getVolunteerIds(event: EventWithAssignments): string[] {
   const parsed = parseDetails(event.volunteerDetails);
-  if (parsed) return Object.keys(parsed);
+  if (parsed) return withoutTentative(Object.keys(parsed), event.tentativeVolunteerIds);
   if (event.assignedVolunteerIds && event.assignedVolunteerIds.length > 0) {
-    return event.assignedVolunteerIds;
+    return withoutTentative(event.assignedVolunteerIds, event.tentativeVolunteerIds);
   }
   return [];
 }
@@ -181,7 +236,8 @@ export function getVolunteerCount(event: EventWithAssignments): number {
  * Check if a specific person is assigned as a volunteer
  */
 export function hasVolunteer(event: EventWithAssignments, personId: string): boolean {
-  return !!(event.volunteerDetails?.[personId]);
+  // Confirmed only: a tentative volunteer can still have a details entry (a note).
+  return getVolunteerIds(event).includes(personId);
 }
 
 /**
@@ -192,12 +248,14 @@ export function getVolunteerDetail(event: EventWithAssignments, personId: string
 }
 
 /**
- * Check if a person is assigned in any role
+ * Check if a person is on the event in any role, confirmed or tentative
  */
 export function isPersonAssigned(event: EventWithAssignments, personId: string): boolean {
   return hasDriver(event, personId) ||
          hasSpeaker(event, personId) ||
          hasVolunteer(event, personId) ||
+         getTentativeDriverIds(event).includes(personId) ||
+         getTentativeVolunteerIds(event).includes(personId) ||
          event.assignedVanDriverId === personId;
 }
 

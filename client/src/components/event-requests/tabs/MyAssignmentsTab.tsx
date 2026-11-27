@@ -312,6 +312,7 @@ export const MyAssignmentsTab: React.FC = () => {
             resolveUserName={resolveUserName}
             resolveRecipientName={resolveRecipientName}
             openAssignmentDialog={(type, isVanDriver) => openAssignmentDialog(request.id, type, isVanDriver)}
+            openEditAssignmentDialog={(type, personId) => openEditAssignmentDialog(request.id, type, personId)}
             handleRemoveAssignment={(type, personId) => handleRemoveAssignment(personId, type, request.id)}
             canEdit={true}
             onEditNextAction={() => {

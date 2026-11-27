@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -500,12 +500,34 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
 
   // Get context to find the event date
   const { eventRequests } = useEventRequestContext();
-  const { assignmentEventId } = useEventDialogState();
+  const { assignmentEventId, isEditingAssignment, editingAssignmentPersonId } = useEventDialogState();
 
   // Find the current event request
   const currentEvent = useMemo(() => {
     return eventRequests.find(e => e.id === assignmentEventId);
   }, [eventRequests, assignmentEventId]);
+
+  // "Change person" mode: start the tentative box at the person's current status,
+  // so saving without touching it keeps them confirmed or tentative as they were.
+  const isEditMode = isEditingAssignment && !!editingAssignmentPersonId && !isVanDriverAssignment;
+  // Set on every opening: the dialog stays mounted, and Cancel/Save close it
+  // without resetting, so a value left by one assignment must not carry into
+  // the next. Add mode always starts unchecked.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!isEditMode || !currentEvent) {
+      setIsTentative(false);
+      return;
+    }
+    const raw = assignmentType === 'driver' ? currentEvent.tentativeDriverIds : currentEvent.tentativeVolunteerIds;
+    const rawValue: unknown = raw;
+    const list: string[] = Array.isArray(rawValue)
+      ? rawValue.map(String)
+      : typeof rawValue === 'string'
+        ? rawValue.replace(/^{|}$/g, '').split(',').map((x: string) => x.replace(/"/g, '').trim())
+        : [];
+    setIsTentative(list.includes(String(editingAssignmentPersonId)));
+  }, [isOpen, isEditMode, editingAssignmentPersonId, assignmentType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Extract event date (use scheduledEventDate if available, otherwise desiredEventDate)
   const eventDate = useMemo(() => {
@@ -546,7 +568,9 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
         <DialogHeader className="border-b border-[#007E8C]/10 pb-4">
           <DialogTitle className="flex items-center gap-2 text-[#236383] text-xl">
             <UserPlus className="w-5 h-5 text-[#007E8C]" aria-hidden="true" />
-            Assign {assignmentType ? assignmentType.charAt(0).toUpperCase() + assignmentType.slice(1) + 's' : 'People'}
+            {isEditMode
+              ? `Change ${assignmentType || 'person'}`
+              : `Assign ${assignmentType ? assignmentType.charAt(0).toUpperCase() + assignmentType.slice(1) + 's' : 'People'}`}
           </DialogTitle>
           <DialogDescription className="text-gray-600 mt-2">
             {assignmentType === 'driver' && isVanDriverAssignment ? (
@@ -554,6 +578,8 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
                 <Truck className="w-4 h-4 text-amber-600" />
                 Van driver assignment - only showing van-approved drivers. Select a van-approved driver to assign.
               </span>
+            ) : isEditMode ? (
+              `Pick who should take this spot (for example, swap a typed-in name for the person in the database), or tick/untick "Mark as tentative". Saving replaces the current ${assignmentType || 'person'} and keeps their note.`
             ) : (
               `Select people to assign as ${assignmentType ? assignmentType + 's' : 'people'} for this event. You can choose from team members, drivers, volunteers, and host contacts.`
             )}
@@ -577,7 +603,13 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
 
         <ComprehensivePersonSelector
           selectedPeople={selectedAssignees}
-          onSelectionChange={setSelectedAssignees}
+          onSelectionChange={(next: string[]) => {
+            // Changing one person is a single choice: picking someone new
+            // replaces the current pick instead of adding a second person.
+            if (!isEditMode) return setSelectedAssignees(next);
+            const added = next.filter((id) => !selectedAssignees.includes(id));
+            setSelectedAssignees(added.length ? [added[added.length - 1]] : next);
+          }}
           assignmentType={assignmentType}
           availabilitySlots={availabilitySlots}
           isLoadingAvailability={isLoadingAvailability}
@@ -624,8 +656,14 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
               ) : (
                 <UserPlus className="w-4 h-4 mr-2" aria-hidden="true" />
               )}
-              {isTentative ? 'Add Tentative' : 'Assign'} {selectedAssignees.length} {assignmentType}
-              {selectedAssignees.length !== 1 ? 's' : ''}
+              {isEditMode ? (
+                'Save change'
+              ) : (
+                <>
+                  {isTentative ? 'Add Tentative' : 'Assign'} {selectedAssignees.length} {assignmentType}
+                  {selectedAssignees.length !== 1 ? 's' : ''}
+                </>
+              )}
             </Button>
           </div>
         </div>

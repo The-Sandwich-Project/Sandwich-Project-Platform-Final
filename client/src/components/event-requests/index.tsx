@@ -83,6 +83,7 @@ import { useEventRequestSocket } from '@/hooks/useEventRequestSocket';
 // Import dialogs
 import { TspContactAssignmentDialog } from './dialogs/TspContactAssignmentDialog';
 import { AssignmentDialog } from './dialogs/AssignmentDialog';
+import { withoutPerson, finishReplacement, type AssignmentKind } from './lib/replace-assignment';
 import { EventDetailsDialog } from './dialogs/EventDetailsDialog';
 import { AiDateSuggestionDialog } from './dialogs/AiDateSuggestionDialog';
 import { AiIntakeAssistantDialog } from './dialogs/AiIntakeAssistantDialog';
@@ -179,6 +180,8 @@ const EventRequestsManagementContent: React.FC = () => {
     setSelectedAssignees,
     isVanDriverAssignment,
     setIsVanDriverAssignment,
+    isEditingAssignment,
+    editingAssignmentPersonId,
     selectedEventRequest,
     setSelectedEventRequest,
     isEditing,
@@ -1331,8 +1334,8 @@ const EventRequestsManagementContent: React.FC = () => {
             logger.log('Available users:', (users ?? []).map((u: any) => ({ id: u.id, name: `${u.firstName} ${u.lastName}` })));
 
             // Get the current event to preserve existing assignments
-            const currentEvent = eventRequests.find(e => e.id === assignmentEventId);
-            if (!currentEvent) {
+            const storedEvent = eventRequests.find(e => e.id === assignmentEventId);
+            if (!storedEvent) {
               toast({
                 title: 'Error',
                 description: 'Event not found',
@@ -1340,6 +1343,20 @@ const EventRequestsManagementContent: React.FC = () => {
               });
               return;
             }
+
+            // "Change person" (edit mode): replace the person being edited with
+            // whoever is picked. The add logic below merges into the existing
+            // lists, so it gets a copy of the event with that person removed
+            // (see lib/replace-assignment.ts). Van driver edits already replace.
+            const replacingId =
+              isEditingAssignment && editingAssignmentPersonId && !isVanDriverAssignment &&
+              (assignmentType === 'driver' || assignmentType === 'volunteer')
+                ? editingAssignmentPersonId
+                : null;
+            const replacement = replacingId
+              ? withoutPerson(storedEvent as any, assignmentType as AssignmentKind, replacingId, assignees)
+              : null;
+            const currentEvent: any = replacement ? replacement.event : storedEvent;
 
             // Build the update data based on assignment type
             let updateData: any = {};
@@ -1505,6 +1522,11 @@ const EventRequestsManagementContent: React.FC = () => {
               }
             }
 
+            if (replacingId && replacement) {
+              // Also write the list it didn't add to, and keep the spot's note.
+              updateData = finishReplacement(updateData, replacement, assignmentType as AssignmentKind, replacingId, assignees, isTentative);
+            }
+
             try {
               logger.log('Update data:', updateData);
 
@@ -1523,9 +1545,11 @@ const EventRequestsManagementContent: React.FC = () => {
 
               toast({
                 title: 'Success',
-                description: isTentative
-                  ? `${assignmentType}s added as tentative (?)`
-                  : `${assignmentType}s assigned successfully`,
+                description: replacingId
+                  ? `${assignmentType === 'driver' ? 'Driver' : 'Volunteer'} updated${isTentative ? ' (tentative)' : ''}`
+                  : isTentative
+                    ? `${assignmentType}s added as tentative (?)`
+                    : `${assignmentType}s assigned successfully`,
               });
             } catch (error) {
               // onError on updateEventRequestMutation already shows a user-facing toast

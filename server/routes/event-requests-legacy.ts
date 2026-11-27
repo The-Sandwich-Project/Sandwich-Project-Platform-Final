@@ -1005,6 +1005,31 @@ router.get('/drivers/available', isAuthenticated, async (req, res) => {
   }
 });
 
+/**
+ * Confirmed volunteers on an event: the keys of volunteerDetails, minus anyone
+ * on the tentative list (a tentative person can have a details entry for a
+ * note, or after being marked tentative from the card).
+ */
+function confirmedVolunteerCount(event: any): number {
+  let details: Record<string, unknown> = {};
+  try {
+    details = typeof event.volunteerDetails === 'string'
+      ? JSON.parse(event.volunteerDetails || '{}')
+      : event.volunteerDetails || {};
+  } catch {
+    details = {};
+  }
+  const raw = event.tentativeVolunteerIds;
+  const tentative = new Set<string>(
+    Array.isArray(raw)
+      ? raw.map(String)
+      : typeof raw === 'string'
+        ? raw.replace(/^{|}$/g, '').split(',').map((x: string) => x.replace(/"/g, '').trim()).filter(Boolean)
+        : []
+  );
+  return Object.keys(details || {}).filter((id) => !tentative.has(id)).length;
+}
+
 // Get complete event details by organization and contact
 router.get(
   '/details/:organizationName/:contactName',
@@ -1489,11 +1514,7 @@ router.get(
 
           // Events needing volunteers
           const volunteersNeeded = event.volunteersNeeded || 0;
-          const assignedVolunteers = event.volunteerDetails
-            ? (typeof event.volunteerDetails === 'string'
-                ? Object.keys(JSON.parse(event.volunteerDetails || '{}')).length
-                : Object.keys(event.volunteerDetails || {}).length)
-            : 0;
+          const assignedVolunteers = confirmedVolunteerCount(event);
           const needsVolunteer = volunteersNeeded > assignedVolunteers;
 
           // Events needing van driver
@@ -1618,11 +1639,7 @@ router.get(
           // (Speaker role retired — speaker needs no longer counted.)
 
           const volunteersNeeded = event.volunteersNeeded || 0;
-          const assignedVolunteers = event.volunteerDetails
-            ? (typeof event.volunteerDetails === 'string'
-                ? Object.keys(JSON.parse(event.volunteerDetails || '{}')).length
-                : Object.keys(event.volunteerDetails || {}).length)
-            : 0;
+          const assignedVolunteers = confirmedVolunteerCount(event);
           const needsVolunteer = volunteersNeeded > assignedVolunteers;
 
           const needsVanDriver = event.vanDriverNeeded && !event.assignedVanDriverId && !event.isDhlVan;
