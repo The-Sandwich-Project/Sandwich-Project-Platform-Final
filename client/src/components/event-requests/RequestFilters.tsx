@@ -222,6 +222,13 @@ export default function RequestFilters({
       count: statusCounts.in_process,
     },
     {
+      value: 'standby',
+      label: 'Standby',
+      shortLabel: 'Standby',
+      icon: Hourglass,
+      count: statusCounts.standby,
+    },
+    {
       value: 'scheduled',
       label: 'Scheduled',
       shortLabel: 'Scheduled',
@@ -248,13 +255,6 @@ export default function RequestFilters({
       shortLabel: 'D/C',
       icon: XCircle,
       count: statusCounts.declined + statusCounts.cancelled,
-    },
-    {
-      value: 'standby',
-      label: 'Standby',
-      shortLabel: 'Standby',
-      icon: Hourglass,
-      count: statusCounts.standby,
     },
     {
       value: 'stalled',

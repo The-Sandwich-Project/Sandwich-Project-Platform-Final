@@ -11,6 +11,7 @@ import { DuplicateEventDialog } from '../dialogs/DuplicateEventDialog';
 import { EventListSkeleton } from '../EventCardSkeleton';
 import { EventListBatchProviders } from '../EventListBatchProviders';
 import type { EventRequest } from '@shared/schema';
+import { emailOrganizer } from '../lib/emailOrganizer';
 
 export const StalledTab: React.FC = () => {
   const { toast } = useToast();
@@ -103,10 +104,12 @@ export const StalledTab: React.FC = () => {
                 deleteEventRequestMutation.mutate(request.id);
               }
             }}
-            onContact={() => {
-              setContactEventRequest(request);
-              openDialog('contactOrganizer');
-            }}
+            onContact={() =>
+              emailOrganizer(request, () => {
+                setContactEventRequest(request);
+                openDialog('contactOrganizer');
+              })
+            }
             onCall={() => handleCall(request)}
             onReactivate={() => {
               if (window.confirm('The organizer responded! Move this event back to In Process?')) {

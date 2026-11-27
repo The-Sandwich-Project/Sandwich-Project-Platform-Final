@@ -19,6 +19,7 @@ import { applyInProcessFilters, hasActiveInProcessFilters } from '../lib/inProce
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { buildAttendancePatch } from '../form-utils';
 import type { EventRequest } from '@shared/schema';
+import { emailOrganizer } from '../lib/emailOrganizer';
 
 export const InProcessTab: React.FC = () => {
   const { toast } = useToast();
@@ -61,7 +62,6 @@ export const InProcessTab: React.FC = () => {
     setAiIntakeAssistantEventRequest,
     setNextActionEventRequest,
     setNextActionMode,
-    setIntakeCallEventRequest,
     openDialog,
   } = useEventDialogState();
 
@@ -385,10 +385,12 @@ export const InProcessTab: React.FC = () => {
                 openDialog('scheduling');
               }}
               onCall={() => handleCall(request)}
-              onContact={() => {
-                setContactEventRequest(request);
-                openDialog('contactOrganizer');
-              }}
+              onContact={() =>
+                emailOrganizer(request, () => {
+                  setContactEventRequest(request);
+                  openDialog('contactOrganizer');
+                })
+              }
               onResendToolkit={() => {
                 setSelectedEventRequest(request);
                 setToolkitEventRequest(request);
