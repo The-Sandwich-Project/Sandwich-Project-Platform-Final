@@ -18,6 +18,9 @@ describe('expected attendees', () => {
     expect(formatAttendance({ estimatedAttendance: 50, estimatedAttendanceMin: 40, estimatedAttendanceMax: 60 })).toBe('40–60');
     expect(formatAttendance({ estimatedAttendance: 40 })).toBe('40');
     expect(formatAttendance({})).toBe('');
+    expect(formatAttendance({ estimatedAttendance: 5, estimatedAttendanceMin: 0, estimatedAttendanceMax: 10 })).toBe('0–10');
+    expect(formatAttendance({ estimatedAttendance: 40, estimatedAttendanceMin: 0, estimatedAttendanceMax: 0 })).toBe('40');
+    expect(parseAttendanceText('0-10').fields).toEqual({ estimatedAttendance: 5, estimatedAttendanceMin: 0, estimatedAttendanceMax: 10 });
   });
 
   it('a new plain number clears an old range on save', () => {

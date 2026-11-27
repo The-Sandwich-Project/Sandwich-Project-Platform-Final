@@ -52,11 +52,22 @@ export function parseAttendanceText(text: string): { fields: AttendanceFields; e
   return { fields: EMPTY_ATTENDANCE, error: `"${t}" isn't a number or a range like 40-60` };
 }
 
-/** "40", "40–60", or "" when not known. A stored range wins over the single number. */
+/**
+ * Whether min/max describe a range. 0 is a valid low end ("0-10"); "no range"
+ * is null in the database and 0/0 in form state, so the test is max > min.
+ */
+export function hasAttendanceRange(min: unknown, max: unknown): boolean {
+  if (min === null || min === undefined || max === null || max === undefined) return false;
+  const lo = Number(min);
+  const hi = Number(max);
+  return Number.isFinite(lo) && Number.isFinite(hi) && lo >= 0 && hi > lo;
+}
+
+/** "40", "40–60", "0–10", or "" when not known. A stored range wins over the single number. */
 export function formatAttendance(f: Partial<AttendanceFields> | null | undefined): string {
-  const min = Number(f?.estimatedAttendanceMin) || 0;
-  const max = Number(f?.estimatedAttendanceMax) || 0;
-  if (min > 0 && max > 0 && max > min) return `${min}–${max}`;
+  if (hasAttendanceRange(f?.estimatedAttendanceMin, f?.estimatedAttendanceMax)) {
+    return `${Number(f!.estimatedAttendanceMin)}–${Number(f!.estimatedAttendanceMax)}`;
+  }
   const n = Number(f?.estimatedAttendance) || 0;
   return n > 0 ? String(n) : '';
 }

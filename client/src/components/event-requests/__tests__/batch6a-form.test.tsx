@@ -6,7 +6,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TspShoppingCheckbox } from '../TspShopping';
 import { ExpectedAttendeesField } from '../form-sections/ExpectedAttendeesField';
-import { buildEventDataForServer, dropUnchangedFields } from '../form-utils';
+import { buildEventDataForServer, dropUnchangedFields, intelligentMergeFormData, normalizeDraftAttendance } from '../form-utils';
 
 describe('TSP shopping checkbox', () => {
   it('asks before changing, and Cancel leaves it alone', () => {
@@ -51,6 +51,25 @@ describe('expected attendees field', () => {
     expect(box.value).toBe('40–60');
     fireEvent.change(box, { target: { value: '30-70' } });
     expect(state()).toMatchObject({ estimatedAttendance: 50, estimatedAttendanceMin: 30, estimatedAttendanceMax: 70 });
+  });
+
+  it('Discard clears rejected text even when the stored number is unchanged', () => {
+    function DiscardHarness() {
+      const initial = { estimatedAttendance: 40, estimatedAttendanceMin: 0, estimatedAttendanceMax: 0 };
+      const [formData, setFormData] = React.useState<any>(initial);
+      return (
+        <>
+          <ExpectedAttendeesField formData={formData} setFormData={setFormData} />
+          <button onClick={() => setFormData(initial)}>Discard</button>
+        </>
+      );
+    }
+    render(<DiscardHarness />);
+    const box = screen.getByTestId('input-expected-attendees') as HTMLInputElement;
+    fireEvent.change(box, { target: { value: 'about 40' } });
+    expect(box.value).toBe('about 40');
+    fireEvent.click(screen.getByText('Discard'));
+    expect(box.value).toBe('40');
   });
 
   it('flags text it cannot read (which blocks saving)', () => {
@@ -99,5 +118,49 @@ describe('saving the new fields', () => {
 
   it('an older draft with an overnight location (no choice saved) stays planned', () => {
     expect(build({ overnightHoldingLocation: 'Church hall' })).toMatchObject({ nextDayPickup: 'planned', overnightHoldingLocation: 'Church hall' });
+  });
+});
+
+describe('Greptile review fixes', () => {
+  const base: any = {
+    eventDate: '2026-06-15', backupDates: [], sandwichTypes: [], totalSandwichCount: 100,
+    estimatedSandwichCountMin: 0, estimatedSandwichCountMax: 0, status: 'in_process',
+  };
+  const build = (f: any) => buildEventDataForServer({ ...base, ...f }, { mode: 'edit', hasEventRequest: true, actualSandwichMode: 'total' });
+
+  it('a range starting at 0 keeps its ends', () => {
+    expect(build({ estimatedAttendance: 5, estimatedAttendanceMin: 0, estimatedAttendanceMax: 10 })).toMatchObject({
+      estimatedAttendance: 5, estimatedAttendanceMin: 0, estimatedAttendanceMax: 10,
+    });
+  });
+
+  it("an older draft's attendance edit survives recovery (missing range fields aren't a server edit)", () => {
+    // Saved before this PR: no range fields in either half of the draft.
+    const original = { status: 'in_process', estimatedAttendance: 30 };
+    const draft = { status: 'in_process', estimatedAttendance: 45 };
+    // The form opens the same event today with the new defaults.
+    const current = { status: 'in_process', estimatedAttendance: 30, estimatedAttendanceMin: 0, estimatedAttendanceMax: 0, nextDayPickup: 'no', isTspShopped: false };
+    const { mergedData, conflicts } = intelligentMergeFormData(normalizeDraftAttendance(draft), normalizeDraftAttendance(original), current);
+    expect(mergedData.estimatedAttendance).toBe(45);
+    expect(conflicts).toEqual([]);
+  });
+
+  it("an older draft that added an overnight location recovers as planned, and saves it", () => {
+    const original = { status: 'in_process', overnightHoldingLocation: '', overnightPickupTime: '' };
+    const draft = { status: 'in_process', overnightHoldingLocation: 'Church hall', overnightPickupTime: '09:00' };
+    const current = { status: 'in_process', overnightHoldingLocation: '', overnightPickupTime: '', nextDayPickup: 'no', holdingOvernight: false };
+    const { mergedData } = intelligentMergeFormData(normalizeDraftAttendance(draft), normalizeDraftAttendance(original), current);
+    expect(mergedData).toMatchObject({ nextDayPickup: 'planned', overnightHoldingLocation: 'Church hall', overnightPickupTime: '09:00' });
+    expect(build(mergedData)).toMatchObject({ nextDayPickup: 'planned', overnightHoldingLocation: 'Church hall', overnightPickupTime: '09:00' });
+  });
+
+  it('next-day pickup and its overnight details merge as one unit', () => {
+    // The user switched to "It's an option" (dropping the location); meanwhile
+    // the server changed the location: the server's whole group wins.
+    const original = { status: 'in_process', nextDayPickup: 'planned', holdingOvernight: true, overnightHoldingLocation: 'A', overnightPickupTime: '' };
+    const draft = { ...original, nextDayPickup: 'option', holdingOvernight: false, overnightHoldingLocation: '' };
+    const current = { ...original, overnightHoldingLocation: 'B' };
+    const { mergedData } = intelligentMergeFormData(draft, original, current);
+    expect(mergedData).toMatchObject({ nextDayPickup: 'planned', overnightHoldingLocation: 'B' });
   });
 });

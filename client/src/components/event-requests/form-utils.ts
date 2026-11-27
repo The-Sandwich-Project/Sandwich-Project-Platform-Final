@@ -12,6 +12,7 @@ import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
 import { estimateStateFromFields, normalizeEstimate } from '@shared/sandwich-estimate';
 import type { EventFormData } from './form-sections/types';
 import { effectiveNextDayPickup } from '@shared/next-day-pickup';
+import { hasAttendanceRange } from '@shared/attendance-estimate';
 export { findMismatchedSavedFields, getDroppedServerFields } from '@/lib/event-save-verification';
 
 /**
@@ -81,11 +82,36 @@ export function buildAttendancePatch(value: unknown): {
  * A no-op for drafts saved after the change: they have no `volunteerCount`.
  */
 export function normalizeDraftAttendance(snapshot: any): any {
-  if (!snapshot || typeof snapshot !== 'object' || !('volunteerCount' in snapshot)) {
-    return snapshot;
+  if (!snapshot || typeof snapshot !== 'object') return snapshot;
+  let out = snapshot;
+  if ('volunteerCount' in out) {
+    const { volunteerCount, ...rest } = out;
+    out = { ...rest, estimatedAttendance: resolveEstimatedAttendance(snapshot) };
   }
-  const { volunteerCount, ...rest } = snapshot;
-  return { ...rest, estimatedAttendance: resolveEstimatedAttendance(snapshot) };
+  return normalizeDraftNewFields(out);
+}
+
+/**
+ * Bring a draft snapshot saved before batch 6a's fields existed into the
+ * current shape, the same way the form opens an event. Applied to both halves
+ * of a draft (see normalizeDraftAttendance): a field missing from an old
+ * draft would otherwise look like a server edit next to the current form's
+ * default (0, false, 'no') and win the merge, discarding the user's changes.
+ *   - no attendance range: estimatedAttendanceMin/Max = 0
+ *   - no next-day choice: derived from the overnight location, like older events
+ *   - no TSP shopping: false
+ */
+export function normalizeDraftNewFields(snapshot: any): any {
+  if (!snapshot || typeof snapshot !== 'object') return snapshot;
+  const out = { ...snapshot };
+  if (!('estimatedAttendanceMin' in out)) out.estimatedAttendanceMin = 0;
+  if (!('estimatedAttendanceMax' in out)) out.estimatedAttendanceMax = 0;
+  if (!('nextDayPickup' in out)) {
+    out.nextDayPickup = effectiveNextDayPickup(out);
+    out.holdingOvernight = out.nextDayPickup === 'planned';
+  }
+  if (!('isTspShopped' in out)) out.isTspShopped = false;
+  return out;
 }
 
 /**
@@ -302,7 +328,8 @@ export function buildEventDataForServer(
   {
     const min = Number((formData as any).estimatedAttendanceMin) || 0;
     const max = Number((formData as any).estimatedAttendanceMax) || 0;
-    const isRange = eventData.estimatedAttendance != null && min > 0 && max > min;
+    // 0 is a valid low end ("0-10"); no range is 0/0 in form state.
+    const isRange = eventData.estimatedAttendance != null && hasAttendanceRange(min, max);
     eventData.estimatedAttendanceMin = isRange ? min : null;
     eventData.estimatedAttendanceMax = isRange ? max : null;
   }
@@ -503,6 +530,8 @@ export function dropUnchangedFields(
 const MERGE_TOGETHER: string[][] = [
   ['standbyCheckBackMode', 'standbyCheckBackDate', 'standbyExpectedDate'],
   ['estimatedAttendance', 'estimatedAttendanceMin', 'estimatedAttendanceMax'],
+  // The next-day choice and the overnight details it keeps or drops.
+  ['nextDayPickup', 'holdingOvernight', 'overnightHoldingLocation', 'overnightPickupTime'],
 ];
 
 /**

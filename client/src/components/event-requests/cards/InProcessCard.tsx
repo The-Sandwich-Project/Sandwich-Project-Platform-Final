@@ -1522,7 +1522,6 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                         ) : (
                           <div className="font-medium text-amber-900">
                             {formatEventEstimate(request)}
-                            <ExpectedAttendeesInline event={request} className="ml-2 font-normal" />
                           </div>
                         )}
                       </div>
@@ -1531,6 +1530,8 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                 </div>
               );
             })()}
+            {/* Expected attendees show whether or not there's sandwich info yet. */}
+            <ExpectedAttendeesInline event={request} />
           </div>
 
           {/* Right Column - Contact Info & TSP Contact */}

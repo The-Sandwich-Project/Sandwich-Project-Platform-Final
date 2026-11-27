@@ -25,13 +25,19 @@ export const ExpectedAttendeesField: React.FC<ExpectedAttendeesFieldProps> = ({ 
   const stored = formatAttendance(formData);
   const [text, setText] = React.useState(stored);
 
-  // Follow outside changes (a recovered draft, a reload) without fighting
-  // the person mid-typing: only when the text no longer means the stored value.
+  // Follow outside changes without fighting the person mid-typing:
+  //  - the stored value changed (a recovered draft, a reload) and the text
+  //    no longer means it;
+  //  - the form was reset (Discard) while the box held text it couldn't read:
+  //    the reset clears attendanceError, which typing bad text always sets, so
+  //    a cleared error with unreadable text means "show the stored value",
+  //    even when the stored number itself didn't change.
+  const hasFormError = !!formData.attendanceError;
   React.useEffect(() => {
     const r = parseAttendanceText(text);
-    if (!r.error && formatAttendance(r.fields) !== stored) setText(stored);
+    if (r.error ? !hasFormError : formatAttendance(r.fields) !== stored) setText(stored);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stored]);
+  }, [stored, hasFormError]);
 
   const error = parseAttendanceText(text).error;
 
