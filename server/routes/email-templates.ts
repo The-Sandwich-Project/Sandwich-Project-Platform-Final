@@ -6,6 +6,46 @@ import { hasPermission } from '@shared/unified-auth-utils';
 import { isAuthenticated } from '../auth';
 import { logger } from '../middleware/logger';
 import type { AuthenticatedRequest } from '../types/express';
+import { db } from '../db';
+import { emailTemplateSections } from '@shared/schema';
+import { sql } from 'drizzle-orm';
+import {
+  TOOLKIT_EMAIL_SECTIONS,
+  TOOLKIT_EMAIL_TEMPLATE_TYPE,
+} from '@shared/toolkit-email-template';
+
+/**
+ * Make sure every toolkit email section has a row, so admins can edit it on
+ * the Email Templates page. Labels, descriptions and default text follow
+ * shared/toolkit-email-template.ts; a saved customization (current_content)
+ * is never touched. Runs once per server process, on the first list request.
+ */
+let toolkitSectionsEnsured = false;
+async function ensureToolkitEmailSections(): Promise<void> {
+  if (toolkitSectionsEnsured) return;
+  for (const section of TOOLKIT_EMAIL_SECTIONS) {
+    await db
+      .insert(emailTemplateSections)
+      .values({
+        templateType: TOOLKIT_EMAIL_TEMPLATE_TYPE,
+        sectionKey: section.key,
+        sectionLabel: section.label,
+        defaultContent: section.content,
+        description: section.description,
+        placeholderHints: section.placeholderHints ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [emailTemplateSections.templateType, emailTemplateSections.sectionKey],
+        set: {
+          sectionLabel: sql`excluded.section_label`,
+          defaultContent: sql`excluded.default_content`,
+          description: sql`excluded.description`,
+          placeholderHints: sql`excluded.placeholder_hints`,
+        },
+      });
+  }
+  toolkitSectionsEnsured = true;
+}
 
 export function createEmailTemplatesRouter(): Router {
   const router = Router();
@@ -14,6 +54,15 @@ export function createEmailTemplatesRouter(): Router {
   router.get('/sections', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { templateType } = req.query;
+      // Optional: a failure here (e.g. table not migrated yet) must not block
+      // the list; the composer falls back to the built-in wording.
+      try {
+        await ensureToolkitEmailSections();
+      } catch (ensureError) {
+        logger.warn(
+          `Could not ensure toolkit email template sections: ${(ensureError as Error)?.message ?? String(ensureError)}`
+        );
+      }
       const sections = await storage.getEmailTemplateSections(
         templateType ? String(templateType) : undefined
       );
