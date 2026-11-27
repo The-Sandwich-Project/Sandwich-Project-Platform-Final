@@ -683,7 +683,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         {/* Header Row - Organization & Status.
             Tightened to mirror InProcessCard density: removed the thick teal
             divider and heavy pb-3 in favor of a single mb-3 bottom margin. */}
-        <div className="flex flex-col gap-2 mb-3">
+        <div className="flex flex-col gap-1.5 mb-3">
           {/* Top: Date + Organization Name */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
             {/* Organization Name + Department (separate edit targets) */}
@@ -701,10 +701,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         if (e.key === 'Escape') cancelEdit();
                       }}
                     />
-                    <Button size="sm" variant="ghost" onClick={saveEdit} className="h-8 w-8 p-0">
+                    <Button size="sm" variant="ghost" onClick={saveEdit} className="h-8 w-8 p-0 md:min-h-0 md:min-w-0 md:h-8">
                       <Save className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 w-8 p-0">
+                    <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 w-8 p-0 md:min-h-0 md:min-w-0 md:h-8">
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
@@ -718,7 +718,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         size="sm"
                         variant="ghost"
                         onClick={() => startEditing('organizationName', request.organizationName || '')}
-                        className="h-6 px-2 hidden group-hover:inline-flex"
+                        className="h-6 px-2 hidden group-hover:inline-flex md:min-h-0 md:h-6"
                         title="Edit organization name"
                         data-testid="button-edit-org-name"
                       >
@@ -745,10 +745,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             if (e.key === 'Escape') cancelEdit();
                           }}
                         />
-                        <Button size="sm" variant="ghost" onClick={saveEdit} className="h-7 w-7 p-0" data-testid="button-save-department">
+                        <Button size="sm" variant="ghost" onClick={saveEdit} className="h-7 w-7 p-0 md:min-h-0 md:min-w-0 md:h-7" data-testid="button-save-department">
                           <Save className="h-3 w-3" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 w-7 p-0" data-testid="button-cancel-department">
+                        <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 w-7 p-0 md:min-h-0 md:min-w-0 md:h-7" data-testid="button-cancel-department">
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
@@ -764,7 +764,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => startEditing('department', request.department || '')}
-                            className="h-6 px-2 hidden group-hover:inline-flex"
+                            className="h-6 px-2 hidden group-hover:inline-flex md:min-h-0 md:h-6"
                             title={request.department ? 'Edit department' : 'Add department'}
                             data-testid="button-edit-department"
                           >
@@ -808,7 +808,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         size="sm"
                         variant="ghost"
                         onClick={() => startEditing(dateFieldToEdit, formatDateForInput(displayDate?.toString() || ''))}
-                        className="text-[#007E8C] hover:bg-[#007E8C]/10 h-6 px-1 transition-colors opacity-0 group-hover:opacity-100"
+                        className="text-[#007E8C] hover:bg-[#007E8C]/10 h-6 px-1 transition-colors opacity-0 group-hover:opacity-100 md:min-h-0 md:h-6"
                         aria-label="Edit date"
                       >
                         <Edit2 className="w-3 h-3" aria-hidden="true" />
@@ -1039,7 +1039,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               
               {/* Address - moved from Event Details */}
               {isEditingThisCard && editingField === 'eventAddress' ? (
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <MapPin className="w-5 h-5 shrink-0 text-[#007E8C]" />
                   <Input
                     value={editingValue}
@@ -1060,13 +1060,13 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   </Button>
                 </div>
               ) : request.eventAddress ? (
-                <div className="flex items-start gap-2 mt-2 group">
+                <div className="flex items-start gap-2 mt-1 group">
                   <MapPin className="w-5 h-5 shrink-0 mt-0.5 text-[#007E8C]" />
                   <a
                     href={`https://maps.google.com/maps?q=${encodeURIComponent(request.eventAddress)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-lg sm:text-xl font-bold text-[#007E8C] hover:text-[#007E8C]/80 underline break-words"
+                    className="text-base sm:text-lg font-bold text-[#007E8C] hover:text-[#007E8C]/80 underline break-words"
                   >
                     {request.eventAddress}
                   </a>
@@ -1075,7 +1075,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => startEditing('eventAddress', request.eventAddress || '')}
-                      className="text-[#007E8C] hover:bg-[#007E8C]/10 h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="text-[#007E8C] hover:bg-[#007E8C]/10 h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-6"
                       aria-label="Edit address"
                     >
                       <Edit2 className="w-4 h-4" aria-hidden="true" />
@@ -1083,13 +1083,13 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   )}
                 </div>
               ) : canEdit ? (
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-1">
                   <MapPin className="w-5 h-5 shrink-0 text-gray-400" />
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => startEditing('eventAddress', '')}
-                    className="text-[#007E8C] border-[#007E8C]/30 hover:bg-[#007E8C]/10 h-7 px-3"
+                    className="text-[#007E8C] border-[#007E8C]/30 hover:bg-[#007E8C]/10 h-7 px-3 md:min-h-0 md:h-7"
                   >
                     <Plus className="w-3 h-3 mr-1" aria-hidden="true" />
                     Add Address
@@ -1365,7 +1365,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 size="sm"
                 variant="outline"
                 onClick={onAddNextAction}
-                className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100 ml-auto"
+                className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100 ml-auto md:min-h-0 md:h-7"
                 data-testid="button-add-action"
               >
                 <Plus className="w-3 h-3 mr-1" />
@@ -1510,10 +1510,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                       if (e.key === 'Escape') cancelEdit();
                     }}
                   />
-                  <Button size="sm" variant="ghost" onClick={saveEdit} className="h-7 w-7 p-0">
+                  <Button size="sm" variant="ghost" onClick={saveEdit} className="h-7 w-7 p-0 md:min-h-0 md:min-w-0 md:h-7">
                     <Save className="h-3 w-3" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 w-7 p-0">
+                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 w-7 p-0 md:min-h-0 md:min-w-0 md:h-7">
                     <X className="h-3 w-3" />
                   </Button>
                 </>
@@ -1556,10 +1556,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                       if (e.key === 'Escape') cancelEdit();
                     }}
                   />
-                  <Button size="sm" variant="ghost" onClick={saveEdit} className="h-7 w-7 p-0">
+                  <Button size="sm" variant="ghost" onClick={saveEdit} className="h-7 w-7 p-0 md:min-h-0 md:min-w-0 md:h-7">
                     <Save className="h-3 w-3" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 w-7 p-0">
+                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 w-7 p-0 md:min-h-0 md:min-w-0 md:h-7">
                     <X className="h-3 w-3" />
                   </Button>
                 </>
@@ -1573,7 +1573,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             nextAction exists, so we no longer render an entire extra row here
             just to host that button. */}
         {request.nextAction && (
-          <div className="mb-4 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg min-w-0">
+          <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg min-w-0">
             <div className="flex flex-wrap items-start justify-between gap-2 min-w-0">
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
@@ -1618,18 +1618,18 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             `lg` (≥1024px viewport) which is the same breakpoint InProcessCard
             uses. At narrower widths (mobile, half-panel multi-view) it collapses
             to a single column gracefully. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 lg:items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-3 lg:items-start">
           {/* Column 1: Event Details */}
-          <div className="flex flex-col gap-4 h-full">
+          <div className="flex flex-col gap-3 h-full">
             {/* Event Details Card */}
-            <div className="bg-white rounded-lg p-4 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md">
-              <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] flex items-center gap-2 mb-4">
+            <div className="bg-white rounded-lg p-3 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md">
+              <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] flex items-center gap-2 mb-2">
                 <Calendar className="w-4 h-4 text-[#47B3CB]" aria-hidden="true" />
                 Event Details
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-2">
             {/* Times Row with Add Times button */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {/* Time fields - stacked layout when editing, grid when not */}
               {addingAllTimes ? (
                 /* Stacked layout when editing all times */
@@ -1761,7 +1761,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                     <div className="grid grid-cols-3 gap-3 text-sm flex-1 min-w-0">
                       {/* Start Time */}
                       <div className="min-w-0">
-                        <div className="text-[#236383] text-sm uppercase font-semibold mb-1">Start</div>
+                        <div className="text-[#236383] text-sm uppercase font-semibold mb-0.5">Start</div>
                         {isEditingThisCard && editingField === 'eventStartTime' ? (
                           <div className="flex flex-col gap-2">
                             <Input
@@ -1771,18 +1771,18 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                               className="h-10 bg-white text-gray-900 text-base border-[#007E8C]/30 focus:border-[#007E8C] focus:ring-2 focus:ring-[#007E8C]/20 px-3"
                             />
                             <div className="flex flex-wrap gap-2">
-                              <Button size="sm" onClick={saveEdit} className="h-8 px-3 text-sm" aria-label="Save">
+                              <Button size="sm" onClick={saveEdit} className="h-8 px-3 text-sm md:min-h-0 md:h-8" aria-label="Save">
                                 <Save className="w-4 h-4 mr-1" aria-hidden="true" />
                                 Save
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 px-3 text-gray-600 hover:bg-gray-100 text-sm" aria-label="Cancel">
+                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 px-3 text-gray-600 hover:bg-gray-100 text-sm md:min-h-0 md:h-8" aria-label="Cancel">
                                 <X className="w-4 h-4 mr-1" aria-hidden="true" />
                                 Cancel
                               </Button>
                             </div>
                           </div>
                         ) : (
-                          <div className="text-base font-bold group cursor-pointer text-[#236383] py-1" onClick={() => canEdit && startEditing('eventStartTime', formatTimeForInput(request.eventStartTime || ''))}>
+                          <div className="text-base font-bold group cursor-pointer text-[#236383]" onClick={() => canEdit && startEditing('eventStartTime', formatTimeForInput(request.eventStartTime || ''))}>
                             {request.eventStartTime ? formatTime12Hour(request.eventStartTime) : <span className="text-gray-600 font-medium">Not set</span>}
                           </div>
                         )}
@@ -1790,7 +1790,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
                       {/* End Time */}
                       <div className="min-w-0">
-                        <div className="text-[#236383] text-sm uppercase font-semibold mb-1">End</div>
+                        <div className="text-[#236383] text-sm uppercase font-semibold mb-0.5">End</div>
                         {isEditingThisCard && editingField === 'eventEndTime' ? (
                           <div className="flex flex-col gap-2">
                             <Input
@@ -1800,18 +1800,18 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                               className="h-10 bg-white text-gray-900 text-base border-[#007E8C]/30 focus:border-[#007E8C] focus:ring-2 focus:ring-[#007E8C]/20 px-3"
                             />
                             <div className="flex flex-wrap gap-2">
-                              <Button size="sm" onClick={saveEdit} className="h-8 px-3 text-sm" aria-label="Save">
+                              <Button size="sm" onClick={saveEdit} className="h-8 px-3 text-sm md:min-h-0 md:h-8" aria-label="Save">
                                 <Save className="w-4 h-4 mr-1" aria-hidden="true" />
                                 Save
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 px-3 text-gray-600 hover:bg-gray-100 text-sm" aria-label="Cancel">
+                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 px-3 text-gray-600 hover:bg-gray-100 text-sm md:min-h-0 md:h-8" aria-label="Cancel">
                                 <X className="w-4 h-4 mr-1" aria-hidden="true" />
                                 Cancel
                               </Button>
                             </div>
                           </div>
                         ) : (
-                          <div className="text-base font-bold group cursor-pointer text-[#236383] py-1" onClick={() => canEdit && startEditing('eventEndTime', formatTimeForInput(request.eventEndTime || ''))}>
+                          <div className="text-base font-bold group cursor-pointer text-[#236383]" onClick={() => canEdit && startEditing('eventEndTime', formatTimeForInput(request.eventEndTime || ''))}>
                             {request.eventEndTime ? formatTime12Hour(request.eventEndTime) : <span className="text-gray-600 font-medium">Not set</span>}
                           </div>
                         )}
@@ -1819,7 +1819,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
                     {/* Pickup Time */}
                     <div className="min-w-0">
-                      <div className="text-gray-700 text-sm uppercase font-semibold mb-1">Pickup</div>
+                      <div className="text-gray-700 text-sm uppercase font-semibold mb-0.5">Pickup</div>
                       {isEditingThisCard && editingField === 'pickupDateTime' ? (
                         <div className="flex flex-col gap-2">
                           <DateTimePicker
@@ -1828,11 +1828,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             className="h-10 min-w-0 w-full text-base border-[#007E8C]/30 focus:border-[#007E8C] focus:ring-2 focus:ring-[#007E8C]/20"
                           />
                           <div className="flex flex-wrap gap-2">
-                            <Button size="sm" onClick={saveEdit} className="h-8 px-3 text-sm" aria-label="Save">
+                            <Button size="sm" onClick={saveEdit} className="h-8 px-3 text-sm md:min-h-0 md:h-8" aria-label="Save">
                               <Save className="w-4 h-4 mr-1" aria-hidden="true" />
                               Save
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 px-3 text-gray-600 hover:bg-gray-100 text-sm" aria-label="Cancel">
+                            <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-8 px-3 text-gray-600 hover:bg-gray-100 text-sm md:min-h-0 md:h-8" aria-label="Cancel">
                               <X className="w-4 h-4 mr-1" aria-hidden="true" />
                               Cancel
                             </Button>
@@ -1922,7 +1922,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="bg-[#007E8C]/10 hover:bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/30 px-3 h-auto min-h-9 max-w-full whitespace-normal break-words text-sm mt-4"
+                      className="bg-[#007E8C]/10 hover:bg-[#007E8C]/20 text-[#007E8C] border-[#007E8C]/30 px-3 h-auto min-h-9 max-w-full whitespace-normal break-words text-sm mt-3"
                       onClick={() => {
                         setTempStartTime(formatTimeForInput(request.eventStartTime || ''));
                         setTempEndTime(formatTimeForInput(request.eventEndTime || ''));
@@ -1940,13 +1940,13 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
             {/* Recipient Logistics - moved from Column 3 */}
             {((request.assignedRecipientIds && request.assignedRecipientIds.length > 0) || request.recipientsCount || request.overnightHoldingLocation || (isEditingThisCard && editingField === 'assignedRecipientIds')) ? (
-              <div className="bg-gradient-to-r from-[#FBAD3F]/40 to-[#FBAD3F]/25 rounded-lg p-4 border-l-4 border-[#FBAD3F] border-t border-r border-b border-[#FBAD3F]/20 shadow-md mt-3">
-                <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-3 flex items-center gap-2">
+              <div className="bg-gradient-to-r from-[#FBAD3F]/40 to-[#FBAD3F]/25 rounded-lg p-3 border-l-4 border-[#FBAD3F] border-t border-r border-b border-[#FBAD3F]/20 shadow-md mt-3">
+                <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-2 flex items-center gap-2">
                   <Package className="w-4 h-4 text-[#FBAD3F]" aria-hidden="true" />
                   Recipient Logistics
                 </h3>
                 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Recipients */}
                   {(request.assignedRecipientIds && request.assignedRecipientIds.length > 0) || (isEditingThisCard && editingField === 'assignedRecipientIds') ? (
                     <div>
@@ -1960,7 +1960,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                               setTempOvernightHolding(request.overnightHoldingLocation || '');
                               startEditing('assignedRecipientIds', JSON.stringify(request.assignedRecipientIds || []));
                             }}
-                            className="h-5 px-1.5 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-5 px-1.5 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-5"
                           >
                             <Edit2 className="w-3 h-3" />
                           </Button>
@@ -2058,7 +2058,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                               size="sm"
                               variant="ghost"
                               onClick={() => setShowAllocationEditor(true)}
-                              className="w-full h-7 mt-2 text-[#007E8C] hover:bg-[#007E8C]/10 border border-dashed border-[#007E8C]/30"
+                              className="w-full h-7 mt-2 text-[#007E8C] hover:bg-[#007E8C]/10 border border-dashed border-[#007E8C]/30 md:min-h-0 md:h-7"
                             >
                               <Edit2 className="w-3 h-3 mr-1" />
                               {(request.recipientAllocations as RecipientAllocation[] | null | undefined)?.some(a => a.sandwichCount > 0)
@@ -2081,7 +2081,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => startEditing('overnightHoldingLocation', request.overnightHoldingLocation || '')}
-                            className="h-5 px-1.5 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-5 px-1.5 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-5"
                           >
                             <Edit2 className="w-3 h-3" />
                           </Button>
@@ -2123,7 +2123,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => startEditing('overnightPickupTime', formatTimeForInput(request.overnightPickupTime || ''))}
-                            className="h-5 px-1.5 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-5 px-1.5 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-5"
                           >
                             <Edit2 className="w-3 h-3" />
                           </Button>
@@ -2172,7 +2172,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                       setTempOvernightHolding(request.overnightHoldingLocation || '');
                       startEditing('assignedRecipientIds', JSON.stringify(request.assignedRecipientIds || []));
                     }}
-                    className="h-5 px-2 text-[#007E8C] text-xs"
+                    className="h-5 px-2 text-[#007E8C] text-xs md:min-h-0 md:h-5"
                   >
                     <Edit2 className="w-3 h-3 mr-1" />
                     Set
@@ -2182,7 +2182,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             ) : null}
 
             {/* Sandwiches - inside Event Details container, after Recipient Logistics */}
-            <div className="flex items-center gap-2 pb-3 border-b border-gray-200 mt-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-gray-200 mt-2">
               <Package className="w-5 h-5 shrink-0" />
               {isEditingThisCard && editingField === 'sandwichTypes' ? (
                 <div className="flex-1">
@@ -2197,8 +2197,8 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 </div>
               ) : (
                 <div className="flex-1 group flex items-center gap-2">
-                  <Badge className="bg-amber-50 text-amber-800 text-lg font-bold px-3 py-1.5 border-2 border-amber-400 shadow-sm flex items-center gap-2">
-                    <span className="text-xl">🥪</span>
+                  <Badge className="bg-amber-50 text-amber-800 text-base font-bold px-2.5 py-1 border-2 border-amber-400 shadow-sm flex items-center gap-2">
+                    <span className="text-lg">🥪</span>
                     <span>{sandwichInfo}</span>
                   </Badge>
                   {canEdit && (
@@ -2206,7 +2206,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => startEditing('sandwichTypes', '')}
-                      className="text-[#236383] hover:bg-[#236383]/10 h-6 px-2 transition-colors opacity-0 group-hover:opacity-100"
+                      className="text-[#236383] hover:bg-[#236383]/10 h-6 px-2 transition-colors opacity-0 group-hover:opacity-100 md:min-h-0 md:h-6"
                       aria-label="Edit sandwich types"
                     >
                       <Edit2 className="w-3 h-3" aria-hidden="true" />
@@ -2217,7 +2217,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             </div>
 
             {/* Record Final Sandwich Count - for day-of recording before event completes */}
-            <div className="flex items-center gap-2 pt-3 border-t border-gray-200 mt-3">
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-200 mt-2">
               <Check className="w-5 h-5 shrink-0 text-green-600" aria-hidden="true" />
               {isEditingActualCount ? (
                 <div className="flex-1 bg-green-50 rounded p-3 space-y-2 border border-green-200">
@@ -2227,7 +2227,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                       size="sm"
                       variant={actualCountMode === 'simple' ? 'default' : 'outline'}
                       onClick={() => setActualCountMode('simple')}
-                      className="h-7"
+                      className="h-7 md:min-h-0 md:h-7"
                     >
                       Total
                     </Button>
@@ -2235,7 +2235,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                       size="sm"
                       variant={actualCountMode === 'detailed' ? 'default' : 'outline'}
                       onClick={() => setActualCountMode('detailed')}
-                      className="h-7"
+                      className="h-7 md:min-h-0 md:h-7"
                     >
                       By Type
                     </Button>
@@ -2311,7 +2311,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         size="sm"
                         variant="outline"
                         onClick={startEditingActualCount}
-                        className="h-7 px-3 text-xs border-green-300 text-green-700 hover:bg-green-50 hover:border-green-400"
+                        className="h-7 px-3 text-xs border-green-300 text-green-700 hover:bg-green-50 hover:border-green-400 md:min-h-0 md:h-7"
                       >
                         <Edit2 className="w-3 h-3 mr-1" />
                         {(request as any).actualSandwichCount ? 'Edit' : 'Record Final Count'}
@@ -2330,9 +2330,9 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               Event Organizer was previously in Column 1; moved here so the right
               column carries the people-oriented info (organizer + TSP contact + team)
               and the left column is purely Event Details. */}
-          <div className="flex flex-col gap-4 h-full">
-            <div className="bg-white rounded-lg p-4 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md">
-              <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] pb-2 mb-3 flex items-center gap-2">
+          <div className="flex flex-col gap-3 h-full">
+            <div className="bg-white rounded-lg p-3 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md">
+              <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-2 flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#47B3CB]" aria-hidden="true" />
                 Event Organizer
               </h3>
@@ -2364,14 +2364,14 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-4 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md flex-1">
-              <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-3 flex items-center gap-2">
+            <div className="bg-white rounded-lg p-3 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md flex-1">
+              <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-2 flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#236383]" aria-hidden="true" />
                 Team Assignments
               </h3>
               {/* TSP Contact + Mark Van Needed — one compact row */}
               {(tspContactDisplay || showMarkVanNeeded) && (
-                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-200 group flex-wrap">
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-200 group flex-wrap">
                   {tspContactDisplay ? (
                     <>
                       <UserPlus className="w-5 h-5 shrink-0 text-[#236383]" aria-hidden="true" />
@@ -2386,7 +2386,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                           size="sm"
                           variant="ghost"
                           onClick={onEditTspContact}
-                          className="h-7 px-2 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-7 px-2 text-[#007E8C] hover:bg-[#007E8C]/10 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-7"
                           aria-label="Edit TSP contact"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -2408,11 +2408,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   )}
                 </div>
               )}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {/* Drivers */}
                 {request.selfTransport ? (
                   // Organization is transporting sandwiches themselves
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-1 pb-3 border-b border-gray-200">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-1 pb-2 border-b border-gray-200">
                     <Badge variant="outline" className="bg-[#FBAD3F]/20 text-[#D68319] border-[#FBAD3F] font-semibold text-sm py-1.5 px-3">
                       <Car className="w-4 h-4 mr-1.5" />
                       Organization Self-Transport
@@ -2426,7 +2426,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                           startEditing('selfTransport', 'false');
                           setTimeout(() => saveEdit(), 0);
                         }}
-                        className="h-5 px-2 text-[#007E8C] text-xs"
+                        className="h-5 px-2 text-[#007E8C] text-xs md:min-h-0 md:h-5"
                       >
                         <Edit2 className="w-3 h-3 mr-0.5" />
                         Change
@@ -2434,7 +2434,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                     )}
                   </div>
                 ) : (driverNeeded > 0 || request.vanDriverNeeded || request.assignedVanDriverId || request.isDhlVan || (isEditingThisCard && editingField === 'driversNeeded')) ? (
-                  <div className="pb-3 border-b border-gray-200 space-y-3">
+                  <div className="pb-2 border-b border-gray-200 space-y-2">
                     {/* Van Driver Section - Show if vanDriverNeeded is true OR van driver is already assigned */}
                     {(request.vanDriverNeeded || request.assignedVanDriverId || request.isDhlVan) && (
                       <div>
@@ -2451,7 +2451,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 // Open assignment dialog for van driver
                                 openAssignmentDialog('driver', true);
                               }} 
-                              className="h-7 bg-amber-600 hover:bg-amber-700 text-white" 
+                              className="h-7 bg-amber-600 hover:bg-amber-700 text-white md:min-h-0 md:h-7" 
                               aria-label="Assign van driver"
                             >
                               <Truck className="w-3 h-3" aria-hidden="true" />
@@ -2469,7 +2469,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleRemoveAssignment('driver', request.assignedVanDriverId!)}
-                                  className="h-5 w-5 p-0 text-red-600 shrink-0"
+                                  className="h-5 w-5 p-0 text-red-600 shrink-0 md:min-h-0 md:min-w-0 md:h-5"
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
@@ -2486,7 +2486,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => toggleDhlVan(false)}
-                                  className="h-5 w-5 p-0 text-red-600 shrink-0"
+                                  className="h-5 w-5 p-0 text-red-600 shrink-0 md:min-h-0 md:min-w-0 md:h-5"
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
@@ -2518,10 +2518,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 placeholder="0"
                               />
                               <span className="text-sm text-[#236383]">needed</span>
-                              <Button size="sm" onClick={saveEdit} className="h-6 px-2" aria-label="Save">
+                              <Button size="sm" onClick={saveEdit} className="h-6 px-2 md:min-h-0 md:h-6" aria-label="Save">
                                 <Save className="w-3 h-3" aria-hidden="true" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2" aria-label="Cancel">
+                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 md:min-h-0 md:h-6" aria-label="Cancel">
                                 <X className="w-3 h-3" aria-hidden="true" />
                               </Button>
                             </div>
@@ -2570,7 +2570,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   <Button
                                     size="sm"
                                     onClick={() => openAssignmentDialog('driver')}
-                                    className="h-7"
+                                    className="h-7 md:min-h-0 md:h-7"
                                     aria-label="Add driver"
                                   >
                                     <UserPlus className="w-3 h-3" aria-hidden="true" />
@@ -2612,7 +2612,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                         size="sm"
                                         variant="ghost"
                                         onClick={() => startEditing(nameFieldKey, displayName)}
-                                        className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                                         title="Edit name"
                                       >
                                         <Edit2 className="w-3 h-3" />
@@ -2622,7 +2622,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => startEditing(notesFieldKey, driverPersonNotes)}
-                                      className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity"
+                                      className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                                       title="Add/edit note"
                                     >
                                       <MessageSquare className="w-3 h-3" />
@@ -2631,7 +2631,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => handleRemoveAssignment('driver', id)}
-                                      className="h-5 w-5 p-0 text-red-600 shrink-0"
+                                      className="h-5 w-5 p-0 text-red-600 shrink-0 md:min-h-0 md:min-w-0 md:h-5"
                                     >
                                       <X className="w-3 h-3" />
                                     </Button>
@@ -2670,11 +2670,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       updateFieldsMutation.mutate({ assignedDriverIds: newArr, driverDetails: newDetails });
                                       cancelEdit();
                                     }}
-                                    className="h-7 px-2 text-xs"
+                                    className="h-7 px-2 text-xs md:min-h-0 md:h-7"
                                   >
                                     Save
                                   </Button>
-                                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600">
+                                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600 md:min-h-0 md:h-7">
                                     Cancel
                                   </Button>
                                 </div>
@@ -2701,12 +2701,12 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                           updateFieldsMutation.mutate({ driverDetails: updatedDetails });
                                           cancelEdit();
                                         }}
-                                        className="h-6 px-2 text-red-600 text-xs"
+                                        className="h-6 px-2 text-red-600 text-xs md:min-h-0 md:h-6"
                                       >
                                         Delete
                                       </Button>
                                     )}
-                                    <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs">
+                                    <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs md:min-h-0 md:h-6">
                                       Cancel
                                     </Button>
                                     <Button
@@ -2719,7 +2719,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                         updateFieldsMutation.mutate({ driverDetails: updatedDetails });
                                         cancelEdit();
                                       }}
-                                      className="h-6 px-2 text-xs"
+                                      className="h-6 px-2 text-xs md:min-h-0 md:h-6"
                                     >
                                       Save
                                     </Button>
@@ -2777,7 +2777,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                         size="sm"
                                         variant="ghost"
                                         onClick={() => startEditing(tDriverNameFieldKey, displayName)}
-                                        className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700"
+                                        className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700 md:min-h-0 md:min-w-0 md:h-5"
                                         title="Edit name"
                                       >
                                         <Edit2 className="w-3 h-3" />
@@ -2787,7 +2787,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => startEditing(tDriverNotesFieldKey, tDriverPersonNotes)}
-                                      className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700"
+                                      className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700 md:min-h-0 md:min-w-0 md:h-5"
                                       title="Add/edit note"
                                     >
                                       <MessageSquare className="w-3 h-3" />
@@ -2796,7 +2796,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => handleRemoveAssignment('driver', id)}
-                                      className="h-5 w-5 p-0 text-red-600 shrink-0"
+                                      className="h-5 w-5 p-0 text-red-600 shrink-0 md:min-h-0 md:min-w-0 md:h-5"
                                     >
                                       <X className="w-3 h-3" />
                                     </Button>
@@ -2835,11 +2835,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       updateFieldsMutation.mutate({ tentativeDriverIds: newArr, driverDetails: newDetails });
                                       cancelEdit();
                                     }}
-                                    className="h-7 px-2 text-xs"
+                                    className="h-7 px-2 text-xs md:min-h-0 md:h-7"
                                   >
                                     Save
                                   </Button>
-                                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600">
+                                  <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600 md:min-h-0 md:h-7">
                                     Cancel
                                   </Button>
                                 </div>
@@ -2866,12 +2866,12 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                           updateFieldsMutation.mutate({ driverDetails: updatedDetails });
                                           cancelEdit();
                                         }}
-                                        className="h-6 px-2 text-red-600 text-xs"
+                                        className="h-6 px-2 text-red-600 text-xs md:min-h-0 md:h-6"
                                       >
                                         Delete
                                       </Button>
                                     )}
-                                    <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs">
+                                    <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs md:min-h-0 md:h-6">
                                       Cancel
                                     </Button>
                                     <Button
@@ -2884,7 +2884,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                         updateFieldsMutation.mutate({ driverDetails: updatedDetails });
                                         cancelEdit();
                                       }}
-                                      className="h-6 px-2 text-xs"
+                                      className="h-6 px-2 text-xs md:min-h-0 md:h-6"
                                     >
                                       Save
                                     </Button>
@@ -2907,12 +2907,12 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                     )}
                   </div>
                 ) : canEdit ? (
-                  <div className="flex items-center justify-end py-0.5 gap-1 pb-3 border-b border-gray-200">
+                  <div className="flex items-center justify-end py-0.5 gap-1 pb-2 border-b border-gray-200">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => startEditing('driversNeeded', '1')}
-                      className="h-5 px-2 text-[#007E8C] text-xs"
+                      className="h-5 px-2 text-[#007E8C] text-xs md:min-h-0 md:h-5"
                     >
                       <Car className="w-3 h-3 mr-0.5" />
                       Add Driver Need
@@ -2924,7 +2924,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         startEditing('selfTransport', 'true');
                         setTimeout(() => saveEdit(), 0);
                       }}
-                      className="h-5 px-2 text-[#D68319] text-xs"
+                      className="h-5 px-2 text-[#D68319] text-xs md:min-h-0 md:h-5"
                       title="Organization will transport sandwiches themselves"
                     >
                       <Car className="w-3 h-3 mr-0.5" />
@@ -2935,14 +2935,14 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
                 {/* Condensed add volunteer when the role is not needed */}
                 {showCondensedStaffingAdds && (
-                  <div className="flex items-center justify-end gap-1 py-0.5 pb-3 border-b border-gray-200">
+                  <div className="flex items-center justify-end gap-1 py-0.5 pb-2 border-b border-gray-200">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => startEditing('volunteersNeeded', '1')}
-                          className="h-5 w-5 p-0 text-[#007E8C]"
+                          className="h-5 w-5 p-0 text-[#007E8C] md:min-h-0 md:min-w-0 md:h-5"
                         >
                           <Users className="w-3 h-3" />
                         </Button>
@@ -2956,7 +2956,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
                 {/* Volunteers */}
                 {showVolunteerSection && (
-                  <div className="pb-3 border-b border-gray-200">
+                  <div className="pb-2 border-b border-gray-200">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
                       {isEditingThisCard && editingField === 'volunteersNeeded' ? (
                         <div className="flex items-center gap-2 flex-1">
@@ -2970,10 +2970,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             placeholder="0"
                           />
                           <span className="text-sm text-[#236383]">needed</span>
-                          <Button size="sm" onClick={saveEdit} className="h-6 px-2" aria-label="Save">
+                          <Button size="sm" onClick={saveEdit} className="h-6 px-2 md:min-h-0 md:h-6" aria-label="Save">
                             <Save className="w-3 h-3" aria-hidden="true" />
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2" aria-label="Cancel">
+                          <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 md:min-h-0 md:h-6" aria-label="Cancel">
                             <X className="w-3 h-3" aria-hidden="true" />
                           </Button>
                         </div>
@@ -3030,7 +3030,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             {canEdit && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button size="sm" onClick={() => openAssignmentDialog('volunteer')} className="h-7" aria-label="Add volunteer">
+                                  <Button size="sm" onClick={() => openAssignmentDialog('volunteer')} className="h-7 md:min-h-0 md:h-7" aria-label="Add volunteer">
                                     <UserPlus className="w-3 h-3" aria-hidden="true" />
                                   </Button>
                                 </TooltipTrigger>
@@ -3069,7 +3069,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => startEditing(volunteerNameFieldKey, displayName)}
-                                    className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                                     title="Edit name"
                                   >
                                     <Edit2 className="w-3 h-3" />
@@ -3079,7 +3079,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => startEditing(volunteerNotesFieldKey, volunteerPersonNotes)}
-                                  className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="h-5 w-5 p-0 text-gray-500 hover:text-[#236383] opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                                   title="Add/edit note"
                                 >
                                   <MessageSquare className="w-3 h-3" />
@@ -3090,7 +3090,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => handleRemoveAssignment('volunteer', id)}
-                                      className="h-5 w-5 p-0 text-red-600 shrink-0"
+                                      className="h-5 w-5 p-0 text-red-600 shrink-0 md:min-h-0 md:min-w-0 md:h-5"
                                     >
                                       <X className="w-3 h-3" />
                                     </Button>
@@ -3134,11 +3134,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   updateFieldsMutation.mutate({ assignedVolunteerIds: newArr, volunteerDetails: newDetails });
                                   cancelEdit();
                                 }}
-                                className="h-7 px-2 text-xs"
+                                className="h-7 px-2 text-xs md:min-h-0 md:h-7"
                               >
                                 Save
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600">
+                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600 md:min-h-0 md:h-7">
                                 Cancel
                               </Button>
                             </div>
@@ -3165,12 +3165,12 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       updateFieldsMutation.mutate({ volunteerDetails: updatedDetails });
                                       cancelEdit();
                                     }}
-                                    className="h-6 px-2 text-red-600 text-xs"
+                                    className="h-6 px-2 text-red-600 text-xs md:min-h-0 md:h-6"
                                   >
                                     Delete
                                   </Button>
                                 )}
-                                <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs">
+                                <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs md:min-h-0 md:h-6">
                                   Cancel
                                 </Button>
                                 <Button
@@ -3183,7 +3183,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     updateFieldsMutation.mutate({ volunteerDetails: updatedDetails });
                                     cancelEdit();
                                   }}
-                                  className="h-6 px-2 text-xs"
+                                  className="h-6 px-2 text-xs md:min-h-0 md:h-6"
                                 >
                                   Save
                                 </Button>
@@ -3232,7 +3232,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => startEditing(tVolunteerNameFieldKey, displayName)}
-                                    className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700"
+                                    className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700 md:min-h-0 md:min-w-0 md:h-5"
                                     title="Edit name"
                                   >
                                     <Edit2 className="w-3 h-3" />
@@ -3242,7 +3242,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => startEditing(tVolunteerNotesFieldKey, tVolunteerPersonNotes)}
-                                  className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700"
+                                  className="h-5 w-5 p-0 text-gray-500 hover:text-amber-700 md:min-h-0 md:min-w-0 md:h-5"
                                   title="Add/edit note"
                                 >
                                   <MessageSquare className="w-3 h-3" />
@@ -3251,7 +3251,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleRemoveAssignment('volunteer', id)}
-                                  className="h-5 w-5 p-0 text-red-600 shrink-0"
+                                  className="h-5 w-5 p-0 text-red-600 shrink-0 md:min-h-0 md:min-w-0 md:h-5"
                                 >
                                   <X className="w-3 h-3" />
                                 </Button>
@@ -3290,11 +3290,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                   updateFieldsMutation.mutate({ tentativeVolunteerIds: newArr, volunteerDetails: newDetails });
                                   cancelEdit();
                                 }}
-                                className="h-7 px-2 text-xs"
+                                className="h-7 px-2 text-xs md:min-h-0 md:h-7"
                               >
                                 Save
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600">
+                              <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 px-2 text-xs text-gray-600 md:min-h-0 md:h-7">
                                 Cancel
                               </Button>
                             </div>
@@ -3321,12 +3321,12 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                       updateFieldsMutation.mutate({ volunteerDetails: updatedDetails });
                                       cancelEdit();
                                     }}
-                                    className="h-6 px-2 text-red-600 text-xs"
+                                    className="h-6 px-2 text-red-600 text-xs md:min-h-0 md:h-6"
                                   >
                                     Delete
                                   </Button>
                                 )}
-                                <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs">
+                                <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-6 px-2 text-gray-600 text-xs md:min-h-0 md:h-6">
                                   Cancel
                                 </Button>
                                 <Button
@@ -3339,7 +3339,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                     updateFieldsMutation.mutate({ volunteerDetails: updatedDetails });
                                     cancelEdit();
                                   }}
-                                  className="h-6 px-2 text-xs"
+                                  className="h-6 px-2 text-xs md:min-h-0 md:h-6"
                                 >
                                   Save
                                 </Button>
@@ -3362,7 +3362,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 )}
 
                 {/* Attendance */}
-                <div className="flex items-start gap-2 pb-3 border-b border-gray-200">
+                <div className="flex items-start gap-2 pb-2 border-b border-gray-200">
                   <Users className="w-5 h-5 shrink-0 mt-0.5" />
                   {isEditingThisCard && editingField === 'attendanceBreakdown' ? (
                     <div className="flex-1 space-y-2">
@@ -3446,7 +3446,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                           size="sm"
                           variant="ghost"
                           onClick={(e) => { e.stopPropagation(); startEditing('attendanceBreakdown', `${request.attendanceAdults || ''},${request.attendanceTeens || ''},${request.attendanceKids || ''}`); }}
-                          className="text-white hover:bg-white/20 h-6 px-2 transition-colors"
+                          className="text-white hover:bg-white/20 h-6 px-2 transition-colors md:min-h-0 md:h-6"
                           aria-label="Edit attendance"
                         >
                           <Edit2 className="w-3 h-3" aria-hidden="true" />
@@ -3463,11 +3463,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
         {/* Scheduling Notes - Collapsed by Default */}
         {request.schedulingNotes && (
-          <div className="bg-gradient-to-r from-green-50 to-green-50/50 rounded-lg mb-4 border-l-4 border-green-500 border-t border-r border-b border-green-200 shadow-sm">
+          <div className="bg-gradient-to-r from-green-50 to-green-50/50 rounded-lg mb-3 border-l-4 border-green-500 border-t border-r border-b border-green-200 shadow-sm">
             <button
               type="button"
               onClick={() => setShowSchedulingNotes(!showSchedulingNotes)}
-              className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-green-50/80 transition-colors rounded-lg"
+              className="w-full flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-green-50/80 transition-colors rounded-lg"
             >
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-green-600" />
@@ -3481,7 +3481,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                     size="sm"
                     variant="ghost"
                     onClick={(e) => { e.stopPropagation(); startEditing('schedulingNotes', request.schedulingNotes || ''); }}
-                    className="h-6 px-2 text-green-700 hover:text-green-800 hover:bg-green-100"
+                    className="h-6 px-2 text-green-700 hover:text-green-800 hover:bg-green-100 md:min-h-0 md:h-6"
                     aria-label="Edit scheduling notes"
                   >
                     <Edit2 className="w-3 h-3" aria-hidden="true" />
@@ -3491,7 +3491,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               </div>
             </button>
             {showSchedulingNotes && (
-              <div className="px-4 pb-4">
+              <div className="px-3 pb-3">
                 {isEditingThisCard && editingField === 'schedulingNotes' ? (
                   <div className="space-y-2">
                     <textarea
@@ -3534,12 +3534,12 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
           request.duplicateNotes ||
           request.unresponsiveNotes ||
           request.socialMediaPostNotes) && (
-          <div className="bg-gradient-to-r from-[#236383]/30 to-[#236383]/15 rounded-lg p-4 mb-4 border-l-4 border-[#236383] border-t border-r border-b border-[#236383]/20 shadow-md">
+          <div className="bg-gradient-to-r from-[#236383]/30 to-[#236383]/15 rounded-lg px-3 py-2 mb-3 border-l-4 border-[#236383] border-t border-r border-b border-[#236383]/20 shadow-md">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowNotesAndRequirements(!showNotesAndRequirements)}
-              className="w-full justify-between text-[#236383] hover:text-[#236383] hover:bg-[#236383]/10 font-medium p-0 h-auto mb-0"
+              className="w-full justify-between text-[#236383] hover:text-[#236383] hover:bg-[#236383]/10 font-medium p-0 h-auto md:min-h-0 mb-0"
             >
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#236383]" />
@@ -3576,7 +3576,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         size="sm"
                         variant="ghost"
                         onClick={() => startEditing('planningNotes', request.planningNotes || '')}
-                        className="h-6 px-2"
+                        className="h-6 px-2 md:min-h-0 md:h-6"
                         aria-label="Edit planning notes"
                       >
                         <Edit2 className="w-3 h-3" aria-hidden="true" />
@@ -3680,7 +3680,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             toggle lives in the Team Assignments box, and "Follow Up" is intentionally
             absent — that step belongs to completed events, not scheduled ones. */}
         <TooltipProvider>
-          <CardActionRow className="mb-4">
+          <CardActionRow className="mb-3">
             {/* Group 1 — Organizer outreach */}
             <Button onClick={onContact} size="sm">
               <Mail className="w-4 h-4 mr-2" />
@@ -3894,7 +3894,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-red-600 hover:text-red-700 h-8"
+                            className="text-red-600 hover:text-red-700 h-8 md:min-h-0 md:h-8"
                             aria-label="Delete event"
                             data-testid="button-delete-event"
                           >
@@ -3921,13 +3921,13 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
         {/* Team Comments Section */}
         {request.id && (
-          <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
+          <div className="bg-white rounded-lg px-2 py-1 mb-2 border border-gray-200">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowComments(!showComments)}
-                className="flex-1 justify-between text-gray-700 hover:text-gray-700 hover:bg-gray-50 font-medium p-2 h-auto min-w-0"
+                className="flex-1 justify-between text-gray-700 hover:text-gray-700 hover:bg-gray-50 font-medium px-2 py-1 h-8 md:min-h-0 min-w-0 md:h-8"
               >
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-gray-600" />
@@ -3943,7 +3943,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             </div>
 
             {showComments && (
-              <div className="mt-3 max-h-[500px]">
+              <div className="mt-2 max-h-[500px]">
                 <CommentThread
                   comments={collaboration.comments || []}
                   currentUserId={user?.id || ''}
@@ -3960,7 +3960,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         )}
 
         {/* Pre-Event Flags Button */}
-        <div className="border-t-2 border-[#007E8C]/10 pt-4 mb-2">
+        <div className="border-t-2 border-[#007E8C]/10 pt-1 mb-0">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -3969,7 +3969,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 e.stopPropagation();
                 setShowFlagsDialog(true);
               }}
-              className="flex-1 justify-between text-[#236383] hover:text-[#236383] hover:bg-[#007E8C]/5 font-medium"
+              className="flex-1 justify-between text-[#236383] hover:text-[#236383] hover:bg-[#007E8C]/5 font-medium h-8 md:min-h-0 md:h-8"
               type="button"
             >
               <div className="flex items-center gap-2">
@@ -3989,7 +3989,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         {/* Contact Log Toggle — shows the full history of Log Contact entries for
             this scheduled event. Read-only here; use the "Log Contact" button in the
             action row above to add a new entry. */}
-        <div className="border-t-2 border-[#007E8C]/10 pt-4 mt-4">
+        <div className="border-t-2 border-[#007E8C]/10 pt-1 mt-1">
           <Button
             variant="ghost"
             size="sm"
@@ -3997,7 +3997,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               e.stopPropagation();
               setShowContactLog((v) => !v);
             }}
-            className="w-full justify-between text-[#236383] hover:text-[#236383] hover:bg-[#007E8C]/5 font-medium"
+            className="w-full justify-between text-[#236383] hover:text-[#236383] hover:bg-[#007E8C]/5 font-medium h-8 md:min-h-0 md:h-8"
             type="button"
             data-testid="button-toggle-contact-log"
           >
@@ -4123,7 +4123,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         </div>
 
         {/* Activity History Toggle */}
-        <div className="border-t-2 border-[#007E8C]/10 pt-4 mt-4">
+        <div className="border-t-2 border-[#007E8C]/10 pt-1 mt-1">
           <Button
             variant="ghost"
             size="sm"
@@ -4131,7 +4131,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               e.stopPropagation();
               setShowAuditLog(!showAuditLog);
             }}
-            className="w-full justify-between text-[#236383] hover:text-[#236383] hover:bg-[#007E8C]/5 font-medium"
+            className="w-full justify-between text-[#236383] hover:text-[#236383] hover:bg-[#007E8C]/5 font-medium h-8 md:min-h-0 md:h-8"
             type="button"
           >
             <div className="flex items-center gap-2">
@@ -4143,7 +4143,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
         </div>
 
         {showAuditLog && (
-          <div className="mt-4 pt-4 border-t-2 border-[#007E8C]/10">
+          <div className="mt-2 pt-2 border-t-2 border-[#007E8C]/10">
             <EventRequestAuditLog
               eventId={request.id?.toString()}
               showFilters={false}
