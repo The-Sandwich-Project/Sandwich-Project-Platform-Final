@@ -219,10 +219,15 @@ export interface ParsedStaffing {
    * drivers as "VD: ..." on van events, so VD names ARE drivers.
    * `vanNames` is just the VD ones; `plainListed` is whether a plain "D" appeared.
    */
-  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number };
+  driver: { listed: boolean; names: string[]; van: boolean; vanNames: string[]; plainListed: boolean; slots: number; numbered: boolean };
   /** Always empty: "S" is read as a volunteer. Kept so callers' shapes don't change. */
-  speaker: { listed: boolean; names: string[]; slots: number };
-  volunteer: { listed: boolean; names: string[]; slots: number };
+  speaker: { listed: boolean; names: string[]; slots: number; numbered: boolean };
+  /**
+   * `numbered` is true when the role was written with numbered slots
+   * ("V1:", "V2:"), which states a count. A lone "V: Jane" doesn't: the push
+   * used to write any count that way.
+   */
+  volunteer: { listed: boolean; names: string[]; slots: number; numbered: boolean };
   /** Parts of the cell that weren't under any role code (shown to the person, never applied). */
   unread: string[];
 }
@@ -245,9 +250,9 @@ export interface ParsedStaffing {
  */
 export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
   const out: ParsedStaffing = {
-    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0 },
-    speaker: { listed: false, names: [], slots: 0 },
-    volunteer: { listed: false, names: [], slots: 0 },
+    driver: { listed: false, names: [], van: false, vanNames: [], plainListed: false, slots: 0, numbered: false },
+    speaker: { listed: false, names: [], slots: 0, numbered: false },
+    volunteer: { listed: false, names: [], slots: 0, numbered: false },
     unread: [],
   };
   const s = clean(raw);
@@ -309,7 +314,7 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     return (cut > 0 ? t.slice(0, cut) : t).trim();
   };
 
-  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean };
+  type Segment = { role: 'driver' | 'volunteer' | 'both'; van: boolean; names: string[]; head: string; fromParen: boolean; numbered: boolean };
   const segments: Segment[] = [];
   let current: Segment | null = null;
   const addTo = (seg: Segment, raw: string) => {
@@ -330,7 +335,7 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
     const head = colon >= 0 ? token.slice(0, colon) : token;
     const hit = roleFor(head);
     if (hit) {
-      current = { role: hit.role, van: hit.van, names: [], head: head.trim(), fromParen };
+      current = { role: hit.role, van: hit.van, names: [], head: head.trim(), fromParen, numbered: /\d\s*$/.test(head) };
       segments.push(current);
       addTo(current, colon >= 0 ? token.slice(colon + 1) : '');
     } else if (colon > 0) {
@@ -359,6 +364,7 @@ export function parsePlanningStaffing(raw: unknown): ParsedStaffing {
       const r = out[role];
       r.listed = true;
       r.slots += 1;
+      if (seg.numbered) r.numbered = true;
       r.names.push(...seg.names);
       if (role === 'driver') {
         if (seg.van) {
@@ -779,7 +785,14 @@ export function buildRowUpdatePlan(
         // someone already assigned (they may be in the unread part).
         if (partlyUnread) newIds = Array.from(new Set([...appIds, ...newIds]));
         // Numbered slots count too ("D1: Karen, D2:" = 2 drivers, 1 assigned).
-        newNeeded = Math.max(appNeeded, sheet.slots, newIds.length, 1);
+        // Numbered slots state the count, so the sheet can lower it as well as
+        // raise it (someone deleted "V3:"). A lone unnumbered code ("V: Jane")
+        // is how the push used to write ANY count, so it can only raise it;
+        // same when part of the cell couldn't be read.
+        const sheetStatesCount = sheet.numbered && !partlyUnread;
+        newNeeded = sheetStatesCount
+          ? Math.max(sheet.slots, newIds.length, 1)
+          : Math.max(appNeeded, sheet.slots, newIds.length, 1);
       }
 
       const changeField = role === 'driver' ? 'drivers' : 'volunteers';

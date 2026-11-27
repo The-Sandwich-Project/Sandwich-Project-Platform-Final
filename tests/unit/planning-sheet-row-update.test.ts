@@ -96,9 +96,9 @@ describe('parsing helpers', () => {
 
   it('parses staffing the way the push writes it', () => {
     const s = parsePlanningStaffing('D: Katie Long, Kim Lee, V: ');
-    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false, vanNames: [], plainListed: true, slots: 1 });
-    expect(s.volunteer).toEqual({ listed: true, names: [], slots: 1 });
-    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true, vanNames: ['Luz'], plainListed: false, slots: 1 });
+    expect(s.driver).toEqual({ listed: true, names: ['Katie Long', 'Kim Lee'], van: false, vanNames: [], plainListed: true, slots: 1, numbered: false });
+    expect(s.volunteer).toEqual({ listed: true, names: [], slots: 1, numbered: false });
+    expect(parsePlanningStaffing('VD: Luz').driver).toEqual({ listed: true, names: ['Luz'], van: true, vanNames: ['Luz'], plainListed: false, slots: 1, numbered: false });
     expect(parsePlanningStaffing('').driver.listed).toBe(false);
   });
 
@@ -220,8 +220,8 @@ describe('buildRowUpdatePlan', () => {
   });
 
   it('reads an old "S" (speaker) as a volunteer and never touches speaker columns', () => {
-    expect(parsePlanningStaffing('S: Ann').volunteer).toEqual({ listed: true, names: ['Ann'], slots: 1 });
-    expect(parsePlanningStaffing('S: Ann').speaker).toEqual({ listed: false, names: [], slots: 0 });
+    expect(parsePlanningStaffing('S: Ann').volunteer).toEqual({ listed: true, names: ['Ann'], slots: 1, numbered: false });
+    expect(parsePlanningStaffing('S: Ann').speaker).toEqual({ listed: false, names: [], slots: 0, numbered: false });
     const plan = buildRowUpdatePlan(
       makeEvent({ speakersNeeded: 1, assignedSpeakerIds: ['u-kim'] }),
       makeRow({ Staffing: 'D: , S: Ann Jones' }),
@@ -893,5 +893,49 @@ describe('Copilot review: type lines satisfy the save schema', () => {
     expect(() => insertEventRequestSchema.partial().parse({ sandwichTypes: lines })).not.toThrow();
     const plan = buildRowUpdatePlan(makeEvent(), makeRow({ 'Deli or PBJ?': 'Deli & PBJ' }), USERS);
     expect(() => insertEventRequestSchema.partial().parse({ sandwichTypes: plan.updates.sandwichTypes })).not.toThrow();
+  });
+});
+
+describe('staffing counts on the sheet (numbered slots)', () => {
+  it('marks numbered codes as stating a count', () => {
+    expect(parsePlanningStaffing('V1: Jane, V2: , V3: ').volunteer).toMatchObject({ names: ['Jane'], slots: 3, numbered: true });
+    expect(parsePlanningStaffing('VD1: Luz, VD2: ').driver).toMatchObject({ names: ['Luz'], slots: 2, numbered: true, van: true });
+    expect(parsePlanningStaffing('V: Jane').volunteer).toMatchObject({ slots: 1, numbered: false });
+  });
+
+  it('lowers the count when numbered slots on the sheet show fewer', () => {
+    const plan = buildRowUpdatePlan(
+      makeEvent({ volunteersNeeded: 3, assignedVolunteerIds: ['u-kim'] }),
+      makeRow({ Staffing: 'D: , V1: Kim, V2: ' }),
+      USERS
+    );
+    expect(plan.updates.volunteersNeeded).toBe(2);
+  });
+
+  it('never lowers the count from a lone unnumbered code (the old push format)', () => {
+    const plan = buildRowUpdatePlan(
+      makeEvent({ volunteersNeeded: 3, assignedVolunteerIds: ['u-kim'] }),
+      makeRow({ Staffing: 'D: , V: Kim' }),
+      USERS
+    );
+    expect(plan.updates.volunteersNeeded).toBeUndefined();
+  });
+
+  it('never lowers the count when part of the cell could not be read', () => {
+    const plan = buildRowUpdatePlan(
+      makeEvent({ volunteersNeeded: 3, assignedVolunteerIds: ['u-kim'] }),
+      makeRow({ Staffing: 'D: , V1: Kim, V2: , Helper: Bo' }),
+      USERS
+    );
+    expect(plan.updates.volunteersNeeded).toBeUndefined();
+  });
+
+  it('still raises the count from numbered slots', () => {
+    const plan = buildRowUpdatePlan(
+      makeEvent({ volunteersNeeded: 1, assignedVolunteerIds: ['u-kim'] }),
+      makeRow({ Staffing: 'D: , V1: Kim, V2: , V3: ' }),
+      USERS
+    );
+    expect(plan.updates.volunteersNeeded).toBe(3);
   });
 });

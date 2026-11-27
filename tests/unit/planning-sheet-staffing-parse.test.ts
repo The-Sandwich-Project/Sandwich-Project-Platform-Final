@@ -45,6 +45,76 @@ describe('parseStaffingColumn (reading the sheet)', () => {
   });
 });
 
+describe('formatStaffingColumn (app -> sheet push)', () => {
+  const role = (needed: boolean, names: string[], count: number) => ({
+    needed,
+    assigned: names.length ? names.join(', ') : null,
+    count,
+    names,
+  });
+
+  it('writes one numbered slot per person needed, keeping open spots visible', () => {
+    expect(
+      formatStaffingColumn({
+        driver: { ...role(true, ['Karen'], 2), isVanDriver: false },
+        speaker: { needed: false, assigned: null },
+        volunteer: role(true, ['Jane'], 3),
+      })
+    ).toBe('D1: Karen, D2: , V1: Jane, V2: , V3: ');
+  });
+
+  it('keeps the plain form when one person is needed', () => {
+    expect(
+      formatStaffingColumn({
+        driver: { ...role(true, [], 1), isVanDriver: false },
+        speaker: { needed: false, assigned: null },
+        volunteer: role(true, ['Jane'], 1),
+      })
+    ).toBe('D: , V: Jane');
+  });
+
+  it('writes a slot for every assigned person, even past the count', () => {
+    expect(
+      formatStaffingColumn({
+        driver: { ...role(true, ['Luz', 'Bo'], 1), isVanDriver: true },
+        speaker: { needed: false, assigned: null },
+        volunteer: role(false, [], 0),
+      })
+    ).toBe('VD1: Luz, VD2: Bo');
+  });
+});
+
+describe('push -> sheet -> app round trip keeps staffing counts', () => {
+  // Imported lazily so this file's DB mock is in place first.
+  const { buildRowUpdatePlan } = require('../../server/services/planning-sheet-row-update');
+  const USERS = [
+    { id: 'u-karen', firstName: 'Karen', lastName: 'Ray', displayName: null },
+    { id: 'u-jane', firstName: 'Jane', lastName: 'Doe', displayName: null },
+  ];
+  const event = {
+    id: 1, organizationName: 'G', status: 'scheduled', scheduledEventDate: '2026-11-14T12:00:00',
+    desiredEventDate: null, eventStartTime: null, eventEndTime: null, pickupTime: null,
+    estimatedSandwichCount: null, actualSandwichCount: null, sandwichTypes: null,
+    firstName: null, lastName: null, email: null, phone: null, eventAddress: null, deliveryDestination: null,
+    driversNeeded: 2, speakersNeeded: 0, volunteersNeeded: 3, vanDriverNeeded: false,
+    assignedDriverIds: ['u-karen'], assignedSpeakerIds: null, assignedVolunteerIds: ['u-jane'],
+    driverDetails: null, speakerDetails: null, volunteerDetails: null,
+  };
+
+  it('reading back what the push wrote changes nothing', () => {
+    const cell = formatStaffingColumn({
+      driver: { needed: true, assigned: 'Karen Ray', isVanDriver: false, count: 2, names: ['Karen Ray'] },
+      speaker: { needed: false, assigned: null },
+      volunteer: { needed: true, assigned: 'Jane Doe', count: 3, names: ['Jane Doe'] },
+    });
+    const plan = buildRowUpdatePlan(event, { date: '2026-11-14', 'Group Name': 'G', Staffing: cell }, USERS);
+    expect(plan.updates.driversNeeded).toBeUndefined();
+    expect(plan.updates.volunteersNeeded).toBeUndefined();
+    expect(plan.updates.assignedDriverIds).toBeUndefined();
+    expect(plan.updates.assignedVolunteerIds).toBeUndefined();
+  });
+});
+
 describe('assignmentLabelForUnknownId (app -> sheet push)', () => {
   it('writes free-text assignee names back as typed, not "Unknown"', () => {
     expect(assignmentLabelForUnknownId('Stranger')).toBe('Stranger');

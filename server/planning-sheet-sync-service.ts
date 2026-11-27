@@ -139,6 +139,9 @@ export function formatVanNeededForCell(
  * Format specifications:
  * - The staffing column contains role assignments separated by role prefixes
  * - Format: "D: Name1, Name2, S: Name3, V: Name4, VD: Name5"
+ * - Numbered slots state a count: "V1: Ann, V2: , V3: " = 3 volunteers needed,
+ *   Ann assigned, 2 open. The push writes this form whenever more than one
+ *   person is needed.
  * - Each role can have multiple people assigned (comma-separated names)
  * - Each role can be:
  *   - Assigned with name(s): "D: John Doe, Jane Smith" (role needed, assigned to John and Jane)
@@ -163,9 +166,9 @@ export function formatVanNeededForCell(
  * Note: Comma-separated names within a role are preserved as a single string.
  */
 export interface StaffingInfo {
-  driver: { needed: boolean; assigned: string | null; isVanDriver: boolean };
-  speaker: { needed: boolean; assigned: string | null };
-  volunteer: { needed: boolean; assigned: string | null };
+  driver: { needed: boolean; assigned: string | null; isVanDriver: boolean; count?: number; names?: string[] };
+  speaker: { needed: boolean; assigned: string | null; count?: number; names?: string[] };
+  volunteer: { needed: boolean; assigned: string | null; count?: number; names?: string[] };
 }
 
 /** user_<ms>_<rand> (current), UUIDs, or bare numbers (legacy) are IDs; anything else is a typed name. */
@@ -201,45 +204,45 @@ export function parseStaffingColumn(staffingStr: string): StaffingInfo {
 
 /**
  * Format a StaffingInfo object into the string format for the Planning Sheet.
- * 
+ *
+ * One slot per person needed, the way the team writes counts on the sheet:
+ * - 1 needed: "V: Jane" or "V: " (open)
+ * - 3 needed, 1 assigned: "V1: Jane, V2: , V3: " (two open spots stay visible)
+ * The slot count is the larger of the role's `count` (how many the app says
+ * are needed) and the number of assigned `names`. Without `count`/`names`
+ * (older callers) the role is written as one slot with `assigned` as typed.
+ *
  * Trailing space behavior:
- * - When a role is needed but unassigned, the format includes a trailing space after the colon.
- * - Examples: "D: ", "S: ", "V: ", "VD: "
- * - This is intentional to indicate the position is open/needed but not yet filled.
+ * - An open slot keeps a trailing space after the colon ("D: ", "V2: ").
  * - The parser handles both "D:" and "D: " as unassigned positions.
- * 
+ *
  * See StaffingInfo documentation for complete format specification.
  */
 export function formatStaffingColumn(staffing: StaffingInfo): string {
   const parts: string[] = [];
 
+  const writeRole = (
+    prefix: string,
+    role: { needed: boolean; assigned: string | null; count?: number; names?: string[] }
+  ) => {
+    if (!role.needed) return;
+    const names = role.names ?? (role.assigned ? [role.assigned] : []);
+    const slots = Math.max(role.count ?? 0, names.length, 1);
+    if (slots === 1) {
+      parts.push(`${prefix}: ${names[0] ?? ''}`);
+      return;
+    }
+    for (let i = 0; i < slots; i++) {
+      parts.push(`${prefix}${i + 1}: ${names[i] ?? ''}`);
+    }
+  };
+
   // Driver or Van Driver
-  if (staffing.driver.needed) {
-    const prefix = staffing.driver.isVanDriver ? 'VD' : 'D';
-    if (staffing.driver.assigned) {
-      parts.push(`${prefix}: ${staffing.driver.assigned}`);
-    } else {
-      parts.push(`${prefix}: `); // Unassigned but needed
-    }
-  }
-
-  // Speaker
-  if (staffing.speaker.needed) {
-    if (staffing.speaker.assigned) {
-      parts.push(`S: ${staffing.speaker.assigned}`);
-    } else {
-      parts.push(`S: `); // Unassigned but needed
-    }
-  }
-
+  writeRole(staffing.driver.isVanDriver ? 'VD' : 'D', staffing.driver);
+  // Speaker (retired role; still written for old rows that have one)
+  writeRole('S', staffing.speaker);
   // Volunteer
-  if (staffing.volunteer.needed) {
-    if (staffing.volunteer.assigned) {
-      parts.push(`V: ${staffing.volunteer.assigned}`);
-    } else {
-      parts.push(`V: `); // Unassigned but needed
-    }
-  }
+  writeRole('V', staffing.volunteer);
 
   return parts.join(', ');
 }
@@ -990,19 +993,25 @@ export class PlanningSheetSyncService {
     }
 
     // Build staffing string
+    // The sheet reads an "S" as a volunteer (the speaker role was retired), so
+    // any leftover speakers are written as volunteer slots. Writing them as a
+    // separate "S" would add an extra volunteer slot on every sheet -> app ->
+    // sheet round trip.
+    const staffVolunteerNames = Array.from(new Set([...volunteerNames, ...speakerNames]));
     const staffing: StaffingInfo = {
       driver: {
         needed: (e.driversNeeded || 0) > 0 || driverNames.length > 0,
         assigned: driverNames.length > 0 ? driverNames.join(', ') : null,
         isVanDriver: e.vanDriverNeeded || false,
+        count: e.driversNeeded || 0,
+        names: driverNames,
       },
-      speaker: {
-        needed: (e.speakersNeeded || 0) > 0 || speakerNames.length > 0,
-        assigned: speakerNames.length > 0 ? speakerNames.join(', ') : null,
-      },
+      speaker: { needed: false, assigned: null },
       volunteer: {
-        needed: (e.volunteersNeeded || 0) > 0 || volunteerNames.length > 0,
-        assigned: volunteerNames.length > 0 ? volunteerNames.join(', ') : null,
+        needed: (e.volunteersNeeded || 0) > 0 || staffVolunteerNames.length > 0,
+        assigned: staffVolunteerNames.length > 0 ? staffVolunteerNames.join(', ') : null,
+        count: e.volunteersNeeded || 0,
+        names: staffVolunteerNames,
       },
     };
 
