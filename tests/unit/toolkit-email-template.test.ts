@@ -65,7 +65,7 @@ describe('toolkit email template', () => {
   });
 
   it('bolds tip labels', () => {
-    expect(buildToolkitEmailHtml(base)).toContain('<strong>Refrigerated van:</strong>');
+    expect(buildToolkitEmailHtml(base)).toMatch(/<strong[^>]*>Refrigerated van:<\/strong>/);
   });
 
   it('has unique section keys', () => {

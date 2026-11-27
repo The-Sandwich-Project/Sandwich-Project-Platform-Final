@@ -268,10 +268,17 @@ const lines = (text: string) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
+// Brand colors (same as the app): dark blue #236383, teal #007E8C,
+// light blue #47B3CB, orange #FBAD3F.
 const P = 'margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #333333;';
-const H = 'margin: 24px 0 8px 0; font-size: 18px; font-weight: bold; color: #236383;';
-const UL = 'margin: 0 0 16px 0; padding-left: 22px; font-size: 16px; line-height: 1.6; color: #333333;';
+const BOX_H = 'margin: 0 0 10px 0; font-size: 19px; font-weight: bold; color: #236383;';
+const UL = 'margin: 0; padding-left: 22px; font-size: 16px; line-height: 1.6; color: #333333;';
 const LI = 'margin: 0 0 8px 0;';
+const TIP_TEXT = 'margin: 0; font-size: 15px; line-height: 1.6; color: #444444;';
+
+/** A full-width colored box with a left accent bar. */
+const box = (bg: string, accent: string, inner: string, margin = '0 0 24px 0') =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: ${margin};"><tr><td style="background-color: ${bg}; border-left: 5px solid ${accent}; padding: 20px 22px; border-radius: 6px;">${inner}</td></tr></table>`;
 
 /** The toolkit email as a full HTML document, ready for the composer's editable preview. */
 export function buildToolkitEmailHtml(opts: ToolkitEmailOptions): string {
@@ -287,22 +294,26 @@ export function buildToolkitEmailHtml(opts: ToolkitEmailOptions): string {
     .filter(Boolean)
     .join(' ');
 
-  const list = (key: string) =>
+  const list = (key: string, liStyle = LI) =>
     lines(t(key))
-      .map((item) => `<li style="${LI}">${render(item, opts)}</li>`)
+      .map((item) => `<li style="${liStyle}">${render(item, opts)}</li>`)
       .join('');
 
-  const tip = (key: string) => `<li style="${LI}">${renderTip(t(key), opts)}</li>`;
+  /** One tip as its own card: bold teal label, then the text. */
+  const tipCard = (inner: string) =>
+    box('#f9f9f9', '#FBAD3F', `<p style="${TIP_TEXT}">${inner}</p>`, '0 0 12px 0');
+  const tip = (key: string) => tipCard(renderTip(t(key), opts).replace('<strong>', '<strong style="color: #236383;">'));
 
-  const sandwichTip = `<li style="${LI}">${renderTip(t('tip_sandwich_type'), opts)}<ul style="margin: 8px 0; padding-left: 22px;">${list('tip_sandwich_nutrition')}</ul>${render(t('tip_sandwich_type_after'), opts)}</li>`;
+  const sandwichTip = box(
+    '#f9f9f9',
+    '#FBAD3F',
+    `<p style="${TIP_TEXT}">${renderTip(t('tip_sandwich_type'), opts).replace('<strong>', '<strong style="color: #236383;">')}</p>` +
+      `<ul style="margin: 8px 0 8px 0; padding-left: 22px; font-size: 15px; line-height: 1.6; color: #444444;">${list('tip_sandwich_nutrition', 'margin: 0 0 4px 0;')}</ul>` +
+      `<p style="${TIP_TEXT}">${render(t('tip_sandwich_type_after'), opts)}</p>`,
+    '0 0 12px 0'
+  );
 
-  const signature = [
-    `<strong>${escapeHtml(opts.senderName)}</strong>`,
-    `<a href="mailto:${escapeHtml(opts.senderEmail)}" style="color: #007E8C; text-decoration: none;">${escapeHtml(opts.senderEmail)}</a>`,
-    opts.senderPhone && opts.senderPhone.trim() ? escapeHtml(opts.senderPhone.trim()) : '',
-  ]
-    .filter(Boolean)
-    .join('<br>');
+  const phone = opts.senderPhone && opts.senderPhone.trim() ? escapeHtml(opts.senderPhone.trim()) : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -314,22 +325,36 @@ export function buildToolkitEmailHtml(opts: ToolkitEmailOptions): string {
 <body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f5f5f5;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f5f5f5;">
 <tr><td align="center" style="padding: 20px 0;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff;">
-<tr><td style="padding: 28px 30px 18px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
-<img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="240" style="display: block; margin: 0 auto; max-width: 240px; height: auto; border: 0;" />
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+<tr><td style="background-color: #ffffff; padding: 30px 30px 20px 30px; text-align: center; border-bottom: 4px solid #007E8C;">
+<img src="https://the-sandwich-project.github.io/sandwichinventory/CMYK_PRINT_TSP-01-01.jpg" alt="The Sandwich Project" width="280" style="display: block; margin: 0 auto; max-width: 280px; height: auto; border: 0;" />
 </td></tr>
-<tr><td style="padding: 32px 30px;">
-<p style="${P}">${render(t('greeting'), opts)}</p>
-<p style="${P}">${render(t('intro'), opts)}</p>
+<tr><td style="padding: 36px 30px 16px 30px;">
+<p style="margin: 0 0 16px 0; font-size: 18px; line-height: 1.6; color: #333333;">${render(t('greeting'), opts)}</p>
+<p style="margin: 0 0 16px 0; font-size: 17px; line-height: 1.6; color: #333333;">${render(t('intro'), opts)}</p>
 <p style="${P}">${render(t('toolkit_attached'), opts)}</p>
-<p style="${P}">${nextStepParagraph}</p>
-<h2 style="${H}">${render(t('prep_heading'), opts)}</h2>
-<p style="${P}">${render(t('prep_intro'), opts)}</p>
-<ul style="${UL}">${list('prep_items')}</ul>
-<h2 style="${H}">${render(t('tips_heading'), opts)}</h2>
-<ul style="${UL}">${sandwichTip}${tip('tip_refrigeration')}${tip('tip_van')}${tip('tip_food_safety')}${tip('tip_labels')}${tip('tip_timing')}</ul>
-<p style="${P}">${render(t('closing'), opts)}</p>
-<p style="margin: 24px 0 0 0; font-size: 16px; line-height: 1.6; color: #333333;">${render(t('signoff'), opts)}<br>${signature}</p>
+${box('#fff7e6', '#FBAD3F', `<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #333333;">${nextStepParagraph}</p>`)}
+${box(
+  '#f0f9fa',
+  '#007E8C',
+  `<h2 style="${BOX_H}">${render(t('prep_heading'), opts)}</h2>` +
+    `<p style="margin: 0 0 10px 0; font-size: 16px; line-height: 1.6; color: #444444;">${render(t('prep_intro'), opts)}</p>` +
+    `<ul style="${UL}">${list('prep_items')}</ul>`
+)}
+<h2 style="margin: 8px 0 14px 0; font-size: 20px; font-weight: bold; color: #236383;">${render(t('tips_heading'), opts)}</h2>
+${sandwichTip}
+${tip('tip_refrigeration')}
+${tip('tip_van')}
+${tip('tip_food_safety')}
+${tip('tip_labels')}
+${tip('tip_timing')}
+${box('#236383', '#47B3CB', `<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #ffffff; text-align: center;">${render(t('closing'), opts)}</p>`, '24px 0 8px 0')}
+</td></tr>
+<tr><td style="background-color: #236383; color: #ffffff; padding: 28px 30px; text-align: center;">
+<p style="margin: 0 0 8px 0; font-size: 16px; color: #ffffff;"><strong>${render(t('signoff'), opts)}</strong></p>
+<p style="margin: 0 0 4px 0; font-size: 16px; color: #ffffff;"><strong>${escapeHtml(opts.senderName)}</strong></p>
+<p style="margin: 0 0 4px 0; font-size: 15px;"><a href="mailto:${escapeHtml(opts.senderEmail)}" style="color: #47B3CB; text-decoration: none;">${escapeHtml(opts.senderEmail)}</a></p>
+${phone ? `<p style="margin: 0; font-size: 15px; color: #ffffff;">${phone}</p>` : ''}
 </td></tr>
 </table>
 </td></tr>
