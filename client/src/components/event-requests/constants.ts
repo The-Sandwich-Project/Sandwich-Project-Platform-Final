@@ -37,6 +37,19 @@ export const SANDWICH_TYPE_CHOICES = [
   { value: 'deli', label: 'Deli' },
 ] as const;
 
+const LEGACY_DELI_TYPES = new Set(['deli_turkey', 'deli_ham', 'turkey', 'ham', 'chicken']);
+
+/**
+ * The picker value to SHOW for a stored type: older meat-specific types
+ * select "Deli", anything else not offered shows as nothing picked. Display
+ * only; the stored value changes only if someone picks a type.
+ */
+export function sandwichTypeChoiceValue(stored: string | null | undefined): string | undefined {
+  const v = (stored || '').toLowerCase();
+  if (LEGACY_DELI_TYPES.has(v)) return 'deli';
+  return SANDWICH_TYPE_CHOICES.some((c) => c.value === v) ? v : undefined;
+}
+
 // Status color scheme - VIBRANT BRAND COLORS: Using TSP brand palette with high saturation
 export const statusColors: Record<string, string> = {
   new: 'bg-gradient-to-br from-[#007E8C] to-[#47B3CB] text-white border-2 border-[#007E8C] shadow-md',

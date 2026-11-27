@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ChevronDown, Plus, Trash2 } from 'lucide-react';
-import { SANDWICH_TYPE_CHOICES } from '../constants';
+import { SANDWICH_TYPE_CHOICES, sandwichTypeChoiceValue } from '../constants';
 import type { FormSectionProps } from './types';
 
 interface CompletedEventSectionProps extends FormSectionProps {
@@ -232,11 +232,11 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
                     {formData.actualSandwichTypes.map((sandwich, index) => (
                       <div key={index} className="flex items-center gap-3 p-3 border rounded bg-white">
                         <Select
-                          value={sandwich.type}
+                          value={sandwichTypeChoiceValue(sandwich.type)}
                           onValueChange={(value) => updateActualSandwichType(index, 'type', value)}
                         >
                           <SelectTrigger className="w-40">
-                            <SelectValue />
+                            <SelectValue placeholder="Pick a type" />
                           </SelectTrigger>
                           <SelectContent className="z-[200]" position="popper" sideOffset={5}>
                             {SANDWICH_TYPE_CHOICES.map((type) => (

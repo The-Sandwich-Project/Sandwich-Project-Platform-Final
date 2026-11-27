@@ -539,6 +539,12 @@ export interface TwoTypeState {
   deli: TypeRow;
   pbj: TypeRow;
   total: string;
+  /**
+   * Lines that are neither Deli nor PB&J, e.g. an "unknown" remainder
+   * ("300 (150 Deli, rest type TBD)"). Not shown as rows, but kept so editing
+   * the other rows doesn't drop them, and they keep the total box open.
+   */
+  rest: EstimateDraft['lines'];
 }
 
 /** Add amounts written as text; "" if any is blank or unreadable. */
@@ -562,29 +568,43 @@ function sumAmountTexts(texts: string[]): string {
 export function twoTypeStateFromDraft(draft: EstimateDraft): TwoTypeState {
   const deliLines = draft.lines.filter((l) => DELI_FAMILY_TYPES.has(normalizeSandwichTypeKey(l.type) ?? ''));
   const pbjLines = draft.lines.filter((l) => normalizeSandwichTypeKey(l.type) === 'pbj');
+  // Anything else (a type-TBD remainder) is "whatever's left of the total":
+  // its own amount is dropped so the typed total stays the number, and the
+  // remainder follows when Deli or PB&J change (300 total, Deli 150 -> 160
+  // reads "300 (160 Deli, rest type TBD)", not 310).
+  const rest = draft.lines
+    .filter((l) => !deliLines.includes(l) && !pbjLines.includes(l))
+    .map((l) => ({ type: l.type, amount: '' }));
   const rowFrom = (rows: typeof draft.lines): TypeRow =>
     rows.length === 0
       ? { checked: false, amount: '' }
       : { checked: true, amount: rows.length === 1 ? rows[0].amount : sumAmountTexts(rows.map((r) => r.amount)) };
-  return { deli: rowFrom(deliLines), pbj: rowFrom(pbjLines), total: draft.total };
+  return { deli: rowFrom(deliLines), pbj: rowFrom(pbjLines), total: draft.total, rest };
 }
 
 /** Whether the total box is something to type in (vs. worked out from the rows). */
 export function totalIsTyped(state: TwoTypeState): boolean {
+  // Part of the total is a type-TBD remainder: the split isn't fully known.
+  if ((state.rest ?? []).length > 0) return true;
   const checked = [state.deli, state.pbj].filter((r) => r.checked);
   if (checked.length === 0) return true;
   return checked.some((r) => !r.amount.trim());
 }
 
 /**
- * The draft for a two-row state. The typed total is kept only while it's
- * needed (no type picked, or a picked type without an amount); once every
- * picked type has an amount, the total is worked out from them so the two
- * can never disagree.
+ * The draft for a two-row state. While the split isn't fully known (no type
+ * picked, a picked type without an amount, or a type-TBD remainder) the
+ * typed total is used. Once every picked type has an amount, the total is
+ * the sum of the rows, so the two can never disagree; that worked-out total
+ * is kept in the draft, so unticking the types afterward keeps the number
+ * (as "type TBD") instead of losing it.
  */
 export function draftFromTwoTypeState(state: TwoTypeState): EstimateDraft {
   const lines: EstimateDraft['lines'] = [];
   if (state.deli.checked) lines.push({ type: 'deli', amount: state.deli.amount });
   if (state.pbj.checked) lines.push({ type: 'pbj', amount: state.pbj.amount });
-  return { total: totalIsTyped(state) ? state.total : '', lines };
+  lines.push(...(state.rest ?? []));
+  if (totalIsTyped(state)) return { total: state.total, lines };
+  const checkedAmounts = [state.deli, state.pbj].filter((r) => r.checked).map((r) => r.amount);
+  return { total: sumAmountTexts(checkedAmounts) || state.total, lines };
 }

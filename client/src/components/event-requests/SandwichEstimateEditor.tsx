@@ -128,7 +128,9 @@ export const SandwichEstimateEditor: React.FC<SandwichEstimateEditorProps> = ({
             data-testid={`${idPrefix}-total`}
           />
           <p className={`text-xs ${hintClass}`}>
-            For when the group knows roughly how many but not the split yet.
+            {state.rest.length > 0
+              ? 'Part of this total is still type TBD.'
+              : 'For when the group knows roughly how many but not the split yet.'}
           </p>
         </div>
       ) : (

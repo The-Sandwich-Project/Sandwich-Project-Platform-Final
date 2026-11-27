@@ -50,6 +50,11 @@ export const SandwichPlanningSection: React.FC<SandwichPlanningSectionProps> = (
     if (formKey !== lastWritten.current) {
       setDraft(draftFromFields(fieldsOfForm(formData)));
       lastWritten.current = formKey;
+      // The editor now shows the stored (valid) estimate, so an "unreadable
+      // text" error from earlier (e.g. restored with a draft) no longer applies.
+      if ((formData as any).sandwichEstimateError) {
+        setFormData((prev) => ({ ...prev, sandwichEstimateError: undefined }));
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formKey]);

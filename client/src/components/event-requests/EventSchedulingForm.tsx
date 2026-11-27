@@ -64,6 +64,7 @@ import {
   determineActualSandwichMode,
   resolveEstimatedAttendance,
   normalizeDraftAttendance,
+  dropUnchangedFields,
 } from './form-utils';
 
 // ────────────────────────────────────────────────────────────────────────
@@ -423,8 +424,12 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   const saveToLocalStorage = useCallback(() => {
     if (!formInitialized) return;
     try {
+      // sandwichEstimateError is a temporary flag for text the editor can't
+      // read; the editor itself isn't saved in the draft, so a restored error
+      // would block saving a valid estimate. Leave it out.
+      const { sandwichEstimateError: _transientEstimateError, ...draftFormData } = formData as any;
       localStorage.setItem(getAutoSaveKey(), JSON.stringify({
-        formData, sandwichMode, actualSandwichMode, attendeeMode,
+        formData: draftFormData, sandwichMode, actualSandwichMode, attendeeMode,
         savedAt: new Date().toISOString(),
         eventId: eventRequest?.id || null,
         originalServerData: originalFormDataRef.current,
@@ -1117,25 +1122,9 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
           sandwichMode: baselineSandwichMode,
           actualSandwichMode: baselineActualSandwichMode,
         });
-        const omittedFields: string[] = [];
-        for (const key of Object.keys(eventData)) {
-          // Never drop a key the caller explicitly overrode this save — an
-          // override is a deliberate write even when it equals the baseline.
-          // (e.g. "No reminder" sends standbyExpectedDate: null; the baseline
-          // also computes null because its status isn't 'standby' yet, so a
-          // plain diff would silently drop the clear and a stale follow-up
-          // date from a previous standby episode would survive.)
-          if (fieldOverrides && Object.prototype.hasOwnProperty.call(fieldOverrides, key)) {
-            continue;
-          }
-          if (
-            Object.prototype.hasOwnProperty.call(baselineData, key) &&
-            JSON.stringify(eventData[key]) === JSON.stringify(baselineData[key])
-          ) {
-            delete eventData[key];
-            omittedFields.push(key);
-          }
-        }
+        // Drop unchanged fields (keeping explicit overrides, and the whole
+        // estimate when any part of it changed); see dropUnchangedFields.
+        const omittedFields = dropUnchangedFields(eventData, baselineData, fieldOverrides);
         if (omittedFields.length > 0) {
           logger.log(`🧮 Diff-based save: omitted ${omittedFields.length} unchanged field(s):`, omittedFields.join(', '));
         }

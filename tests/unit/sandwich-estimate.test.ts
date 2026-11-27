@@ -472,7 +472,35 @@ describe('two-row editor (Deli / PB&J)', () => {
     expect(draftFromTwoTypeState(partial).total).toBe('300');
     const full = { ...partial, pbj: { checked: true, amount: '100' } };
     expect(totalIsTyped(full)).toBe(false);
-    expect(draftFromTwoTypeState(full)).toEqual({ total: '', lines: [{ type: 'deli', amount: '150' }, { type: 'pbj', amount: '100' }] });
+    expect(draftFromTwoTypeState(full)).toEqual({ total: '250', lines: [{ type: 'deli', amount: '150' }, { type: 'pbj', amount: '100' }] });
     expect(totalIsTyped({ deli: { checked: false, amount: '' }, pbj: { checked: false, amount: '' }, total: '250' })).toBe(true);
+  });
+});
+
+describe('two-row editor review fixes', () => {
+  const { twoTypeStateFromDraft, draftFromTwoTypeState, totalIsTyped, resolveDraft, draftFromFields } = require('../../shared/sandwich-estimate');
+
+  it('keeps a type-TBD remainder: total 300, Deli 150 + rest TBD, then Deli -> 160 still saves 300', () => {
+    const stored = { estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 150 }, { type: 'unknown', quantity: 150 }] };
+    const st = twoTypeStateFromDraft(draftFromFields(stored));
+    expect(st.rest.length).toBe(1);
+    expect(totalIsTyped(st)).toBe(true); // total box stays open
+    const edited = draftFromTwoTypeState({ ...st, deli: { checked: true, amount: '160' } });
+    expect(edited.total).toBe('300');
+    expect(resolveDraft(edited).fields.estimatedSandwichCount).toBe(300);
+  });
+
+  it('unticking every type after a complete split keeps the worked-out total', () => {
+    const complete = draftFromTwoTypeState({ deli: { checked: true, amount: '200' }, pbj: { checked: true, amount: '50' }, total: '', rest: [] });
+    expect(complete.total).toBe('250');
+    const st = twoTypeStateFromDraft(complete);
+    const unticked = draftFromTwoTypeState({ ...st, deli: { checked: false, amount: '' }, pbj: { checked: false, amount: '' } });
+    expect(unticked).toEqual({ total: '250', lines: [] });
+    expect(resolveDraft(unticked).preview).toBe('250, type TBD');
+  });
+
+  it('the carried total never overrides complete rows', () => {
+    const st = { deli: { checked: true, amount: '200' }, pbj: { checked: true, amount: '75' }, total: '250', rest: [] };
+    expect(draftFromTwoTypeState(st).total).toBe('275');
   });
 });

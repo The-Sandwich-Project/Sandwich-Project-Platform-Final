@@ -421,3 +421,43 @@ export function determineActualSandwichMode(actualSandwichTypes: any): 'total' |
     (typeof actualSandwichTypes === 'string' ? JSON.parse(actualSandwichTypes) : actualSandwichTypes) : [];
   return Array.isArray(parsed) && parsed.length > 0 ? 'types' : 'total';
 }
+
+/** The fields that together make up an event's sandwich estimate. */
+export const ESTIMATE_SAVE_KEYS = [
+  'estimatedSandwichCount',
+  'estimatedSandwichCountMin',
+  'estimatedSandwichCountMax',
+  'estimatedSandwichRangeType',
+  'sandwichTypes',
+] as const;
+
+/**
+ * The edit form's changed-fields save: delete every key of `eventData` whose
+ * value equals the baseline (the form as it was loaded), so untouched fields
+ * can't overwrite changes made elsewhere. Returns the dropped keys.
+ * - A key in `overrides` is always kept (a deliberate write).
+ * - The estimate is one value spread over several fields: if any of them
+ *   changed, all are kept, so the server's estimate rule reads the same split
+ *   the editor previewed (sending only a cleared total would make it drop the
+ *   per-type amounts that are still shown).
+ */
+export function dropUnchangedFields(
+  eventData: Record<string, any>,
+  baselineData: Record<string, any>,
+  overrides?: Record<string, any>
+): string[] {
+  const has = (o: Record<string, any>, k: string) => Object.prototype.hasOwnProperty.call(o, k);
+  const same = (k: string) => has(baselineData, k) && JSON.stringify(eventData[k]) === JSON.stringify(baselineData[k]);
+  const estimateChanged = ESTIMATE_SAVE_KEYS.some((k) => has(eventData, k) && !same(k));
+  const omitted: string[] = [];
+  for (const key of Object.keys(eventData)) {
+    if (overrides && has(overrides, key)) continue;
+    if (estimateChanged && (ESTIMATE_SAVE_KEYS as readonly string[]).includes(key)) continue;
+    if (same(key)) {
+      delete eventData[key];
+      omitted.push(key);
+    }
+  }
+  return omitted;
+}
+
