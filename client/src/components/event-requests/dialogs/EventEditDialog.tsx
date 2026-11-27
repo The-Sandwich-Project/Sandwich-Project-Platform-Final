@@ -51,7 +51,7 @@ import {
   formatDraftTimestamp,
 } from '@/hooks/useDraftPersistence';
 import { logger } from '@/lib/logger';
-import { getDriverIds, getVolunteerIds, extractNameFromAssignmentId, resolveAssignmentDisplayName } from '@/lib/assignment-utils';
+import { getDriverIds, getVolunteerIds, getTentativeDriverIds, getTentativeVolunteerIds, rebuildDetailsForSelection, extractNameFromAssignmentId, resolveAssignmentDisplayName } from '@/lib/assignment-utils';
 import { getRecipientDisplayRegion } from '@/lib/atlanta-regions';
 import type { EventRequest } from '@shared/schema';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
@@ -835,25 +835,31 @@ export const EventEditDialog: React.FC<EventEditDialogProps> = ({
     const originalDriverIds = event ? getDriverIds(event) : [];
     if (JSON.stringify(assignedDriverIds.sort()) !== JSON.stringify(originalDriverIds.sort())) {
       updates.assignedDriverIds = assignedDriverIds;
-      // Also update driverDetails JSONB to keep it in sync (source of truth)
-      const driverDetailsObj = (event?.driverDetails || {}) as Record<string, { name?: string }>;
-      const newDriverDetails: Record<string, { name?: string }> = {};
-      assignedDriverIds.forEach(id => {
-        newDriverDetails[id] = driverDetailsObj[id] || {};
-      });
-      updates.driverDetails = newDriverDetails;
+      // Also update driverDetails JSONB to keep it in sync (source of truth).
+      // Tentative drivers keep their entries (notes); anyone picked here as
+      // confirmed leaves the tentative list.
+      const rebuilt = rebuildDetailsForSelection(
+        event?.driverDetails as any,
+        assignedDriverIds,
+        event ? getTentativeDriverIds(event as any) : []
+      );
+      updates.driverDetails = rebuilt.details;
+      if (rebuilt.tentativeIds) updates.tentativeDriverIds = rebuilt.tentativeIds;
     }
 
     const originalVolunteerIds = event ? getVolunteerIds(event) : [];
     if (JSON.stringify(assignedVolunteerIds.sort()) !== JSON.stringify(originalVolunteerIds.sort())) {
       updates.assignedVolunteerIds = assignedVolunteerIds;
-      // Also update volunteerDetails JSONB to keep it in sync (source of truth)
-      const volunteerDetailsObj = (event?.volunteerDetails || {}) as Record<string, { name?: string }>;
-      const newVolunteerDetails: Record<string, { name?: string }> = {};
-      assignedVolunteerIds.forEach(id => {
-        newVolunteerDetails[id] = volunteerDetailsObj[id] || {};
-      });
-      updates.volunteerDetails = newVolunteerDetails;
+      // Also update volunteerDetails JSONB to keep it in sync (source of truth).
+      // Tentative volunteers keep their entries (notes); anyone picked here as
+      // confirmed leaves the tentative list.
+      const rebuilt = rebuildDetailsForSelection(
+        event?.volunteerDetails as any,
+        assignedVolunteerIds,
+        event ? getTentativeVolunteerIds(event as any) : []
+      );
+      updates.volunteerDetails = rebuilt.details;
+      if (rebuilt.tentativeIds) updates.tentativeVolunteerIds = rebuilt.tentativeIds;
     }
 
     if (assignedVanDriverId !== (event?.assignedVanDriverId || null)) {
