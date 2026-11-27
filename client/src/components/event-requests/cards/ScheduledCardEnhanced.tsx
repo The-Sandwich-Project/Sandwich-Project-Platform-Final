@@ -840,7 +840,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   <TooltipTrigger asChild>
                     <Badge
                       variant="outline"
-                      className={`whitespace-nowrap cursor-help mt-1 ${
+                      className={`flex-wrap whitespace-normal max-w-full cursor-help mt-1 ${
                         returningOrgData.isReturningContact
                           ? 'bg-purple-50 text-purple-700 border-purple-300'
                           : (request.email || request.firstName || request.lastName || request.phone)
@@ -932,7 +932,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   <TooltipTrigger asChild>
                     <Badge
                       variant="outline"
-                      className={`whitespace-nowrap cursor-help mt-1 ${
+                      className={`flex-wrap whitespace-normal max-w-full cursor-help mt-1 ${
                         likelySameOrg
                           ? 'bg-orange-50 text-orange-700 border-orange-300'
                           : 'bg-purple-50 text-purple-700 border-purple-300'
@@ -979,7 +979,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               ) && (
                 <Badge
                   variant="outline"
-                  className="whitespace-nowrap bg-blue-50 text-blue-700 border-blue-300 mt-1"
+                  className="whitespace-normal max-w-full bg-blue-50 text-blue-700 border-blue-300 mt-1"
                 >
                   New Department
                 </Badge>
@@ -990,7 +990,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   <TooltipTrigger asChild>
                     <Badge
                       variant="outline"
-                      className="whitespace-nowrap bg-amber-50 text-amber-700 border-amber-300 mt-1 cursor-help"
+                      className="whitespace-normal max-w-full bg-amber-50 text-amber-700 border-amber-300 mt-1 cursor-help"
                     >
                       <History className="w-3 h-3 mr-1" />
                       Rescheduled
@@ -2577,7 +2577,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             </>
                           )}
                         </div>
-                        <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-1">
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-1">
                           {parsePostgresArray(request.assignedDriverIds).map((id) => {
                             const isCustom = id.startsWith('custom-');
                             // Check if the ID itself looks like a human name (not a system ID)
@@ -3040,7 +3040,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         </>
                       )}
                     </div>
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-1">
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(15rem,100%),1fr))] gap-1">
                       {parsePostgresArray(request.assignedVolunteerIds).map((id) => {
                         const detailName = (request.volunteerDetails as Record<string, { name?: string }>)?.[id]?.name;
                         const resolvedName = resolveUserName(id);
