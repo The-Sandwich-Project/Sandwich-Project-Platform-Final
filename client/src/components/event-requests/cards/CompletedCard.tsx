@@ -174,6 +174,8 @@ interface CardHeaderProps {
   presentUsers?: Array<{ userId: string; userName: string; joinedAt: Date; lastHeartbeat: Date; socketId: string }>;
   currentUserId?: string;
   canEditTspContact?: boolean;
+  /** Shown at the right end of the header's top row (e.g. "Add Action"). */
+  headerAction?: React.ReactNode;
 }
 
 const CardHeader: React.FC<CardHeaderProps> = ({
@@ -207,6 +209,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   presentUsers = [],
   currentUserId = '',
   canEditTspContact = false,
+  headerAction,
 }) => {
   const StatusIcon = statusIcons[request.status as keyof typeof statusIcons] || statusIcons.new;
   
@@ -287,7 +290,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
   const isEditingDepartment = isEditingThisCard && editingField === 'department';
 
   return (
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3 mb-3">
       <div className="flex items-start space-x-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -326,7 +329,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                     size="sm"
                     variant="ghost"
                     onClick={() => startEditing('organizationName', request.organizationName || '')}
-                    className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-6"
                     title="Edit organization name"
                     data-testid="button-edit-org-name"
                   >
@@ -369,7 +372,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                         size="sm"
                         variant="ghost"
                         onClick={() => startEditing('department', request.department || '')}
-                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-6"
                         title={request.department ? "Edit department" : "Add department"}
                         data-testid="button-edit-department"
                       >
@@ -552,7 +555,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                         size="sm" 
                         variant="outline" 
                         onClick={() => setTspContactInputMode?.('text')}
-                        className="h-7 px-2 text-xs"
+                        className="h-7 px-2 text-xs md:min-h-0 md:h-7"
                         title="Switch to custom name"
                       >
                         or enter name
@@ -571,17 +574,17 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                         size="sm" 
                         variant="outline" 
                         onClick={() => setTspContactInputMode?.('dropdown')}
-                        className="h-7 px-2 text-xs"
+                        className="h-7 px-2 text-xs md:min-h-0 md:h-7"
                         title="Switch to user dropdown"
                       >
                         or select user
                       </Button>
                     </>
                   )}
-                  <Button size="sm" onClick={saveTspContact} disabled={updateTspContactMutation?.isPending} className="h-7 px-2">
+                  <Button size="sm" onClick={saveTspContact} disabled={updateTspContactMutation?.isPending} className="h-7 px-2 md:min-h-0 md:h-7">
                     <Save className="w-3 h-3" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={cancelTspContactEdit} className="h-7 px-2">
+                  <Button size="sm" variant="ghost" onClick={cancelTspContactEdit} className="h-7 px-2 md:min-h-0 md:h-7">
                     <X className="w-3 h-3" />
                   </Button>
                 </div>
@@ -602,7 +605,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                           size="sm"
                           variant="ghost"
                           onClick={startEditingTspContact}
-                          className="ml-2 h-6 w-6 p-0 text-[#236383] hover:bg-[#236383]/10 transition-opacity opacity-0 group-hover:opacity-100"
+                          className="ml-2 h-6 w-6 p-0 text-[#236383] hover:bg-[#236383]/10 transition-opacity opacity-0 group-hover:opacity-100 md:min-h-0 md:min-w-0 md:h-6"
                           title="Edit TSP contact"
                         >
                           <Edit2 className="w-3 h-3" />
@@ -614,7 +617,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       size="sm"
                       variant="outline"
                       onClick={startEditingTspContact}
-                      className="ml-2 h-7 px-3 text-xs"
+                      className="ml-2 h-7 px-3 text-xs md:min-h-0 md:h-7"
                     >
                       Assign TSP Contact
                     </Button>
@@ -684,7 +687,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => startEditing(dateFieldToEdit, formatDateForInput(displayDate?.toString() || ''))}
-                      className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:h-6"
                       title={`Edit ${dateLabel}`}
                       data-testid="button-edit-date"
                     >
@@ -739,7 +742,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                         size="sm"
                         variant="ghost"
                         onClick={() => startEditing('eventAddress', request.eventAddress || '')}
-                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 md:min-h-0 md:h-6"
                         title={request.eventAddress ? 'Edit address' : 'Add address'}
                         data-testid="button-edit-event-address-header"
                       >
@@ -753,6 +756,8 @@ const CardHeader: React.FC<CardHeaderProps> = ({
           </div>
         </div>
       </div>
+      {/* Top-right on wider screens; on phones it drops below the header so the name keeps the full width. */}
+      {headerAction && <div className="shrink-0 self-end sm:self-auto">{headerAction}</div>}
     </div>
   );
 };
@@ -1301,7 +1306,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
           {!request.socialMediaPostRequested && !request.socialMediaPostCompleted && (
             <Button
               onClick={handleMarkRequested}
-              className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs px-3 py-1 h-8 w-full"
+              className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs px-3 py-1 h-8 w-full md:min-h-0 md:h-8"
               disabled={updateSocialMediaMutation.isPending}
             >
               📱 Mark Social Media Requested
@@ -1339,7 +1344,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                 
                 <Button
                   onClick={() => setShowInstagramDialog(true)}
-                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs px-3 py-1 h-7 w-full"
+                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs px-3 py-1 h-7 w-full md:min-h-0 md:h-7"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   Mark as Posted
@@ -1413,7 +1418,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                     <Button
                       size="sm"
                       onClick={() => handleUpdateInstagramLink(tempInstagramLink)}
-                      className="bg-[#E4405F] hover:bg-[#C13584] text-white text-xs px-2 py-0.5 h-5"
+                      className="bg-[#E4405F] hover:bg-[#C13584] text-white text-xs px-2 py-0.5 h-5 md:min-h-0 md:h-5"
                       disabled={updateSocialMediaMutation.isPending}
                     >
                       <Save className="w-3 h-3 mr-1" />
@@ -1426,7 +1431,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                         setEditingInstagramLink(false);
                         setTempInstagramLink('');
                       }}
-                      className="text-xs px-2 py-0.5 h-5"
+                      className="text-xs px-2 py-0.5 h-5 md:min-h-0 md:h-5"
                     >
                       Cancel
                     </Button>
@@ -1469,7 +1474,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                     setTempInstagramLink('');
                     setEditingInstagramLink(true);
                   }}
-                  className="bg-[#E4405F]/10 hover:bg-[#E4405F]/20 text-[#E4405F] text-xs px-2 py-1 h-6 w-full"
+                  className="bg-[#E4405F]/10 hover:bg-[#E4405F]/20 text-[#E4405F] text-xs px-2 py-1 h-6 w-full md:min-h-0 md:h-6"
                 >
                   <Instagram className="w-3 h-3 mr-1" />
                   Add Instagram Link
@@ -1500,7 +1505,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                         <Button
                           size="sm"
                           onClick={handleUpdatePostLink}
-                          className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs px-2 py-1 h-6"
+                          className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs px-2 py-1 h-6 md:min-h-0 md:h-6"
                           disabled={updateSocialMediaMutation.isPending}
                         >
                           Save
@@ -1512,7 +1517,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
                             setPostLink(request.socialMediaPostLink || '');
                             setEditingPostLink(false);
                           }}
-                          className="text-xs px-2 py-1 h-6"
+                          className="text-xs px-2 py-1 h-6 md:min-h-0 md:h-6"
                           disabled={updateSocialMediaMutation.isPending}
                         >
                           Cancel
@@ -1548,7 +1553,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
               {!request.socialMediaPostLink && !editingPostLink && (
                 <Button
                   onClick={() => setEditingPostLink(true)}
-                  className="bg-[#47b3cb]/20 hover:bg-[#47b3cb]/30 text-[#236383] text-xs px-2 py-1 h-6 w-full"
+                  className="bg-[#47b3cb]/20 hover:bg-[#47b3cb]/30 text-[#236383] text-xs px-2 py-1 h-6 w-full md:min-h-0 md:h-6"
                 >
                   + Add link
                 </Button>
@@ -1564,7 +1569,7 @@ const SocialMediaTracking: React.FC<SocialMediaTrackingProps> = ({ request }) =>
           <DialogHeader>
             <DialogTitle>Mark Social Media as Posted</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <p className="text-sm text-gray-600">
               Confirm that the social media post has been completed.
             </p>
@@ -2401,13 +2406,28 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
           presentUsers={collaboration.presentUsers}
           currentUserId={user?.id}
           canEditTspContact={canEditTspContact}
+          headerAction={
+            !request.nextAction && onAddNextAction ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onAddNextAction}
+                className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100 md:min-h-0 md:h-7"
+                data-testid="button-add-action-completed"
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Action
+              </Button>
+            ) : null
+          }
         />
 
-        {/* Next Action - shown when one exists; otherwise an "Add Action" affordance
-            is offered below. Mirrors the InProcessCard pattern so behavior is
+        {/* Next Action - shown when one exists; otherwise the "Add Action" button
+            sits at the right end of the header row (it used to take a row of its
+            own here). Mirrors the InProcessCard pattern so behavior is
             consistent across statuses. */}
         {request.nextAction ? (
-          <div className="mb-4 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg">
+          <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
               <div className="flex items-start gap-2 flex-1 min-w-0">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -2422,7 +2442,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={onEditNextAction}
-                    className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100"
+                    className="h-7 text-xs border-amber-400 text-amber-700 hover:bg-amber-100 md:min-h-0 md:h-7"
                   >
                     <Edit2 className="w-3 h-3 mr-1" />
                     Edit
@@ -2433,7 +2453,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     size="sm"
                     variant="default"
                     onClick={onCompleteNextAction}
-                    className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
+                    className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white md:min-h-0 md:h-7"
                   >
                     <CheckCircle className="w-3 h-3 mr-1" />
                     Complete
@@ -2442,19 +2462,6 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
               </div>
             </div>
           </div>
-        ) : onAddNextAction ? (
-          <div className="mb-3 flex justify-end">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onAddNextAction}
-              className="h-7 text-xs border-slate-300 text-slate-600 hover:bg-slate-100"
-              data-testid="button-add-action-completed"
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add Action
-            </Button>
-          </div>
         ) : null}
 
         {/* Main content split into two columns on lg+ so the card isn't a
@@ -2462,7 +2469,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
             Column 2: event summary (date history, recipients/team, follow-ups,
             completion notes). Mirrors the InProcessCard / ScheduledCardEnhanced
             two-column layout. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 lg:items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-3 mb-3 lg:items-start">
           {/* Column 1 */}
           <div className="space-y-3 min-w-0">
         {/* At-a-glance: sandwiches + social — minimal, expand only when needed */}
@@ -2485,11 +2492,11 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     if (e.key === 'Escape') cancelSandwichCountEdit();
                   }}
                 />
-                <Button size="sm" onClick={saveSandwichCount} disabled={updateSandwichCountMutation.isPending} className="h-7">
+                <Button size="sm" onClick={saveSandwichCount} disabled={updateSandwichCountMutation.isPending} className="h-7 md:min-h-0 md:h-7">
                   <Save className="w-3 h-3 mr-1" />
                   Save
                 </Button>
-                <Button size="sm" variant="ghost" onClick={cancelSandwichCountEdit} className="h-7">
+                <Button size="sm" variant="ghost" onClick={cancelSandwichCountEdit} className="h-7 md:min-h-0 md:h-7">
                   <X className="w-3 h-3 mr-1" />
                   Cancel
                 </Button>
@@ -2523,7 +2530,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                   size="sm"
                   variant="ghost"
                   onClick={startEditingSandwichCount}
-                  className="h-6 px-1.5 text-xs text-gray-500 hover:text-gray-800"
+                  className="h-6 px-1.5 text-xs text-gray-500 hover:text-gray-800 md:min-h-0 md:h-6"
                   title="Edit delivered count"
                 >
                   <Edit2 className="w-3 h-3 mr-1" />
@@ -2573,7 +2580,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                       socialMediaPostRequestedDate: todayDate,
                     });
                   }}
-                  className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs h-7 px-2"
+                  className="bg-[#007e8c] hover:bg-[#236383] text-white text-xs h-7 px-2 md:min-h-0 md:h-7"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   Mark Requested
@@ -2583,7 +2590,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 <Button
                   size="sm"
                   onClick={() => setShowInstagramDialog(true)}
-                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs h-7 px-2"
+                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs h-7 px-2 md:min-h-0 md:h-7"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   Mark Posted
@@ -2593,7 +2600,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                 <Button
                   size="sm"
                   onClick={() => setShowInstagramDialog(true)}
-                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs h-7 px-2"
+                  className="bg-[#fbad3f] hover:bg-[#a31c41] text-white text-xs h-7 px-2 md:min-h-0 md:h-7"
                   disabled={updateSocialMediaMutation.isPending}
                 >
                   <Instagram className="w-3 h-3 mr-1" />
@@ -2606,7 +2613,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-7 px-2 text-xs text-gray-500 hover:text-gray-800"
+                      className="h-7 px-2 text-xs text-gray-500 hover:text-gray-800 md:min-h-0 md:h-7"
                       disabled={updateSocialMediaMutation.isPending}
                       title="Edit social status"
                     >
@@ -2731,7 +2738,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => setShowRecipientAllocationDialog(true)}
-                      className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity md:min-h-0 md:min-w-0 md:h-5"
                       title={assignedRecipientInfo.length > 0 ? "Edit recipients" : "Add recipients"}
                     >
                       <Edit2 className="w-3 h-3" />
@@ -2761,7 +2768,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                           size="sm"
                           variant="ghost"
                           onClick={() => openAssignmentDialog('driver')}
-                          className="h-5 w-5 p-0 hover:bg-[#236383]/10"
+                          className="h-5 w-5 p-0 hover:bg-[#236383]/10 md:min-h-0 md:min-w-0 md:h-5"
                           title="Add driver"
                         >
                           <UserPlus className="w-3 h-3 text-[#236383]" />
@@ -2828,7 +2835,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
                       size="sm"
                       variant="ghost"
                       onClick={() => openAssignmentDialog('volunteer')}
-                      className="h-5 w-5 p-0 hover:bg-[#236383]/10"
+                      className="h-5 w-5 p-0 hover:bg-[#236383]/10 md:min-h-0 md:min-w-0 md:h-5"
                       title="Add volunteer"
                     >
                       <UserPlus className="w-3 h-3 text-[#236383]" />
@@ -3121,7 +3128,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
               e.stopPropagation();
               setShowAuditLog(!showAuditLog);
             }}
-            className="w-full justify-between text-gray-600 hover:text-gray-800 p-2 h-8"
+            className="w-full justify-between text-gray-600 hover:text-gray-800 p-2 h-8 md:min-h-0 md:h-8"
             data-testid="button-toggle-audit-log"
             type="button"
           >
@@ -3154,7 +3161,7 @@ export const CompletedCard: React.FC<CompletedCardProps> = ({
           <DialogHeader>
             <DialogTitle>Mark Social Media as Posted</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <p className="text-sm text-gray-600">
               Confirm that the social media post has been completed.
             </p>
