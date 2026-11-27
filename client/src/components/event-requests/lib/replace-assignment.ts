@@ -74,7 +74,14 @@ export function finishReplacement(
   const note = replacement.replacedDetails?.notes;
   if (newId && newId !== personId && note) {
     const details = { ...(out[k.details] || {}) };
-    details[newId] = { ...(details[newId] || {}), notes: note };
+    // The picked person may already be on the event with their own note
+    // (e.g. a typed-in duplicate replaced by the existing database entry):
+    // keep both notes rather than overwriting one.
+    const existing: string = details[newId]?.notes || '';
+    let notes = note;
+    if (existing.trim() === String(note).trim()) notes = existing;
+    else if (existing.trim()) notes = `${existing}\n${note}`;
+    details[newId] = { ...(details[newId] || {}), notes };
     out[k.details] = details;
   }
   return out;

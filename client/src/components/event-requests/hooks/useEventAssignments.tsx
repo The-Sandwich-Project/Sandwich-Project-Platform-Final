@@ -263,6 +263,9 @@ export const useEventAssignments = () => {
     setIsEditingAssignment(true);
     setEditingAssignmentPersonId(personId);
     setSelectedAssignees([personId]);
+    // A van-driver assignment leaves this flag on; clear it so changing a
+    // regular driver or volunteer replaces them instead of the van slot.
+    setIsVanDriverAssignment(false);
     openDialog('assignment');
   };
 

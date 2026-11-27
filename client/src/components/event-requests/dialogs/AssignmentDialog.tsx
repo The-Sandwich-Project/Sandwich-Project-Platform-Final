@@ -510,8 +510,15 @@ export const AssignmentDialog: React.FC<AssignmentDialogProps> = ({
   // "Change person" mode: start the tentative box at the person's current status,
   // so saving without touching it keeps them confirmed or tentative as they were.
   const isEditMode = isEditingAssignment && !!editingAssignmentPersonId && !isVanDriverAssignment;
+  // Set on every opening: the dialog stays mounted, and Cancel/Save close it
+  // without resetting, so a value left by one assignment must not carry into
+  // the next. Add mode always starts unchecked.
   useEffect(() => {
-    if (!isOpen || !isEditMode || !currentEvent) return;
+    if (!isOpen) return;
+    if (!isEditMode || !currentEvent) {
+      setIsTentative(false);
+      return;
+    }
     const raw = assignmentType === 'driver' ? currentEvent.tentativeDriverIds : currentEvent.tentativeVolunteerIds;
     const rawValue: unknown = raw;
     const list: string[] = Array.isArray(rawValue)

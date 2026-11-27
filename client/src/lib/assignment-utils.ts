@@ -4,7 +4,8 @@ import { extractNameFromAssignmentId } from '@shared/assignment-ids';
  * Centralized utilities for reading assignment data.
  *
  * These functions use the JSONB fields (driverDetails, speakerDetails, volunteerDetails)
- * as the source of truth, rather than the legacy array columns.
+ * as the source of truth, rather than the legacy array columns. People on the
+ * tentative lists are left out of the confirmed driver/volunteer ids and counts.
  *
  * This consolidates the dual-storage pattern where both arrays and JSONB exist.
  */
@@ -19,7 +20,25 @@ type EventWithAssignments = {
   assignedDriverIds?: string[] | null;
   assignedSpeakerIds?: string[] | null;
   assignedVolunteerIds?: string[] | null;
+  // Tentative people can have a details entry too (a note, or a confirmed
+  // person marked tentative), so they must be excluded from confirmed counts.
+  tentativeDriverIds?: string[] | string | null;
+  tentativeVolunteerIds?: string[] | string | null;
 };
+
+/** Reads an id list stored as a JS array or a Postgres array string ("{a,b}"). */
+function idList(value: string[] | string | null | undefined): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String);
+  const cleaned = value.replace(/^{|}$/g, '');
+  if (!cleaned) return [];
+  return (cleaned.match(/"[^"]*"|[^",]+/g) || []).map((s) => s.replace(/"/g, '').trim()).filter(Boolean);
+}
+
+function withoutTentative(ids: string[], tentative: string[] | string | null | undefined): string[] {
+  const t = new Set(idList(tentative));
+  return t.size ? ids.filter((id) => !t.has(String(id))) : ids;
+}
 
 function parseDetails(details?: Record<string, any> | string | null): Record<string, any> | null {
   if (!details) return null;
@@ -87,9 +106,9 @@ export function resolveAssignmentDisplayName(
  */
 export function getDriverIds(event: EventWithAssignments): string[] {
   const parsed = parseDetails(event.driverDetails);
-  if (parsed) return Object.keys(parsed);
+  if (parsed) return withoutTentative(Object.keys(parsed), event.tentativeDriverIds);
   if (event.assignedDriverIds && event.assignedDriverIds.length > 0) {
-    return event.assignedDriverIds;
+    return withoutTentative(event.assignedDriverIds, event.tentativeDriverIds);
   }
   return [];
 }
@@ -163,9 +182,9 @@ export function getSpeakerDetail(event: EventWithAssignments, personId: string):
  */
 export function getVolunteerIds(event: EventWithAssignments): string[] {
   const parsed = parseDetails(event.volunteerDetails);
-  if (parsed) return Object.keys(parsed);
+  if (parsed) return withoutTentative(Object.keys(parsed), event.tentativeVolunteerIds);
   if (event.assignedVolunteerIds && event.assignedVolunteerIds.length > 0) {
-    return event.assignedVolunteerIds;
+    return withoutTentative(event.assignedVolunteerIds, event.tentativeVolunteerIds);
   }
   return [];
 }

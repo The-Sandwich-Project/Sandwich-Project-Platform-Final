@@ -81,6 +81,30 @@ describe('Change person on an event card', () => {
     expect(update.volunteerDetails.u43.notes).toBeUndefined();
   });
 
+  it('keeps both notes when the picked person is already on the event', () => {
+    const withDuplicate = {
+      assignedVolunteerIds: ['u3', 'custom-2-Ana'],
+      tentativeVolunteerIds: [],
+      volunteerDetails: {
+        u3: { name: 'Ana', notes: 'Bringing a cooler' },
+        'custom-2-Ana': { name: 'Ana', notes: 'Can stay late' },
+      },
+    };
+    const update = change(withDuplicate, 'volunteer', 'custom-2-Ana', ['u3'], false);
+    expect(update.assignedVolunteerIds).toEqual(['u3']);
+    expect(update.volunteerDetails.u3).toEqual({ name: 'Ana', notes: 'Bringing a cooler\nCan stay late' });
+    expect(update.volunteerDetails['custom-2-Ana']).toBeUndefined();
+  });
+
+  it('does not repeat a note that is already the same', () => {
+    const same = {
+      assignedVolunteerIds: ['u3', 'custom-2-Ana'],
+      volunteerDetails: { u3: { notes: 'Cooler' }, 'custom-2-Ana': { notes: 'Cooler' } },
+    };
+    const update = change(same, 'volunteer', 'custom-2-Ana', ['u3'], false);
+    expect(update.volunteerDetails.u3.notes).toBe('Cooler');
+  });
+
   it('reads id lists in either storage format', () => {
     expect(toIdList(['a', 'b'])).toEqual(['a', 'b']);
     expect(toIdList('{a,"b c"}')).toEqual(['a', 'b c']);
