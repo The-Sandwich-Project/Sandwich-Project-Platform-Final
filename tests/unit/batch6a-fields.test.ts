@@ -53,3 +53,15 @@ describe('constrained fields are refused with a clear message', () => {
     expect(strictBooleanFieldError({ nextDayPickup: 'maybe' })).toMatch(/must be one of: no, option, planned/);
   });
 });
+
+describe('inline overnight saves keep next-day pickup in sync', () => {
+  const { normalizeNextDayPickupPatch } = require('../../shared/next-day-pickup');
+  it('saving a location without a choice marks it planned', () => {
+    expect(normalizeNextDayPickupPatch({ overnightHoldingLocation: 'Church hall' })).toEqual({ overnightHoldingLocation: 'Church hall', nextDayPickup: 'planned' });
+  });
+  it('an explicit choice, a cleared location, or unrelated saves are left alone', () => {
+    expect(normalizeNextDayPickupPatch({ overnightHoldingLocation: 'Church', nextDayPickup: 'option' })).toEqual({ overnightHoldingLocation: 'Church', nextDayPickup: 'option' });
+    expect(normalizeNextDayPickupPatch({ overnightHoldingLocation: null })).toEqual({ overnightHoldingLocation: null });
+    expect(normalizeNextDayPickupPatch({ notes: 'x' })).toEqual({ notes: 'x' });
+  });
+});

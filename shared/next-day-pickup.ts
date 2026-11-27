@@ -28,3 +28,19 @@ export function effectiveNextDayPickup(event: {
   if (isNextDayPickup(event?.nextDayPickup)) return event!.nextDayPickup as NextDayPickup;
   return String(event?.overnightHoldingLocation ?? '').trim() ? 'planned' : 'no';
 }
+
+/**
+ * Keep the choice in sync on save: a request that sets an overnight holding
+ * location but says nothing about nextDayPickup (the Scheduled card's
+ * Recipient Logistics editor, the inline location edit, older clients) means
+ * the group is holding overnight, so the choice becomes 'planned'. Without
+ * this, a stored 'no' / 'option' would hide the saved location.
+ */
+export function normalizeNextDayPickupPatch<T extends Record<string, any>>(updates: T): T {
+  if (!updates || typeof updates !== 'object') return updates;
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(updates, k);
+  if (has('overnightHoldingLocation') && !has('nextDayPickup') && String(updates.overnightHoldingLocation ?? '').trim()) {
+    return { ...updates, nextDayPickup: 'planned' };
+  }
+  return updates;
+}
