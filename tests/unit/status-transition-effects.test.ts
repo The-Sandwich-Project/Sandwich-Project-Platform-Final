@@ -2,6 +2,7 @@ import {
   easternDatePlusDays,
   normalizeIncomingStatus,
   rescheduleMoveFields,
+  scheduledDateMoveFields,
   statusTransitionEffects,
 } from '../../server/utils/status-transition-effects';
 
@@ -80,5 +81,28 @@ describe('rescheduleMoveFields (old clients sending "rescheduled")', () => {
   });
   it('does nothing for other statuses', () => {
     expect(rescheduleMoveFields('scheduled', { scheduledEventDate: first }, {})).toEqual({});
+  });
+});
+
+describe('scheduledDateMoveFields (a Scheduled event moved to another day, e.g. in Edit)', () => {
+  const stored = { status: 'scheduled', scheduledEventDate: new Date('2026-12-05T12:00:00Z'), postponementCount: 0 };
+  it('records the move and keeps the first date', () => {
+    expect(scheduledDateMoveFields(stored, { scheduledEventDate: '2026-12-12' })).toEqual({
+      wasPostponed: true,
+      postponementCount: 1,
+      originalScheduledDate: stored.scheduledEventDate,
+    });
+  });
+  it('counts further moves without replacing the original date', () => {
+    const moved = { ...stored, postponementCount: 1, originalScheduledDate: new Date('2026-11-28T12:00:00Z') };
+    expect(scheduledDateMoveFields(moved, { scheduledEventDate: '2026-12-19' })).toEqual({ wasPostponed: true, postponementCount: 2 });
+  });
+  it('does nothing for the same day, a request that records it itself, unscheduled events, or a move off Scheduled', () => {
+    expect(scheduledDateMoveFields(stored, { scheduledEventDate: '2026-12-05' })).toEqual({});
+    expect(scheduledDateMoveFields(stored, { scheduledEventDate: '2026-12-12', wasPostponed: true, postponementCount: 1 })).toEqual({});
+    expect(scheduledDateMoveFields({ ...stored, status: 'in_process' }, { scheduledEventDate: '2026-12-12' })).toEqual({});
+    expect(scheduledDateMoveFields({ ...stored, scheduledEventDate: null }, { scheduledEventDate: '2026-12-12' })).toEqual({});
+    expect(scheduledDateMoveFields(stored, { scheduledEventDate: '2026-12-12', status: 'in_process' })).toEqual({});
+    expect(scheduledDateMoveFields(stored, { notes: 'x' })).toEqual({});
   });
 });

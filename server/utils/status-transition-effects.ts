@@ -34,6 +34,41 @@ export function rescheduleMoveFields(
   return out;
 }
 
+const dayKeyOf = (v: unknown): string => {
+  if (v === null || v === undefined || v === '') return '';
+  const d = v instanceof Date ? v : new Date(String(v).length === 10 ? `${v}T12:00:00` : String(v));
+  return Number.isNaN(d.getTime()) ? String(v) : d.toISOString().slice(0, 10);
+};
+
+/**
+ * A Scheduled event moved to a different day (from Edit or anywhere else; the
+ * card's Reschedule button is gone): record the move, so the card's
+ * "Rescheduled" history badge and "originally scheduled for" keep working.
+ * Skipped when the request records it itself (wasPostponed /
+ * postponementCount), when the event wasn't scheduled with a date, or when it
+ * stops being Scheduled (losing its date is "needs new date" instead).
+ */
+export function scheduledDateMoveFields(
+  original: { status?: string | null; scheduledEventDate?: unknown; originalScheduledDate?: unknown; postponementCount?: number | null },
+  updates: Record<string, unknown>,
+): Record<string, unknown> {
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(updates, k);
+  if (!SCHEDULED_STATUSES.has(String(original.status)) || !original.scheduledEventDate) return {};
+  if (!has('scheduledEventDate') || !updates.scheduledEventDate) return {};
+  if (has('wasPostponed') || has('postponementCount')) return {};
+  const nextStatus = normalizeIncomingStatus((updates.status as string | undefined) ?? original.status ?? '');
+  if (nextStatus !== 'scheduled') return {};
+  if (dayKeyOf(updates.scheduledEventDate) === dayKeyOf(original.scheduledEventDate)) return {};
+  const out: Record<string, unknown> = {
+    wasPostponed: true,
+    postponementCount: (Number(original.postponementCount) || 0) + 1,
+  };
+  if (!updates.originalScheduledDate && !original.originalScheduledDate) {
+    out.originalScheduledDate = original.scheduledEventDate;
+  }
+  return out;
+}
+
 /** Days until the default standby check-back reminder. */
 export const DEFAULT_STANDBY_CHECK_BACK_DAYS = 7;
 

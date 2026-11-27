@@ -1,5 +1,5 @@
 import { normalizeToolkitPatch, isToolkitSent } from '@shared/toolkit-state';
-import { normalizeIncomingStatus, rescheduleMoveFields, statusTransitionEffects } from '../utils/status-transition-effects';
+import { normalizeIncomingStatus, rescheduleMoveFields, scheduledDateMoveFields, statusTransitionEffects } from '../utils/status-transition-effects';
 import { strictBooleanFieldError } from '../utils/strict-boolean-fields';
 import { normalizeAttendancePatch } from '@shared/attendance-estimate';
 import { normalizeNextDayPickupPatch } from '@shared/next-day-pickup';
@@ -2925,6 +2925,9 @@ router.patch(
         processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
       }
 
+      // A Scheduled event moved to another day records the move (history badge).
+      Object.assign(processedUpdates, scheduledDateMoveFields(originalEvent as any, processedUpdates as Record<string, unknown>));
+
       // Check if status is changing and set statusChangedAt accordingly
       if (
         processedUpdates.status &&
@@ -3672,6 +3675,9 @@ router.put(
         );
         processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
       }
+
+      // A Scheduled event moved to another day records the move (history badge).
+      Object.assign(processedUpdates, scheduledDateMoveFields(originalEvent as any, processedUpdates as Record<string, unknown>));
 
       // Check if status is changing and set statusChangedAt accordingly
       if (

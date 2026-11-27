@@ -81,7 +81,6 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { MultiRecipientSelector } from '@/components/ui/multi-recipient-selector';
 import { getMissingIntakeInfo } from '@/lib/event-request-validation';
 import { EventRequestAuditLog } from '@/components/event-request-audit-log';
-import { useMessageAboutEvent } from '@/components/chat/chat-dock-context';
 import { InstructionsSection } from '../form-sections/InstructionsSection';
 import { MlkDayBadge } from '@/components/event-requests/MlkDayBadge';
 import { MissingDriverTimeBadge } from '@/components/event-requests/MissingDriverTimeBadge';
@@ -131,7 +130,8 @@ interface ScheduledCardEnhancedProps {
   onAssignTspContact: () => void;
   onEditTspContact: () => void;
   onLogContact: () => void;
-  onReschedule: () => void;
+  /** No longer shown on the card (dates change in Edit); kept so callers don't break. */
+  onReschedule?: () => void;
   onCancelEvent?: () => void;
   onDuplicate?: () => void;
   onAiIntakeAssist?: () => void;
@@ -184,7 +184,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   onAssignTspContact,
   onEditTspContact,
   onLogContact,
-  onReschedule,
   onCancelEvent,
   onDuplicate,
   onAiIntakeAssist,
@@ -209,7 +208,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
   const [showAuditLog, setShowAuditLog] = useState(false);
   const [showSchedulingNotes, setShowSchedulingNotes] = useState(false);
   const [showNotesAndRequirements, setShowNotesAndRequirements] = useState(false);
-  const messageAboutEvent = useMessageAboutEvent(request);
   const [showInstructionsDialog, setShowInstructionsDialog] = useState(false);
   const [instructionsDraft, setInstructionsDraft] = useState({ driverInstructions: '', volunteerInstructions: '' });
   const [showSendSmsDialog, setShowSendSmsDialog] = useState(false);
@@ -1671,8 +1669,8 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
           <div className="flex flex-col gap-3 h-full">
             {/* Event Details Card */}
             <div className="bg-white rounded-lg p-3 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md">
-              <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] flex items-center gap-2 mb-2">
-                <Calendar className="w-4 h-4 text-[#47B3CB]" aria-hidden="true" />
+              <h3 className="text-base uppercase font-bold tracking-wide text-[#236383] flex items-center gap-2 pb-2 mb-3 border-b border-[#47B3CB]/30">
+                <Calendar className="w-5 h-5 text-[#47B3CB]" aria-hidden="true" />
                 Event Details
               </h3>
               <div className="space-y-2">
@@ -1808,8 +1806,8 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   <div className="hidden sm:flex flex-row items-start justify-between gap-4 min-w-0">
                     <div className="grid grid-cols-3 gap-3 text-sm flex-1 min-w-0">
                       {/* Start Time */}
-                      <div className="min-w-0">
-                        <div className="text-[#236383] text-sm uppercase font-semibold mb-0.5">Start</div>
+                      <div className="min-w-0 rounded-md bg-[#E9EFF3]/70 px-3 py-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">Start</div>
                         {isEditingThisCard && editingField === 'eventStartTime' ? (
                           <div className="flex flex-col gap-2">
                             <Input
@@ -1830,15 +1828,15 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             </div>
                           </div>
                         ) : (
-                          <div className="text-base font-bold group cursor-pointer text-[#236383]" onClick={() => canEdit && startEditing('eventStartTime', formatTimeForInput(request.eventStartTime || ''))}>
+                          <div className="text-lg font-bold group cursor-pointer text-[#114145]" onClick={() => canEdit && startEditing('eventStartTime', formatTimeForInput(request.eventStartTime || ''))}>
                             {request.eventStartTime ? formatTime12Hour(request.eventStartTime) : <span className="text-gray-600 font-medium">Not set</span>}
                           </div>
                         )}
                       </div>
 
                       {/* End Time */}
-                      <div className="min-w-0">
-                        <div className="text-[#236383] text-sm uppercase font-semibold mb-0.5">End</div>
+                      <div className="min-w-0 rounded-md bg-[#E9EFF3]/70 px-3 py-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">End</div>
                         {isEditingThisCard && editingField === 'eventEndTime' ? (
                           <div className="flex flex-col gap-2">
                             <Input
@@ -1859,15 +1857,15 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             </div>
                           </div>
                         ) : (
-                          <div className="text-base font-bold group cursor-pointer text-[#236383]" onClick={() => canEdit && startEditing('eventEndTime', formatTimeForInput(request.eventEndTime || ''))}>
+                          <div className="text-lg font-bold group cursor-pointer text-[#114145]" onClick={() => canEdit && startEditing('eventEndTime', formatTimeForInput(request.eventEndTime || ''))}>
                             {request.eventEndTime ? formatTime12Hour(request.eventEndTime) : <span className="text-gray-600 font-medium">Not set</span>}
                           </div>
                         )}
                       </div>
 
                     {/* Pickup Time */}
-                    <div className="min-w-0">
-                      <div className="text-gray-700 text-sm uppercase font-semibold mb-0.5">Pickup</div>
+                    <div className="min-w-0 rounded-md bg-[#E9EFF3]/70 px-3 py-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">Pickup</div>
                       {isEditingThisCard && editingField === 'pickupDateTime' ? (
                         <div className="flex flex-col gap-2">
                           <DateTimePicker
@@ -1888,7 +1886,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         </div>
                       ) : (
                         <div>
-                          <div className="text-base font-bold group cursor-pointer text-gray-900 flex items-center gap-2 flex-wrap min-w-0" onClick={() => canEdit && startEditing('pickupDateTime', request.pickupDateTime?.toString() || '')}>
+                          <div className="text-lg font-bold group cursor-pointer text-[#114145] flex items-center gap-2 flex-wrap min-w-0" onClick={() => canEdit && startEditing('pickupDateTime', request.pickupDateTime?.toString() || '')}>
                             {(() => {
                               // Check if overnight holding is set and use overnight pickup time if available
                               // Overnight pickup is always next day
@@ -2205,9 +2203,9 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 </div>
               </div>
             ) : canEdit ? (
-              <div className="mt-3">
+              <div className="mt-3 pt-3 border-t border-gray-100">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs uppercase text-gray-600 font-medium">Recipient Logistics</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Recipient Logistics</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-[#FBAD3F]/20 text-[#B8871F] border-[#FBAD3F] text-xs py-0.5 px-2">
@@ -2230,7 +2228,9 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             ) : null}
 
             {/* Sandwiches - inside Event Details container, after Recipient Logistics */}
-            <div className="flex items-center gap-2 pb-2 border-b border-gray-200 mt-2">
+            <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">Sandwiches &amp; attendees</div>
+            <div className="flex items-center gap-2">
               <Package className="w-5 h-5 shrink-0" />
               {isEditingThisCard && editingField === 'sandwichTypes' ? (
                 <div className="flex-1">
@@ -2264,9 +2264,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 </div>
               )}
             </div>
+            </div>
 
             {/* Record Final Sandwich Count - for day-of recording before event completes */}
-            <div className="flex items-center gap-2 pt-2 border-t border-gray-200 mt-2">
+            <div className="flex items-center gap-2 pt-3 border-t border-gray-100 mt-3">
               <Check className="w-5 h-5 shrink-0 text-green-600" aria-hidden="true" />
               {isEditingActualCount ? (
                 <div className="flex-1 bg-green-50 rounded p-3 space-y-2 border border-green-200">
@@ -2344,7 +2345,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xs uppercase text-gray-600 font-medium">Final Count</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Final Count</div>
                       <div className="text-sm font-semibold">
                         {(request as any).actualSandwichCount ? (
                           <span className="text-green-700">
@@ -3872,26 +3873,9 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               </>
             )}
 
-            {/* Group 3 — Team coordination (message other TSP team members about this event) */}
-            <div className="h-6 w-px bg-slate-200 mx-0.5" aria-hidden="true" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={messageAboutEvent}
-                  className="border-[#007E8C] text-[#007E8C] hover:bg-[#007E8C]/10"
-                  data-testid="button-message-event"
-                >
-                  <MessageSquare className="w-4 h-4 mr-1" />
-                  Message
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Message the team about this event</p>
-              </TooltipContent>
-            </Tooltip>
-
+            {/* Group 3 — Team coordination. (The "Message" button was removed:
+                the team doesn't message about events from here.) */}
+            {canEdit && <div className="h-6 w-px bg-slate-200 mx-0.5" aria-hidden="true" />}
             {canEdit && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -3941,10 +3925,8 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
               </Button>
             )}
 
-
-            <Button size="sm" variant="outline" onClick={onReschedule}>
-              Reschedule
-            </Button>
+            {/* No "Reschedule" button: a new date is set in Edit (the event stays
+                Scheduled and the card keeps its "Rescheduled" history badge). */}
 
             {onCancelEvent && (
               <Tooltip>
