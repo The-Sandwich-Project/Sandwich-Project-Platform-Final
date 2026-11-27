@@ -11,6 +11,8 @@ import { normalizeToolkitPatch } from '@shared/toolkit-state';
 import { hasActiveSandwichRange } from '@shared/sandwich-count-utils';
 import { estimateStateFromFields, normalizeEstimate } from '@shared/sandwich-estimate';
 import type { EventFormData } from './form-sections/types';
+import { effectiveNextDayPickup } from '@shared/next-day-pickup';
+import { hasAttendanceRange } from '@shared/attendance-estimate';
 export { findMismatchedSavedFields, getDroppedServerFields } from '@/lib/event-save-verification';
 
 /**
@@ -80,11 +82,36 @@ export function buildAttendancePatch(value: unknown): {
  * A no-op for drafts saved after the change: they have no `volunteerCount`.
  */
 export function normalizeDraftAttendance(snapshot: any): any {
-  if (!snapshot || typeof snapshot !== 'object' || !('volunteerCount' in snapshot)) {
-    return snapshot;
+  if (!snapshot || typeof snapshot !== 'object') return snapshot;
+  let out = snapshot;
+  if ('volunteerCount' in out) {
+    const { volunteerCount, ...rest } = out;
+    out = { ...rest, estimatedAttendance: resolveEstimatedAttendance(snapshot) };
   }
-  const { volunteerCount, ...rest } = snapshot;
-  return { ...rest, estimatedAttendance: resolveEstimatedAttendance(snapshot) };
+  return normalizeDraftNewFields(out);
+}
+
+/**
+ * Bring a draft snapshot saved before batch 6a's fields existed into the
+ * current shape, the same way the form opens an event. Applied to both halves
+ * of a draft (see normalizeDraftAttendance): a field missing from an old
+ * draft would otherwise look like a server edit next to the current form's
+ * default (0, false, 'no') and win the merge, discarding the user's changes.
+ *   - no attendance range: estimatedAttendanceMin/Max = 0
+ *   - no next-day choice: derived from the overnight location, like older events
+ *   - no TSP shopping: false
+ */
+export function normalizeDraftNewFields(snapshot: any): any {
+  if (!snapshot || typeof snapshot !== 'object') return snapshot;
+  const out = { ...snapshot };
+  if (!('estimatedAttendanceMin' in out)) out.estimatedAttendanceMin = 0;
+  if (!('estimatedAttendanceMax' in out)) out.estimatedAttendanceMax = 0;
+  if (!('nextDayPickup' in out)) {
+    out.nextDayPickup = effectiveNextDayPickup(out);
+    out.holdingOvernight = out.nextDayPickup === 'planned';
+  }
+  if (!('isTspShopped' in out)) out.isTspShopped = false;
+  return out;
 }
 
 /**
@@ -147,8 +174,12 @@ export function buildEventDataForServer(
     // Location
     eventAddress: formData.eventAddress || null,
     deliveryDestination: formData.deliveryDestination || null,
-    overnightHoldingLocation: formData.overnightHoldingLocation || null,
-    overnightPickupTime: formData.overnightPickupTime || null,
+    // Next-day pickup: only a planned one keeps the overnight details. Form
+    // state from before the choice existed (a recovered draft) derives it the
+    // same way older events do, so its overnight location isn't dropped.
+    nextDayPickup: effectiveNextDayPickup(formData as any),
+    overnightHoldingLocation: effectiveNextDayPickup(formData as any) === 'planned' ? formData.overnightHoldingLocation || null : null,
+    overnightPickupTime: effectiveNextDayPickup(formData as any) === 'planned' ? formData.overnightPickupTime || null : null,
 
     // Refrigeration
     hasRefrigeration: formData.hasRefrigeration === 'true' ? true :
@@ -165,6 +196,9 @@ export function buildEventDataForServer(
         : null;
     })(),
     volunteersNeeded: parseInt(formData.volunteersNeeded?.toString() || '0') || 0,
+
+    // TSP shopping: strictly true/false (the column is NOT NULL)
+    isTspShopped: formData.isTspShopped === true,
 
     // Contacts
     tspContact: formData.tspContact || null,
@@ -290,6 +324,15 @@ export function buildEventDataForServer(
   // large-event logistics modal) and must never be written from an input —
   // that is what let the two columns drift apart.
   Object.assign(eventData, buildAttendancePatch(formData.estimatedAttendance));
+  // A range ("40-60") keeps its ends; a single number clears them.
+  {
+    const min = Number((formData as any).estimatedAttendanceMin) || 0;
+    const max = Number((formData as any).estimatedAttendanceMax) || 0;
+    // 0 is a valid low end ("0-10"); no range is 0/0 in form state.
+    const isRange = eventData.estimatedAttendance != null && hasAttendanceRange(min, max);
+    eventData.estimatedAttendanceMin = isRange ? min : null;
+    eventData.estimatedAttendanceMax = isRange ? max : null;
+  }
   eventData.adultCount = formData.adultCount || 0;
   eventData.childrenCount = formData.childrenCount || 0;
   eventData.kidsAgeRange = formData.kidsAgeRange || null;
@@ -448,6 +491,16 @@ export const ESTIMATE_SAVE_KEYS = [
  *   the editor previewed (sending only a cleared total would make it drop the
  *   per-type amounts that are still shown).
  */
+/** The expected-attendees number and its range travel together. */
+export const ATTENDANCE_SAVE_KEYS = [
+  'estimatedAttendance',
+  'volunteerCount',
+  'estimatedAttendanceMin',
+  'estimatedAttendanceMax',
+] as const;
+
+const SAVE_TOGETHER: readonly (readonly string[])[] = [ESTIMATE_SAVE_KEYS, ATTENDANCE_SAVE_KEYS];
+
 export function dropUnchangedFields(
   eventData: Record<string, any>,
   baselineData: Record<string, any>,
@@ -455,11 +508,12 @@ export function dropUnchangedFields(
 ): string[] {
   const has = (o: Record<string, any>, k: string) => Object.prototype.hasOwnProperty.call(o, k);
   const same = (k: string) => has(baselineData, k) && JSON.stringify(eventData[k]) === JSON.stringify(baselineData[k]);
-  const estimateChanged = ESTIMATE_SAVE_KEYS.some((k) => has(eventData, k) && !same(k));
+  // A group whose parts only make sense together is sent whole when any part changed.
+  const changedGroups = SAVE_TOGETHER.filter((group) => group.some((k) => has(eventData, k) && !same(k)));
   const omitted: string[] = [];
   for (const key of Object.keys(eventData)) {
     if (overrides && has(overrides, key)) continue;
-    if (estimateChanged && (ESTIMATE_SAVE_KEYS as readonly string[]).includes(key)) continue;
+    if (changedGroups.some((group) => group.includes(key))) continue;
     if (same(key)) {
       delete eventData[key];
       omitted.push(key);
@@ -475,6 +529,10 @@ export function dropUnchangedFields(
  */
 const MERGE_TOGETHER: string[][] = [
   ['standbyCheckBackMode', 'standbyCheckBackDate', 'standbyExpectedDate'],
+  ['estimatedAttendance', 'estimatedAttendanceMin', 'estimatedAttendanceMax'],
+  // The next-day choice and the overnight details it keeps or drops (choosing
+  // No / It's an option clears the delivery window and parking too).
+  ['nextDayPickup', 'holdingOvernight', 'overnightHoldingLocation', 'overnightPickupTime', 'deliveryTimeWindow', 'deliveryParkingAccess'],
 ];
 
 /**

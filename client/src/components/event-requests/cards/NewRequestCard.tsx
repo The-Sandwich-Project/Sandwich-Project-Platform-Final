@@ -71,6 +71,9 @@ import {
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { InfoBadge, CardActionRow, ActionRowSpacer } from './card-ui';
 import { EventNotesSection } from './EventNotesSection';
+import { TspShoppingBadge } from '../TspShopping';
+import { ExpectedAttendeesInline } from '../ExpectedAttendees';
+import { NextDayPickupBadge } from '../NextDayPickupBadge';
 
 interface NewRequestCardProps {
   request: EventRequest;
@@ -481,6 +484,14 @@ const CardHeader: React.FC<CardHeaderProps> = ({
                 New Department
               </Badge>
             )}
+            <NextDayPickupBadge event={request} />
+            <TspShoppingBadge
+              eventRequestId={request.id}
+              isTspShopped={(request as any).isTspShopped}
+              organizationName={request.organizationName}
+              canEdit={!!canEdit}
+              hideWhenFalse
+            />
             {/* Partner Organizations */}
             {request.partnerOrganizations && Array.isArray(request.partnerOrganizations) && request.partnerOrganizations.length > 0 && (
               <div className="text-base sm:text-lg text-gray-600 mt-1">
@@ -1068,8 +1079,11 @@ export const NewRequestCard: React.FC<NewRequestCardProps> = ({
                   <span className="font-medium">Sandwiches:</span>
                   <span>{formatEventEstimate(request)}</span>
                 </div>
+                <ExpectedAttendeesInline event={request} className="mt-1" />
               </div>
-            ) : null}
+            ) : (
+              <ExpectedAttendeesInline event={request} />
+            )}
 
             {/* Previous Host Status — derived from the real previouslyHosted
                 column (the list used to send a computed hasHostedBefore, which
