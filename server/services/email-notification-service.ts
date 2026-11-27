@@ -1033,11 +1033,16 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
 
         // Determine subject and header based on whether it's a reply
         const isReply = !!originalComment;
-        const emailSubject = isReply
+        // On New requests the thread is "New Event Flags": notes from intake
+        // for the TSP contact. A flag added after assignment arrives here.
+        const isFlag = event.status === 'new';
+        const emailSubject = isFlag
+          ? `New flag on ${organizationName} - The Sandwich Project`
+          : isReply
           ? `${commenterFirstName} replied to a comment on ${organizationName} - The Sandwich Project`
           : `New comment on ${organizationName} event - The Sandwich Project`;
-        const emailHeader = isReply ? '↩️ New Reply on Event' : '💬 New Comment on Event';
-        const commentAction = isReply ? 'replied' : 'commented';
+        const emailHeader = isFlag ? '🚩 New Event Flag' : isReply ? '↩️ New Reply on Event' : '💬 New Comment on Event';
+        const commentAction = isFlag ? 'added a flag' : isReply ? 'replied' : 'commented';
 
         // Build original comment HTML section (only shown for replies)
         const originalCommentHtml = isReply ? `
@@ -1056,7 +1061,7 @@ To unsubscribe from these emails, please contact us at katie@thesandwichproject.
 In reply to ${originalComment.userName}'s comment:
 "${displayOriginalComment}"
 
-${commenterFirstName} replied on ${formattedCommentTime}:` : `${commenterFirstName} commented on ${formattedCommentTime}:`;
+${commenterFirstName} replied on ${formattedCommentTime}:` : `${commenterFirstName} ${commentAction} on ${formattedCommentTime}:`;
 
         const msg = {
           to: userEmail,
@@ -1085,7 +1090,7 @@ ${commenterFirstName} replied on ${formattedCommentTime}:` : `${commenterFirstNa
                 </div>
                 <div class="content">
                   <p>Hello ${userName}!</p>
-                  <p>${isReply ? `<strong>${commenterFirstName}</strong> replied to a comment on an event you're assigned to:` : 'A new comment has been added to an event you\'re assigned to:'}</p>
+                  <p>${isFlag ? 'A new flag was added to an event you\'re assigned to. Please read it before you reach out:' : isReply ? `<strong>${commenterFirstName}</strong> replied to a comment on an event you're assigned to:` : 'A new comment has been added to an event you\'re assigned to:'}</p>
 
                   <div class="event-details">
                     <strong>Organization:</strong> ${organizationName}<br>
@@ -1113,7 +1118,7 @@ ${commenterFirstName} replied on ${formattedCommentTime}:` : `${commenterFirstNa
           text: `
 Hello ${userName}!
 
-${isReply ? `${commenterFirstName} replied to a comment on an event you're assigned to:` : 'A new comment has been added to an event you\'re assigned to:'}
+${isFlag ? 'A new flag was added to an event you\'re assigned to. Please read it before you reach out:' : isReply ? `${commenterFirstName} replied to a comment on an event you're assigned to:` : 'A new comment has been added to an event you\'re assigned to:'}
 
 Organization: ${organizationName}
 Event Date: ${formattedEventDate}

@@ -78,7 +78,12 @@ export const SandwichEstimateEditor: React.FC<SandwichEstimateEditorProps> = ({
 
   return (
     <div className="space-y-3" data-testid={`${idPrefix}-editor`}>
-      <Label className={labelClass}>Estimated sandwiches</Label>
+      <div>
+        <Label className={labelClass}>Estimated sandwiches</Label>
+        <p className={`text-xs ${hintClass}`} data-testid={`${idPrefix}-range-hint`}>
+          Any box takes a single number or a range, like <strong>400</strong> or <strong>400-500</strong>.
+        </p>
+      </div>
       <div className="space-y-2">
         {ROWS.map(({ key, label }) => {
           const row = state[key];
@@ -99,7 +104,7 @@ export const SandwichEstimateEditor: React.FC<SandwichEstimateEditorProps> = ({
               </div>
               <Input
                 id={`${id}-amount`}
-                inputMode="numeric"
+                inputMode="text"
                 value={row.amount}
                 disabled={!row.checked}
                 onChange={(e) => setRow(key, { amount: e.target.value })}
@@ -120,7 +125,7 @@ export const SandwichEstimateEditor: React.FC<SandwichEstimateEditorProps> = ({
           </Label>
           <Input
             id={`${idPrefix}-total`}
-            inputMode="numeric"
+            inputMode="text"
             value={state.total}
             onChange={(e) => update({ ...state, total: e.target.value })}
             placeholder="e.g. 300 or 300-400"
