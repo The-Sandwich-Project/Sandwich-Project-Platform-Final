@@ -24,6 +24,7 @@ export {
   StandbyDetailsSection,
   standbyCheckBackValue,
   isStandbyReasonComplete,
+  isStandbyCheckBackComplete,
   type StandbyCheckBackMode,
 } from './StandbyDetailsSection';
 

@@ -42,3 +42,13 @@ describe('Standby details in the edit form', () => {
     expect(standbyCheckBackValue('one_week', '')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
+
+describe('Standby check-back date', () => {
+  it('"On a specific date" needs a date; only "No reminder" turns it off', () => {
+    const { isStandbyCheckBackComplete } = require('../form-sections/StandbyDetailsSection');
+    expect(isStandbyCheckBackComplete('specific', '')).toBe(false);
+    expect(isStandbyCheckBackComplete('specific', '2026-12-20')).toBe(true);
+    expect(isStandbyCheckBackComplete('none', '')).toBe(true);
+    expect(isStandbyCheckBackComplete('one_week', '')).toBe(true);
+  });
+});

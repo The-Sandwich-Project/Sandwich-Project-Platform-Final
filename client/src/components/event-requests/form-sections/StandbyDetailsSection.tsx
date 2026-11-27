@@ -26,7 +26,7 @@ interface StandbyDetailsSectionProps {
   setCheckBackMode: (mode: StandbyCheckBackMode) => void;
   checkBackDate: string;
   setCheckBackDate: (date: string) => void;
-  /** Show the "pick a reason" hint after a save attempt without one. */
+  /** Show the "pick a reason" / "pick a date" hints after a save attempt. */
   showReasonError: boolean;
 }
 
@@ -43,6 +43,14 @@ export function standbyCheckBackValue(mode: StandbyCheckBackMode, specificDate: 
   if (mode === 'none') return '';
   if (mode === 'one_week') return datePlusDays(7);
   return specificDate;
+}
+
+/**
+ * A check-back choice is complete unless it's "on a specific date" with no
+ * date: only "No reminder" may turn the reminder off.
+ */
+export function isStandbyCheckBackComplete(mode: StandbyCheckBackMode, specificDate: string): boolean {
+  return mode !== 'specific' || /^\d{4}-\d{2}-\d{2}$/.test(specificDate.trim());
 }
 
 /** A reason is required; "Other" also needs a note. */
@@ -141,14 +149,21 @@ export const StandbyDetailsSection: React.FC<StandbyDetailsSectionProps> = ({
             On a specific date
           </label>
           {checkBackMode === 'specific' && (
-            <Input
-              type="date"
-              value={checkBackDate}
-              min={datePlusDays(0)}
-              onChange={(e) => setCheckBackDate(e.target.value)}
-              className="ml-6 w-48 bg-white"
-              data-testid="standby-checkback-date"
-            />
+            <>
+              <Input
+                type="date"
+                value={checkBackDate}
+                min={datePlusDays(0)}
+                onChange={(e) => setCheckBackDate(e.target.value)}
+                className="ml-6 w-48 bg-white"
+                data-testid="standby-checkback-date"
+              />
+              {showReasonError && !isStandbyCheckBackComplete(checkBackMode, checkBackDate) && (
+                <p className="ml-6 text-sm text-red-600" data-testid="standby-checkback-error">
+                  Pick a date, or choose "No reminder".
+                </p>
+              )}
+            </>
           )}
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input

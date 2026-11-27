@@ -18,6 +18,14 @@ import {
   subscribeEventRequestViewedChanges,
 } from '@/lib/event-request-viewed';
 
+/**
+ * Tabs that were retired, mapped to where old links should land. The
+ * Rescheduled tab is gone: a moved event is simply Scheduled.
+ */
+function retiredTabRedirect<T extends string | null | undefined>(tab: T): T {
+  return (tab === 'rescheduled' ? 'scheduled' : tab) as T;
+}
+
 interface EventRequestContextType {
   // Event requests data
   eventRequests: EventRequest[];
@@ -147,9 +155,9 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
   // Default to 'new' tab if no initialTab is provided, otherwise use initialTab or role default
   const getDefaultTab = () => {
     // The Rescheduled tab was retired; old links land on Scheduled.
-    if (initialTab === 'rescheduled') return 'scheduled';
-    if (initialTab && ['new', 'in_process', 'scheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments', 'admin_overview'].includes(initialTab)) {
-      return initialTab;
+    const initial = retiredTabRedirect(initialTab);
+    if (initial && ['new', 'in_process', 'scheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments', 'admin_overview'].includes(initial)) {
+      return initial;
     }
     // Default to 'new' for event requests when no tab is specified
     return 'new';
@@ -246,9 +254,10 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
   // Update activeTab when initialTab prop changes (for navigation)
   useEffect(() => {
     const validTabs = ['all', 'new', 'in_process', 'scheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments', 'admin_overview', 'sandwich_overview'];
-    if (initialTab && validTabs.includes(initialTab)) {
-      logger.log('[EventRequestContext] Setting activeTab from initialTab:', initialTab);
-      setActiveTab(initialTab);
+    const tab = retiredTabRedirect(initialTab);
+    if (tab && validTabs.includes(tab)) {
+      logger.log('[EventRequestContext] Setting activeTab from initialTab:', tab);
+      setActiveTab(tab);
     } else if (!initialTab) {
       // Reset to 'new' when initialTab is cleared/null (but only if we're not already on a valid tab)
       if (!validTabs.includes(activeTab)) {
@@ -261,7 +270,7 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
   // Also listen to URL changes directly in case the component doesn't remount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const tabFromUrl = urlParams.get('tab');
+    const tabFromUrl = retiredTabRedirect(urlParams.get('tab'));
     const sectionFromUrl = urlParams.get('section');
     const validTabs = ['all', 'new', 'in_process', 'scheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments', 'admin_overview', 'sandwich_overview'];
 
@@ -628,8 +637,9 @@ const EventRequestProviderInner: React.FC<EventRequestProviderProps> = ({
 
   // Handle initial event ID - auto-open event details if specified
   useEffect(() => {
-    if (initialTab && ['new', 'in_process', 'scheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments', 'admin_overview'].includes(initialTab)) {
-      setActiveTab(initialTab);
+    const initial = retiredTabRedirect(initialTab);
+    if (initial && ['new', 'in_process', 'scheduled', 'completed', 'declined', 'standby', 'stalled', 'non_event', 'my_assignments', 'admin_overview'].includes(initial)) {
+      setActiveTab(initial);
     }
 
     if (initialEventId && !hasHandledInitialEvent && (eventRequests.length > 0 || !isLoading)) {

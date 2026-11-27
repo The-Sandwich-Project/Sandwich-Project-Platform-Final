@@ -53,6 +53,7 @@ import {
   StandbyDetailsSection,
   standbyCheckBackValue,
   isStandbyReasonComplete,
+  isStandbyCheckBackComplete,
   type StandbyCheckBackMode,
   DeleteConfirmDialog,
   type EventFormData,
@@ -1284,6 +1285,19 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         toast({
           title: 'What are we waiting on?',
           description: 'Pick a reason in the Standby details before saving.',
+          variant: 'destructive',
+        });
+        document.querySelector('[data-testid="standby-details"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      // "On a specific date" needs a date: a blank one must not silently turn
+      // the reminder off (only "No reminder" does that).
+      if (!isStandbyCheckBackComplete(standbyFollowUpMode, standbyFollowUpDate)) {
+        setStandbyReasonError(true);
+        setIsSubmitting(false);
+        toast({
+          title: 'Pick a check-back date',
+          description: 'Choose a date in the Standby details, or "No reminder".',
           variant: 'destructive',
         });
         document.querySelector('[data-testid="standby-details"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
