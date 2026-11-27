@@ -18,7 +18,22 @@ interface GuideItem {
   topic: string;
   /** Talking points or rules of thumb for this topic. */
   points?: string[];
+  /** An outside page to open while on the call. */
+  link?: { label: string; href: string };
 }
+
+/** Where we usually hold events (from the old intake call form). */
+export const TYPICAL_OPERATING_AREAS = [
+  'Dunwoody',
+  'Sandy Springs',
+  'Intown (generally not South Atlanta)',
+  'Buckhead',
+  'Peachtree Corners',
+  'Alpharetta',
+  'Milton',
+  'Marietta',
+  'Roswell',
+];
 
 interface GuideSection {
   title: string;
@@ -46,6 +61,7 @@ export const INTAKE_GUIDE_SECTIONS: GuideSection[] = [
       {
         topic: 'Outside our usual area?',
         points: [
+          `Our typical areas: ${TYPICAL_OPERATING_AREAS.join(', ')}.`,
           'Check with Christine & Marcy before saying yes.',
           'Let the group know we will try to make it work but need leadership confirmation first.',
         ],
@@ -67,28 +83,33 @@ export const INTAKE_GUIDE_SECTIONS: GuideSection[] = [
         topic: 'How many sandwiches?',
         points: [
           'An exact number or a range is fine (e.g. 400-500).',
-          'Under about 200 sandwiches is usually better as a Wednesday drop-off at a host home than a group event. Check with Christine/Marcy before going ahead with a smaller group event.',
+          'Under about 200 sandwiches is usually better as a Wednesday drop-off at a host home than a group event. Share the host finder with them. Check with Christine/Marcy before going ahead with a smaller group event.',
         ],
+        link: { label: 'Open TSP Host Finder', href: 'https://tsp-host-finder-tool.web.app/' },
       },
       {
         topic: 'Deli or PB&J?',
         points: [
           'We focus on fresh deli sandwiches.',
           'Only a limited number of recipient partners can take PB&J, so groups making a larger number of sandwiches should make deli.',
+          'No fridge space for deli? They can make enough for the van, or switch to PB&J.',
         ],
       },
       {
         topic: 'Children under 13 making PB&J?',
         points: [
           'We generally do not have children under 13 make PB&J, for safety and hygiene reasons.',
-          'A high adult-to-child ratio improves the odds of an exception.',
+          'A high adult-to-child ratio improves the odds of an exception. Clear any exception with Christine/Marcy.',
         ],
       },
       {
         topic: 'Expected number of people',
         points: ['A rough estimate is fine; it is expected to change.'],
       },
-      { topic: 'Do they want TSP volunteers?' },
+      {
+        topic: 'Do they want TSP volunteers?',
+        points: ['Our volunteer roster is limited, so we generally prioritize larger events. Only offer volunteers if it really fits the event.'],
+      },
       {
         topic: 'Is TSP buying the food?',
         points: ['If TSP is ordering the ingredients, mark "TSP shopping" on the event.'],
@@ -125,9 +146,10 @@ export const INTAKE_GUIDE_SECTIONS: GuideSection[] = [
       {
         topic: 'Event rules',
         points: [
-          'Food-safe gloves and hair restraints (hair tied back) for everyone.',
+          'Food-safe gloves and hairnets (beardnets where relevant) for everyone.',
+          'Access to sinks for handwashing. Hand sanitizer is NOT sufficient.',
           'Sandwiches are made indoors.',
-          'Tablecloths on work surfaces.',
+          'Disposable tablecloths on work surfaces help keep the prep area clean.',
           'Someone to snap photos.',
         ],
       },
@@ -151,7 +173,10 @@ export const INTAKE_GUIDE_SECTIONS: GuideSection[] = [
       {
         topic: 'How to make the sandwiches',
         points: [
-          'Two slices of bread, two slices of cheese, two to three slices of turkey (show them the PDF).',
+          'Deli: bread → cheese → meat → cheese → bread. Two slices of cheese, with the meat in between.',
+          'Meat: check the serving size on the package and use that many slices per sandwich (= 2 oz, our required amount).',
+          'PB&J: peanut butter on BOTH slices of bread; jelly on one side, kept away from the edges so it doesn\'t leak.',
+          'Each sandwich goes in its own sandwich-sized ziploc, stacked 10–12 per stack, back in the bag the loaf came out of.',
           'Teams work in an assembly line.',
           'A runner gets meat and cheese out of the fridge and puts finished sandwiches back.',
           'Mention the recommended PB&J spatulas (link in the toolkit).',
@@ -159,7 +184,7 @@ export const INTAKE_GUIDE_SECTIONS: GuideSection[] = [
       },
       {
         topic: 'Labels',
-        points: ['Labels go on the outside of each loaf bag (10–12 sandwiches per bag).'],
+        points: ['Labels go on the outside of each loaf bag (the bag holding the 10–12 bagged sandwiches).'],
       },
     ],
   },
@@ -232,6 +257,16 @@ export function EventIntakeTrainingGuide() {
                           <li key={point}>{point}</li>
                         ))}
                       </ul>
+                    )}
+                    {item.link && (
+                      <a
+                        href={item.link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 ml-4 inline-block text-sm font-medium text-[#007E8C] underline hover:text-[#236383]"
+                      >
+                        {item.link.label}
+                      </a>
                     )}
                   </li>
                 ))}
