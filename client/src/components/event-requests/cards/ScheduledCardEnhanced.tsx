@@ -2324,13 +2324,6 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
               </div>
             </div>
-          </div>
-
-          {/* Column 2: Event Organizer (top) + Team Assignments (bottom).
-              Event Organizer was previously in Column 1; moved here so the right
-              column carries the people-oriented info (organizer + TSP contact + team)
-              and the left column is purely Event Details. */}
-          <div className="flex flex-col gap-3 h-full">
             <div className="bg-white rounded-lg p-3 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md">
               <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-2 flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#47B3CB]" aria-hidden="true" />
@@ -2363,7 +2356,11 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                 )}
               </div>
             </div>
+          </div>
 
+          {/* Column 2: Team Assignments. Event Organizer sits under Event Details
+              in Column 1 so the columns stay balanced when the team list grows. */}
+          <div className="flex flex-col gap-3 h-full">
             <div className="bg-white rounded-lg p-3 border-l-4 border-[#47B3CB] border-t border-r border-b border-[#47B3CB]/20 shadow-md flex-1">
               <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-2 flex items-center gap-2">
                 <Users className="w-4 h-4 text-[#236383]" aria-hidden="true" />
@@ -2580,7 +2577,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             </>
                           )}
                         </div>
-                        <div className="space-y-1">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-1">
                           {parsePostgresArray(request.assignedDriverIds).map((id) => {
                             const isCustom = id.startsWith('custom-');
                             // Check if the ID itself looks like a human name (not a system ID)
@@ -2738,7 +2735,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             );
                           })}
                           {parsePostgresArray(request.assignedDriverIds).length === 0 && driverNeeded > 0 && parsePostgresArray(request.tentativeDriverIds).length === 0 && (
-                            <Badge variant="outline" className="bg-[#236383]/20 text-[#236383] border-[#236383] font-medium">
+                            <Badge variant="outline" className="justify-self-start w-fit bg-[#236383]/20 text-[#236383] border-[#236383] font-medium">
                               <Car className="w-3 h-3 mr-1" />None assigned
                             </Badge>
                           )}
@@ -3043,7 +3040,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         </>
                       )}
                     </div>
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-1">
                       {parsePostgresArray(request.assignedVolunteerIds).map((id) => {
                         const detailName = (request.volunteerDetails as Record<string, { name?: string }>)?.[id]?.name;
                         const resolvedName = resolveUserName(id);
@@ -3201,7 +3198,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                         </div>
                         );
                       })}
-                      {volunteerAssigned === 0 && parsePostgresArray(request.tentativeVolunteerIds).length === 0 && <Badge variant="outline" className="bg-[#47B3CB]/15 text-[#236383] border-[#47B3CB]/40 font-medium"><Users className="w-3 h-3 mr-1" />None assigned</Badge>}
+                      {volunteerAssigned === 0 && parsePostgresArray(request.tentativeVolunteerIds).length === 0 && <Badge variant="outline" className="justify-self-start w-fit bg-[#47B3CB]/15 text-[#236383] border-[#47B3CB]/40 font-medium"><Users className="w-3 h-3 mr-1" />None assigned</Badge>}
                       {/* Tentative Volunteers */}
                       {parsePostgresArray(request.tentativeVolunteerIds).map((id) => {
                         const detailName = (request.volunteerDetails as Record<string, { name?: string }>)?.[id]?.name;
