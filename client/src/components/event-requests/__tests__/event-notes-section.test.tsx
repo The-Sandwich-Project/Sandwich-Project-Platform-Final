@@ -41,6 +41,15 @@ describe('Event card notes section', () => {
     expect(screen.queryByRole('button', { name: /Reply|Edit|Delete|Add/ })).toBeNull();
   });
 
+  it('opening flags by default makes no network requests (no per-comment likes)', () => {
+    const fetchSpy = jest.fn();
+    (global as any).fetch = fetchSpy;
+    setup('flags', [comment(1, 'Budget is tight'), comment(2, 'Prefers mornings'), { ...comment(3, 'Agreed'), parentCommentId: 1 }]);
+    expect(screen.getByText('Prefers mornings')).toBeTruthy();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('like-button-1')).toBeNull();
+  });
+
   it('other cards with no comments show nothing', () => {
     setup('earlier', []);
     expect(screen.queryByTestId('earlier-comments')).toBeNull();

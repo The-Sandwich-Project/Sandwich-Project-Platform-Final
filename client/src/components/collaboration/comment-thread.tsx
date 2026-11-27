@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageSquare, Edit2, Trash2, Reply, Loader2, Heart } from "lucide-react";
+import { MessageSquare, Edit2, Trash2, Reply, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import type { EventCollaborationComment } from "@shared/schema";
@@ -95,38 +94,14 @@ function CommentItem({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const queryClient = useQueryClient();
 
   const isOwner = comment.userId === currentUserId;
   const maxDepth = 3;
   const replies = getReplies(comment.id);
 
-  // Fetch likes for this comment
-  const { data: likesData } = useQuery({
-    queryKey: [`/api/event-requests/${eventId}/collaboration/comments/${comment.id}/likes`],
-  });
-
-  const likes = likesData?.likes || [];
-  const likeCount = likes.length;
-  const isLikedByMe = likes.some((like: any) => like.userId === currentUserId);
-
-  // Like/unlike mutation
-  const likeMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch(`/api/event-requests/${eventId}/collaboration/comments/${comment.id}/likes`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to toggle like');
-      return response.json();
-    },
-    onSuccess: () => {
-      // Refetch likes for this comment
-      queryClient.invalidateQueries({
-        queryKey: [`/api/event-requests/${eventId}/collaboration/comments/${comment.id}/likes`],
-      });
-    },
-  });
+  // Likes were never built on the server (GET always returned an empty list,
+  // POST saved nothing), so there's no like button and no per-comment
+  // request: with flags open by default, that was one useless request each.
 
   const handleSaveEdit = async () => {
     if (!editContent.trim() || isSubmitting) return;
@@ -225,22 +200,6 @@ function CommentItem({
 
               {!readOnly && (
               <div className="flex items-center gap-2 mt-2">
-                {/* Like button - always visible */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={cn(
-                    "h-7 text-xs",
-                    isLikedByMe && "text-red-500 hover:text-red-600"
-                  )}
-                  onClick={() => likeMutation.mutate()}
-                  disabled={likeMutation.isPending}
-                  data-testid={`like-button-${comment.id}`}
-                >
-                  <Heart className={cn("h-3 w-3 mr-1", isLikedByMe && "fill-current")} />
-                  {likeCount > 0 && <span>{likeCount}</span>}
-                </Button>
-
                 {/* Other actions - shown on hover */}
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   {depth < maxDepth && (
