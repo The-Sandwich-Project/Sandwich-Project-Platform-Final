@@ -170,6 +170,31 @@ describe("a recovered draft's sharing OK stays with its day", () => {
     const server = { ...original, vanDay: '2026-12-09' };
     expect(intelligentMergeFormData(draft, original, server).mergedData.vanTeamOk).toBe(false);
   });
+  describe('drafts saved before vanDay existed', () => {
+    const oldOriginal = { eventDate: '2026-12-05', vanDriverNeeded: true, vanTeamOk: false };
+    const server = { ...oldOriginal, vanDay: '2026-12-05' };
+
+    it("keep the drafted date (the server's first vanDay isn't a change)", () => {
+      const oldDraft = { ...oldOriginal, eventDate: '2026-12-09' };
+      const { mergedData, conflicts } = intelligentMergeFormData(oldDraft, oldOriginal, server);
+      expect(mergedData).toMatchObject({ eventDate: '2026-12-09', vanDay: '2026-12-09' });
+      expect(conflicts).not.toContain('eventDate');
+    });
+    it("take the server's day when the draft didn't touch the date", () => {
+      const oldDraft = { ...oldOriginal, planningNotes: 'x' };
+      expect(intelligentMergeFormData(oldDraft, oldOriginal, { ...server, vanDay: '2026-12-07' }).mergedData).toMatchObject({
+        eventDate: '2026-12-05', vanDay: '2026-12-07',
+      });
+    });
+    it('still let the server win when both changed the date', () => {
+      const oldDraft = { ...oldOriginal, eventDate: '2026-12-09' };
+      const moved = { ...server, eventDate: '2026-12-11', vanDay: '2026-12-11' };
+      const { mergedData, conflicts } = intelligentMergeFormData(oldDraft, oldOriginal, moved);
+      expect(mergedData).toMatchObject({ eventDate: '2026-12-11', vanDay: '2026-12-11' });
+      expect(conflicts).toContain('eventDate');
+    });
+  });
+
   it('keeps a draft OK when the day is unchanged', () => {
     const draft = { ...original, vanTeamOk: true };
     expect(intelligentMergeFormData(draft, original, original).mergedData.vanTeamOk).toBe(true);

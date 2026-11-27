@@ -594,12 +594,23 @@ export function intelligentMergeFormData(
   for (const group of MERGE_TOGETHER) {
     const keys = group.filter((k) => k in cachedFormData || k in currentServerData);
     if (keys.length === 0) continue;
-    const userChanged = keys.some((k) => !valuesEqual(cachedFormData[k], originalServerData[k]));
-    const serverChanged = keys.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
+    // A field newer than the draft (e.g. vanDay, added after it was saved) is
+    // in neither snapshot. Its first appearance on the server isn't a change,
+    // so it can't outvote the user's edit to the rest of its group.
+    const newerThanDraft = (k: string) => !(k in cachedFormData) && !(k in originalServerData);
+    const compared = keys.filter((k) => !newerThanDraft(k));
+    const userChanged = compared.some((k) => !valuesEqual(cachedFormData[k], originalServerData[k]));
+    const serverChanged = compared.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
     // Same rule as single fields: both changed -> the server wins.
     const source = userChanged && !serverChanged ? cachedFormData : currentServerData;
     if (group.includes('vanTeamOk')) vanGroupSource = source;
-    for (const k of keys) mergedData[k] = source[k];
+    for (const k of keys) {
+      if (!newerThanDraft(k)) mergedData[k] = source[k];
+      // The draft moved the date: the van's day is that new date (as
+      // withEventDate sets it). Otherwise the server's value stands.
+      else if (k === 'vanDay' && source === cachedFormData) mergedData[k] = cachedFormData.eventDate;
+      else mergedData[k] = currentServerData[k];
+    }
     if (userChanged && serverChanged) conflicts.push(...keys);
     else if (userChanged) userChangesPreserved.push(...keys);
     else if (serverChanged) serverUpdates.push(...keys);
