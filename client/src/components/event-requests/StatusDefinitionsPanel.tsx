@@ -17,13 +17,12 @@ import type { EventStatus } from '@shared/event-status-workflow';
 const statusOrder: EventStatus[] = [
   'new',
   'in_process',
+  'standby',
   'scheduled',
-  'rescheduled',
   'completed',
   'declined',
   'cancelled',
   'non_event',
-  'standby',
   'stalled',
 ];
 
@@ -117,12 +116,11 @@ export const StatusDefinitionsPanel: React.FC<{ defaultOpen?: boolean }> = ({ de
                 <strong>Declined</strong> usually fits better.
               </li>
               <li>
-                If a <strong>Scheduled</strong> event needs to be rescheduled but the group cannot provide a new date right away, move it to <strong>Standby</strong> until the new date is confirmed.
+                If a <strong>Scheduled</strong> event's date moves, just change the date. If it loses its date and the group needs to pick a new one, move it back to <strong>In Process</strong>; it shows a <strong>Needs new date</strong> badge until it's scheduled again.
               </li>
               <li>
                 Status changes to Declined, Cancelled, or Non-Event still require a
-                reason to be recorded, and Scheduled/Rescheduled still require an
-                event date.
+                reason to be recorded, and Scheduled still requires an event date.
               </li>
             </ul>
           </div>

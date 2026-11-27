@@ -99,7 +99,6 @@ export function buildEventRequestsListFilterParams(
   if (activeTab === 'new') return { status: 'new' };
   if (activeTab === 'in_process') return { status: 'in_process' };
   if (activeTab === 'scheduled') return { status: 'scheduled,rescheduled' };
-  if (activeTab === 'rescheduled') return { status: 'rescheduled' };
 
   // Other status tabs (no date restrictions) - lazy load these on demand
   // "declined" tab shows both declined AND cancelled events

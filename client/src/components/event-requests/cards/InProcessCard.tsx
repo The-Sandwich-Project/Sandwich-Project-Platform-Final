@@ -82,6 +82,8 @@ import { RefreshCw } from 'lucide-react';
 import { useEventRequestContext } from '../context/EventRequestContext';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { InfoBadge, CardActionRow, ActionRowSpacer } from './card-ui';
+import { needsNewDate } from '../lib/inProcessFilters';
+import { parseEventDate } from '@/lib/date-utils';
 
 interface InProcessCardProps {
   request: EventRequest;
@@ -625,6 +627,23 @@ const CardHeader: React.FC<CardHeaderProps> = ({
           <Calendar className="w-4 h-4 opacity-80" />
           <span className="text-xs font-semibold opacity-80">Event Date</span>
         </div>
+        {needsNewDate(request) && (
+          <div
+            className="mb-2 flex items-center gap-1.5 rounded-md bg-[#FBAD3F] px-2 py-1 text-sm font-semibold text-[#114145]"
+            data-testid="badge-needs-new-date"
+          >
+            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              Needs new date
+              {(() => {
+                const was = parseEventDate(request.scheduledEventDate as any);
+                return was
+                  ? ` · was scheduled for ${was.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : '';
+              })()}
+            </span>
+          </div>
+        )}
         {isEditingDate ? (
           <div className="flex items-center gap-2">
             <Input

@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
 import type { CheckInReminderPreferences } from '@shared/types';
 import {
   EMPTY_IN_PROCESS_FILTERS,
@@ -117,6 +117,21 @@ export function InProcessFilterBar({ filters, onChange, resultCount }: InProcess
             <SelectItem value="updated">Last updated (longest ago first)</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="mt-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={filters.needsNewDate ? 'default' : 'outline'}
+          aria-pressed={filters.needsNewDate}
+          className="h-8 text-xs"
+          onClick={() => set({ needsNewDate: !filters.needsNewDate })}
+          data-testid="filter-needs-new-date"
+        >
+          <RotateCcw className="mr-1 h-3 w-3" />
+          Needs new date
+        </Button>
       </div>
 
       {(active || usingOwn) && (
