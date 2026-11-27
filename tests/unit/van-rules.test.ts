@@ -90,6 +90,28 @@ describe('save-time cleanup (normalizeVanPatch)', () => {
   it('turning the van off clears the OK and the reason', () => {
     expect(normalizeVanPatch({ vanDriverNeeded: false }, stored)).toMatchObject({ vanTeamOk: false, vanReason: null });
   });
+
+  // The route's van-purpose cleanup (selfTransport -> van off) runs AFTER this
+  // helper, so it must judge the event as it will be saved.
+  const tspVan = { ...stored, vanDriverNeeded: true, vanTeamOk: true, vanReason: 'no fridge' };
+  it('self-transport or the DHL van clears the OK and the reason (even before the van is turned off)', () => {
+    expect(normalizeVanPatch({ selfTransport: true }, tspVan)).toMatchObject({ vanTeamOk: false, vanReason: null });
+    expect(normalizeVanPatch({ selfTransport: 'true' } as any, tspVan)).toMatchObject({ vanTeamOk: false, vanReason: null });
+    expect(normalizeVanPatch({ isDhlVan: true }, tspVan)).toMatchObject({ vanTeamOk: false, vanReason: null });
+  });
+  it('an OK sent along with leaving TSP\'s van is still cleared', () => {
+    expect(normalizeVanPatch({ selfTransport: true, vanTeamOk: true, vanReason: 'x' }, tspVan)).toMatchObject({ vanTeamOk: false, vanReason: null });
+  });
+  it('switching back to TSP\'s van later finds no old OK to reuse', () => {
+    const leftVan = { ...tspVan, ...normalizeVanPatch({ isDhlVan: true }, tspVan), isDhlVan: true };
+    expect(leftVan.vanTeamOk).toBe(false);
+    expect(normalizeVanPatch({ isDhlVan: false }, leftVan)).not.toHaveProperty('vanTeamOk', true);
+  });
+  it("leaves the OK and reason alone while the event keeps TSP's van", () => {
+    expect(normalizeVanPatch({ selfTransport: false }, tspVan)).not.toHaveProperty('vanTeamOk');
+    expect(normalizeVanPatch({ isDhlVan: false, vanDriverNeeded: true }, tspVan)).not.toHaveProperty('vanReason');
+    expect(normalizeVanPatch({ vanTeamOk: true }, tspVan)).toMatchObject({ vanTeamOk: true });
+  });
   it('a new date clears the OK; the same day in another format does not', () => {
     expect(normalizeVanPatch({ scheduledEventDate: '2026-12-06' }, stored)).toMatchObject({ vanTeamOk: false });
     expect(normalizeVanPatch({ scheduledEventDate: '2026-12-05' }, stored)).not.toHaveProperty('vanTeamOk');

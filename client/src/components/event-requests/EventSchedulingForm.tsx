@@ -59,7 +59,7 @@ import {
   type EventFormData,
 } from './form-sections';
 import { TspShoppingCheckbox } from './TspShopping';
-import { vanReasonMissing } from './form-sections/VanDetailsPanel';
+import { vanReasonMissing, withEventDate } from './form-sections/VanDetailsPanel';
 import { effectiveNextDayPickup } from '@shared/next-day-pickup';
 import { ExpectedAttendeesField } from './form-sections/ExpectedAttendeesField';
 import {
@@ -1257,7 +1257,14 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   // ── Date Change ────────────────────────────────────────────────────
 
   const handleDateChangeConfirmation = () => {
-    setFormData(prev => ({ ...prev, eventDate: pendingDateChange }));
+    setFormData(prev =>
+      withEventDate(prev, pendingDateChange, eventRequest
+        ? {
+            date: formatDateForInput(eventRequest.desiredEventDate || eventRequest.scheduledEventDate),
+            vanTeamOk: (eventRequest as any).vanTeamOk === true,
+          }
+        : null),
+    );
     setShowDateConfirmation(false);
     setPendingDateChange('');
   };

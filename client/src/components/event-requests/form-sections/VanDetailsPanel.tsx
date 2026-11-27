@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { totalFromFields } from '@shared/sandwich-estimate';
 import {
+  SAME_DAY_VAN_QUERY_KEY,
   VAN_REASON_THRESHOLD,
   describeVanEvent,
   effectiveVanTime,
@@ -42,6 +43,23 @@ export function vanReasonMissing(formData: any): boolean {
   return vanReasonRequired(formData, formEstimateMax(formData)) && !String(formData.vanReason ?? '').trim();
 }
 
+/**
+ * Set the form's event date. "Events team OK'd sharing the van" was about the
+ * conflict on the saved day, so a different day starts unticked (the panel
+ * then shows that day's conflicts as pending); going back to the saved day
+ * restores the saved OK. The server clears a saved OK on a date change too
+ * (normalizeVanPatch).
+ */
+export function withEventDate<T extends { eventDate?: string; vanTeamOk?: boolean }>(
+  prev: T,
+  newDate: string,
+  saved: { date: string; vanTeamOk: boolean } | null | undefined,
+): T {
+  if (newDate === prev.eventDate) return { ...prev, eventDate: newDate };
+  const backToSavedDay = !!saved && newDate === saved.date;
+  return { ...prev, eventDate: newDate, vanTeamOk: backToSavedDay ? saved!.vanTeamOk : false };
+}
+
 function dateOnly(v: unknown): string | null {
   if (!v) return null;
   const s = String(v);
@@ -51,7 +69,7 @@ function dateOnly(v: unknown): string | null {
 export function useSameDayVanEvents(eventDate: unknown, eventRequestId: number | null | undefined, enabled: boolean) {
   const date = dateOnly(eventDate);
   return useQuery<{ otherEvents: SameDayVanEvent[] }>({
-    queryKey: ['van-requests-for-date', date, eventRequestId ?? null],
+    queryKey: [SAME_DAY_VAN_QUERY_KEY, date, eventRequestId ?? null],
     queryFn: async () => {
       const params = new URLSearchParams({ date: date! });
       if (eventRequestId) params.set('excludeEventId', String(eventRequestId));

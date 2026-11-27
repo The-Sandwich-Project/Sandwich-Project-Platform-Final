@@ -4,7 +4,7 @@ jest.mock('@/lib/queryClient', () => ({ apiRequest: jest.fn(), queryClient: {}, 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { VanDetailsPanel, formVanTime, vanReasonMissing } from '../form-sections/VanDetailsPanel';
+import { VanDetailsPanel, formVanTime, vanReasonMissing, withEventDate } from '../form-sections/VanDetailsPanel';
 import { buildEventDataForServer } from '../form-utils';
 
 function Harness({ initial, others = [] as any[], stored }: { initial: any; others?: any[]; stored?: any }) {
@@ -74,5 +74,43 @@ describe('saving the van fields', () => {
   it('clears them when the van is not needed (or is the DHL van)', () => {
     expect(build({ vanDriverNeeded: false, vanReason: 'x', vanTeamOk: true })).toMatchObject({ vanReason: null, vanTeamOk: false });
     expect(build({ vanDriverNeeded: true, isDhlVan: true, vanReason: 'x', vanTeamOk: true })).toMatchObject({ vanReason: null, vanTeamOk: false });
+  });
+});
+
+describe("a new event date resets the form's sharing OK", () => {
+  const saved = { date: '2026-12-05', vanTeamOk: true };
+  const form = { eventDate: '2026-12-05', vanTeamOk: true, other: 1 };
+
+  it('unticks the OK on a different day', () => {
+    expect(withEventDate(form, '2026-12-06', saved)).toEqual({ eventDate: '2026-12-06', vanTeamOk: false, other: 1 });
+  });
+  it('restores the saved OK when the date goes back to the saved day', () => {
+    const moved = withEventDate(form, '2026-12-06', saved);
+    expect(withEventDate(moved, '2026-12-05', saved)).toMatchObject({ eventDate: '2026-12-05', vanTeamOk: true });
+  });
+  it('keeps the OK when the date is set to the same value', () => {
+    expect(withEventDate({ ...form, vanTeamOk: true }, '2026-12-05', null)).toMatchObject({ vanTeamOk: true });
+  });
+  it('shows the new day as pending, not already approved', async () => {
+    function DateHarness() {
+      (global as any).fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ otherEvents: [{ id: 2, organizationName: 'Lincoln Elementary', vanDriverNeeded: true, vanTeamOk: false }] }),
+      });
+      const [formData, setFormData] = React.useState<any>({ ...base, vanTeamOk: true });
+      return (
+        <QueryClientProvider client={new QueryClient()}>
+          <button onClick={() => setFormData((p: any) => withEventDate(p, '2026-12-06', saved))}>move</button>
+          <VanDetailsPanel formData={formData} setFormData={setFormData} eventRequestId={7} />
+        </QueryClientProvider>
+      );
+    }
+    render(<DateHarness />);
+    await waitFor(() => expect(screen.getByTestId('van-conflict')).toBeTruthy());
+    expect((screen.getByTestId('checkbox-van-team-ok') as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByText('move'));
+    await waitFor(() => expect(screen.getByTestId('van-conflict')).toBeTruthy());
+    expect((screen.getByTestId('checkbox-van-team-ok') as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText(/Until this is ticked/)).toBeTruthy();
   });
 });

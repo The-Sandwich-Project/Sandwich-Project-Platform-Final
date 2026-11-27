@@ -38,7 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { totalFromFields } from '@shared/sandwich-estimate';
-import { VAN_REASON_THRESHOLD, describeVanEvent, vanIsPending, vanReasonRequired } from '@shared/van-rules';
+import { SAME_DAY_VAN_QUERY_KEY, VAN_REASON_THRESHOLD, describeVanEvent, vanIsPending, vanReasonRequired } from '@shared/van-rules';
 
 /** The fields of the event the van rules need (shared/van-rules.ts). */
 interface VanRuleEvent {
@@ -125,7 +125,7 @@ function useSameDayVanRequests(
   const dateStr = normalizeDateStr(eventDate);
 
   return useQuery<{ otherEvents: SameDayVanRequest[] }>({
-    queryKey: ['van-requests-for-date', dateStr, eventRequestId],
+    queryKey: [SAME_DAY_VAN_QUERY_KEY, dateStr, eventRequestId],
     queryFn: async () => {
       const params = new URLSearchParams({ date: dateStr! });
       params.set('excludeEventId', String(eventRequestId));

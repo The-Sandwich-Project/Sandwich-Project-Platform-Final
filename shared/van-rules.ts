@@ -20,6 +20,9 @@ export type VanTime = (typeof VAN_TIMES)[number];
 
 export const VAN_REASON_THRESHOLD = 800;
 
+/** TanStack Query key prefix for /api/event-requests/van-requests-for-date (badge + edit form). */
+export const SAME_DAY_VAN_QUERY_KEY = 'van-requests-for-date';
+
 export function isVanTime(v: unknown): v is VanTime {
   return typeof v === 'string' && (VAN_TIMES as readonly string[]).includes(v);
 }
@@ -134,6 +137,10 @@ export function describeVanEvent(o: SameDayVanEvent): string {
   return `${o.organizationName || 'Another event'}${detail ? ` (${detail})` : ''}`;
 }
 
+/** true / false from a boolean or the strings "true" / "false" (as some clients send); else as-is. */
+const asBool = (v: unknown): boolean | null | undefined =>
+  v === 'true' ? true : v === 'false' ? false : (v as boolean | null | undefined);
+
 const dayKey = (v: unknown): string => {
   if (v === null || v === undefined || v === '') return '';
   const d = v instanceof Date ? v : new Date(String(v).length === 10 ? `${v}T12:00:00` : String(v));
@@ -144,7 +151,9 @@ const dayKey = (v: unknown): string => {
  * Keep the van fields consistent on save (PATCH/PUT), given the stored event:
  *  - start or end time changed -> the sheet's time override clears (it was
  *    about the old times), unless the request sets it;
- *  - van no longer needed -> the team OK and the reason clear;
+ *  - the saved event stops using TSP's van (van off, self-transport, or the
+ *    DHL van) -> the team OK and the reason clear, even if the request sent
+ *    them;
  *  - the event date changed -> the team OK clears (it was about that day's
  *    conflict), unless the request sets it.
  */
@@ -159,9 +168,22 @@ export function normalizeVanPatch<T extends Record<string, any>>(updates: T, ori
   );
   if (timeChanged && !has('vanTimeOverride')) out.vanTimeOverride = null;
 
-  if (has('vanDriverNeeded') && updates.vanDriverNeeded === false) {
-    if (!has('vanTeamOk')) out.vanTeamOk = false;
-    if (!has('vanReason')) out.vanReason = null;
+  // Judge the event as it will be once saved, so this works whichever order
+  // it runs in relative to the route's van-purpose cleanup (which turns the
+  // van off for self-transport). Self-transport, the DHL van, or no van at
+  // all: the reason and the sharing OK were about TSP's van, so they go.
+  const vanFieldTouched = ['vanDriverNeeded', 'selfTransport', 'isDhlVan'].some(has);
+  if (vanFieldTouched) {
+    const merged = { ...o, ...updates };
+    const stillTspVan = usesTspVan({
+      vanDriverNeeded: asBool(merged.vanDriverNeeded),
+      isDhlVan: asBool(merged.isDhlVan),
+      selfTransport: asBool(merged.selfTransport),
+    });
+    if (!stillTspVan) {
+      out.vanTeamOk = false;
+      out.vanReason = null;
+    }
   }
 
   const dateChanged = ['scheduledEventDate', 'desiredEventDate'].some(
