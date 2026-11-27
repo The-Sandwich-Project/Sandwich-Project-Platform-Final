@@ -17,7 +17,6 @@ import { DeclinedTab } from './tabs/DeclinedTab';
 import { StandbyTab } from './tabs/StandbyTab';
 import { StalledTab } from './tabs/StalledTab';
 import { NonEventTab } from './tabs/NonEventTab';
-import { RescheduledTab } from './tabs/RescheduledTab';
 import { MyAssignmentsTab } from './tabs/MyAssignmentsTab';
 import { AllEventsTab } from './tabs/AllEventsTab';
 import { AdminOverviewTab } from './tabs/AdminOverviewTab';
@@ -429,7 +428,6 @@ const EventRequestsManagementContent: React.FC = () => {
       standby: <StandbyTab />,
       stalled: <StalledTab />,
       non_event: <NonEventTab />,
-      rescheduled: <RescheduledTab />,
       my_assignments: <MyAssignmentsTab />,
     };
 

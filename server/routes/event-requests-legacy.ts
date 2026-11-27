@@ -1,4 +1,5 @@
 import { normalizeToolkitPatch, isToolkitSent } from '@shared/toolkit-state';
+import { normalizeIncomingStatus, statusTransitionEffects } from '../utils/status-transition-effects';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage-wrapper';
@@ -2881,6 +2882,11 @@ router.patch(
         }
       });
 
+      // "Rescheduled" was retired; treat it as "scheduled".
+      if (processedUpdates.status) {
+        processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
+      }
+
       // Check if status is changing and set statusChangedAt accordingly
       if (
         processedUpdates.status &&
@@ -3014,13 +3020,17 @@ router.patch(
           processedUpdates.nonEventBy = req.user?.id || null;
         }
 
-        // Track when the event entered standby. Drives the "since ..." badge on
-        // the standby card and lets the standby follow-up reminder treat each
-        // standby episode independently. Only set on the transition INTO
-        // standby, so re-saving an already-standby event keeps the original date.
-        if (processedUpdates.status === 'standby') {
-          processedUpdates.standbyMarkedAt = new Date();
-        }
+        // Standby (stamp + default check-back date) and the "needs new date"
+        // marker for a scheduled event going back to In Process. Shared with
+        // PUT and the admin status endpoint; see status-transition-effects.
+        Object.assign(
+          processedUpdates,
+          statusTransitionEffects({
+            fromStatus: originalEvent.status,
+            toStatus: processedUpdates.status,
+            updates: processedUpdates as Record<string, unknown>,
+          })
+        );
 
         // Track metadata for rescheduled status
         if (processedUpdates.status === 'rescheduled') {
@@ -3616,6 +3626,11 @@ router.put(
 
       }
 
+      // "Rescheduled" was retired; treat it as "scheduled".
+      if (processedUpdates.status) {
+        processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
+      }
+
       // Check if status is changing and set statusChangedAt accordingly
       if (
         processedUpdates.status &&
@@ -3637,11 +3652,16 @@ router.put(
           }
         }
 
-        // Keep PUT behavior aligned with PATCH: stamp when the event entered
-        // standby (drives the "since ..." badge and per-episode reminder dedup).
-        if (toStatus === 'standby') {
-          processedUpdates.standbyMarkedAt = new Date();
-        }
+        // Same status side effects as PATCH (standby stamp + default check-back
+        // date, "needs new date" marker); see status-transition-effects.
+        Object.assign(
+          processedUpdates,
+          statusTransitionEffects({
+            fromStatus: originalEvent.status,
+            toStatus,
+            updates: processedUpdates as Record<string, unknown>,
+          })
+        );
       }
 
       // Track who marked the event as unresponsive

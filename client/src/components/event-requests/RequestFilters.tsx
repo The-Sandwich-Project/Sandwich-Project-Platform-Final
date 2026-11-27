@@ -40,14 +40,13 @@ import { Info } from 'lucide-react';
  */
 const STATUS_TAB_TIPS: Record<string, string> = {
   new: 'Review the details and make first contact. Move to In Process once you’ve sent the toolkit, or Non-Event if it isn’t a real event request.',
-  in_process: 'Work with the contact to finalize event details. Move to Scheduled once a date is locked in, or Standby/Stalled if you’re waiting on them.',
-  scheduled: 'Assign drivers and volunteers. Confirm logistics. Move to Completed after the event date, or Cancelled/Rescheduled if plans change.',
-  rescheduled: 'Treat like a Scheduled event. Re-confirm assignments for the new date.',
+  in_process: 'Work with the contact to finalize event details. Move to Scheduled once a date is locked in, or Standby/Stalled if you’re waiting on them. “Needs new date” means it was scheduled and lost its date.',
+  scheduled: 'Assign drivers and volunteers. Confirm logistics. If the date moves, just change it; if it loses its date, move it back to In Process. Cancelled if it won’t happen.',
   completed: 'Finish 1-day and 1-month follow-ups, and request a social media post if applicable.',
   declined: 'Record the reason. Can be reactivated if they come back later.',
   cancelled: 'Make sure the cancellation reason is documented in the notes.',
   non_event: 'Terminal status — applies to requests that turned out not to be real events.',
-  standby: 'Follow up closely. Move back to In Process or Scheduled once they’re ready, or to Stalled/Declined if they don’t respond.',
+  standby: 'Waiting on something specific from the group (budget, date/time, volunteers, # of sandwiches…). Check back on the reminder date. Move to Scheduled or In Process once they’re ready, or Stalled/Declined if they don’t respond.',
   stalled: 'Continue periodic outreach. Move back to In Process if they respond, or Declined if they confirm they’re no longer interested.',
   all: 'All events across every status — useful for searching or auditing.',
 };
@@ -234,13 +233,6 @@ export default function RequestFilters({
       shortLabel: 'Scheduled',
       icon: Calendar,
       count: statusCounts.scheduled + statusCounts.rescheduled,
-    },
-    {
-      value: 'rescheduled',
-      label: 'Rescheduled',
-      shortLabel: 'Resched',
-      icon: RefreshCw,
-      count: statusCounts.rescheduled,
     },
     {
       value: 'completed',

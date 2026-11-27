@@ -11,6 +11,8 @@ export interface InProcessFilters {
   noContactDays: number | null;
   noUpdateDays: number | null;
   dateWithinDays: number | null;
+  /** Only events that lost their scheduled date and need a new one. */
+  needsNewDate: boolean;
   sort: InProcessSort;
 }
 
@@ -18,11 +20,18 @@ export const EMPTY_IN_PROCESS_FILTERS: InProcessFilters = {
   noContactDays: null,
   noUpdateDays: null,
   dateWithinDays: null,
+  needsNewDate: false,
   sort: 'default',
 };
 
 export function hasActiveInProcessFilters(f: InProcessFilters): boolean {
-  return f.noContactDays !== null || f.noUpdateDays !== null || f.dateWithinDays !== null || f.sort !== 'default';
+  return (
+    f.noContactDays !== null ||
+    f.noUpdateDays !== null ||
+    f.dateWithinDays !== null ||
+    f.needsNewDate ||
+    f.sort !== 'default'
+  );
 }
 
 export const FIXED_OPTIONS = {
@@ -63,10 +72,19 @@ function eventDateTime(request: any): number | null {
   return d ? d.getTime() : null;
 }
 
+/**
+ * A scheduled event that went back to In Process because it lost its date
+ * (replaces the retired "rescheduled" status).
+ */
+export function needsNewDate(request: any): boolean {
+  return request?.status === 'in_process' && !!request?.needsNewDateSince;
+}
+
 /** Apply filters and sort. Pure: safe to call inside useMemo. */
 export function applyInProcessFilters<T>(requests: T[], f: InProcessFilters): T[] {
   const now = Date.now();
   let result = requests.filter((r: any) => {
+    if (f.needsNewDate && !needsNewDate(r)) return false;
     if (f.noContactDays !== null) {
       // Never contacted counts from when the request came in
       const last = lastContactTime(r) ?? time(r.createdAt);

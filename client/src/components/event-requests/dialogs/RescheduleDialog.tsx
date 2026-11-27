@@ -73,7 +73,8 @@ export const RescheduleDialog: React.FC<RescheduleDialogProps> = ({
     try {
       const formattedDate = format(data.newScheduledDate, 'yyyy-MM-dd');
       await onConfirm(request.id, {
-        status: 'rescheduled',
+        // "Rescheduled" was retired: a new date keeps the event Scheduled.
+        status: 'scheduled',
         scheduledEventDate: formattedDate,
         originalScheduledDate: request.scheduledEventDate || request.originalScheduledDate || null,
         postponementNotes: data.rescheduleNotes || undefined,

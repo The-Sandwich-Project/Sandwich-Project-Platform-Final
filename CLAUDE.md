@@ -102,7 +102,8 @@ The event request pipeline is the heart of the app. Community groups submit requ
 **Status workflow** (defined in `shared/event-status-workflow.ts`):
 - `new` → `in_process` → `scheduled` → `completed`
 - Side tracks: `standby` (waiting on group), `stalled` (unreachable), `declined`, `cancelled`
-- `rescheduled` = scheduled event moved to a new date
+- `rescheduled` is **retired** (kept only on old rows until `npm run statuses:retire-rescheduled` moves them): a date change keeps an event `scheduled`; a scheduled event that loses its date goes back to `in_process` with `needs_new_date_since` set ("Needs new date" badge and In Process filter). `normalizeIncomingStatus()` in `server/utils/status-transition-effects.ts` maps any incoming `rescheduled` to `scheduled`
+- Status side effects (standby stamp + default check-back date a week out, the needs-new-date marker) live in `statusTransitionEffects()` in the same file, shared by the PATCH/PUT routes and the admin status endpoint. The edit form asks Standby's reason and check-back date inline (`StandbyDetailsSection`), not in a popup
 - `non_event` = not a real event request (terminal)
 - Transitions are enforced — see `VALID_STATUS_TRANSITIONS` and `isValidTransition()`
 

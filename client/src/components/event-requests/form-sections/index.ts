@@ -20,11 +20,18 @@ export { NotesSection } from './NotesSection';
 export { InstructionsSection } from './InstructionsSection';
 export { StatusToolkitSection } from './StatusToolkitSection';
 export { TspContactSection } from './TspContactSection';
+export {
+  StandbyDetailsSection,
+  standbyCheckBackValue,
+  isStandbyReasonComplete,
+  isStandbyCheckBackComplete,
+  shouldSendStandbyCheckBack,
+  type StandbyCheckBackMode,
+} from './StandbyDetailsSection';
 
 // Dialogs
 export {
   DateChangeDialog,
   VanConflictDialog,
-  StandbyFollowUpDialog,
   DeleteConfirmDialog,
 } from './FormDialogs';
