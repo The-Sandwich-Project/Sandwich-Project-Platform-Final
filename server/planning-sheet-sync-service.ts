@@ -244,6 +244,49 @@ export function formatStaffingColumn(staffing: StaffingInfo): string {
 }
 
 /**
+ * The Staffing cell's content for an event, given the display names of its
+ * assigned drivers and of its assigned volunteers plus leftover speakers.
+ *
+ * - Speakers (a retired role) are written as volunteers: the sheet reads an
+ *   "S" as a volunteer, so a separate "S" would add an extra volunteer on
+ *   every sheet -> app -> sheet round trip. The caller merges volunteer and
+ *   speaker assignments by ID, never by name: two different people can share
+ *   a name and both must be written.
+ * - A leftover unfilled speaker need (old completed events keep
+ *   speakersNeeded) still shows as an open volunteer spot. It's max, not sum:
+ *   reading the row back sets volunteersNeeded to the cell's total and never
+ *   touches the speaker columns, so a sum would grow on every round trip.
+ */
+export function staffingInfoForEvent(
+  e: {
+    driversNeeded?: number | null;
+    volunteersNeeded?: number | null;
+    speakersNeeded?: number | null;
+    vanDriverNeeded?: boolean | null;
+  },
+  driverNames: string[],
+  volunteerNames: string[]
+): StaffingInfo {
+  const volunteerCount = Math.max(e.volunteersNeeded || 0, e.speakersNeeded || 0);
+  return {
+    driver: {
+      needed: (e.driversNeeded || 0) > 0 || driverNames.length > 0,
+      assigned: driverNames.length > 0 ? driverNames.join(', ') : null,
+      isVanDriver: e.vanDriverNeeded || false,
+      count: e.driversNeeded || 0,
+      names: driverNames,
+    },
+    speaker: { needed: false, assigned: null },
+    volunteer: {
+      needed: volunteerCount > 0 || volunteerNames.length > 0,
+      assigned: volunteerNames.length > 0 ? volunteerNames.join(', ') : null,
+      count: volunteerCount,
+      names: volunteerNames,
+    },
+  };
+}
+
+/**
  * Planning Sheet row data - represents one row in the Planning Sheet
  */
 export interface PlanningSheetRow {
@@ -964,8 +1007,6 @@ export class PlanningSheetSyncService {
 
     // Get assigned driver/speaker/volunteer names
     const driverNames = await this.getAssignedNames(e.assignedDriverIds || []);
-    const speakerNames = await this.getAssignedNames(e.assignedSpeakerIds || []);
-    const volunteerNames = await this.getAssignedNames(e.assignedVolunteerIds || []);
 
     // Resolve TSP contact - either customTspContact (free text) or
     // tspContact (user ID). The planning sheet TSP Contact column only
@@ -988,28 +1029,16 @@ export class PlanningSheetSyncService {
       tspContactName = toFirstName(names[0] || e.tspContact);
     }
 
-    // Build staffing string
-    // The sheet reads an "S" as a volunteer (the speaker role was retired), so
-    // any leftover speakers are written as volunteer slots. Writing them as a
-    // separate "S" would add an extra volunteer slot on every sheet -> app ->
-    // sheet round trip.
-    const staffVolunteerNames = Array.from(new Set([...volunteerNames, ...speakerNames]));
-    const staffing: StaffingInfo = {
-      driver: {
-        needed: (e.driversNeeded || 0) > 0 || driverNames.length > 0,
-        assigned: driverNames.length > 0 ? driverNames.join(', ') : null,
-        isVanDriver: e.vanDriverNeeded || false,
-        count: e.driversNeeded || 0,
-        names: driverNames,
-      },
-      speaker: { needed: false, assigned: null },
-      volunteer: {
-        needed: (e.volunteersNeeded || 0) > 0 || staffVolunteerNames.length > 0,
-        assigned: staffVolunteerNames.length > 0 ? staffVolunteerNames.join(', ') : null,
-        count: e.volunteersNeeded || 0,
-        names: staffVolunteerNames,
-      },
-    };
+    // Build staffing string. Leftover speakers (a retired role) are merged
+    // into volunteers by ID; see staffingInfoForEvent.
+    const staffVolunteerIds = Array.from(
+      new Set([...(e.assignedVolunteerIds || []), ...(e.assignedSpeakerIds || [])].filter(Boolean))
+    );
+    const staffing = staffingInfoForEvent(
+      e,
+      driverNames,
+      staffVolunteerIds.length ? await this.getAssignedNames(staffVolunteerIds) : []
+    );
 
     // Format date with 2-digit year (M/D/YY)
     const eventDate = getEffectiveEventDate(e);

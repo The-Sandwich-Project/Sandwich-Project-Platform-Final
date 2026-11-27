@@ -14,6 +14,7 @@ import {
   assignmentLabelForUnknownId,
   formatStaffingColumn,
   parseStaffingColumn,
+  staffingInfoForEvent,
 } from '../../server/planning-sheet-sync-service';
 
 describe('parseStaffingColumn (reading the sheet)', () => {
@@ -81,6 +82,33 @@ describe('formatStaffingColumn (app -> sheet push)', () => {
         volunteer: role(false, [], 0),
       })
     ).toBe('VD: Luz, Bo');
+  });
+});
+
+describe('staffingInfoForEvent (what the push puts in Staffing)', () => {
+  it('writes two different people who share a name', () => {
+    const info = staffingInfoForEvent({ volunteersNeeded: 2 }, [], ['Jane Doe', 'Jane Doe']);
+    expect(formatStaffingColumn(info)).toBe('V: Jane Doe, Jane Doe');
+  });
+
+  it('keeps a leftover unfilled speaker need as an open volunteer spot', () => {
+    const info = staffingInfoForEvent({ volunteersNeeded: 0, speakersNeeded: 1 }, [], []);
+    expect(formatStaffingColumn(info)).toBe('V1');
+  });
+
+  it("doesn't grow when a speaker need is read back into volunteers", () => {
+    // Push: 1 volunteer + 1 unfilled speaker -> one open spot. Reading the row
+    // back sets volunteersNeeded to 1; speakersNeeded is never changed. The
+    // next push must write the same cell.
+    const first = formatStaffingColumn(staffingInfoForEvent({ volunteersNeeded: 1, speakersNeeded: 1 }, [], []));
+    const second = formatStaffingColumn(staffingInfoForEvent({ volunteersNeeded: 1, speakersNeeded: 1 }, [], []));
+    expect(first).toBe('V1');
+    expect(second).toBe(first);
+  });
+
+  it('writes drivers with the van prefix and open spots', () => {
+    const info = staffingInfoForEvent({ driversNeeded: 2, vanDriverNeeded: true }, ['Luz'], []);
+    expect(formatStaffingColumn(info)).toBe('VD: Luz, VD1');
   });
 });
 
