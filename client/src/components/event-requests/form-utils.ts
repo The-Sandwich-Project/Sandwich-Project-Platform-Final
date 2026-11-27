@@ -506,7 +506,16 @@ export const ATTENDANCE_SAVE_KEYS = [
   'estimatedAttendanceMax',
 ] as const;
 
-const SAVE_TOGETHER: readonly (readonly string[])[] = [ESTIMATE_SAVE_KEYS, ATTENDANCE_SAVE_KEYS];
+/**
+ * A changed date and "Events team OK'd sharing the van": the OK is about one
+ * day's conflict, and the server clears it on a new day unless the save says
+ * otherwise. An OK ticked for the new day can equal the old day's value, so
+ * it must still be sent with the new date (the date keys are only in the
+ * payload when the date box changed).
+ */
+export const VAN_DAY_SAVE_KEYS = ['scheduledEventDate', 'desiredEventDate', 'vanTeamOk'] as const;
+
+const SAVE_TOGETHER: readonly (readonly string[])[] = [ESTIMATE_SAVE_KEYS, ATTENDANCE_SAVE_KEYS, VAN_DAY_SAVE_KEYS];
 
 export function dropUnchangedFields(
   eventData: Record<string, any>,
@@ -542,6 +551,8 @@ const MERGE_TOGETHER: string[][] = [
   ['nextDayPickup', 'holdingOvernight', 'overnightHoldingLocation', 'overnightPickupTime', 'deliveryTimeWindow', 'deliveryParkingAccess'],
   // Whether the van is needed, and the reason / "team OK'd" that only apply then.
   ['vanDriverNeeded', 'vanNeededFor', 'isDhlVan', 'vanReason', 'vanTeamOk'],
+  // The date box and the day the van is booked for (they move together).
+  ['eventDate', 'vanDay'],
 ];
 
 /**
@@ -579,6 +590,7 @@ export function intelligentMergeFormData(
   };
 
   const grouped = new Set(MERGE_TOGETHER.flat());
+  let vanGroupSource: Record<string, any> = currentServerData;
   for (const group of MERGE_TOGETHER) {
     const keys = group.filter((k) => k in cachedFormData || k in currentServerData);
     if (keys.length === 0) continue;
@@ -586,6 +598,7 @@ export function intelligentMergeFormData(
     const serverChanged = keys.some((k) => !valuesEqual(currentServerData[k], originalServerData[k]));
     // Same rule as single fields: both changed -> the server wins.
     const source = userChanged && !serverChanged ? cachedFormData : currentServerData;
+    if (group.includes('vanTeamOk')) vanGroupSource = source;
     for (const k of keys) mergedData[k] = source[k];
     if (userChanged && serverChanged) conflicts.push(...keys);
     else if (userChanged) userChangesPreserved.push(...keys);
@@ -609,6 +622,17 @@ export function intelligentMergeFormData(
     } else if (serverChangedField) {
       serverUpdates.push(key);
       mergedData[key] = currentValue;
+    }
+  }
+
+  // "Events team OK'd sharing the van" belongs to the day it was ticked for:
+  // the draft's day if the van group came from the draft, else the server's.
+  // If the recovered form ends up on another day, the OK doesn't carry over.
+  if ('vanTeamOk' in mergedData && mergedData.vanTeamOk === true) {
+    const dayOf = (d: Record<string, any>) => d.vanDay || d.eventDate;
+    if (!valuesEqual(dayOf(vanGroupSource), dayOf(mergedData))) {
+      mergedData.vanTeamOk = false;
+      if (!conflicts.includes('vanTeamOk')) conflicts.push('vanTeamOk');
     }
   }
 

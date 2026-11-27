@@ -4,8 +4,9 @@ jest.mock('@/lib/queryClient', () => ({ apiRequest: jest.fn(), queryClient: {}, 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { VanDetailsPanel, formVanTime, vanReasonMissing, withEventDate } from '../form-sections/VanDetailsPanel';
-import { buildEventDataForServer } from '../form-utils';
+import { VanDetailsPanel, formVanTime, formVanDay, vanReasonMissing, withEventDate } from '../form-sections/VanDetailsPanel';
+import { buildEventDataForServer, dropUnchangedFields, intelligentMergeFormData } from '../form-utils';
+import { VanNeededBadgeAndButton } from '../VanNeededBadgeAndButton';
 
 function Harness({ initial, others = [] as any[], stored }: { initial: any; others?: any[]; stored?: any }) {
   (global as any).fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ otherEvents: others }) });
@@ -82,7 +83,7 @@ describe("a new event date resets the form's sharing OK", () => {
   const form = { eventDate: '2026-12-05', vanTeamOk: true, other: 1 };
 
   it('unticks the OK on a different day', () => {
-    expect(withEventDate(form, '2026-12-06', saved)).toEqual({ eventDate: '2026-12-06', vanTeamOk: false, other: 1 });
+    expect(withEventDate(form, '2026-12-06', saved)).toEqual({ eventDate: '2026-12-06', vanDay: '2026-12-06', vanTeamOk: false, other: 1 });
   });
   it('restores the saved OK when the date goes back to the saved day', () => {
     const moved = withEventDate(form, '2026-12-06', saved);
@@ -112,5 +113,91 @@ describe("a new event date resets the form's sharing OK", () => {
     await waitFor(() => expect(screen.getByTestId('van-conflict')).toBeTruthy());
     expect((screen.getByTestId('checkbox-van-team-ok') as HTMLInputElement).checked).toBe(false);
     expect(screen.getByText(/Until this is ticked/)).toBeTruthy();
+  });
+});
+
+describe('the van is checked on the scheduled day, not the requested one', () => {
+  it('uses the van day (scheduled date) until the date box changes', () => {
+    expect(formVanDay({ eventDate: '2026-12-01', vanDay: '2026-12-05' })).toBe('2026-12-05');
+    const moved = withEventDate({ eventDate: '2026-12-01', vanDay: '2026-12-05', vanTeamOk: true }, '2026-12-09', {
+      date: '2026-12-01', vanDay: '2026-12-05', vanTeamOk: true,
+    });
+    expect(moved).toMatchObject({ eventDate: '2026-12-09', vanDay: '2026-12-09', vanTeamOk: false });
+    expect(withEventDate(moved, '2026-12-01', { date: '2026-12-01', vanDay: '2026-12-05', vanTeamOk: true })).toMatchObject({
+      eventDate: '2026-12-01', vanDay: '2026-12-05', vanTeamOk: true,
+    });
+  });
+
+  it("asks for the scheduled day's van events", async () => {
+    render(<Harness initial={{ ...base, eventDate: '2026-12-01', vanDay: '2026-12-05' }} />);
+    await waitFor(() => expect((global as any).fetch).toHaveBeenCalled());
+    expect(String((global as any).fetch.mock.calls[0][0])).toContain('date=2026-12-05');
+  });
+});
+
+describe('a new date and its sharing OK are saved together', () => {
+  it('keeps an unchanged vanTeamOk when the date changed', () => {
+    const payload: Record<string, any> = { desiredEventDate: '2026-12-09T12:00:00.000Z', vanTeamOk: true, planningNotes: 'same' };
+    const baseline = { desiredEventDate: '2026-12-05T12:00:00.000Z', vanTeamOk: true, planningNotes: 'same' };
+    dropUnchangedFields(payload, baseline);
+    expect(payload).toEqual({ desiredEventDate: '2026-12-09T12:00:00.000Z', vanTeamOk: true });
+  });
+  it('still drops it when nothing date-related changed', () => {
+    const payload: Record<string, any> = { vanTeamOk: true, planningNotes: 'new' };
+    dropUnchangedFields(payload, { vanTeamOk: true, planningNotes: 'old' });
+    expect(payload).toEqual({ planningNotes: 'new' });
+  });
+});
+
+describe("a recovered draft's sharing OK stays with its day", () => {
+  const original = { eventDate: '2026-12-05', vanDay: '2026-12-05', vanDriverNeeded: true, vanTeamOk: false };
+
+  it('drops a draft OK when another coordinator moved the event', () => {
+    const draft = { ...original, vanTeamOk: true };
+    const server = { ...original, eventDate: '2026-12-09', vanDay: '2026-12-09' };
+    const { mergedData, conflicts } = intelligentMergeFormData(draft, original, server);
+    expect(mergedData).toMatchObject({ eventDate: '2026-12-09', vanTeamOk: false });
+    expect(conflicts).toContain('vanTeamOk');
+  });
+  it('drops a server OK for the old day when the draft moved the event', () => {
+    const draft = { ...original, eventDate: '2026-12-09', vanDay: '2026-12-09', vanTeamOk: false, vanReason: 'x' };
+    const server = { ...original, vanTeamOk: true, vanReason: 'y' };
+    const { mergedData } = intelligentMergeFormData(draft, original, server);
+    expect(mergedData).toMatchObject({ eventDate: '2026-12-09', vanTeamOk: false });
+  });
+  it("catches a reschedule that only changed the scheduled date (the van day)", () => {
+    const draft = { ...original, vanTeamOk: true };
+    const server = { ...original, vanDay: '2026-12-09' };
+    expect(intelligentMergeFormData(draft, original, server).mergedData.vanTeamOk).toBe(false);
+  });
+  it('keeps a draft OK when the day is unchanged', () => {
+    const draft = { ...original, vanTeamOk: true };
+    expect(intelligentMergeFormData(draft, original, original).mergedData.vanTeamOk).toBe(true);
+  });
+});
+
+describe('pending-only van badge (fully staffed cards with a driver)', () => {
+  function renderPending(others: any[], event: any = { vanTeamOk: false }) {
+    (global as any).fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ otherEvents: others }) });
+    return render(
+      <QueryClientProvider client={new QueryClient()}>
+        <VanNeededBadgeAndButton eventRequestId={7} vanDriverNeeded vanNeededLikely={false} eventDate="2026-12-05" event={event} mode="pending" />
+      </QueryClientProvider>,
+    );
+  }
+  const other = { id: 2, organizationName: 'Lincoln Elementary', vanDriverNeeded: true, vanTeamOk: false };
+
+  it('shows "Van pending" while sharing is unsettled', async () => {
+    renderPending([other]);
+    await waitFor(() => expect(screen.getByTestId('badge-van-pending').textContent).toMatch(/Van pending – discuss with team/));
+  });
+  it('shows nothing once either event is OK\'d, or with no other van event', async () => {
+    const { container, unmount } = renderPending([{ ...other, vanTeamOk: true }]);
+    await waitFor(() => expect((global as any).fetch).toHaveBeenCalled());
+    expect(container.textContent).toBe('');
+    unmount();
+    const r2 = renderPending([]);
+    await waitFor(() => expect((global as any).fetch).toHaveBeenCalled());
+    expect(r2.container.textContent).toBe('');
   });
 });

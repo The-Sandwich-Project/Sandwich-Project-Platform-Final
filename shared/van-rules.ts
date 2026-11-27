@@ -147,6 +147,22 @@ const dayKey = (v: unknown): string => {
   return Number.isNaN(d.getTime()) ? String(v) : d.toISOString().slice(0, 10);
 };
 
+/** Patch fields that can make a saved van OK, reason or time override stale. */
+export const VAN_RULE_TRIGGER_FIELDS = [
+  'eventStartTime',
+  'eventEndTime',
+  'scheduledEventDate',
+  'desiredEventDate',
+  'vanDriverNeeded',
+  'selfTransport',
+  'isDhlVan',
+] as const;
+
+/** Whether a patch changes anything normalizeVanPatch needs the stored event for. */
+export function touchesVanRules(updates: Record<string, unknown> | null | undefined): boolean {
+  return !!updates && VAN_RULE_TRIGGER_FIELDS.some((k) => updates[k] !== undefined);
+}
+
 /**
  * Keep the van fields consistent on save (PATCH/PUT), given the stored event:
  *  - start or end time changed -> the sheet's time override clears (it was
@@ -154,12 +170,17 @@ const dayKey = (v: unknown): string => {
  *  - the saved event stops using TSP's van (van off, self-transport, or the
  *    DHL van) -> the team OK and the reason clear, even if the request sent
  *    them;
- *  - the event date changed -> the team OK clears (it was about that day's
- *    conflict), unless the request sets it.
+ *  - the event's day changed (scheduled date, else requested date) -> the
+ *    team OK clears (it was about that day's conflict), unless the request
+ *    sets it.
+ * Runs in the PATCH/PUT routes and again in storage.updateEventRequest, so
+ * every writer (sheet imports, syncs, scripts) gets it; running twice is
+ * harmless because a key the first pass set is kept by the second.
  */
 export function normalizeVanPatch<T extends Record<string, any>>(updates: T, original: Record<string, any> | null | undefined): T {
   if (!updates || typeof updates !== 'object') return updates;
-  const has = (k: string) => Object.prototype.hasOwnProperty.call(updates, k);
+  // A key sent as undefined isn't written (storage drops it), so it doesn't count.
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(updates, k) && updates[k] !== undefined;
   const out: Record<string, any> = { ...updates };
   const o = original ?? {};
 
@@ -174,7 +195,8 @@ export function normalizeVanPatch<T extends Record<string, any>>(updates: T, ori
   // all: the reason and the sharing OK were about TSP's van, so they go.
   const vanFieldTouched = ['vanDriverNeeded', 'selfTransport', 'isDhlVan'].some(has);
   if (vanFieldTouched) {
-    const merged = { ...o, ...updates };
+    const merged: Record<string, any> = { ...o };
+    for (const k of Object.keys(updates)) if (has(k)) merged[k] = updates[k];
     const stillTspVan = usesTspVan({
       vanDriverNeeded: asBool(merged.vanDriverNeeded),
       isDhlVan: asBool(merged.isDhlVan),
@@ -186,9 +208,13 @@ export function normalizeVanPatch<T extends Record<string, any>>(updates: T, ori
     }
   }
 
-  const dateChanged = ['scheduledEventDate', 'desiredEventDate'].some(
-    (k) => has(k) && dayKey(updates[k]) !== dayKey(o[k]),
-  );
+  // The day the van is booked for: the scheduled date, else the requested
+  // one (the same COALESCE the cards and the same-day van query use).
+  const valueAfter = (k: string) => (has(k) ? updates[k] : o[k]);
+  const dateChanged =
+    (has('scheduledEventDate') || has('desiredEventDate')) &&
+    dayKey(valueAfter('scheduledEventDate') || valueAfter('desiredEventDate')) !==
+      dayKey(o.scheduledEventDate || o.desiredEventDate);
   if (dateChanged && !has('vanTeamOk')) out.vanTeamOk = false;
 
   return out as T;

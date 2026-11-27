@@ -1313,9 +1313,26 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             {!request.selfTransport && (
               <>
                 {staffingComplete ? (
-                  <Badge className="bg-gradient-to-br from-[#47B3CB] to-[#007E8C] text-white border border-[#47B3CB] text-xs sm:text-sm font-medium">
-                    Fully Staffed
-                  </Badge>
+                  <>
+                    <Badge className="bg-gradient-to-br from-[#47B3CB] to-[#007E8C] text-white border border-[#47B3CB] text-xs sm:text-sm font-medium">
+                      Fully Staffed
+                    </Badge>
+                    {/* A full staff (and an assigned van driver) doesn't settle
+                        sharing the van with another event that day, so the
+                        pending warning still shows here. Without a van driver
+                        the Van row below already shows the full badge. */}
+                    {request.vanDriverNeeded && !request.isDhlVan && request.assignedVanDriverId && (
+                      <VanNeededBadgeAndButton
+                        eventRequestId={request.id}
+                        event={request as any}
+                        vanDriverNeeded={request.vanDriverNeeded}
+                        vanNeededLikely={(request as any).vanNeededLikely}
+                        eventDate={displayDate}
+                        canEdit={!!canEdit}
+                        mode="pending"
+                      />
+                    )}
+                  </>
                 ) : (
                   <>
                     {/* Show regular driver needs only if NOT a van driver event (van takes precedence) */}

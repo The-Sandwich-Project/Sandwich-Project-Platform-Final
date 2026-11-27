@@ -2,6 +2,7 @@ import {
   describeVanEvent,
   effectiveVanTime,
   normalizeVanPatch,
+  touchesVanRules,
   timeToMinutes,
   vanIsPending,
   vanReasonRequired,
@@ -124,5 +125,32 @@ describe('van fields are refused with a clear message when malformed', () => {
     expect(strictBooleanFieldError({ vanTimeOverride: 'Mid-day' })).toBeNull();
     expect(strictBooleanFieldError({ vanTimeOverride: null })).toBeNull();
     expect(strictBooleanFieldError({ vanTimeOverride: 'noon' })).toMatch(/must be one of: AM, Mid-day, PM, All day/);
+  });
+});
+
+describe("the van's day is the scheduled date, else the requested one", () => {
+  const rescheduled = {
+    vanDriverNeeded: true, vanTeamOk: true,
+    desiredEventDate: new Date('2026-12-01T12:00:00Z'),
+    scheduledEventDate: new Date('2026-12-05T12:00:00Z'),
+  };
+  it('a new scheduled day clears the OK', () => {
+    expect(normalizeVanPatch({ scheduledEventDate: '2026-12-08' }, rescheduled)).toMatchObject({ vanTeamOk: false });
+  });
+  it('changing only the requested date keeps it (the scheduled date still wins)', () => {
+    expect(normalizeVanPatch({ desiredEventDate: '2026-12-02' }, rescheduled)).not.toHaveProperty('vanTeamOk');
+  });
+  it('with no scheduled date, a new requested date clears it', () => {
+    expect(normalizeVanPatch({ desiredEventDate: '2026-12-02' }, { ...rescheduled, scheduledEventDate: null })).toMatchObject({ vanTeamOk: false });
+  });
+  it('a key sent as undefined is not a change', () => {
+    expect(normalizeVanPatch({ eventStartTime: undefined, scheduledEventDate: undefined }, { ...rescheduled, vanTimeOverride: 'PM' })).toEqual({
+      eventStartTime: undefined, scheduledEventDate: undefined,
+    });
+  });
+  it('knows which patches need the stored event', () => {
+    expect(touchesVanRules({ eventEndTime: '12:00' })).toBe(true);
+    expect(touchesVanRules({ planningNotes: 'x' })).toBe(false);
+    expect(touchesVanRules({ scheduledEventDate: undefined })).toBe(false);
   });
 });

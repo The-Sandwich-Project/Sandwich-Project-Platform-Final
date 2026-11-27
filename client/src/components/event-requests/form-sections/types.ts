@@ -29,6 +29,13 @@ export interface EventFormData {
   vanReason?: string;
   /** "Events team OK'd sharing the van" with another same-day van event. */
   vanTeamOk?: boolean;
+  /**
+   * The day the van is booked for (YYYY-MM-DD): the scheduled date, else the
+   * requested one, until the date box is changed (then the new date). The
+   * date box starts from the requested date, so after a reschedule the two
+   * differ. Form-only; never sent.
+   */
+  vanDay?: string;
   overnightHoldingLocation: string;
   overnightPickupTime: string;
   sandwichTypes: Array<{ type: string; quantity: number }>;

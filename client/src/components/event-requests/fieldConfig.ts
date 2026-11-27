@@ -96,6 +96,7 @@ export const DEFAULT_FORM_DATA = {
   isTspShopped: false,
   vanReason: '',
   vanTeamOk: false,
+  vanDay: '',
   vanNeededFor: '',
   assignedVanDriverId: '',
   isDhlVan: false,

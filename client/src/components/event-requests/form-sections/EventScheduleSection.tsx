@@ -38,6 +38,7 @@ export const EventScheduleSection: React.FC<EventScheduleSectionProps> = ({
   const savedVanDay = eventRequest
     ? {
         date: formatDateForInput(eventRequest.desiredEventDate || eventRequest.scheduledEventDate),
+        vanDay: formatDateForInput(eventRequest.scheduledEventDate || eventRequest.desiredEventDate),
         vanTeamOk: eventRequest.vanTeamOk === true,
       }
     : null;

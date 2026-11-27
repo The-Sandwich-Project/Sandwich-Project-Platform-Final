@@ -46,18 +46,32 @@ export function vanReasonMissing(formData: any): boolean {
 /**
  * Set the form's event date. "Events team OK'd sharing the van" was about the
  * conflict on the saved day, so a different day starts unticked (the panel
- * then shows that day's conflicts as pending); going back to the saved day
- * restores the saved OK. The server clears a saved OK on a date change too
- * (normalizeVanPatch).
+ * then shows that day's conflicts as pending); going back to the saved date
+ * restores the saved day and OK. The server clears a saved OK on a date
+ * change too (normalizeVanPatch).
+ *
+ * `saved.date` is what the date box starts with (the requested date), and
+ * `saved.vanDay` the day the van is actually booked for (the scheduled date,
+ * else the requested one).
  */
-export function withEventDate<T extends { eventDate?: string; vanTeamOk?: boolean }>(
+export function withEventDate<T extends { eventDate?: string; vanTeamOk?: boolean; vanDay?: string }>(
   prev: T,
   newDate: string,
-  saved: { date: string; vanTeamOk: boolean } | null | undefined,
+  saved: { date: string; vanDay?: string; vanTeamOk: boolean } | null | undefined,
 ): T {
   if (newDate === prev.eventDate) return { ...prev, eventDate: newDate };
   const backToSavedDay = !!saved && newDate === saved.date;
-  return { ...prev, eventDate: newDate, vanTeamOk: backToSavedDay ? saved!.vanTeamOk : false };
+  return {
+    ...prev,
+    eventDate: newDate,
+    vanDay: backToSavedDay ? saved!.vanDay || newDate : newDate,
+    vanTeamOk: backToSavedDay ? saved!.vanTeamOk : false,
+  };
+}
+
+/** The day to check for other van events: the van's booked day, else the date box. */
+export function formVanDay(formData: { vanDay?: string; eventDate?: string }): string | undefined {
+  return formData.vanDay || formData.eventDate;
 }
 
 function dateOnly(v: unknown): string | null {
@@ -111,7 +125,7 @@ export function formVanTime(formData: any, storedEvent?: VanDetailsPanelProps['s
 
 export const VanDetailsPanel: React.FC<VanDetailsPanelProps> = ({ formData, setFormData, eventRequestId, storedEvent, showReasonError }) => {
   const active = usesTspVan(formData);
-  const { data } = useSameDayVanEvents(formData.eventDate, eventRequestId, active);
+  const { data } = useSameDayVanEvents(formVanDay(formData), eventRequestId, active);
   if (!active) return null;
 
   const time = formVanTime(formData, storedEvent);

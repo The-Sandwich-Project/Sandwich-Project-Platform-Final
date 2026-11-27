@@ -132,6 +132,7 @@ function buildFormDataFromEventRequest(
     // Van rules (shared/van-rules.ts): under-800 reason and "team OK'd sharing".
     vanReason: (eventRequest as any)?.vanReason || '',
     vanTeamOk: (eventRequest as any)?.vanTeamOk === true,
+    vanDay: eventRequest ? formatDateForInput(eventRequest.scheduledEventDate || eventRequest.desiredEventDate) : '',
     // TSP shopping: strictly true/false (checked = TSP buys the food).
     isTspShopped: (eventRequest as any)?.isTspShopped === true,
     volunteersNeeded: eventRequest?.volunteersNeeded || 0,
@@ -264,7 +265,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     overnightHoldingLocation: '', overnightPickupTime: '',
     sandwichTypes: [] as Array<{type: string, quantity: number}>,
     hasRefrigeration: '', driversNeeded: 0, selfTransport: false, vanDriverNeeded: false, vanNeededLikely: false, vanNeededFor: '',
-    assignedVanDriverId: '', isDhlVan: false, volunteersNeeded: 0, isTspShopped: false, vanReason: '', vanTeamOk: false,
+    assignedVanDriverId: '', isDhlVan: false, volunteersNeeded: 0, isTspShopped: false, vanReason: '', vanTeamOk: false, vanDay: '',
     tspContact: '', customTspContact: '', message: '', schedulingNotes: '',
     planningNotes: '', nextAction: '', driverInstructions: '', volunteerInstructions: '',
     totalSandwichCount: 0, estimatedSandwichCountMin: 0,
@@ -1261,6 +1262,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
       withEventDate(prev, pendingDateChange, eventRequest
         ? {
             date: formatDateForInput(eventRequest.desiredEventDate || eventRequest.scheduledEventDate),
+            vanDay: formatDateForInput(eventRequest.scheduledEventDate || eventRequest.desiredEventDate),
             vanTeamOk: (eventRequest as any).vanTeamOk === true,
           }
         : null),

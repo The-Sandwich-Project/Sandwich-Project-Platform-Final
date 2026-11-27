@@ -87,8 +87,12 @@ interface VanNeededBadgeAndButtonProps {
    *  - 'button' — only renders the "Needs Van?" / "Mark Van Needed" call-to-action
    *               button (the un-set state); renders nothing when a badge would
    *               otherwise show. Use in the bottom action row.
+   *  - 'pending' — only the "Van pending – discuss with team" warning; renders
+   *               nothing unless sharing the van that day is still unsettled.
+   *               For places that hide the Van Needed badge (e.g. once a van
+   *               driver is assigned), since a driver doesn't settle sharing.
    */
-  mode?: 'full' | 'badge' | 'button';
+  mode?: 'full' | 'badge' | 'button' | 'pending';
 }
 
 type VanChoice = 'likely' | 'confirmed';
@@ -309,6 +313,30 @@ export function VanNeededBadgeAndButton({
   const clearVan = () => {
     updateMutation.mutate({ vanDriverNeeded: false, vanNeededLikely: false, vanNeededFor: null });
   };
+
+  // ── Pending-only mode: just the sharing warning, read-only.
+  if (mode === 'pending') {
+    if (!pending) return null;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Badge
+              className="inline-flex items-center gap-1 whitespace-nowrap bg-[#FBAD3F] text-[#114145] border border-[#D68319]"
+              data-testid="badge-van-pending"
+            >
+              <Truck className="w-3 h-3" />
+              Van pending – discuss with team
+            </Badge>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <PendingVanNote otherEvents={otherVanEvents} />
+            <SameDayVanTooltipLines otherEvents={otherVanEvents} />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   // ── Simple toggle mode (scheduled cards): no dialog, no "likely" tier.
   // One click sets vanDriverNeeded=true; clicking the badge clears it.
