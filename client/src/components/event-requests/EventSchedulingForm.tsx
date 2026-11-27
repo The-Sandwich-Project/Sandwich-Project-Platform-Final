@@ -1,4 +1,3 @@
-import { totalFromFields } from '@shared/sandwich-estimate';
 import * as React from 'react';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -50,7 +49,6 @@ import {
   StatusToolkitSection,
   TspContactSection,
   DateChangeDialog,
-  VanConflictDialog,
   StandbyDetailsSection,
   standbyCheckBackValue,
   isStandbyReasonComplete,
@@ -61,6 +59,7 @@ import {
   type EventFormData,
 } from './form-sections';
 import { TspShoppingCheckbox } from './TspShopping';
+import { vanReasonMissing } from './form-sections/VanDetailsPanel';
 import { effectiveNextDayPickup } from '@shared/next-day-pickup';
 import { ExpectedAttendeesField } from './form-sections/ExpectedAttendeesField';
 import {
@@ -130,6 +129,9 @@ function buildFormDataFromEventRequest(
       ? (eventRequest as any).vanNeededFor
       : '',
     vanNeededLikely: (eventRequest as any)?.vanNeededLikely || false,
+    // Van rules (shared/van-rules.ts): under-800 reason and "team OK'd sharing".
+    vanReason: (eventRequest as any)?.vanReason || '',
+    vanTeamOk: (eventRequest as any)?.vanTeamOk === true,
     // TSP shopping: strictly true/false (checked = TSP buys the food).
     isTspShopped: (eventRequest as any)?.isTspShopped === true,
     volunteersNeeded: eventRequest?.volunteersNeeded || 0,
@@ -262,7 +264,7 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     overnightHoldingLocation: '', overnightPickupTime: '',
     sandwichTypes: [] as Array<{type: string, quantity: number}>,
     hasRefrigeration: '', driversNeeded: 0, selfTransport: false, vanDriverNeeded: false, vanNeededLikely: false, vanNeededFor: '',
-    assignedVanDriverId: '', isDhlVan: false, volunteersNeeded: 0, isTspShopped: false,
+    assignedVanDriverId: '', isDhlVan: false, volunteersNeeded: 0, isTspShopped: false, vanReason: '', vanTeamOk: false,
     tspContact: '', customTspContact: '', message: '', schedulingNotes: '',
     planningNotes: '', nextAction: '', driverInstructions: '', volunteerInstructions: '',
     totalSandwichCount: 0, estimatedSandwichCountMin: 0,
@@ -302,17 +304,13 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   const [showDateConfirmation, setShowDateConfirmation] = useState(false);
   const [pendingDateChange, setPendingDateChange] = useState('');
   const [isMessageEditable, setIsMessageEditable] = useState(false);
-  const [showVanConflictDialog, setShowVanConflictDialog] = useState(false);
   // Local session dismissal for the "Van Possibly Needed" panel. Lets the user
   // hide the reminder without taking a definitive action — the DB flag stays
   // set so the panel reappears next time the form opens (in case new info has
   // come in). Resets automatically when the dialog closes/reopens.
   const [vanPossiblyPanelDismissed, setVanPossiblyPanelDismissed] = useState(false);
-  const [vanConflictDetails, setVanConflictDetails] = useState<{
-    conflictingEvents: Array<{ id: number; name: string; time?: string }>;
-    acknowledged: boolean;
-  } | null>(null);
-  const [vanConflictChecked, setVanConflictChecked] = useState(false);
+  // "Add a reason for the van" after a save attempt with the estimate under 800.
+  const [showVanReasonError, setShowVanReasonError] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [standbyReasonError, setStandbyReasonError] = useState(false);
   const [showStatusReasonDialog, setShowStatusReasonDialog] = useState(false);
@@ -900,48 +898,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
     },
   });
 
-  // ── Van Conflict Check ─────────────────────────────────────────────
-
-  const eventLikelyNeedsVan = (): boolean => {
-    if ((formData.vanDriverNeeded || formData.isDhlVan) && !formData.selfTransport) return true;
-    // Largest the estimate could be (a range's max).
-    const est = totalFromFields({
-      estimatedSandwichCount: formData.totalSandwichCount || null,
-      estimatedSandwichCountMin: formData.estimatedSandwichCountMin || null,
-      estimatedSandwichCountMax: formData.estimatedSandwichCountMax || null,
-    });
-    const count = est?.max ?? 0;
-    if (count > 500) return true;
-    const notes = `${formData.schedulingNotes || ''} ${formData.planningNotes || ''}`.toLowerCase();
-    if (/\bvan\b/.test(notes) && !notes.includes('van-approved') && !notes.includes('van approved')) return true;
-    return false;
-  };
-
-  const checkVanConflicts = async (): Promise<boolean> => {
-    if (!formData.eventDate || !eventLikelyNeedsVan()) return true;
-    try {
-      const response = await fetch(`/api/event-requests/conflicts-for-date?date=${formData.eventDate}`);
-      if (!response.ok) return true;
-      const data = await response.json();
-      if (data.vanConflicts?.length > 0) {
-        const conflictingEvents = data.vanConflicts.flatMap((c: any) => [
-          { id: c.event1?.id, name: c.event1?.organizationName, time: c.event1?.eventStartTime },
-          { id: c.event2?.id, name: c.event2?.organizationName, time: c.event2?.eventStartTime },
-        ]).filter((e: any) => e.id !== eventRequest?.id);
-        const uniqueEvents = Array.from(new Map(conflictingEvents.map((e: any) => [e.id, e])).values());
-        if (uniqueEvents.length > 0) {
-          toast({
-            title: 'Van Availability Notice',
-            description: `The van may already be assigned to: ${uniqueEvents.map((e: any) => e.name + (e.time ? ` at ${e.time}` : '')).join(', ')}`,
-            duration: 12000,
-          });
-          return false;
-        }
-      }
-      return true;
-    } catch { return true; }
-  };
-
   // ── Submit ─────────────────────────────────────────────────────────
 
   const performSubmit = async (skipSpeakerWarning = false, fieldOverrides?: Record<string, any>) => {
@@ -1227,11 +1183,16 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
     e?.preventDefault?.();
 
-    // Non-blocking van conflict check
-    if (eventLikelyNeedsVan() && !vanConflictChecked) {
-      checkVanConflicts()
-        .then(noConflicts => { setVanConflictChecked(true); })
-        .catch(() => { setVanConflictChecked(true); });
+    // The van needs a reason when the estimate is under 800 (the same-day
+    // van warning shows inline in the form and never blocks saving).
+    if (vanReasonMissing(formData)) {
+      setShowVanReasonError(true);
+      toast({
+        title: 'Add a reason for the van',
+        description: 'The van is for events of 800 sandwiches or more. Say why this event needs it.',
+        variant: 'destructive',
+      });
+      return;
     }
 
     // Standby: what they're waiting on and the check-back date are asked right
@@ -1325,7 +1286,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
   // them rely on the parent closing.
   const anyNestedDialogOpen =
     showDateConfirmation ||
-    showVanConflictDialog ||
     showStatusReasonDialog ||
     showDeleteConfirmation;
 
@@ -1484,7 +1444,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 isComplete={sectionStatus.schedule}
                 eventRequest={eventRequest}
                 formatDateForInput={formatDateForInput}
-                onVanConflictReset={() => setVanConflictChecked(false)}
                 onScheduledDateChange={(newDate) => {
                   setPendingDateChange(newDate);
                   setShowDateConfirmation(true);
@@ -1579,6 +1538,9 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
                 setFormData={setFormData}
                 vanDrivers={vanDrivers}
                 isComplete={sectionStatus.resources}
+                eventRequestId={eventRequest?.id}
+                storedEvent={eventRequest as any}
+                showVanReasonError={showVanReasonError}
               />
             </div>
 
@@ -1731,13 +1693,6 @@ const EventSchedulingForm: React.FC<EventSchedulingFormProps> = ({
         onCancel={() => setShowDateConfirmation(false)}
       />
 
-      <VanConflictDialog
-        open={showVanConflictDialog}
-        onOpenChange={(open) => { if (!open) { setShowVanConflictDialog(false); setVanConflictChecked(false); setIsSubmitting(false); } }}
-        conflictDetails={vanConflictDetails}
-        onGoBack={() => { setShowVanConflictDialog(false); setVanConflictChecked(false); setIsSubmitting(false); }}
-        onAcknowledge={() => { setShowVanConflictDialog(false); setVanConflictChecked(true); }}
-      />
 
 
       {eventRequest && pendingReasonStatus && (

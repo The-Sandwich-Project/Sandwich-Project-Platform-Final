@@ -20,7 +20,6 @@ interface EventScheduleSectionProps {
   isComplete: boolean;
   eventRequest: any | null;
   formatDateForInput: (date: any) => string;
-  onVanConflictReset: () => void;
   /** Called when user finishes editing the date on a scheduled event, to trigger confirmation dialog */
   onScheduledDateChange?: (newDate: string) => void;
 }
@@ -31,7 +30,6 @@ export const EventScheduleSection: React.FC<EventScheduleSectionProps> = ({
   isComplete,
   eventRequest,
   formatDateForInput,
-  onVanConflictReset,
   onScheduledDateChange,
 }) => {
   const { setViewMode } = useEventRequestContext();
@@ -72,7 +70,6 @@ export const EventScheduleSection: React.FC<EventScheduleSectionProps> = ({
             value={formData.eventDate}
             onChange={(e) => {
               setFormData((prev: any) => ({ ...prev, eventDate: e.target.value }));
-              onVanConflictReset();
             }}
             onBlur={(e) => {
               const newDate = e.target.value;

@@ -3001,6 +3001,9 @@ export const eventRequests = pgTable(
     vanDriverNeeded: boolean('van_driver_needed').default(false), // Whether a van driver is required (confirmed)
     vanNeededLikely: boolean('van_needed_likely').notNull().default(false), // Soft flag set during in-process; user is told to confirm or clear when scheduling. When vanDriverNeeded becomes true, this is cleared.
     vanNeededFor: varchar('van_needed_for'), // 'transport' | 'refrigeration' | null — why the van is needed; only meaningful when vanDriverNeeded is true. Maps to planning-sheet column J.
+    vanReason: text('van_reason'), // Why the van is needed when the estimate is under 800 (shared/van-rules.ts)
+    vanTeamOk: boolean('van_team_ok').notNull().default(false), // "Events team OK'd sharing the van" with another same-day van event; until then the van shows as pending
+    vanTimeOverride: varchar('van_time_override'), // 'AM' | 'Mid-day' | 'PM' | 'All day' picked on the planning sheet (column I); NULL = worked out from event times. Cleared when the times change. CHECK in migration.
     assignedVanDriverId: text('assigned_van_driver_id'), // Van driver ID from database
     customVanDriverName: text('custom_van_driver_name'), // Custom van driver name (text entry)
     vanDriverNotes: text('van_driver_notes'), // Special notes for van driver
@@ -3690,6 +3693,9 @@ export const insertEventRequestSchema = createInsertSchema(eventRequests)
     attendanceNotes: z.string().nullable().optional(),
     driversArranged: z.boolean().nullable().optional(),
     selfTransport: z.boolean().nullable().optional(), // Organization transporting sandwiches themselves
+    vanReason: z.string().nullable().optional(),
+    vanTeamOk: z.boolean().optional(),
+    vanTimeOverride: z.enum(['AM', 'Mid-day', 'PM', 'All day']).nullable().optional(),
     vanNeededFor: z
       .union([
         z.enum(['transport', 'refrigeration']),

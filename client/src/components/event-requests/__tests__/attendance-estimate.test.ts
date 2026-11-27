@@ -490,6 +490,7 @@ describe('normalizeDraftAttendance', () => {
     const draft = {
       estimatedAttendance: 40, adultCount: 0,
       estimatedAttendanceMin: 0, estimatedAttendanceMax: 0, nextDayPickup: 'no', isTspShopped: false,
+      vanReason: '', vanTeamOk: false,
     };
     expect(normalizeDraftAttendance(draft)).toEqual(draft);
   });

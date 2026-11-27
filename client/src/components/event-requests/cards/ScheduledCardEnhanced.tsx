@@ -1337,6 +1337,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                     {request.vanDriverNeeded && !request.isDhlVan && (
                       <VanNeededBadgeAndButton
                         eventRequestId={request.id}
+                        event={request as any}
                         vanDriverNeeded={request.vanDriverNeeded}
                         vanNeededLikely={(request as any).vanNeededLikely}
                         eventDate={displayDate}
@@ -1461,6 +1462,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             {!request.assignedVanDriverId && !request.isDhlVan && (request.vanDriverNeeded || (request as any).vanNeededLikely) && (
               <VanNeededBadgeAndButton
                 eventRequestId={request.id}
+                event={request as any}
                 vanDriverNeeded={request.vanDriverNeeded}
                 vanNeededLikely={(request as any).vanNeededLikely}
                 eventDate={displayDate}
@@ -2426,6 +2428,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   {showMarkVanNeeded && (
                     <VanNeededBadgeAndButton
                       eventRequestId={request.id}
+                      event={request as any}
                       vanDriverNeeded={request.vanDriverNeeded}
                       vanNeededLikely={(request as any).vanNeededLikely}
                       canEdit={!!canEdit}

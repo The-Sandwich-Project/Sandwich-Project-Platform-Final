@@ -25,6 +25,10 @@ export interface EventFormData {
   nextDayPickup?: 'no' | 'option' | 'planned';
   /** true = TSP is buying the food; false = the group shops. */
   isTspShopped?: boolean;
+  /** Why the van is needed when the estimate is under 800. */
+  vanReason?: string;
+  /** "Events team OK'd sharing the van" with another same-day van event. */
+  vanTeamOk?: boolean;
   overnightHoldingLocation: string;
   overnightPickupTime: string;
   sandwichTypes: Array<{ type: string; quantity: number }>;

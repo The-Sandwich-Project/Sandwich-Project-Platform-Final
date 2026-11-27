@@ -603,6 +603,7 @@ const CardHeader: React.FC<CardHeaderProps> = ({
               lives in the bottom action row alongside other workflow buttons. */}
           <VanNeededBadgeAndButton
             eventRequestId={request.id}
+            event={request as any}
             vanDriverNeeded={request.vanDriverNeeded}
             vanNeededLikely={(request as any).vanNeededLikely}
             eventDate={displayDate}
@@ -1744,6 +1745,7 @@ export const InProcessCard: React.FC<InProcessCardProps> = ({
                 for actions to take. */}
             <VanNeededBadgeAndButton
               eventRequestId={request.id}
+              event={request as any}
               vanDriverNeeded={request.vanDriverNeeded}
               vanNeededLikely={(request as any).vanNeededLikely}
               canEdit={!!canEdit}

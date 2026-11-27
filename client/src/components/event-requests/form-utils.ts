@@ -13,6 +13,7 @@ import { estimateStateFromFields, normalizeEstimate } from '@shared/sandwich-est
 import type { EventFormData } from './form-sections/types';
 import { effectiveNextDayPickup } from '@shared/next-day-pickup';
 import { hasAttendanceRange } from '@shared/attendance-estimate';
+import { usesTspVan } from '@shared/van-rules';
 export { findMismatchedSavedFields, getDroppedServerFields } from '@/lib/event-save-verification';
 
 /**
@@ -111,6 +112,8 @@ export function normalizeDraftNewFields(snapshot: any): any {
     out.holdingOvernight = out.nextDayPickup === 'planned';
   }
   if (!('isTspShopped' in out)) out.isTspShopped = false;
+  if (!('vanReason' in out)) out.vanReason = '';
+  if (!('vanTeamOk' in out)) out.vanTeamOk = false;
   return out;
 }
 
@@ -196,6 +199,10 @@ export function buildEventDataForServer(
         : null;
     })(),
     volunteersNeeded: parseInt(formData.volunteersNeeded?.toString() || '0') || 0,
+
+    // Van rules: the reason and the "team OK'd" only apply while TSP's van is needed.
+    vanReason: usesTspVan(formData as any) ? String((formData as any).vanReason ?? '').trim() || null : null,
+    vanTeamOk: usesTspVan(formData as any) ? (formData as any).vanTeamOk === true : false,
 
     // TSP shopping: strictly true/false (the column is NOT NULL)
     isTspShopped: formData.isTspShopped === true,
@@ -533,6 +540,8 @@ const MERGE_TOGETHER: string[][] = [
   // The next-day choice and the overnight details it keeps or drops (choosing
   // No / It's an option clears the delivery window and parking too).
   ['nextDayPickup', 'holdingOvernight', 'overnightHoldingLocation', 'overnightPickupTime', 'deliveryTimeWindow', 'deliveryParkingAccess'],
+  // Whether the van is needed, and the reason / "team OK'd" that only apply then.
+  ['vanDriverNeeded', 'vanNeededFor', 'isDhlVan', 'vanReason', 'vanTeamOk'],
 ];
 
 /**
