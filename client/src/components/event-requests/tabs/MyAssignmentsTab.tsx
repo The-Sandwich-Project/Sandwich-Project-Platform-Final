@@ -69,7 +69,6 @@ export const MyAssignmentsTab: React.FC = () => {
     setTspContactEventRequest,
     setCollectionLogEventRequest,
     setLogContactEventRequest,
-    setIntakeCallEventRequest,
     setNextActionEventRequest,
     setNextActionMode,
     editingScheduledId,
@@ -210,13 +209,6 @@ export const MyAssignmentsTab: React.FC = () => {
                 if (result === 'needs_reason') {
                   setReasonDialogEventRequest(request);
                   openDialog('decline');
-                }
-              }}
-            onNonEvent={async () => {
-                const result = await handleStatusChange(request.id, 'non_event');
-                if (result === 'needs_reason') {
-                  setNonEventDialogEventRequest(request);
-                  openDialog('nonEvent');
                 }
               }}
             onLogContact={() => {
@@ -508,13 +500,6 @@ export const MyAssignmentsTab: React.FC = () => {
                 if (result === 'needs_reason') {
                   setReasonDialogEventRequest(request);
                   openDialog('decline');
-                }
-              }}
-            onNonEvent={async () => {
-                const result = await handleStatusChange(request.id, 'non_event');
-                if (result === 'needs_reason') {
-                  setNonEventDialogEventRequest(request);
-                  openDialog('nonEvent');
                 }
               }}
             onLogContact={() => {

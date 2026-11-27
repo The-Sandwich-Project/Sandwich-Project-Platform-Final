@@ -63,6 +63,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EventIntakeTrainingGuide } from '@/components/resources/EventIntakeTrainingGuide';
 
 // Category definitions with icons and colors (using brand color scheme)
 const CATEGORIES = [
@@ -1506,6 +1507,9 @@ export function Resources() {
             </div>
           )}
         </div>
+
+        {/* Event Intake Training Guide (read-only reference for the intake team) */}
+        <EventIntakeTrainingGuide />
 
         {/* Sandwich Assembly Guides */}
         <SandwichAssemblyGuides />

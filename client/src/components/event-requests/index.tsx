@@ -90,7 +90,6 @@ import { AiIntakeAssistantDialog } from './dialogs/AiIntakeAssistantDialog';
 import { StatusReasonDialog } from './dialogs/StatusReasonDialog';
 import { NonEventDialog } from './dialogs/NonEventDialog';
 import { RescheduleDialog } from './dialogs/RescheduleDialog';
-import IntakeCallDialog from './IntakeCallDialog';
 import NextActionDialog from './NextActionDialog';
 import { StatusDefinitionsPanel } from './StatusDefinitionsPanel';
 import { OnboardingTooltip } from '@/components/ui/onboarding-tooltip';
@@ -205,8 +204,6 @@ const EventRequestsManagementContent: React.FC = () => {
     setAiSuggestionEventRequest,
     aiIntakeAssistantEventRequest,
     setAiIntakeAssistantEventRequest,
-    intakeCallEventRequest,
-    setIntakeCallEventRequest,
     reasonDialogEventRequest,
     setReasonDialogEventRequest,
     nonEventDialogEventRequest,
@@ -272,12 +269,9 @@ const EventRequestsManagementContent: React.FC = () => {
   const { markViewedIfNew } = useMarkNewEventViewedOnOpen(user?.id);
 
   useEffect(() => {
-    const event =
-      activeDialog === 'intakeCall' ? intakeCallEventRequest : selectedEventRequest;
+    const event = selectedEventRequest;
     if (
-      (activeDialog === 'eventDetails' ||
-        activeDialog === 'eventDetailsPreview' ||
-        activeDialog === 'intakeCall') &&
+      (activeDialog === 'eventDetails' || activeDialog === 'eventDetailsPreview') &&
       event?.status === 'new'
     ) {
       markViewedIfNew(event);
@@ -285,7 +279,6 @@ const EventRequestsManagementContent: React.FC = () => {
   }, [
     activeDialog,
     selectedEventRequest,
-    intakeCallEventRequest,
     markViewedIfNew,
     user?.id,
   ]);
@@ -1278,18 +1271,6 @@ const EventRequestsManagementContent: React.FC = () => {
               closeDialog('reschedule');
               setRescheduleDialogEventRequest(null);
             }}
-          />
-        )}
-
-        {/* Intake Call Dialog */}
-        {intakeCallEventRequest && (
-          <IntakeCallDialog
-            isOpen={(activeDialog === 'intakeCall')}
-            onClose={() => {
-              closeDialog('intakeCall');
-              setIntakeCallEventRequest(null);
-            }}
-            eventRequest={intakeCallEventRequest}
           />
         )}
 
