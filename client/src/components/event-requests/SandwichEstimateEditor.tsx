@@ -1,51 +1,44 @@
 /**
  * SandwichEstimateEditor - the one editor for an event's ESTIMATED sandwiches.
  *
- * Used by the full event form and the quick edit on event cards, so both work
- * the same way. One total box (a number, a range like 200-300, or blank while
- * it isn't known) plus type rows, each with an optional amount. Every shape
- * the team uses fits:
- *   300 + PB&J                     -> "300 PB&J"
- *   200-300 + Turkey               -> "200–300 Turkey"
- *   Deli 100-150 + PB&J 200-250    -> total worked out: "300–400 (...)"
- *   300-400 + Deli + PB&J          -> "300–400, Deli & PB&J (split TBD)"
- *   250, no types                  -> "250, type TBD"
+ * Used by the full event form, the quick edit on Scheduled cards and the
+ * spreadsheet view, so all of them work the same way. Two fixed rows, Deli
+ * and PB&J: tick the types the group is making and give each a number, a
+ * range (400-500) or nothing yet. While the split isn't fully known (no type
+ * ticked, or a ticked type without an amount) a "Total, if known" box shows;
+ * once every ticked type has an amount the total is worked out from them, so
+ * the two can never disagree. Examples:
+ *   Deli 400-500 + PB&J 100-150    -> "500–650 (400–500 Deli, 100–150 PB&J)"
+ *   Deli + PB&J, total 300-400     -> "300–400, Deli & PB&J (split TBD)"
+ *   Deli 150 + PB&J, total 300     -> "300 (150 Deli, PB&J TBD)"
+ *   nothing ticked, total 250      -> "250, type TBD"
  *
  * The text is turned into stored fields by resolveDraft (shared/
  * sandwich-estimate.ts), the same rule the server applies, and the line under
- * the editor shows exactly how it will be saved.
+ * the editor shows exactly how it will be saved. Older events tagged Turkey,
+ * Ham or Chicken show in the Deli row.
  */
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Plus, X } from 'lucide-react';
-import {
   draftFromFields,
+  draftFromTwoTypeState,
   resolveDraft,
+  totalFromFields,
+  totalIsTyped,
+  twoTypeStateFromDraft,
   type DraftResult,
   type EstimateDraft,
   type EstimateFields,
+  type TwoTypeState,
 } from '@shared/sandwich-estimate';
-import { SANDWICH_TYPES } from './constants';
 
 export type { EstimateDraft };
 export { draftFromFields, resolveDraft };
-
-/** Default type for a newly added row: one the dropdown offers. */
-export const NEW_ROW_TYPE = 'deli_turkey';
-
-const TYPE_OPTIONS = SANDWICH_TYPES.map((t) =>
-  t.value === 'unknown' ? { value: t.value, label: 'Not decided' } : { value: t.value, label: t.label }
-);
 
 interface SandwichEstimateEditorProps {
   value: EstimateDraft;
@@ -56,87 +49,93 @@ interface SandwichEstimateEditorProps {
   idPrefix?: string;
 }
 
+const ROWS: Array<{ key: 'deli' | 'pbj'; label: string }> = [
+  { key: 'deli', label: 'Deli' },
+  { key: 'pbj', label: 'PB&J' },
+];
+
 export const SandwichEstimateEditor: React.FC<SandwichEstimateEditorProps> = ({
   value,
   onChange,
   tone = 'light',
   idPrefix = 'sandwich-estimate',
 }) => {
+  const state: TwoTypeState = React.useMemo(() => twoTypeStateFromDraft(value), [value]);
   const result: DraftResult = React.useMemo(() => resolveDraft(value), [value]);
   const onDark = tone === 'onDark';
   const labelClass = onDark ? 'text-white' : 'text-gray-900';
   const hintClass = onDark ? 'text-white/80' : 'text-[#236383]';
   const inputClass = 'bg-white text-gray-900';
+  const typed = totalIsTyped(state);
 
-  const setTotal = (total: string) => onChange({ ...value, total });
-  const setLine = (index: number, patch: Partial<{ type: string; amount: string }>) =>
-    onChange({ ...value, lines: value.lines.map((l, i) => (i === index ? { ...l, ...patch } : l)) });
-  const addLine = () => onChange({ ...value, lines: [...value.lines, { type: NEW_ROW_TYPE, amount: '' }] });
-  const removeLine = (index: number) => onChange({ ...value, lines: value.lines.filter((_, i) => i !== index) });
+  const update = (next: TwoTypeState) => onChange(draftFromTwoTypeState(next));
+  const setRow = (key: 'deli' | 'pbj', patch: Partial<TwoTypeState['deli']>) =>
+    update({ ...state, [key]: { ...state[key], ...patch } });
+
+  // The worked-out total once every ticked type has an amount.
+  const computed = result.errors.length === 0 ? totalFromFields(result.fields as any) : null;
+  const computedTotal = computed ? (computed.min === computed.max ? `${computed.min}` : `${computed.min}–${computed.max}`) : '';
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-1">
-        <Label htmlFor={`${idPrefix}-total`} className={labelClass}>
-          Estimated sandwiches
-        </Label>
-        <Input
-          id={`${idPrefix}-total`}
-          inputMode="numeric"
-          value={value.total}
-          onChange={(e) => setTotal(e.target.value)}
-          placeholder="e.g. 300 or 200-300"
-          className={`w-48 ${inputClass}`}
-        />
-        <p className={`text-xs ${hintClass}`}>A number, a range, or blank if you only know the types.</p>
+    <div className="space-y-3" data-testid={`${idPrefix}-editor`}>
+      <Label className={labelClass}>Estimated sandwiches</Label>
+      <div className="space-y-2">
+        {ROWS.map(({ key, label }) => {
+          const row = state[key];
+          const id = `${idPrefix}-${key}`;
+          return (
+            <div key={key} className="flex items-center gap-3">
+              <div className="flex items-center gap-2 w-24">
+                <Checkbox
+                  id={`${id}-check`}
+                  checked={row.checked}
+                  onCheckedChange={(c) => setRow(key, { checked: c === true, ...(c === true ? {} : { amount: '' }) })}
+                  className={onDark ? 'border-white data-[state=checked]:bg-white data-[state=checked]:text-[#236383]' : ''}
+                  data-testid={`${id}-check`}
+                />
+                <Label htmlFor={`${id}-check`} className={`cursor-pointer ${labelClass}`}>
+                  {label}
+                </Label>
+              </div>
+              <Input
+                id={`${id}-amount`}
+                inputMode="numeric"
+                value={row.amount}
+                disabled={!row.checked}
+                onChange={(e) => setRow(key, { amount: e.target.value })}
+                placeholder={row.checked ? 'e.g. 400 or 400-500' : ''}
+                aria-label={`${label} amount`}
+                className={`w-44 ${inputClass}`}
+                data-testid={`${id}-amount`}
+              />
+            </div>
+          );
+        })}
       </div>
 
-      <div className="space-y-2">
-        <Label className={labelClass}>Types</Label>
-        {value.lines.length === 0 && (
-          <p className={`text-xs ${hintClass}`}>No types yet (type TBD). Add one if you know it.</p>
-        )}
-        {value.lines.map((line, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <Select value={line.type} onValueChange={(type) => setLine(index, { type })}>
-              <SelectTrigger className={`w-36 ${inputClass}`} aria-label={`Sandwich type ${index + 1}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-[200]" position="popper" sideOffset={5}>
-                {TYPE_OPTIONS.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              inputMode="numeric"
-              value={line.amount}
-              onChange={(e) => setLine(index, { amount: e.target.value })}
-              placeholder="amount (optional)"
-              aria-label={`Amount for sandwich type ${index + 1}`}
-              className={`w-36 ${inputClass}`}
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => removeLine(index)}
-              className={onDark ? 'text-white hover:bg-white/20' : ''}
-              aria-label={`Remove sandwich type ${index + 1}`}
-            >
-              <X className="w-3 h-3" aria-hidden="true" />
-            </Button>
-          </div>
-        ))}
-        <Button type="button" size="sm" variant="outline" onClick={addLine}>
-          <Plus className="w-3 h-3 mr-1" aria-hidden="true" /> Add type
-        </Button>
-        {value.lines.length > 1 && (
-          <p className={`text-xs ${hintClass}`}>Leave an amount blank if the split isn't decided yet.</p>
-        )}
-      </div>
+      {typed ? (
+        <div className="space-y-1">
+          <Label htmlFor={`${idPrefix}-total`} className={labelClass}>
+            Total, if known
+          </Label>
+          <Input
+            id={`${idPrefix}-total`}
+            inputMode="numeric"
+            value={state.total}
+            onChange={(e) => update({ ...state, total: e.target.value })}
+            placeholder="e.g. 300 or 300-400"
+            className={`w-44 ${inputClass}`}
+            data-testid={`${idPrefix}-total`}
+          />
+          <p className={`text-xs ${hintClass}`}>
+            For when the group knows roughly how many but not the split yet.
+          </p>
+        </div>
+      ) : (
+        <p className={`text-sm ${labelClass}`} data-testid={`${idPrefix}-computed-total`}>
+          Total: <strong>{computedTotal || '—'}</strong>
+        </p>
+      )}
 
       <div className="text-sm space-y-1" aria-live="polite">
         {result.errors.map((e) => (
@@ -146,14 +145,16 @@ export const SandwichEstimateEditor: React.FC<SandwichEstimateEditorProps> = ({
         ))}
         {result.errors.length === 0 && (
           <p className={labelClass}>
-            Saves as: <strong>{result.preview || 'no estimate yet'}</strong>
+            Saves as: <strong data-testid={`${idPrefix}-preview`}>{result.preview || 'no estimate yet'}</strong>
           </p>
         )}
-        {result.notes.map((n) => (
-          <p key={n} className={onDark ? 'text-amber-200 text-xs' : 'text-amber-700 text-xs'}>
-            {n}
-          </p>
-        ))}
+        {result.notes
+          .filter((n) => !n.startsWith('Total worked out from the types'))
+          .map((n) => (
+            <p key={n} className={onDark ? 'text-amber-200 text-xs' : 'text-amber-700 text-xs'}>
+              {n}
+            </p>
+          ))}
       </div>
     </div>
   );

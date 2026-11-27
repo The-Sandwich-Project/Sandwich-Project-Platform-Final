@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ChevronDown, Plus, Trash2 } from 'lucide-react';
-import { SANDWICH_TYPES } from '../constants';
+import { SANDWICH_TYPE_CHOICES } from '../constants';
 import type { FormSectionProps } from './types';
 
 interface CompletedEventSectionProps extends FormSectionProps {
@@ -239,7 +239,7 @@ export const CompletedEventSection: React.FC<CompletedEventSectionProps> = ({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="z-[200]" position="popper" sideOffset={5}>
-                            {SANDWICH_TYPES.map((type) => (
+                            {SANDWICH_TYPE_CHOICES.map((type) => (
                               <SelectItem key={type.value} value={type.value}>
                                 {type.label}
                               </SelectItem>

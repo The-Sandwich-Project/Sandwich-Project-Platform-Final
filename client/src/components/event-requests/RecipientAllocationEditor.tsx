@@ -22,7 +22,7 @@ import { Plus, Trash2, Building, Search, Loader2, Check, Star } from 'lucide-rea
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, applyPatchResponseToCache } from '@/lib/queryClient';
-import { SANDWICH_TYPES } from './constants';
+import { SANDWICH_TYPES, SANDWICH_TYPE_CHOICES } from './constants';
 
 // Type for recipient allocation
 export interface RecipientAllocation {
@@ -347,7 +347,7 @@ export function RecipientAllocationEditor({
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="none">Any type</SelectItem>
-                              {SANDWICH_TYPES.map((type) => (
+                              {SANDWICH_TYPE_CHOICES.map((type) => (
                                 <SelectItem key={type.value} value={type.value}>
                                   {type.label}
                                 </SelectItem>

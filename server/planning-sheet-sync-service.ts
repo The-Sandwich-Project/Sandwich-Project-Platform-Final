@@ -1081,15 +1081,16 @@ export class PlanningSheetSyncService {
     // "Turkey", "Ham", "Deli", "PBJ" — not "Deli_turkey" or "Deli,
     // Turkey". Map raw → label explicitly.
     const sandwichTypes = e.sandwichTypes as Array<{ type: string; quantity?: number }> | null;
+    // The types are Deli and PB&J only; older meat-specific types go out as Deli.
     const SANDWICH_TYPE_LABELS: Record<string, string> = {
       pbj: 'PBJ',
       'pb&j': 'PBJ',
       deli: 'Deli',
-      deli_turkey: 'Turkey',
-      turkey: 'Turkey',
-      deli_ham: 'Ham',
-      ham: 'Ham',
-      chicken: 'Chicken',
+      deli_turkey: 'Deli',
+      turkey: 'Deli',
+      deli_ham: 'Deli',
+      ham: 'Deli',
+      chicken: 'Deli',
       unknown: '',
     };
     const formatSandwichType = (type: string): string => {

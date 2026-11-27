@@ -21,13 +21,20 @@ export {
 } from '@shared/event-status-workflow';
 export type { EventStatus } from '@shared/event-status-workflow';
 
-// Standardized sandwich types - only these 5 options allowed
+// Sandwich types: the choices are PB&J and Deli only. Older events may still
+// hold turkey/ham (shown as Deli) or unknown, so those stay here for lookups.
 export const SANDWICH_TYPES = [
   { value: 'pbj', label: 'PB&J' },
   { value: 'deli', label: 'Deli' },
-  { value: 'deli_turkey', label: 'Turkey' },
-  { value: 'deli_ham', label: 'Ham' },
+  { value: 'deli_turkey', label: 'Deli' },
+  { value: 'deli_ham', label: 'Deli' },
   { value: 'unknown', label: 'Unknown' },
+] as const;
+
+/** What people can pick for a sandwich type. */
+export const SANDWICH_TYPE_CHOICES = [
+  { value: 'pbj', label: 'PB&J' },
+  { value: 'deli', label: 'Deli' },
 ] as const;
 
 // Status color scheme - VIBRANT BRAND COLORS: Using TSP brand palette with high saturation

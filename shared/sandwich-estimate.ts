@@ -383,14 +383,19 @@ export function resolveEstimatePatch(
 // Display (shared so every screen says the same thing)
 // ---------------------------------------------------------------------------
 
+// The choices are Deli and PB&J only. Older events tagged with a meat
+// (turkey, ham, chicken) show as Deli; the stored value isn't changed.
 const DISPLAY_LABELS: Record<string, string> = {
   pbj: 'PB&J',
   deli: 'Deli',
-  deli_turkey: 'Turkey',
-  deli_ham: 'Ham',
-  chicken: 'Chicken',
+  deli_turkey: 'Deli',
+  deli_ham: 'Deli',
+  chicken: 'Deli',
   unknown: 'type TBD',
 };
+
+/** Deli and the older meat-specific types that count as deli. */
+export const DELI_FAMILY_TYPES = new Set(['deli', 'deli_turkey', 'deli_ham', 'chicken']);
 
 export function sandwichTypeLabel(key: string): string {
   return DISPLAY_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
@@ -513,4 +518,73 @@ export function resolveDraft(draft: EstimateDraft): DraftResult {
     notes.push(`Total worked out from the types: ${fmtAmount(out.total)}.`);
   }
   return { fields, errors, notes, preview: formatEstimate(fields) };
+}
+
+// ---------------------------------------------------------------------------
+// Two-row editor (Deli / PB&J) <-> draft
+// ---------------------------------------------------------------------------
+
+/** One fixed row of the editor: whether the type is being made, and how many. */
+export interface TypeRow {
+  checked: boolean;
+  /** "" (not known yet), "300" or "200-300". */
+  amount: string;
+}
+
+/**
+ * What the editor shows: a Deli row, a PB&J row, and the total box (used
+ * while the split isn't fully known).
+ */
+export interface TwoTypeState {
+  deli: TypeRow;
+  pbj: TypeRow;
+  total: string;
+}
+
+/** Add amounts written as text; "" if any is blank or unreadable. */
+function sumAmountTexts(texts: string[]): string {
+  let min = 0;
+  let max = 0;
+  for (const t of texts) {
+    const a = parseAmountText(t).amount;
+    if (!a) return '';
+    min += a.min;
+    max += a.max;
+  }
+  return amountText({ min, max });
+}
+
+/**
+ * The two-row view of a draft. Older meat-specific deli lines (turkey, ham,
+ * chicken) fold into the Deli row; their amounts are added when every one is
+ * known, otherwise the Deli amount is left blank (not known).
+ */
+export function twoTypeStateFromDraft(draft: EstimateDraft): TwoTypeState {
+  const deliLines = draft.lines.filter((l) => DELI_FAMILY_TYPES.has(normalizeSandwichTypeKey(l.type) ?? ''));
+  const pbjLines = draft.lines.filter((l) => normalizeSandwichTypeKey(l.type) === 'pbj');
+  const rowFrom = (rows: typeof draft.lines): TypeRow =>
+    rows.length === 0
+      ? { checked: false, amount: '' }
+      : { checked: true, amount: rows.length === 1 ? rows[0].amount : sumAmountTexts(rows.map((r) => r.amount)) };
+  return { deli: rowFrom(deliLines), pbj: rowFrom(pbjLines), total: draft.total };
+}
+
+/** Whether the total box is something to type in (vs. worked out from the rows). */
+export function totalIsTyped(state: TwoTypeState): boolean {
+  const checked = [state.deli, state.pbj].filter((r) => r.checked);
+  if (checked.length === 0) return true;
+  return checked.some((r) => !r.amount.trim());
+}
+
+/**
+ * The draft for a two-row state. The typed total is kept only while it's
+ * needed (no type picked, or a picked type without an amount); once every
+ * picked type has an amount, the total is worked out from them so the two
+ * can never disagree.
+ */
+export function draftFromTwoTypeState(state: TwoTypeState): EstimateDraft {
+  const lines: EstimateDraft['lines'] = [];
+  if (state.deli.checked) lines.push({ type: 'deli', amount: state.deli.amount });
+  if (state.pbj.checked) lines.push({ type: 'pbj', amount: state.pbj.amount });
+  return { total: totalIsTyped(state) ? state.total : '', lines };
 }

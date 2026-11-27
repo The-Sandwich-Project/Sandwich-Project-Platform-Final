@@ -27,13 +27,13 @@ describe('the agreed cases (what you enter -> what the card shows)', () => {
 
   it('total 200, Turkey', () => {
     const { f, text } = show({ estimatedSandwichCount: 200, sandwichTypes: [{ type: 'deli_turkey' }] });
-    expect(text).toBe('200 Turkey');
+    expect(text).toBe('200 Deli');
     expect(f).toMatchObject({ estimatedSandwichCount: 200, estimatedSandwichCountMin: null, sandwichTypes: [{ type: 'deli_turkey', quantity: 200 }] });
   });
 
   it('total 200-300, Turkey', () => {
     const { f, text } = show({ estimatedSandwichCountMin: 200, estimatedSandwichCountMax: 300, sandwichTypes: [{ type: 'turkey' }] });
-    expect(text).toBe('200–300 Turkey');
+    expect(text).toBe('200–300 Deli');
     expect(f).toEqual({
       estimatedSandwichCount: 250,
       estimatedSandwichCountMin: 200,
@@ -450,5 +450,29 @@ describe('formatEstimate with unknown rows', () => {
       .toBe('300 (150 Deli, rest type TBD)');
     expect(formatEstimate({ estimatedSandwichCount: 300, sandwichTypes: [{ type: 'deli', quantity: 0 }, { type: 'unknown', quantity: 0 }] }))
       .toBe('300 (Deli, rest type TBD)');
+  });
+});
+
+describe('two-row editor (Deli / PB&J)', () => {
+  const { twoTypeStateFromDraft, draftFromTwoTypeState, totalIsTyped } = require('../../shared/sandwich-estimate');
+
+  it('folds older meat types into Deli and adds their known amounts', () => {
+    const st = twoTypeStateFromDraft({ total: '', lines: [{ type: 'deli_turkey', amount: '100' }, { type: 'deli_ham', amount: '50-60' }, { type: 'pbj', amount: '' }] });
+    expect(st.deli).toEqual({ checked: true, amount: '150-160' });
+    expect(st.pbj).toEqual({ checked: true, amount: '' });
+  });
+
+  it('leaves the Deli amount blank when an older line has no amount', () => {
+    expect(twoTypeStateFromDraft({ total: '', lines: [{ type: 'deli_turkey', amount: '100' }, { type: 'deli_ham', amount: '' }] }).deli).toEqual({ checked: true, amount: '' });
+  });
+
+  it('keeps the typed total only while the split is not fully known', () => {
+    const partial = { deli: { checked: true, amount: '150' }, pbj: { checked: true, amount: '' }, total: '300' };
+    expect(totalIsTyped(partial)).toBe(true);
+    expect(draftFromTwoTypeState(partial).total).toBe('300');
+    const full = { ...partial, pbj: { checked: true, amount: '100' } };
+    expect(totalIsTyped(full)).toBe(false);
+    expect(draftFromTwoTypeState(full)).toEqual({ total: '', lines: [{ type: 'deli', amount: '150' }, { type: 'pbj', amount: '100' }] });
+    expect(totalIsTyped({ deli: { checked: false, amount: '' }, pbj: { checked: false, amount: '' }, total: '250' })).toBe(true);
   });
 });
