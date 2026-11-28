@@ -119,6 +119,11 @@ export const PLANNING_SHEET_LAST_COLUMN = planningSheetColumnLetter(
  */
 export const SHEET_READ_LAST_COLUMN = 'CZ';
 
+/** The app-owned logical columns this sheet's header row has. */
+export function writableColumnsOf(map: PlanningHeaderMap): number[] {
+  return Array.from(map.columns.keys()).filter((l) => APP_WRITTEN_COLUMNS.has(l)).sort((a, b) => a - b);
+}
+
 /** Pre-J layout was A:AA (27 cells). Inserting J made A:AB (28 cells). */
 export const LEGACY_PLANNING_SHEET_COLUMN_COUNT = 27;
 
@@ -991,9 +996,19 @@ export class PlanningSheetSyncService {
    * isn't shown as a difference that never clears.
    */
   async getWritableColumns(): Promise<number[]> {
-    const map = await this.readHeaderMap();
-    return Array.from(map.columns.keys()).filter((l) => APP_WRITTEN_COLUMNS.has(l)).sort((a, b) => a - b);
+    return writableColumnsOf(await this.readHeaderMap());
   }
+
+  /**
+   * The writable columns from the header row the last readPlanningSheet()
+   * already fetched (no extra request, so it can't fail separately from the
+   * rows it describes). null before any read.
+   */
+  writableColumnsFromLastRead(): number[] | null {
+    return this.lastReadHeaderMap ? writableColumnsOf(this.lastReadHeaderMap) : null;
+  }
+
+  private lastReadHeaderMap: PlanningHeaderMap | null = null;
 
   async readPlanningSheet(): Promise<PlanningSheetRow[]> {
     await this.ensureInitialized();
@@ -1006,6 +1021,7 @@ export class PlanningSheetSyncService {
 
     const all: string[][] = response.data.values || [];
     const headerMap = resolvePlanningHeaders(all[0] || []);
+    this.lastReadHeaderMap = headerMap;
     const rows = all.slice(1);
     logger.log(`Read ${rows.length} rows from Planning Sheet`);
 

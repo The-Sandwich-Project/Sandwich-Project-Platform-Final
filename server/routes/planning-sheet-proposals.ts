@@ -159,7 +159,9 @@ export function createPlanningSheetProposalsRouter(
         // per step would triple the API calls and let the three answers be
         // based on different versions of the sheet.
         const allSheetRows = await service.readPlanningSheet();
-        writableColumns = await service.getWritableColumns();
+        // From the same read as the rows (no second request that could fail
+        // on its own and make an existing row look like a new one).
+        writableColumns = service.writableColumnsFromLastRead();
 
         // Try exact match first
         existingSheetRow = await service.findMatchingRow(parsedEventId, allSheetRows);
