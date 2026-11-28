@@ -140,17 +140,12 @@ export function createPlanningSheetProposalsRouter(
         return res.status(500).json({ error: 'Planning Sheet service not configured' });
       }
 
-      const rowData = await service.eventToSheetRow(parsedEventId);
+      let rowData = await service.eventToSheetRow(parsedEventId);
 
       if (!rowData) {
         return res.status(404).json({ error: 'Event not found' });
       }
 
-      // Return both raw array and labeled data for UI display
-      const labeledData: Record<string, string> = {};
-      Object.entries(PLANNING_SHEET_COLUMNS).forEach(([key, index]) => {
-        labeledData[key] = rowData[index] || '';
-      });
 
       // Find matching row in the current sheet for side-by-side comparison
       let existingSheetRow = null;
@@ -201,7 +196,16 @@ export function createPlanningSheetProposalsRouter(
       let existingRawData: string[] | null = null;
       if (existingSheetRow) {
         existingRawData = service.planningSheetRowToRawArray(existingSheetRow);
+        // Details is the planner's column: what the push would write keeps
+        // their text and only updates the app's attendee line.
+        rowData = (await service.eventToSheetRow(parsedEventId, existingRawData)) ?? rowData;
       }
+
+      // Return both raw array and labeled data for UI display
+      const labeledData: Record<string, string> = {};
+      Object.entries(PLANNING_SHEET_COLUMNS).forEach(([key, index]) => {
+        labeledData[key] = rowData![index] || '';
+      });
 
       res.json({
         rawData: rowData,

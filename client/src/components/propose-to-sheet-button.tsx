@@ -53,8 +53,8 @@ const COLUMN_LABELS: Record<number, string> = {
   4: 'Event End Time',
   5: 'Pick Up Time',
   6: 'Pick Up Next Day?',
-  7: 'All Details',
-  8: 'Van Booked?',
+  7: 'Details',
+  8: 'Van time (AM / Mid Day / PM / All Day)',
   9: 'Van needed for?',
   10: 'Staffing',
   11: 'Estimate # Sandwiches',
@@ -62,7 +62,7 @@ const COLUMN_LABELS: Record<number, string> = {
   13: 'Final # Sandwiches',
   14: "#'s added to app",
   15: 'Follow-up email sent',
-  16: 'Sent Toolkit?',
+  16: 'Toolkit Sent',
   17: 'Contact Name',
   18: 'Email',
   19: 'Phone',
@@ -71,15 +71,17 @@ const COLUMN_LABELS: Record<number, string> = {
   22: 'Recipient/Host',
   23: 'After Event Notes',
   24: 'Cancelled',
-  25: 'Notes',
+  25: 'Blank column',
   26: 'sync_id',
-  27: '(unlabeled)',
+  27: 'Planning/Contact Notes',
+  28: 'TSP shopping',
 };
 
-// Columns the sheet owns (O, P, AA sync_id, AB). The server never writes them
-// and always keeps the sheet's value on update, so they aren't offered as
-// differences here. Mirrors SHEET_OWNED_COLUMNS in server/planning-sheet-sync-service.ts.
-const SHEET_OWNED_COLUMNS = new Set([14, 15, 26, 27]);
+// Columns the sheet owns ("#'s added to app", "Follow-up email sent",
+// "Toolkit Sent", the blank column, sync_id, Planning/Contact Notes). The
+// server never writes them, so they aren't offered as differences here.
+// Mirrors APP_WRITTEN_COLUMNS in server/services/planning-sheet-headers.ts.
+const SHEET_OWNED_COLUMNS = new Set([14, 15, 16, 25, 26, 27]);
 
 // Keep ProposeToSheetButton as an alias for backward compatibility
 export { PushToSheetButton as ProposeToSheetButton };

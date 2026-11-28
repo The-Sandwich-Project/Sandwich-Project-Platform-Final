@@ -162,7 +162,8 @@ describe('sheet-owned columns (live layout, Nov 2026)', () => {
     expect(PLANNING_SHEET_COLUMNS.FOLLOW_UP_EMAIL_SENT).toBe(15);
     expect(PLANNING_SHEET_COLUMNS.SYNC_ID).toBe(26);
     expect(PLANNING_SHEET_COLUMNS.UNLABELED_AB).toBe(27);
-    expect([...SHEET_OWNED_COLUMNS].sort((a, b) => a - b)).toEqual([14, 15, 26, 27]);
+    // Batch 7: Toolkit Sent (16, becoming TSP shopping) and the blank column Z (25) are sheet-owned too.
+    expect([...SHEET_OWNED_COLUMNS].sort((a, b) => a - b)).toEqual([14, 15, 16, 25, 26, 27]);
   });
 
   it('a push never overwrites sync_id or the other sheet-owned cells', () => {
