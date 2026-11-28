@@ -32,6 +32,7 @@ import { formatEventDate } from '../utils';
 import { parseSandwichTypes, formatSandwichTypesDisplay, formatEventEstimate } from '@/lib/sandwich-utils';
 import { RefrigerationWarningBadge } from '../RefrigerationWarningBadge';
 import EventEmailLogDisplay from '@/components/event-email-log-display';
+import { effectiveNextDayPickup } from '@shared/next-day-pickup';
 
 interface EventDetailsDialogProps {
   event: EventRequest | null;
@@ -297,11 +298,15 @@ export function EventDetailsDialog({
           )}
 
           {/* Delivery Information */}
-          {(event.pickupTime || event.deliveryDestination || event.overnightHoldingLocation) && (
+          {(event.pickupTime || event.deliveryDestination || event.overnightHoldingLocation || effectiveNextDayPickup(event) === 'planned') && (
             <div className="space-y-2">
               <h3 className="font-semibold text-sm text-gray-700">Delivery Information</h3>
               <div className="pl-6 space-y-1">
-                {event.pickupTime && (
+                {effectiveNextDayPickup(event) === 'planned' ? (
+                  <p className="text-base">
+                    <span className="font-medium">Pickup:</span> next day{event.overnightPickupTime ? `, ${event.overnightPickupTime}` : ' (time not set)'}
+                  </p>
+                ) : event.pickupTime && (
                   <p className="text-base">
                     <span className="font-medium">Pickup time:</span> {event.pickupTime}
                   </p>
