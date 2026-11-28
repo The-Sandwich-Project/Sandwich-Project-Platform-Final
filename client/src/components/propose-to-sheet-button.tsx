@@ -113,6 +113,13 @@ export function PushToSheetButton({
     enabled: showDialog,
   });
 
+  // A column is compared only if the push can write it: the app owns it, and
+  // the sheet has its header (an older sheet may not have "TSP Shopping" yet,
+  // and a difference there would never clear).
+  const writable: number[] | null = previewData?.writableColumns ?? null;
+  const isComparableColumn = (i: number) =>
+    !SHEET_OWNED_COLUMNS.has(i) && (!writable || writable.includes(i));
+
   const hasExistingRow = previewData?.existingSheetRow;
   const hasExistingRawData = previewData?.existingRawData;
   const hasPotentialDuplicates = previewData?.potentialMatches?.length > 0;
@@ -125,7 +132,7 @@ export function PushToSheetButton({
     // Sheet columns through AB/"Waiting On" (index 27).
     const columnCount = Object.keys(COLUMN_LABELS).length;
     for (let i = 0; i < columnCount; i++) {
-      if (SHEET_OWNED_COLUMNS.has(i)) continue;
+      if (!isComparableColumn(i)) continue;
       const appValue = (previewData.rawData[i] || '').trim();
       const sheetValue = (previewData.existingRawData[i] || '').trim();
       if (appValue !== sheetValue) {
@@ -229,7 +236,7 @@ export function PushToSheetButton({
   };
 
   const unchangedCount = hasExistingRawData
-    ? Object.keys(COLUMN_LABELS).length - SHEET_OWNED_COLUMNS.size - conflicts.length
+    ? Object.keys(COLUMN_LABELS).map(Number).filter(isComparableColumn).length - conflicts.length
     : 0;
   const allMatch = hasExistingRow && hasExistingRawData && conflicts.length === 0;
 
@@ -463,7 +470,7 @@ export function PushToSheetButton({
                                 </div>
                                 {Array.from({ length: Object.keys(COLUMN_LABELS).length }, (_, i) => i)
                                   .filter(i => {
-                                    if (SHEET_OWNED_COLUMNS.has(i)) return false;
+                                    if (!isComparableColumn(i)) return false;
                                     const appVal = (previewData.rawData[i] || '').trim();
                                     const sheetVal = (previewData.existingRawData[i] || '').trim();
                                     return appVal === sheetVal && (appVal || sheetVal);

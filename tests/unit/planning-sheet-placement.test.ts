@@ -508,6 +508,8 @@ describe('writing a row into the sheet', () => {
           return {};
         },
         values: {
+          // Row 1: columns are found by header now (services/planning-sheet-headers.ts).
+          get: async () => ({ data: { values: [['Date', 'Day of the Week', 'Group Name']] } }),
           update: async ({ range, resource }: any) => {
             written.push({ range, values: resource.values });
             return {};
@@ -600,18 +602,23 @@ describe('planning sheet column map (van needed for insertion)', () => {
     expect(PLANNING_SHEET_COLUMNS.STAFFING).toBe(10);
     expect(PLANNING_SHEET_COLUMNS.UNLABELED_AB).toBe(27);
     expect(PLANNING_SHEET_COLUMNS.SYNC_ID).toBe(26);
-    expect(PLANNING_SHEET_COLUMN_COUNT).toBe(28);
-    expect(PLANNING_SHEET_LAST_COLUMN).toBe('AB');
+    // Batch 7a: logical TSP_SHOPPING (28) added at the end. These are the app's
+    // logical columns; the sheet's are found by header.
+    expect(PLANNING_SHEET_COLUMNS.TSP_SHOPPING).toBe(28);
+    expect(PLANNING_SHEET_COLUMN_COUNT).toBe(29);
+    expect(PLANNING_SHEET_LAST_COLUMN).toBe('AC');
     expect(planningSheetColumnLetter(9)).toBe('J');
     expect(planningSheetColumnLetter(27)).toBe('AB');
   });
 
-  it('round-trips Transport / Refrigeration cell values', () => {
+  it("round-trips the sheet's van dropdown (older values still read)", () => {
     expect(parseVanNeededForCell('Transport')).toBe('transport');
+    expect(parseVanNeededForCell('Just Transport')).toBe('transport');
     expect(parseVanNeededForCell('refrigeration during event')).toBe('refrigeration');
+    expect(parseVanNeededForCell('Event Refrigeration')).toBe('refrigeration');
     expect(parseVanNeededForCell('')).toBeNull();
-    expect(formatVanNeededForCell('transport')).toBe('Transport');
-    expect(formatVanNeededForCell('refrigeration')).toBe('Refrigeration');
+    expect(formatVanNeededForCell('transport')).toBe('Just Transport');
+    expect(formatVanNeededForCell('refrigeration')).toBe('Event Refrigeration');
     expect(formatVanNeededForCell(null)).toBe('');
   });
 });

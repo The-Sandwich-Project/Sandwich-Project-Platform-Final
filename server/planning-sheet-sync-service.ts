@@ -984,6 +984,17 @@ export class PlanningSheetSyncService {
     return resolvePlanningHeaders(response.data.values?.[0] || []);
   }
 
+  /**
+   * The logical columns a push can actually write on this sheet: the app's
+   * own columns that the header row has. The push preview only compares these,
+   * so a column the sheet doesn't have (e.g. "TSP Shopping" before it's added)
+   * isn't shown as a difference that never clears.
+   */
+  async getWritableColumns(): Promise<number[]> {
+    const map = await this.readHeaderMap();
+    return Array.from(map.columns.keys()).filter((l) => APP_WRITTEN_COLUMNS.has(l)).sort((a, b) => a - b);
+  }
+
   async readPlanningSheet(): Promise<PlanningSheetRow[]> {
     await this.ensureInitialized();
 
@@ -1216,11 +1227,13 @@ export class PlanningSheetSyncService {
     if (!date) return false;
     try {
       const { getOtherVanRequestsOnDate } = await import('./services/event-conflict-detection');
-      const { otherEvents } = await getOtherVanRequestsOnDate(new Date(date as string | Date), e.id);
+      const { otherEvents } = await getOtherVanRequestsOnDate(new Date(date as string | Date), e.id, { throwOnError: true });
       return vanIsPending(e, otherEvents as any);
     } catch (error) {
-      logger.warn(`[PlanningSheet] Could not check same-day vans for event ${e.id}; writing the van time.`, error);
-      return false;
+      // Can't tell whether another event shares the van: leave the van cell
+      // blank (treat as pending) rather than show the van as booked.
+      logger.warn(`[PlanningSheet] Could not check same-day vans for event ${e.id}; leaving the van time blank.`, error);
+      return true;
     }
   }
 
@@ -1990,6 +2003,10 @@ export class PlanningSheetSyncService {
             const decision = mergeDecisions[String(i)];
             if (decision === 'keep_sheet') {
               finalRow[i] = existingRaw[i] ?? '';
+            } else if (decision === 'append' && i === PLANNING_SHEET_COLUMNS.ALL_DETAILS) {
+              // Details already keeps the planner's text and only swaps the
+              // app's attendee line; appending the whole cell would repeat it.
+              finalRow[i] = rowData[i];
             } else if (decision === 'append') {
               const existingVal = (existingRaw[i] || '').trim();
               const appVal = (rowData[i] || '').trim();
