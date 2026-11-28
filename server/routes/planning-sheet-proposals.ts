@@ -140,27 +140,28 @@ export function createPlanningSheetProposalsRouter(
         return res.status(500).json({ error: 'Planning Sheet service not configured' });
       }
 
-      const rowData = await service.eventToSheetRow(parsedEventId);
+      let rowData = await service.eventToSheetRow(parsedEventId);
 
       if (!rowData) {
         return res.status(404).json({ error: 'Event not found' });
       }
 
-      // Return both raw array and labeled data for UI display
-      const labeledData: Record<string, string> = {};
-      Object.entries(PLANNING_SHEET_COLUMNS).forEach(([key, index]) => {
-        labeledData[key] = rowData[index] || '';
-      });
 
       // Find matching row in the current sheet for side-by-side comparison
       let existingSheetRow = null;
       let potentialMatches: any[] = [];
       let placement: SheetPlacement | null = null;
+      // Columns the push can write on this sheet (found by header); the
+      // dialog only compares these.
+      let writableColumns: number[] | null = null;
       try {
         // One read feeds matching, placement, and duplicate detection. Reading
         // per step would triple the API calls and let the three answers be
         // based on different versions of the sheet.
         const allSheetRows = await service.readPlanningSheet();
+        // From the same read as the rows (no second request that could fail
+        // on its own and make an existing row look like a new one).
+        writableColumns = service.writableColumnsFromLastRead();
 
         // Try exact match first
         existingSheetRow = await service.findMatchingRow(parsedEventId, allSheetRows);
@@ -201,9 +202,19 @@ export function createPlanningSheetProposalsRouter(
       let existingRawData: string[] | null = null;
       if (existingSheetRow) {
         existingRawData = service.planningSheetRowToRawArray(existingSheetRow);
+        // Details is the planner's column: what the push would write keeps
+        // their text and only updates the app's attendee line.
+        rowData = (await service.eventToSheetRow(parsedEventId, existingRawData)) ?? rowData;
       }
 
+      // Return both raw array and labeled data for UI display
+      const labeledData: Record<string, string> = {};
+      Object.entries(PLANNING_SHEET_COLUMNS).forEach(([key, index]) => {
+        labeledData[key] = rowData![index] || '';
+      });
+
       res.json({
+        writableColumns,
         rawData: rowData,
         labeledData,
         columns: PLANNING_SHEET_COLUMNS,

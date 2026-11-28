@@ -9,13 +9,35 @@ import { eq, desc, inArray, and, gte, sql } from 'drizzle-orm';
 import { eventRequests, proposedSheetChanges, users } from '@shared/schema';
 import { logger } from './utils/production-safe-logger';
 import { getEffectiveEventDate } from '../shared/event-validation-utils';
+import {
+  APP_WRITTEN_COLUMNS,
+  appCellWrites,
+  newSheetRow,
+  resolvePlanningHeaders,
+  toLogicalRow,
+  type PlanningHeaderMap,
+} from './services/planning-sheet-headers';
+import {
+  attendeeLine,
+  formatNextDayCell,
+  formatPickupCell,
+  formatSheetTime,
+  formatVanNeededForSheet,
+  formatVanTimeCell,
+  joinContacts,
+  mergeAttendeeLine,
+} from './services/planning-sheet-values';
+import { effectiveVanTime, usesTspVan, vanIsPending } from '@shared/van-rules';
 
 /**
- * Planning Sheet Column Mapping
- * Maps the Google Sheet columns to app fields
+ * Planning Sheet logical columns.
  *
- * If a column is inserted, bump every index after the insertion point and
- * PLANNING_SHEET_COLUMN_COUNT / LAST_COLUMN will follow automatically.
+ * These are the app's own column numbers (proposals, merge choices and the
+ * push preview use them). They are NOT the sheet's positions: every read and
+ * write finds each column by its header in row 1
+ * (services/planning-sheet-headers.ts), so the sheet can rename, move or
+ * insert columns. New columns are added at the end; existing numbers never
+ * change, because queued proposals store rows in this order.
  */
 export const PLANNING_SHEET_COLUMNS = {
   DATE: 0,                    // A - Date
@@ -26,7 +48,7 @@ export const PLANNING_SHEET_COLUMNS = {
   PICK_UP_TIME: 5,            // F - Pick up time
   PICK_UP_NEXT_DAY: 6,        // G - Pick up next day?
   ALL_DETAILS: 7,             // H - ALL DETAILS
-  VAN_BOOKED: 8,              // I - Van Booked?
+  VAN_BOOKED: 8,              // I - Van Needed (AM/PM/mid-day/All day?): the van time of day
   VAN_NEEDED_FOR: 9,          // J - Van needed for? (Transport / Refrigeration)
   STAFFING: 10,               // K - Staffing (special format: D: Name, S: Name, V: Name)
   ESTIMATE_SANDWICHES: 11,    // L - Estimate # sandwiches
@@ -34,7 +56,7 @@ export const PLANNING_SHEET_COLUMNS = {
   FINAL_SANDWICHES: 13,       // N - Final # sandwiches made
   TOTAL_IN_APP: 14,           // O - #'s added to app (sheet-owned)
   FOLLOW_UP_EMAIL_SENT: 15,   // P - Follow-up email sent (sheet-owned; was "Social Post")
-  SENT_TOOLKIT: 16,           // Q - Sent toolkit?
+  SENT_TOOLKIT: 16,           // "Toolkit Sent" (sheet-owned now; the column is becoming TSP shopping)
   CONTACT_NAME: 17,           // R - Contact Name
   EMAIL: 18,                  // S - Email Address
   PHONE: 19,                  // T - Contact Cell Number
@@ -43,9 +65,10 @@ export const PLANNING_SHEET_COLUMNS = {
   RECIPIENT_HOST: 22,         // W - Planned Recipient/Host Home
   AFTER_EVENT_NOTES: 23,      // X - After Event Notes
   CANCELLED: 24,              // Y - Cancelled
-  NOTES: 25,                  // Z - Notes
-  SYNC_ID: 26,                // AA - sync_id: a per-row ID kept on the sheet (sheet-owned; was "Add'l Notes")
-  UNLABELED_AB: 27,           // AB - no header (sheet-owned; was "Waiting On")
+  NOTES: 25,                  // Z - "blank column" (sheet-owned)
+  SYNC_ID: 26,                // sync_id: a per-row ID kept on the sheet (sheet-owned)
+  UNLABELED_AB: 27,           // AB - Planning/Contact Notes (sheet-owned)
+  TSP_SHOPPING: 28,           // TSP shopping: "Yes" when TSP buys the food, else blank
 } as const;
 
 /**
@@ -54,12 +77,9 @@ export const PLANNING_SHEET_COLUMNS = {
  * picked ("use app" included). Matches the live sheet as of Nov 2026:
  * O "#'s added to app", P "Follow-up email sent", AA "sync_id", AB unlabeled.
  */
-export const SHEET_OWNED_COLUMNS: readonly number[] = [
-  PLANNING_SHEET_COLUMNS.TOTAL_IN_APP,
-  PLANNING_SHEET_COLUMNS.FOLLOW_UP_EMAIL_SENT,
-  PLANNING_SHEET_COLUMNS.SYNC_ID,
-  PLANNING_SHEET_COLUMNS.UNLABELED_AB,
-];
+export const SHEET_OWNED_COLUMNS: readonly number[] = Object.values(PLANNING_SHEET_COLUMNS).filter(
+  (i) => !APP_WRITTEN_COLUMNS.has(i),
+);
 
 /** A copy of a new row with every sheet-owned cell blank (for rows the app creates). */
 export function blankSheetOwnedColumns(row: string[]): string[] {
@@ -93,6 +113,17 @@ export const PLANNING_SHEET_LAST_COLUMN = planningSheetColumnLetter(
   PLANNING_SHEET_COLUMN_COUNT - 1
 );
 
+/**
+ * How far right a read goes. The sheet's columns are found by header, and
+ * sync_id sits far to the right (column BC), so read well past it.
+ */
+export const SHEET_READ_LAST_COLUMN = 'CZ';
+
+/** The app-owned logical columns this sheet's header row has. */
+export function writableColumnsOf(map: PlanningHeaderMap): number[] {
+  return Array.from(map.columns.keys()).filter((l) => APP_WRITTEN_COLUMNS.has(l)).sort((a, b) => a - b);
+}
+
 /** Pre-J layout was A:AA (27 cells). Inserting J made A:AB (28 cells). */
 export const LEGACY_PLANNING_SHEET_COLUMN_COUNT = 27;
 
@@ -119,8 +150,10 @@ export function parseVanNeededForCell(
 ): VanNeededFor | null {
   const v = (cell || '').trim().toLowerCase();
   if (!v) return null;
-  if (v.startsWith('refrig')) return 'refrigeration';
-  if (v.startsWith('transport')) return 'transport';
+  // The sheet's dropdown: "Event Refrigeration" / "Just Transport" (older
+  // rows: "Refrigeration" / "Transport").
+  if (v.includes('refrig')) return 'refrigeration';
+  if (v.includes('transport')) return 'transport';
   return null;
 }
 
@@ -128,9 +161,7 @@ export function parseVanNeededForCell(
 export function formatVanNeededForCell(
   value: string | null | undefined
 ): string {
-  if (value === 'transport') return 'Transport';
-  if (value === 'refrigeration') return 'Refrigeration';
-  return '';
+  return formatVanNeededForSheet(value);
 }
 
 /**
@@ -320,8 +351,12 @@ export interface PlanningSheetRow {
   notes: string;
   /** AA: the sheet's per-row ID. Not notes. */
   syncId: string;
-  /** AB: unlabeled column, read only so an update can write it back unchanged. */
+  /** AB: Planning/Contact Notes (sheet-owned). */
   unlabeledAB: string;
+  /** TSP shopping: "Yes" or blank. */
+  tspShopping?: string;
+  /** The row exactly as the sheet has it (sheet layout), for cell-by-cell writes. */
+  rawCells?: string[];
 }
 
 /**
@@ -941,18 +976,57 @@ export class PlanningSheetSyncService {
   /**
    * Read all rows from the Planning Sheet
    */
+  /**
+   * Row 1 of the sheet, mapped onto the logical columns. Read fresh for every
+   * read and write, so a renamed or moved column is picked up right away.
+   */
+  private async readHeaderMap(): Promise<PlanningHeaderMap> {
+    await this.ensureInitialized();
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: this.getSheetRange(`1:1`),
+    });
+    return resolvePlanningHeaders(response.data.values?.[0] || []);
+  }
+
+  /**
+   * The logical columns a push can actually write on this sheet: the app's
+   * own columns that the header row has. The push preview only compares these,
+   * so a column the sheet doesn't have (e.g. "TSP Shopping" before it's added)
+   * isn't shown as a difference that never clears.
+   */
+  async getWritableColumns(): Promise<number[]> {
+    return writableColumnsOf(await this.readHeaderMap());
+  }
+
+  /**
+   * The writable columns from the header row the last readPlanningSheet()
+   * already fetched (no extra request, so it can't fail separately from the
+   * rows it describes). null before any read.
+   */
+  writableColumnsFromLastRead(): number[] | null {
+    return this.lastReadHeaderMap ? writableColumnsOf(this.lastReadHeaderMap) : null;
+  }
+
+  private lastReadHeaderMap: PlanningHeaderMap | null = null;
+
   async readPlanningSheet(): Promise<PlanningSheetRow[]> {
     await this.ensureInitialized();
 
+    // Header row + data in one read, so the map and the rows match.
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: this.getSheetRange(`A2:${PLANNING_SHEET_LAST_COLUMN}`), // Skip header row
+      range: this.getSheetRange(`A1:${SHEET_READ_LAST_COLUMN}`),
     });
 
-    const rows = response.data.values || [];
+    const all: string[][] = response.data.values || [];
+    const headerMap = resolvePlanningHeaders(all[0] || []);
+    this.lastReadHeaderMap = headerMap;
+    const rows = all.slice(1);
     logger.log(`Read ${rows.length} rows from Planning Sheet`);
 
-    return rows.map((row: string[], index: number) => {
+    return rows.map((rawCells: string[], index: number) => {
+      const row = toLogicalRow(rawCells, headerMap, PLANNING_SHEET_COLUMN_COUNT);
       const staffingStr = row[PLANNING_SHEET_COLUMNS.STAFFING] || '';
       return {
         rowIndex: index + 2, // +2 because we start at A2 and arrays are 0-indexed
@@ -985,14 +1059,19 @@ export class PlanningSheetSyncService {
         notes: row[PLANNING_SHEET_COLUMNS.NOTES] || '',
         syncId: row[PLANNING_SHEET_COLUMNS.SYNC_ID] || '',
         unlabeledAB: row[PLANNING_SHEET_COLUMNS.UNLABELED_AB] || '',
+        tspShopping: row[PLANNING_SHEET_COLUMNS.TSP_SHOPPING] || '',
+        rawCells,
       };
     });
   }
 
   /**
-   * Convert an EventRequest from the app into Planning Sheet row format
+   * Convert an EventRequest from the app into a Planning Sheet row (logical
+   * column order). `existingRow` is the sheet's current row in the same order,
+   * when there is one: Details is the planner's column, so the app only
+   * replaces its own "Expected attendees:" line in it.
    */
-  async eventToSheetRow(eventId: number): Promise<string[] | null> {
+  async eventToSheetRow(eventId: number, existingRow?: string[] | null): Promise<string[] | null> {
     const event = await db
       .select()
       .from(eventRequests)
@@ -1053,25 +1132,7 @@ export class PlanningSheetSyncService {
       weekday: 'long'
     }) : '';
 
-    // Convert military time (e.g., "14:00" or "14:00:00") to 12-hour format (e.g., "2:00 PM")
-    const formatTime12Hour = (timeStr: string | null | undefined): string => {
-      if (!timeStr) return '';
-      // Handle HH:MM or HH:MM:SS format
-      const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-      if (!match) return timeStr; // Return as-is if not recognized format
-
-      let hours = parseInt(match[1], 10);
-      const minutes = match[2];
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-
-      if (hours === 0) {
-        hours = 12;
-      } else if (hours > 12) {
-        hours -= 12;
-      }
-
-      return `${hours}:${minutes} ${ampm}`;
-    };
+    const formatTime12Hour = formatSheetTime;
 
     // Format sandwich types for the planning sheet using the canonical
     // user-facing label from constants.ts SANDWICH_TYPES. The raw stored
@@ -1119,11 +1180,21 @@ export class PlanningSheetSyncService {
     row[PLANNING_SHEET_COLUMNS.GROUP_NAME] = e.organizationName || '';
     row[PLANNING_SHEET_COLUMNS.EVENT_START_TIME] = formatTime12Hour(e.eventStartTime);
     row[PLANNING_SHEET_COLUMNS.EVENT_END_TIME] = formatTime12Hour(e.eventEndTime);
-    row[PLANNING_SHEET_COLUMNS.PICK_UP_TIME] = formatTime12Hour(e.pickupTime);
-    row[PLANNING_SHEET_COLUMNS.PICK_UP_NEXT_DAY] = e.overnightHoldingLocation ? 'Yes' : '';
-    row[PLANNING_SHEET_COLUMNS.ALL_DETAILS] = e.message || '';
-    row[PLANNING_SHEET_COLUMNS.VAN_BOOKED] = e.vanDriverNeeded ? 'Yes' : '';
-    row[PLANNING_SHEET_COLUMNS.VAN_NEEDED_FOR] = formatVanNeededForCell(e.vanNeededFor);
+    // F: N/D (+ next-day time), or the pickup time when it differs from the
+    // end time (or there's no end time). G: Y / O / blank.
+    row[PLANNING_SHEET_COLUMNS.PICK_UP_TIME] = formatPickupCell(e as any);
+    row[PLANNING_SHEET_COLUMNS.PICK_UP_NEXT_DAY] = formatNextDayCell(e as any);
+    // H (Details) is the planner's; the app manages only its attendee line.
+    row[PLANNING_SHEET_COLUMNS.ALL_DETAILS] = mergeAttendeeLine(
+      existingRow?.[PLANNING_SHEET_COLUMNS.ALL_DETAILS] ?? '',
+      attendeeLine(e as any),
+    );
+    // I: the van time of day (AM / Mid Day / PM / All Day), blank while the
+    // van is pending the events team's OK, so the sheet never shows it booked.
+    row[PLANNING_SHEET_COLUMNS.VAN_BOOKED] = e.vanDriverNeeded && !(await this.vanPendingFor(e))
+      ? formatVanTimeCell(effectiveVanTime(e as any).value)
+      : '';
+    row[PLANNING_SHEET_COLUMNS.VAN_NEEDED_FOR] = e.vanDriverNeeded ? formatVanNeededForCell(e.vanNeededFor) : '';
     row[PLANNING_SHEET_COLUMNS.STAFFING] = formatStaffingColumn(staffing);
     // A live range goes to the sheet as "min-max" (it used to export blank,
     // or only the midpoint); otherwise the exact count.
@@ -1145,21 +1216,41 @@ export class PlanningSheetSyncService {
     // to compute from sandwich_collections — that would risk corrupting the
     // official count records. Only show it if it's a positive number.
     row[PLANNING_SHEET_COLUMNS.FINAL_SANDWICHES] = (e.actualSandwichCount && e.actualSandwichCount > 0) ? e.actualSandwichCount.toString() : '';
-    // P is now "Follow-up email sent" (sheet-owned), so the app writes nothing there.
-    row[PLANNING_SHEET_COLUMNS.SENT_TOOLKIT] = e.toolkitSent ? 'Yes' : '';
-    row[PLANNING_SHEET_COLUMNS.CONTACT_NAME] = `${e.firstName || ''} ${e.lastName || ''}`.trim();
-    row[PLANNING_SHEET_COLUMNS.EMAIL] = e.email || '';
-    row[PLANNING_SHEET_COLUMNS.PHONE] = e.phone || '';
+    // P "Follow-up email sent" and "Toolkit Sent" are sheet-owned: nothing written.
+    // Contact columns carry both contacts: "Primary; Backup".
+    row[PLANNING_SHEET_COLUMNS.CONTACT_NAME] = joinContacts(
+      `${e.firstName || ''} ${e.lastName || ''}`.trim(),
+      `${(e as any).backupContactFirstName || ''} ${(e as any).backupContactLastName || ''}`.trim(),
+    );
+    row[PLANNING_SHEET_COLUMNS.EMAIL] = joinContacts(e.email, (e as any).backupContactEmail);
+    row[PLANNING_SHEET_COLUMNS.PHONE] = joinContacts(e.phone, (e as any).backupContactPhone);
     row[PLANNING_SHEET_COLUMNS.TSP_CONTACT] = tspContactName;
     row[PLANNING_SHEET_COLUMNS.ADDRESS] = e.eventAddress || '';
     row[PLANNING_SHEET_COLUMNS.RECIPIENT_HOST] = e.deliveryDestination || '';
     row[PLANNING_SHEET_COLUMNS.AFTER_EVENT_NOTES] = e.followUpNotes || '';
     row[PLANNING_SHEET_COLUMNS.CANCELLED] = e.status === 'cancelled' ? 'Yes' : '';
-    row[PLANNING_SHEET_COLUMNS.NOTES] = '';
-    // AA (sync_id) and AB (unlabeled) are sheet-owned: left blank here, and
-    // an existing row keeps the sheet's values (pushEventDirectly).
+    row[PLANNING_SHEET_COLUMNS.TSP_SHOPPING] = (e as any).isTspShopped === true ? 'Yes' : '';
+    // Z ("blank column"), sync_id and AB (Planning/Contact Notes) are
+    // sheet-owned: never written (see APP_WRITTEN_COLUMNS).
 
     return row;
+  }
+
+  /** Whether the event's van is pending the events team's OK (shared/van-rules.ts). */
+  private async vanPendingFor(e: any): Promise<boolean> {
+    if (!usesTspVan(e) || e.vanTeamOk === true) return false;
+    const date = getEffectiveEventDate(e);
+    if (!date) return false;
+    try {
+      const { getOtherVanRequestsOnDate } = await import('./services/event-conflict-detection');
+      const { otherEvents } = await getOtherVanRequestsOnDate(new Date(date as string | Date), e.id, { throwOnError: true });
+      return vanIsPending(e, otherEvents as any);
+    } catch (error) {
+      // Can't tell whether another event shares the van: leave the van cell
+      // blank (treat as pending) rather than show the van as booked.
+      logger.warn(`[PlanningSheet] Could not check same-day vans for event ${e.id}; leaving the van time blank.`, error);
+      return true;
+    }
   }
 
   /**
@@ -1498,8 +1589,13 @@ export class PlanningSheetSyncService {
       return { success: false, message: `${proposal.fieldName} is maintained on the sheet; the app doesn't write it` };
     }
 
-    // Convert 0-based column index → spreadsheet letter (A, B, ..., Z, AA, AB, ...).
-    const columnLetter = planningSheetColumnLetter(columnIndex);
+    // Find the column by its header (the logical index isn't the sheet position).
+    const headerMap = await this.readHeaderMap();
+    const sheetColumn = headerMap.columns.get(columnIndex);
+    if (sheetColumn === undefined) {
+      return { success: false, message: `The sheet has no column for ${proposal.fieldName}` };
+    }
+    const columnLetter = planningSheetColumnLetter(sheetColumn);
     const range = this.getSheetRange(`${columnLetter}${proposal.targetRowIndex}`);
 
     await this.sheets.spreadsheets.values.update({
@@ -1677,12 +1773,14 @@ export class PlanningSheetSyncService {
     rowData: string[],
     formatFromRow?: number | null
   ): Promise<number | undefined> {
+    const headerMap = await this.readHeaderMap();
+    const sheetRow = newSheetRow(rowData, headerMap);
     const response = await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: this.getSheetRange(`A:${PLANNING_SHEET_LAST_COLUMN}`),
+      range: this.getSheetRange(`A:${planningSheetColumnLetter(sheetRow.length - 1)}`),
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
-      resource: { values: [rowData] },
+      resource: { values: [sheetRow] },
     });
 
     const updatedRange = response.data.updates?.updatedRange || '';
@@ -1700,7 +1798,7 @@ export class PlanningSheetSyncService {
     // Wrong formatting on one row is a far smaller problem than either.
     if (newRowIndex && formatFromRow && formatFromRow !== newRowIndex) {
       try {
-        await this.copyRowFormat(formatFromRow, newRowIndex);
+        await this.copyRowFormat(formatFromRow, newRowIndex, headerMap.width);
       } catch (error) {
         logger.warn(
           `[PlanningSheet] Row ${newRowIndex} was appended but could not be given event-row formatting from row ${formatFromRow}. The row is in the sheet and may need restyling by hand.`,
@@ -1713,7 +1811,7 @@ export class PlanningSheetSyncService {
   }
 
   /** Copy one row's formatting onto another, leaving its values alone. */
-  private async copyRowFormat(sourceRow: number, destinationRow: number): Promise<void> {
+  private async copyRowFormat(sourceRow: number, destinationRow: number, width: number): Promise<void> {
     const sheetId = await this.getWorksheetId();
     if (sheetId === null) return;
 
@@ -1728,14 +1826,14 @@ export class PlanningSheetSyncService {
                 startRowIndex: sourceRow - 1,
                 endRowIndex: sourceRow,
                 startColumnIndex: 0,
-                endColumnIndex: PLANNING_SHEET_COLUMN_COUNT,
+                endColumnIndex: width,
               },
               destination: {
                 sheetId,
                 startRowIndex: destinationRow - 1,
                 endRowIndex: destinationRow,
                 startColumnIndex: 0,
-                endColumnIndex: PLANNING_SHEET_COLUMN_COUNT,
+                endColumnIndex: width,
               },
               pasteType: 'PASTE_FORMAT',
             },
@@ -1757,6 +1855,8 @@ export class PlanningSheetSyncService {
   ): Promise<boolean> {
     const sheetId = await this.getWorksheetId();
     if (sheetId === null) return false;
+    // Read before inserting, so a header problem stops this before the sheet changes.
+    const headerMap = await this.readHeaderMap();
 
     const requests: any[] = [
       {
@@ -1790,14 +1890,14 @@ export class PlanningSheetSyncService {
             startRowIndex: source - 1,
             endRowIndex: source,
             startColumnIndex: 0,
-            endColumnIndex: PLANNING_SHEET_COLUMN_COUNT,
+            endColumnIndex: headerMap.width,
           },
           destination: {
             sheetId,
             startRowIndex: rowIndex - 1,
             endRowIndex: rowIndex,
             startColumnIndex: 0,
-            endColumnIndex: PLANNING_SHEET_COLUMN_COUNT,
+            endColumnIndex: headerMap.width,
           },
           pasteType: 'PASTE_FORMAT',
         },
@@ -1809,11 +1909,13 @@ export class PlanningSheetSyncService {
       resource: { requests },
     });
 
+    // Place each value under its header; sheet-owned columns stay blank.
+    const sheetRow = newSheetRow(rowData, headerMap);
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: this.getSheetRange(`A${rowIndex}:${PLANNING_SHEET_LAST_COLUMN}${rowIndex}`),
+      range: this.getSheetRange(`A${rowIndex}:${planningSheetColumnLetter(sheetRow.length - 1)}${rowIndex}`),
       valueInputOption: 'USER_ENTERED',
-      resource: { values: [rowData] },
+      resource: { values: [sheetRow] },
     });
 
     // Everything below just moved down a row, including whatever rows pending
@@ -1861,6 +1963,7 @@ export class PlanningSheetSyncService {
     raw[C.NOTES] = row.notes;
     raw[C.SYNC_ID] = row.syncId;
     raw[C.UNLABELED_AB] = row.unlabeledAB;
+    raw[C.TSP_SHOPPING] = row.tspShopping ?? '';
     return raw;
   }
 
@@ -1889,14 +1992,18 @@ export class PlanningSheetSyncService {
     try {
       await this.ensureInitialized();
 
+      // Check if row already exists for this event (first, so the row data
+      // can keep the planner's Details text around the app's attendee line)
+      const existingRow = await this.findMatchingRow(eventId);
+
       // Get the row data for this event
-      const rowData = await this.eventToSheetRow(eventId);
+      const rowData = await this.eventToSheetRow(
+        eventId,
+        existingRow ? this.planningSheetRowToRawArray(existingRow) : null,
+      );
       if (!rowData) {
         return { success: false, message: 'Could not generate row data for this event' };
       }
-
-      // Check if row already exists for this event
-      const existingRow = await this.findMatchingRow(eventId);
 
       if (existingRow) {
         // Build the final row data, applying merge decisions if provided
@@ -1912,6 +2019,10 @@ export class PlanningSheetSyncService {
             const decision = mergeDecisions[String(i)];
             if (decision === 'keep_sheet') {
               finalRow[i] = existingRaw[i] ?? '';
+            } else if (decision === 'append' && i === PLANNING_SHEET_COLUMNS.ALL_DETAILS) {
+              // Details already keeps the planner's text and only swaps the
+              // app's attendee line; appending the whole cell would repeat it.
+              finalRow[i] = rowData[i];
             } else if (decision === 'append') {
               const existingVal = (existingRaw[i] || '').trim();
               const appVal = (rowData[i] || '').trim();
@@ -1931,18 +2042,23 @@ export class PlanningSheetSyncService {
           finalRow = [...rowData];
         }
 
-        // Sheet-owned columns (sync_id, follow-up email, ...) always keep the
-        // sheet's value, whatever was decided, so a "use app" can't blank them.
-        finalRow = keepSheetOwnedColumns(finalRow, this.planningSheetRowToRawArray(existingRow));
-
-        // Update existing row
-        const range = this.getSheetRange(`A${existingRow.rowIndex}:${PLANNING_SHEET_LAST_COLUMN}${existingRow.rowIndex}`);
-        await this.sheets.spreadsheets.values.update({
-          spreadsheetId: this.spreadsheetId,
-          range,
-          valueInputOption: 'USER_ENTERED',
-          resource: { values: [finalRow] },
-        });
+        // Write only the app's own cells, found by header, and only those
+        // that changed. Every other cell (sheet-owned columns, formulas,
+        // anything the planner added) is never touched.
+        const headerMap = await this.readHeaderMap();
+        const writes = appCellWrites(finalRow, headerMap, existingRow.rawCells);
+        if (writes.length > 0) {
+          await this.sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: this.spreadsheetId,
+            resource: {
+              valueInputOption: 'USER_ENTERED',
+              data: writes.map((w) => ({
+                range: this.getSheetRange(`${planningSheetColumnLetter(w.column)}${existingRow.rowIndex}`),
+                values: [[w.value]],
+              })),
+            },
+          });
+        }
 
         logger.log(`[PlanningSheet] User ${userId} updated row ${existingRow.rowIndex} for event ${eventId}`);
         return {
