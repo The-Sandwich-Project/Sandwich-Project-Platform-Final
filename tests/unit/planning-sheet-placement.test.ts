@@ -622,3 +622,26 @@ describe('planning sheet column map (van needed for insertion)', () => {
     expect(formatVanNeededForCell(null)).toBe('');
   });
 });
+
+describe('#609 review fixes, round 2', () => {
+  it('the preview takes the writable columns from the same read as the rows', async () => {
+    const service = new PlanningSheetSyncService('sheet', '2026 Groups') as any;
+    let gets = 0;
+    service.ensureInitialized = async () => {};
+    service.sheets = {
+      spreadsheets: {
+        values: {
+          get: async () => {
+            gets += 1;
+            return { data: { values: [['Date', 'Day of the Week', 'Group Name', 'TSP Shopping'], ['12/5/26', 'Saturday', 'Lincoln PTA', 'Yes']] } };
+          },
+        },
+      },
+    };
+    expect(service.writableColumnsFromLastRead()).toBeNull();
+    const rows = await service.readPlanningSheet();
+    expect(rows[0].tspShopping).toBe('Yes');
+    expect(service.writableColumnsFromLastRead()).toEqual([0, 1, 2, 28]);
+    expect(gets).toBe(1); // no second request
+  });
+});

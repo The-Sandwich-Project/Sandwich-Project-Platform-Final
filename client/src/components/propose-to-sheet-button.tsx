@@ -145,7 +145,10 @@ export function PushToSheetButton({
       }
     }
     return result;
-  }, [previewData?.rawData, previewData?.existingRawData]);
+    // writableColumns: a header added or removed on the sheet changes which
+    // columns are compared, even when neither value array changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewData?.rawData, previewData?.existingRawData, previewData?.writableColumns]);
 
   // Initialize smart defaults when conflicts change
   useEffect(() => {
