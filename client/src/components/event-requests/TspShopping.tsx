@@ -132,8 +132,8 @@ export function TspShoppingCheckbox({
 }
 
 /**
- * The card badge. Shows "TSP shopping" or "Group shopping"; when the user can
- * edit, clicking it asks to confirm and then saves.
+ * The card badge. Shows "TSP shopping" only when TSP is shopping; when the user
+ * can edit, clicking it asks to confirm switching back to the group shopping.
  */
 export function TspShoppingBadge({
   eventRequestId,
@@ -148,7 +148,7 @@ export function TspShoppingBadge({
   organizationName?: string | null;
   canEdit: boolean;
   className?: string;
-  /** Show nothing while the group is shopping (used on New cards). */
+  /** @deprecated The badge always hides while the group is shopping. */
   hideWhenFalse?: boolean;
 }) {
   const { toast } = useToast();
@@ -166,7 +166,9 @@ export function TspShoppingBadge({
     },
   });
 
-  if (hideWhenFalse && !current) return null;
+  // Only shown once TSP shopping is ticked (in Edit). The group doing its own
+  // shopping is the default, so there's no "Group shopping" badge.
+  if (!current) return null;
 
   return (
     <>
