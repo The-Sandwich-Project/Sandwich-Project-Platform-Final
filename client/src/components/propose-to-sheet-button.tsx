@@ -53,8 +53,8 @@ const COLUMN_LABELS: Record<number, string> = {
   4: 'Event End Time',
   5: 'Pick Up Time',
   6: 'Pick Up Next Day?',
-  7: 'All Details',
-  8: 'Van Booked?',
+  7: 'Details',
+  8: 'Van time (AM / Mid Day / PM / All Day)',
   9: 'Van needed for?',
   10: 'Staffing',
   11: 'Estimate # Sandwiches',
@@ -62,7 +62,7 @@ const COLUMN_LABELS: Record<number, string> = {
   13: 'Final # Sandwiches',
   14: "#'s added to app",
   15: 'Follow-up email sent',
-  16: 'Sent Toolkit?',
+  16: 'Toolkit Sent',
   17: 'Contact Name',
   18: 'Email',
   19: 'Phone',
@@ -71,15 +71,17 @@ const COLUMN_LABELS: Record<number, string> = {
   22: 'Recipient/Host',
   23: 'After Event Notes',
   24: 'Cancelled',
-  25: 'Notes',
+  25: 'Blank column',
   26: 'sync_id',
-  27: '(unlabeled)',
+  27: 'Planning/Contact Notes',
+  28: 'TSP shopping',
 };
 
-// Columns the sheet owns (O, P, AA sync_id, AB). The server never writes them
-// and always keeps the sheet's value on update, so they aren't offered as
-// differences here. Mirrors SHEET_OWNED_COLUMNS in server/planning-sheet-sync-service.ts.
-const SHEET_OWNED_COLUMNS = new Set([14, 15, 26, 27]);
+// Columns the sheet owns ("#'s added to app", "Follow-up email sent",
+// "Toolkit Sent", the blank column, sync_id, Planning/Contact Notes). The
+// server never writes them, so they aren't offered as differences here.
+// Mirrors APP_WRITTEN_COLUMNS in server/services/planning-sheet-headers.ts.
+const SHEET_OWNED_COLUMNS = new Set([14, 15, 16, 25, 26, 27]);
 
 // Keep ProposeToSheetButton as an alias for backward compatibility
 export { PushToSheetButton as ProposeToSheetButton };
@@ -111,6 +113,13 @@ export function PushToSheetButton({
     enabled: showDialog,
   });
 
+  // A column is compared only if the push can write it: the app owns it, and
+  // the sheet has its header (an older sheet may not have "TSP Shopping" yet,
+  // and a difference there would never clear).
+  const writable: number[] | null = previewData?.writableColumns ?? null;
+  const isComparableColumn = (i: number) =>
+    !SHEET_OWNED_COLUMNS.has(i) && (!writable || writable.includes(i));
+
   const hasExistingRow = previewData?.existingSheetRow;
   const hasExistingRawData = previewData?.existingRawData;
   const hasPotentialDuplicates = previewData?.potentialMatches?.length > 0;
@@ -123,7 +132,7 @@ export function PushToSheetButton({
     // Sheet columns through AB/"Waiting On" (index 27).
     const columnCount = Object.keys(COLUMN_LABELS).length;
     for (let i = 0; i < columnCount; i++) {
-      if (SHEET_OWNED_COLUMNS.has(i)) continue;
+      if (!isComparableColumn(i)) continue;
       const appValue = (previewData.rawData[i] || '').trim();
       const sheetValue = (previewData.existingRawData[i] || '').trim();
       if (appValue !== sheetValue) {
@@ -136,7 +145,10 @@ export function PushToSheetButton({
       }
     }
     return result;
-  }, [previewData?.rawData, previewData?.existingRawData]);
+    // writableColumns: a header added or removed on the sheet changes which
+    // columns are compared, even when neither value array changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewData?.rawData, previewData?.existingRawData, previewData?.writableColumns]);
 
   // Initialize smart defaults when conflicts change
   useEffect(() => {
@@ -227,7 +239,7 @@ export function PushToSheetButton({
   };
 
   const unchangedCount = hasExistingRawData
-    ? Object.keys(COLUMN_LABELS).length - SHEET_OWNED_COLUMNS.size - conflicts.length
+    ? Object.keys(COLUMN_LABELS).map(Number).filter(isComparableColumn).length - conflicts.length
     : 0;
   const allMatch = hasExistingRow && hasExistingRawData && conflicts.length === 0;
 
@@ -461,7 +473,7 @@ export function PushToSheetButton({
                                 </div>
                                 {Array.from({ length: Object.keys(COLUMN_LABELS).length }, (_, i) => i)
                                   .filter(i => {
-                                    if (SHEET_OWNED_COLUMNS.has(i)) return false;
+                                    if (!isComparableColumn(i)) return false;
                                     const appVal = (previewData.rawData[i] || '').trim();
                                     const sheetVal = (previewData.existingRawData[i] || '').trim();
                                     return appVal === sheetVal && (appVal || sheetVal);

@@ -3984,6 +3984,11 @@ export const importFromSheetsSchema = z.object({
   'Address': z.string().optional(),
   'Van Booked?': z.string().optional(),
   'Van needed for?': z.string().optional(),
+  // Batch 7b: the script finds each column by header and sends these too.
+  // (Unlisted keys are dropped by this schema, so every key read must be here.)
+  'Van Needed For': z.string().optional(),
+  'Pick up next day': z.union([z.string(), z.number(), z.boolean()]).optional().transform((v) => (v == null ? undefined : String(v))),
+  'TSP Shopping': z.union([z.string(), z.number(), z.boolean()]).optional().transform((v) => (v == null ? undefined : String(v))),
 
   // Notes
   'Notes': z.string().optional(),

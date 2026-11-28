@@ -1,9 +1,17 @@
 import { normalizeToolkitPatch, isToolkitSent } from '@shared/toolkit-state';
-import { normalizeIncomingStatus, rescheduleMoveFields, statusTransitionEffects } from '../utils/status-transition-effects';
+import { normalizeIncomingStatus, rescheduleMoveFields, scheduledDateMoveFields, statusTransitionEffects } from '../utils/status-transition-effects';
 import { strictBooleanFieldError } from '../utils/strict-boolean-fields';
-import { normalizeAttendancePatch } from '@shared/attendance-estimate';
+import { normalizeAttendancePatch, parseAttendanceText } from '@shared/attendance-estimate';
+import {
+  attendanceFromDetails,
+  parseNextDayCell,
+  parseNextDayPickupCell,
+  parseVanTimeCell,
+  splitContacts,
+  stripAttendeeLine,
+} from '../services/planning-sheet-values';
 import { normalizeNextDayPickupPatch } from '@shared/next-day-pickup';
-import { normalizeVanPatch } from '@shared/van-rules';
+import { normalizeVanPatch, vanTimeOfDay } from '@shared/van-rules';
 import { Router, Response } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage-wrapper';
@@ -83,6 +91,7 @@ import { filterEventsByWeekScope, parseWeekScopeOffset } from '../lib/event-week
 import {
   buildRowUpdatePlan,
   normalizeGroupName,
+  normalizeTime,
   normalizeSheetDate,
   planToken,
   resolveSheetName,
@@ -541,8 +550,31 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
     // Parse sandwich types
     const sandwichTypes = sandwichTypesForNewEvent(data['Deli or PBJ?']);
 
-    // Parse contact name
-    const contactNameParts = parseContactName(data['Contact Name']);
+    // Contact columns carry both contacts: "Primary; Backup".
+    const [primaryName, backupName] = splitContacts(data['Contact Name']);
+    const contactNameParts = parseContactName(primaryName);
+    const backupNameParts = backupName ? parseContactName(backupName) : { firstName: null, lastName: null };
+    const [primaryEmail, backupEmail] = splitContacts(data['Email Address']);
+    const [primaryPhone, backupPhone] = splitContacts(data['Contact Cell Number']);
+
+    // Next-day pickup: G (Y / O) and "N/D 9am" in the pick-up column.
+    const ndCell = parseNextDayPickupCell(data['Pick up time']);
+    const gChoice = parseNextDayCell(data['Pick up next day']);
+    const nextDayPickup = ndCell ? 'planned' : gChoice === 'planned' || gChoice === 'option' ? gChoice : null;
+    const overnightPickupTime = ndCell?.timeText ? normalizeTime(ndCell.timeText) : null;
+
+    // Van time of day (I): kept as an override only when it differs from the event times.
+    const sheetVanTime = parseVanTimeCell(data['Van Booked?']);
+    const computedVanTime = vanTimeOfDay(
+      data['Event Start time (MUST when volunteer needed)'],
+      data['Event end time (MUST when volunteer needed)'],
+    );
+    const vanTimeOverride = sheetVanTime && sheetVanTime !== computedVanTime ? sheetVanTime : null;
+
+    // Expected attendees: the "Expected attendees:" line in Details.
+    const attendanceLine = attendanceFromDetails(data['ALL DETAILS']);
+    const attendance = attendanceLine ? parseAttendanceText(attendanceLine.text) : null;
+    const attendanceFields = attendance && !attendance.error && attendance.fields.estimatedAttendance ? attendance.fields : null;
 
     // Batch match all staff names to user IDs (single DB query instead of N+1)
     const {
@@ -558,17 +590,18 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
 
     // Combine notes
     const planningNotes = combineNotesFields(
-      data['ALL DETAILS'],
+      stripAttendeeLine(data['ALL DETAILS']),
       data['Notes'],
       data["Add'l Notes"],
       data['Waiting On']
     );
 
-    const vanNeededForCell = (data['Van needed for?'] || '').trim().toLowerCase();
+    // The sheet's dropdown: "Event Refrigeration" / "Just Transport".
+    const vanNeededForCell = (data['Van Needed For'] || data['Van needed for?'] || '').trim().toLowerCase();
     const vanNeededFor =
-      vanNeededForCell.startsWith('refrig')
+      vanNeededForCell.includes('refrig')
         ? 'refrigeration' as const
-        : vanNeededForCell.startsWith('transport')
+        : vanNeededForCell.includes('transport')
           ? 'transport' as const
           : null;
 
@@ -600,13 +633,19 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       // Contact info
       firstName: contactNameParts.firstName,
       lastName: contactNameParts.lastName,
-      email: data['Email Address']?.trim() || null,
-      phone: data['Contact Cell Number']?.trim() || null,
+      email: primaryEmail || null,
+      phone: primaryPhone || null,
+      backupContactFirstName: backupNameParts.firstName || null,
+      backupContactLastName: backupNameParts.lastName || null,
+      backupContactEmail: backupEmail || null,
+      backupContactPhone: backupPhone || null,
 
       // Event timing
       eventStartTime: data['Event Start time (MUST when volunteer needed)'] || null,
       eventEndTime: data['Event end time (MUST when volunteer needed)'] || null,
-      pickupTime: data['Pick up time'] || null,
+      pickupTime: ndCell ? null : data['Pick up time'] || null,
+      ...(nextDayPickup ? { nextDayPickup } : {}),
+      ...(overnightPickupTime ? { overnightPickupTime } : {}),
 
       // Location
       eventAddress: data['Address'] || null,
@@ -623,8 +662,17 @@ router.post('/import-from-sheets', validateSheetsApiKey, async (req, res) => {
       driversNeeded: staffing.driversNeeded,
       speakersNeeded: staffing.speakersNeeded,
       volunteersNeeded: staffing.volunteersNeeded,
-      vanDriverNeeded: staffing.vanDriverNeeded || !!vanNeededFor,
+      vanDriverNeeded: staffing.vanDriverNeeded || !!vanNeededFor || !!sheetVanTime,
       vanNeededFor,
+      vanTimeOverride,
+      isTspShopped: ['yes', 'y', 'true'].includes(String(data['TSP Shopping'] ?? '').trim().toLowerCase()),
+      ...(attendanceFields
+        ? {
+            estimatedAttendance: attendanceFields.estimatedAttendance,
+            estimatedAttendanceMin: attendanceFields.estimatedAttendanceMin,
+            estimatedAttendanceMax: attendanceFields.estimatedAttendanceMax,
+          }
+        : {}),
 
       // Staffing assignments
       assignedDriverIds: assignedDriverIds.length > 0 ? assignedDriverIds : null,
@@ -2925,6 +2973,9 @@ router.patch(
         processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
       }
 
+      // A Scheduled event moved to another day records the move (history badge).
+      Object.assign(processedUpdates, scheduledDateMoveFields(originalEvent as any, processedUpdates as Record<string, unknown>));
+
       // Check if status is changing and set statusChangedAt accordingly
       if (
         processedUpdates.status &&
@@ -3672,6 +3723,9 @@ router.put(
         );
         processedUpdates.status = normalizeIncomingStatus(processedUpdates.status);
       }
+
+      // A Scheduled event moved to another day records the move (history badge).
+      Object.assign(processedUpdates, scheduledDateMoveFields(originalEvent as any, processedUpdates as Record<string, unknown>));
 
       // Check if status is changing and set statusChangedAt accordingly
       if (

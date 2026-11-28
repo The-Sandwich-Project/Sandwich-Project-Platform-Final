@@ -580,7 +580,9 @@ export interface SameDayVanRequest {
  */
 export async function getOtherVanRequestsOnDate(
   date: Date,
-  excludeEventId?: number
+  excludeEventId?: number,
+  /** Throw instead of returning an empty list when the lookup fails (callers that must not guess). */
+  options: { throwOnError?: boolean } = {}
 ): Promise<{ otherEvents: SameDayVanRequest[] }> {
   const dateStr = getDateString(date);
   const startOfDay = new Date(dateStr + 'T00:00:00.000Z');
@@ -634,6 +636,7 @@ export async function getOtherVanRequestsOnDate(
     return { otherEvents };
   } catch (error) {
     logger.error('Error getting other van requests for date:', error);
+    if (options.throwOnError) throw error;
     return { otherEvents: [] };
   }
 }
