@@ -3,7 +3,7 @@
  * planning team). Pure functions, so each rule is unit tested.
  */
 import { effectiveNextDayPickup } from '@shared/next-day-pickup';
-import { formatAttendance } from '@shared/attendance-estimate';
+import { formatAttendance, parseAttendanceText } from '@shared/attendance-estimate';
 import { timeToMinutes, type VanTime } from '@shared/van-rules';
 
 /** "14:00" / "14:00:00" -> "2:00 PM"; anything else as-is; blank -> ''. */
@@ -81,10 +81,13 @@ export function formatVanNeededForSheet(value: string | null | undefined): strin
 
 /** Contact columns carry both contacts: "Primary; Backup" (blank parts dropped). */
 export function joinContacts(primary: string | null | undefined, backup: string | null | undefined): string {
-  return [primary, backup]
-    .map((v) => String(v ?? '').trim())
-    .filter(Boolean)
-    .join('; ');
+  const p = String(primary ?? '').trim();
+  const b = String(backup ?? '').trim();
+  if (p && b) return `${p}; ${b}`;
+  // Only the backup has this value: keep the separator ("; sam@x.org"), so
+  // reading the row back doesn't give the backup's value to the primary.
+  if (b) return `; ${b}`;
+  return p;
 }
 
 /** The app's own line in the Details column. */
@@ -114,4 +117,59 @@ export function mergeAttendeeLine(existing: string | null | undefined, line: str
   }
   if (!line) return text;
   return text.trim() ? `${text.replace(/\s+$/, '')}\n${line}` : line;
+}
+
+// ---------------------------------------------------------------------------
+// Reading the sheet back (batch 7b)
+// ---------------------------------------------------------------------------
+
+/** Column G: "Y" -> planned, "O" -> option, blank -> null (not filled in), anything else -> 'unreadable'. */
+export function parseNextDayCell(cell: unknown): 'planned' | 'option' | null | 'unreadable' {
+  const v = String(cell ?? '').trim().toLowerCase();
+  if (!v) return null;
+  if (v === 'y' || v === 'yes' || v.startsWith('y ')) return 'planned';
+  if (v === 'o' || v.startsWith('o ') || v.includes('option')) return 'option';
+  return 'unreadable';
+}
+
+/** Column F: "N/D 9am" / "N/D" -> next-day pickup (with the time text, if any); otherwise null. */
+export function parseNextDayPickupCell(cell: unknown): { nextDay: true; timeText: string } | null {
+  const m = String(cell ?? '').trim().match(/^n\s*\/?\s*d\b[\s,:-]*(.*)$/i);
+  return m ? { nextDay: true, timeText: m[1].trim() } : null;
+}
+
+/** Column I: AM / Mid Day / PM / All Day (any case, spacing or hyphen) -> the app's value; else null. */
+export function parseVanTimeCell(cell: unknown): VanTime | null {
+  const v = String(cell ?? '').toLowerCase().replace(/[\s-]+/g, '');
+  if (v === 'am') return 'AM';
+  if (v === 'midday') return 'Mid-day';
+  if (v === 'pm') return 'PM';
+  if (v === 'allday') return 'All day';
+  return null;
+}
+
+/** "Pat Doe; Sam Lee" -> ['Pat Doe', 'Sam Lee']; one value -> [value, '']. */
+export function splitContacts(cell: unknown): [string, string] {
+  const parts = String(cell ?? '').split(';').map((p) => p.trim());
+  return [parts[0] ?? '', parts.slice(1).filter(Boolean).join('; ')];
+}
+
+/** The attendance in the Details column's "Expected attendees:" line, or null when there's no line. */
+export function attendanceFromDetails(details: unknown): { text: string } | null {
+  const m = String(details ?? '').match(/^[ \t]*Expected attendees:[ \t]*~?[ \t]*(.*)$/im);
+  return m ? { text: m[1].trim() } : null;
+}
+
+/**
+ * Details without the app's attendee line, but only when its value could be
+ * read (it's then stored as attendance). An unreadable line ("about 40") stays,
+ * so the planner's text isn't lost.
+ */
+export function stripAttendeeLine(details: unknown): string {
+  const text = String(details ?? '');
+  const line = attendanceFromDetails(text);
+  if (!line) return text;
+  const parsed = parseAttendanceText(line.text);
+  if (parsed.error || !parsed.fields.estimatedAttendance) return text;
+  return mergeAttendeeLine(text, '');
 }

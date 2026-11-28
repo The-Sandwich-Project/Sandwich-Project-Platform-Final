@@ -13,6 +13,11 @@ import {
   formatVanTimeCell,
   joinContacts,
   mergeAttendeeLine,
+  parseNextDayCell,
+  parseNextDayPickupCell,
+  parseVanTimeCell,
+  splitContacts,
+  attendanceFromDetails,
 } from '../../server/services/planning-sheet-values';
 
 // The live "2026 Groups" header row (Nov 2026), with TSP shopping moved to K.
@@ -112,7 +117,9 @@ describe('planning sheet cell values', () => {
   it('contacts carry both people: "Primary; Backup"', () => {
     expect(joinContacts('Pat Doe', 'Sam Lee')).toBe('Pat Doe; Sam Lee');
     expect(joinContacts('pat@x.org', '')).toBe('pat@x.org');
-    expect(joinContacts('', 'sam@x.org')).toBe('sam@x.org');
+    // Only the backup has an email: the separator stays, so it reads back as the backup's.
+    expect(joinContacts('', 'sam@x.org')).toBe('; sam@x.org');
+    expect(splitContacts('; sam@x.org')).toEqual(['', 'sam@x.org']);
   });
 
   it('Details keeps the planner\'s text and only manages the attendee line', () => {
@@ -123,6 +130,25 @@ describe('planning sheet cell values', () => {
     expect(mergeAttendeeLine('Bring labels\nExpected attendees: ~30\nPark in back', line)).toBe('Bring labels\nExpected attendees: ~40–60\nPark in back');
     expect(mergeAttendeeLine('Bring labels\nExpected attendees: ~30', '')).toBe('Bring labels');
     expect(mergeAttendeeLine('Bring labels', '')).toBe('Bring labels');
+  });
+});
+
+describe('reading sheet cells back (7b parsers)', () => {
+  it('G, F, I and contacts', () => {
+    expect(parseNextDayCell('Y')).toBe('planned');
+    expect(parseNextDayCell('o')).toBe('option');
+    expect(parseNextDayCell('')).toBeNull();
+    expect(parseNextDayCell('maybe')).toBe('unreadable');
+    expect(parseNextDayPickupCell('N/D 9:00 AM')).toEqual({ nextDay: true, timeText: '9:00 AM' });
+    expect(parseNextDayPickupCell('ND')).toEqual({ nextDay: true, timeText: '' });
+    expect(parseNextDayPickupCell('3:30 PM')).toBeNull();
+    expect(parseVanTimeCell('Mid Day')).toBe('Mid-day');
+    expect(parseVanTimeCell('all day')).toBe('All day');
+    expect(parseVanTimeCell('Yes')).toBeNull();
+    expect(splitContacts('Pat; Sam')).toEqual(['Pat', 'Sam']);
+    expect(splitContacts('Pat')).toEqual(['Pat', '']);
+    expect(attendanceFromDetails('x\nExpected attendees: ~40–60')).toEqual({ text: '40–60' });
+    expect(attendanceFromDetails('no line')).toBeNull();
   });
 });
 

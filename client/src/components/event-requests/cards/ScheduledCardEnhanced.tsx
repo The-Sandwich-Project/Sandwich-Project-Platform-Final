@@ -117,6 +117,7 @@ import { EventNotesSection } from './EventNotesSection';
 import { TspShoppingBadge } from '../TspShopping';
 import { ExpectedAttendeesInline } from '../ExpectedAttendees';
 import { NextDayPickupBadge } from '../NextDayPickupBadge';
+import { effectiveNextDayPickup } from '@shared/next-day-pickup';
 
 interface ScheduledCardEnhancedProps {
   request: EventRequest;
@@ -441,6 +442,9 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
 
   // Get display date
   const displayDate = getEffectiveEventDate(request);
+  // Next-day pickup planned (the edit form's choice or sheet "N/D"), with or
+  // without an overnight holding location entered yet.
+  const nextDayPlanned = effectiveNextDayPickup(request) === 'planned';
   const dateInfo = displayDate ? formatEventDate(displayDate.toString()) : null;
 
   // Calculate follow-up reminder status
@@ -1890,8 +1894,10 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                             {(() => {
                               // Check if overnight holding is set and use overnight pickup time if available
                               // Overnight pickup is always next day
-                              if (request.overnightHoldingLocation && request.overnightPickupTime) {
-                                const timeStr = formatTime12Hour(request.overnightPickupTime);
+                              // (No next-day time yet: say so, rather than showing the
+                              // old same-day pickup time.)
+                              if (nextDayPlanned) {
+                                const timeStr = request.overnightPickupTime ? formatTime12Hour(request.overnightPickupTime) : null;
                                 // Calculate next day date from event date
                                 const nextDayDate = displayDate ? (() => {
                                   const dateStr = displayDate.toString().split('T')[0];
@@ -1906,7 +1912,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                                 })() : null;
                                 return (
                                   <>
-                                    <span>{timeStr}</span>
+                                    {timeStr ? <span>{timeStr}</span> : <span className="text-gray-500 italic text-base font-normal">Time not set</span>}
                                     <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 text-xs font-semibold max-w-full whitespace-normal break-words px-2 py-0.5">
                                       Next Day {nextDayDate ? `(${nextDayDate})` : ''}
                                     </Badge>
@@ -1985,7 +1991,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
             </div>
 
             {/* Recipient Logistics - moved from Column 3 */}
-            {((request.assignedRecipientIds && request.assignedRecipientIds.length > 0) || request.recipientsCount || request.overnightHoldingLocation || (isEditingThisCard && editingField === 'assignedRecipientIds')) ? (
+            {((request.assignedRecipientIds && request.assignedRecipientIds.length > 0) || request.recipientsCount || request.overnightHoldingLocation || nextDayPlanned || (isEditingThisCard && editingField === 'assignedRecipientIds')) ? (
               <div className="bg-gradient-to-r from-[#FBAD3F]/40 to-[#FBAD3F]/25 rounded-lg p-3 border-l-4 border-[#FBAD3F] border-t border-r border-b border-[#FBAD3F]/20 shadow-md mt-3">
                 <h3 className="text-sm uppercase font-bold tracking-wide text-[#236383] mb-2 flex items-center gap-2">
                   <Package className="w-4 h-4 text-[#FBAD3F]" aria-hidden="true" />
@@ -2160,7 +2166,7 @@ export const ScheduledCardEnhanced: React.FC<ScheduledCardEnhancedProps> = ({
                   )}
 
                   {/* Next-Day Pickup Time */}
-                  {request.overnightHoldingLocation && (
+                  {nextDayPlanned && (
                     <div>
                       <div className="flex items-center gap-2 mb-2 group">
                         <span className="text-xs uppercase text-gray-600 font-medium">Next-Day Pickup Time</span>
