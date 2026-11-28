@@ -115,3 +115,49 @@ export function mergeAttendeeLine(existing: string | null | undefined, line: str
   if (!line) return text;
   return text.trim() ? `${text.replace(/\s+$/, '')}\n${line}` : line;
 }
+
+// ---------------------------------------------------------------------------
+// Reading the sheet back (batch 7b)
+// ---------------------------------------------------------------------------
+
+/** Column G: "Y" -> planned, "O" -> option, blank -> null (not filled in), anything else -> 'unreadable'. */
+export function parseNextDayCell(cell: unknown): 'planned' | 'option' | null | 'unreadable' {
+  const v = String(cell ?? '').trim().toLowerCase();
+  if (!v) return null;
+  if (v === 'y' || v === 'yes' || v.startsWith('y ')) return 'planned';
+  if (v === 'o' || v.startsWith('o ') || v.includes('option')) return 'option';
+  return 'unreadable';
+}
+
+/** Column F: "N/D 9am" / "N/D" -> next-day pickup (with the time text, if any); otherwise null. */
+export function parseNextDayPickupCell(cell: unknown): { nextDay: true; timeText: string } | null {
+  const m = String(cell ?? '').trim().match(/^n\s*\/?\s*d\b[\s,:-]*(.*)$/i);
+  return m ? { nextDay: true, timeText: m[1].trim() } : null;
+}
+
+/** Column I: AM / Mid Day / PM / All Day (any case, spacing or hyphen) -> the app's value; else null. */
+export function parseVanTimeCell(cell: unknown): VanTime | null {
+  const v = String(cell ?? '').toLowerCase().replace(/[\s-]+/g, '');
+  if (v === 'am') return 'AM';
+  if (v === 'midday') return 'Mid-day';
+  if (v === 'pm') return 'PM';
+  if (v === 'allday') return 'All day';
+  return null;
+}
+
+/** "Pat Doe; Sam Lee" -> ['Pat Doe', 'Sam Lee']; one value -> [value, '']. */
+export function splitContacts(cell: unknown): [string, string] {
+  const parts = String(cell ?? '').split(';').map((p) => p.trim());
+  return [parts[0] ?? '', parts.slice(1).filter(Boolean).join('; ')];
+}
+
+/** The attendance in the Details column's "Expected attendees:" line, or null when there's no line. */
+export function attendanceFromDetails(details: unknown): { text: string } | null {
+  const m = String(details ?? '').match(/^[ \t]*Expected attendees:[ \t]*~?[ \t]*(.*)$/im);
+  return m ? { text: m[1].trim() } : null;
+}
+
+/** Details without the app's own attendee line (so it isn't copied into planning notes). */
+export function stripAttendeeLine(details: unknown): string {
+  return mergeAttendeeLine(String(details ?? ''), '');
+}

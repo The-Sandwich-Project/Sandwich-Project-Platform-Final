@@ -406,7 +406,7 @@ describe('notes from the sheet', () => {
       makeRow({ Notes: 'Bring gloves', 'Waiting On': 'Headcount' }),
       USERS
     );
-    expect(plan.updates.planningNotes).toBe('Notes: Bring gloves\n\nWaiting On: Headcount');
+    expect(plan.updates.planningNotes).toBe('Notes: Bring gloves\n\nPlanning/Contact Notes: Headcount');
     expect(plan.changes.find((c) => c.field === 'planningNotes')?.kind).toBe('fill');
   });
 
@@ -1017,5 +1017,71 @@ describe('staffing review fixes (mixed styles, same person twice)', () => {
     );
     expect(plan.updates.assignedVolunteerIds).toBeUndefined();
     expect(plan.updates.volunteersNeeded).toBeUndefined();
+  });
+});
+
+describe('batch 7b: reading the new sheet columns back', () => {
+  const plan = (eventOverrides: object, rowOverrides: object) =>
+    buildRowUpdatePlan(makeEvent(eventOverrides as any), makeRow(rowOverrides as any), USERS);
+  const fields = (p: ReturnType<typeof buildRowUpdatePlan>) => p.changes.map((c) => c.field);
+
+  it('G: Y / O set the next-day pickup choice; blank changes nothing', () => {
+    expect(plan({}, { 'Pick up next day': 'Y' }).updates).toMatchObject({ nextDayPickup: 'planned' });
+    expect(plan({}, { 'Pick up next day': 'O' }).updates).toMatchObject({ nextDayPickup: 'option' });
+    expect(fields(plan({}, { 'Pick up next day': '' }))).not.toContain('nextDayPickup');
+    expect(fields(plan({ nextDayPickup: 'option' }, { 'Pick up next day': 'O' }))).not.toContain('nextDayPickup');
+  });
+
+  it('F: "N/D 9am" is a planned next-day pickup with its time (not a same-day pick-up time)', () => {
+    const p = plan({}, { 'Pick up time': 'N/D 9am' });
+    expect(p.updates).toMatchObject({ nextDayPickup: 'planned', overnightPickupTime: '09:00' });
+    expect(fields(p)).not.toContain('pickupTime');
+    expect(plan({}, { 'Pick up time': 'N/D' }).updates).toMatchObject({ nextDayPickup: 'planned' });
+  });
+
+  it('I: a preset different from the event times becomes an override; the same value clears it; free text is ignored', () => {
+    const times = { eventStartTime: '09:00', eventEndTime: '10:00' }; // works out to AM
+    expect(plan(times, { 'Van Booked?': 'PM' }).updates).toMatchObject({ vanTimeOverride: 'PM' });
+    expect(plan({ ...times, vanTimeOverride: 'PM' }, { 'Van Booked?': 'AM' }).updates).toMatchObject({ vanTimeOverride: null });
+    expect(fields(plan(times, { 'Van Booked?': 'AM' }))).not.toContain('vanTimeOverride');
+    expect(fields(plan(times, { 'Van Booked?': 'Yes' }))).not.toContain('vanTimeOverride');
+    expect(plan(times, { 'Van Booked?': 'Mid Day' }).updates).toMatchObject({ vanTimeOverride: 'Mid-day' });
+  });
+
+  it("J: the sheet's dropdown values set what the van is for", () => {
+    expect(plan({}, { 'Van Needed For': 'Event Refrigeration' }).updates).toMatchObject({ vanNeededFor: 'refrigeration' });
+    expect(plan({ vanNeededFor: 'refrigeration' }, { 'Van Needed For': 'Just Transport' }).updates).toMatchObject({ vanNeededFor: 'transport' });
+  });
+
+  it('TSP shopping: "Yes" turns it on; blank never turns it off', () => {
+    expect(plan({}, { 'TSP Shopping': 'Yes' }).updates).toMatchObject({ isTspShopped: true });
+    expect(fields(plan({ isTspShopped: true }, { 'TSP Shopping': '' }))).not.toContain('isTspShopped');
+  });
+
+  it('contacts: "Primary; Backup" fills the backup contact', () => {
+    const p = plan(
+      { firstName: 'Pat', lastName: 'Doe', email: 'pat@example.com', phone: '404-555-0100' },
+      { 'Contact Name': 'Pat Doe; Sam Lee', 'Email Address': 'pat@example.com; sam@example.com', 'Contact Cell Number': '404-555-0100; 404-555-0199' },
+    );
+    expect(p.updates).toMatchObject({
+      backupContactFirstName: 'Sam',
+      backupContactLastName: 'Lee',
+      backupContactEmail: 'sam@example.com',
+      backupContactPhone: '404-555-0199',
+    });
+    expect(fields(p)).not.toContain('email'); // primary unchanged
+  });
+
+  it("Details: the app's attendee line updates attendance and isn't copied into planning notes", () => {
+    const p = plan({ estimatedAttendance: 30 }, { 'ALL DETAILS': 'Bring labels\nExpected attendees: ~40–60' });
+    expect(p.updates).toMatchObject({ estimatedAttendance: 50, estimatedAttendanceMin: 40, estimatedAttendanceMax: 60 });
+    expect(String(p.updates.planningNotes)).toContain('Bring labels');
+    expect(String(p.updates.planningNotes)).not.toContain('Expected attendees');
+  });
+
+  it('AB (sent as "Waiting On") is added to planning notes as Planning/Contact Notes', () => {
+    expect(String(plan({}, { 'Waiting On': 'Left a voicemail Tue' }).updates.planningNotes)).toContain(
+      'Planning/Contact Notes: Left a voicemail Tue',
+    );
   });
 });

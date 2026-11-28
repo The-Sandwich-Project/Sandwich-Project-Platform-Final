@@ -4,6 +4,17 @@ import { parseDateOnly, toDateOnlyString } from '@shared/date-utils';
 import { getEffectiveEventDate } from '@shared/event-validation-utils';
 import { parseSandwichCountInput } from '@shared/sandwich-count-utils';
 import { DELI_FAMILY_TYPES, estimateStateFromFields } from '@shared/sandwich-estimate';
+import { effectiveNextDayPickup, NEXT_DAY_PICKUP_LABELS, type NextDayPickup } from '@shared/next-day-pickup';
+import { formatAttendance, parseAttendanceText } from '@shared/attendance-estimate';
+import { effectiveVanTime, isVanTime, vanTimeOfDay, type VanTime } from '@shared/van-rules';
+import {
+  attendanceFromDetails,
+  parseNextDayCell,
+  parseNextDayPickupCell,
+  parseVanTimeCell,
+  splitContacts,
+  stripAttendeeLine,
+} from './planning-sheet-values';
 
 /**
  * Planning sheet → app UPDATE ("send row to app" on a row that already exists).
@@ -74,6 +85,20 @@ export interface RowUpdateEvent {
   message?: string | null;
   /** The push writes this into the sheet's Waiting On column. */
   nextAction?: string | null;
+  // Batch 7b: read back from the sheet
+  nextDayPickup?: string | null;
+  overnightHoldingLocation?: string | null;
+  overnightPickupTime?: string | null;
+  vanNeededFor?: string | null;
+  vanTimeOverride?: string | null;
+  isTspShopped?: boolean | null;
+  backupContactFirstName?: string | null;
+  backupContactLastName?: string | null;
+  backupContactEmail?: string | null;
+  backupContactPhone?: string | null;
+  estimatedAttendance?: number | null;
+  estimatedAttendanceMin?: number | null;
+  estimatedAttendanceMax?: number | null;
 }
 
 /** A sheet row as the Apps Script sends it (same keys as /import-from-sheets). */
@@ -99,6 +124,16 @@ export interface SheetRowData {
   'Contact Cell Number'?: string;
   Address?: string;
   'Planned Recipient/Host Home'?: string;
+  // Batch 7b keys (the script finds each column by header)
+  'Day of Week'?: string;
+  /** Column G: Y (next day planned) / O (next day is an option) / blank. */
+  'Pick up next day'?: string;
+  /** Column I: the van time of day (AM / Mid Day / PM / All Day). */
+  'Van Booked?'?: string;
+  /** Column J: Event Refrigeration / Just Transport. */
+  'Van Needed For'?: string;
+  /** "Yes" when TSP is buying the food. */
+  'TSP Shopping'?: string;
 }
 
 /** Which app directory a person comes from (the assignment picker's sections). */
@@ -659,6 +694,8 @@ export function buildRowUpdatePlan(
   for (const [field, col, label] of timeFields) {
     const rawSheet = clean(row[col]);
     if (!rawSheet) continue;
+    // "N/D" (+ time) in the pick-up column is a next-day pickup (read below).
+    if (field === 'pickupTime' && parseNextDayPickupCell(rawSheet)) continue;
     const sheetT = normalizeTime(rawSheet);
     if (!sheetT) {
       notes.push(`${label} "${rawSheet}" isn't a time the app can read, so it was left alone.`);
@@ -764,14 +801,24 @@ export function buildRowUpdatePlan(
       notes.push(`${label} differs (app: "${appVal}", sheet: "${sheetVal}"). The app keeps its value. Change it in the app if the sheet is right.`);
     }
   };
-  const contact = clean(row['Contact Name']);
+  // The contact columns carry both contacts: "Primary; Backup".
+  const [contact, backupContact] = splitContacts(clean(row['Contact Name']));
   if (contact) {
     const [first, ...rest] = contact.split(/\s+/);
     fill('firstName', 'Contact first name', first);
     if (rest.length) fill('lastName', 'Contact last name', rest.join(' '));
   }
-  fill('email', 'Contact email', clean(row['Email Address']));
-  fill('phone', 'Contact phone', clean(row['Contact Cell Number']));
+  if (backupContact) {
+    const [first, ...rest] = backupContact.split(/\s+/);
+    fill('backupContactFirstName', 'Backup contact first name', first);
+    if (rest.length) fill('backupContactLastName', 'Backup contact last name', rest.join(' '));
+  }
+  const [email, backupEmail] = splitContacts(clean(row['Email Address']));
+  const [phone, backupPhone] = splitContacts(clean(row['Contact Cell Number']));
+  fill('email', 'Contact email', email);
+  fill('phone', 'Contact phone', phone);
+  fill('backupContactEmail', 'Backup contact email', backupEmail);
+  fill('backupContactPhone', 'Backup contact phone', backupPhone);
   fill('eventAddress', 'Address', clean(row.Address));
   fill('deliveryDestination', 'Recipient / host home', clean(row['Planned Recipient/Host Home']));
 
@@ -913,6 +960,103 @@ export function buildRowUpdatePlan(
     notes.push('The sheet says not cancelled, but the app has this event as cancelled. Change it in the app if the event is back on.');
   }
 
+  // --- Next-day pickup (G, and "N/D" in F) -----------------------------------
+  // A blank cell never changes anything ("not filled in").
+  {
+    const g = parseNextDayCell(row['Pick up next day']);
+    const f = parseNextDayPickupCell(row['Pick up time']);
+    if (g === 'unreadable') {
+      notes.push(`Next-day pickup "${clean(row['Pick up next day'])}" isn't Y or O, so it was left alone.`);
+    }
+    const sheetChoice: NextDayPickup | null = f ? 'planned' : g === 'planned' || g === 'option' ? g : null;
+    const appChoice = effectiveNextDayPickup(event);
+    if (sheetChoice && sheetChoice !== appChoice) {
+      changes.push({
+        field: 'nextDayPickup',
+        label: 'Next-day pickup',
+        from: NEXT_DAY_PICKUP_LABELS[appChoice],
+        to: NEXT_DAY_PICKUP_LABELS[sheetChoice],
+        kind: 'update',
+      });
+      set('nextDayPickup', 'nextDayPickup', sheetChoice);
+    }
+    if (f && f.timeText) {
+      const t = normalizeTime(f.timeText);
+      if (!t) {
+        notes.push(`Next-day pickup time "${f.timeText}" isn't a time the app can read, so it was left alone.`);
+      } else if (normalizeTime(event.overnightPickupTime) !== t) {
+        changes.push({
+          field: 'overnightPickupTime',
+          label: 'Next-day pickup time',
+          from: event.overnightPickupTime ? displayTime(event.overnightPickupTime) : '',
+          to: displayTime(t),
+          kind: event.overnightPickupTime ? 'update' : 'fill',
+        });
+        set('overnightPickupTime', 'overnightPickupTime', t);
+      }
+    }
+  }
+
+  // --- Van (I: time of day, J: what it's for) -------------------------------
+  {
+    // I: a preset different from what the app works out from the times is
+    // kept as an override (it clears when the times change in the app). The
+    // same value as the worked-out one clears any old override. Free text is
+    // ignored.
+    const iCell = clean(row['Van Booked?']);
+    const sheetTime = parseVanTimeCell(iCell);
+    if (sheetTime) {
+      const computed = vanTimeOfDay(event.eventStartTime, event.eventEndTime);
+      const current = isVanTime(event.vanTimeOverride) ? (event.vanTimeOverride as VanTime) : null;
+      const nextOverride = sheetTime === computed ? null : sheetTime;
+      if (nextOverride !== current) {
+        changes.push({
+          field: 'vanTimeOverride',
+          label: 'Van time of day',
+          from: effectiveVanTime(event).value || '',
+          to: sheetTime,
+          kind: 'update',
+        });
+        set('vanTimeOverride', 'vanTimeOverride', nextOverride);
+      }
+    }
+    const jCell = clean(row['Van Needed For'] ?? (row as any)['Van needed for?']);
+    if (jCell) {
+      const v = jCell.toLowerCase();
+      const sheetFor = v.includes('refrig') ? 'refrigeration' : v.includes('transport') ? 'transport' : null;
+      if (!sheetFor) {
+        notes.push(`Van needed for "${jCell}" isn't Event Refrigeration or Just Transport, so it was left alone.`);
+      } else if (sheetFor !== event.vanNeededFor) {
+        const label = (x: string | null | undefined) => (x === 'refrigeration' ? 'Event Refrigeration' : x === 'transport' ? 'Just Transport' : '');
+        changes.push({ field: 'vanNeededFor', label: 'Van needed for', from: label(event.vanNeededFor), to: label(sheetFor), kind: event.vanNeededFor ? 'update' : 'fill' });
+        set('vanNeededFor', 'vanNeededFor', sheetFor);
+      }
+    }
+  }
+
+  // --- TSP shopping ("Yes"; a blank never turns it off) ---------------------
+  if (['yes', 'y', 'true'].includes(lower(clean(row['TSP Shopping']))) && event.isTspShopped !== true) {
+    changes.push({ field: 'isTspShopped', label: 'TSP shopping', from: 'No (group shops)', to: 'Yes', kind: 'update' });
+    set('isTspShopped', 'isTspShopped', true);
+  }
+
+  // --- Expected attendees (the app's line in Details) -----------------------
+  {
+    const line = attendanceFromDetails(row['ALL DETAILS']);
+    if (line && line.text) {
+      const parsed = parseAttendanceText(line.text);
+      if (parsed.error) {
+        notes.push(`Expected attendees "${line.text}" isn't a number or a range, so it was left alone.`);
+      } else if (parsed.fields.estimatedAttendance && formatAttendance(parsed.fields) !== formatAttendance(event)) {
+        const from = formatAttendance(event);
+        changes.push({ field: 'estimatedAttendance', label: 'Expected attendees', from, to: formatAttendance(parsed.fields), kind: from ? 'update' : 'fill' });
+        set('estimatedAttendance', 'estimatedAttendance', parsed.fields.estimatedAttendance);
+        set('estimatedAttendance', 'estimatedAttendanceMin', parsed.fields.estimatedAttendanceMin);
+        set('estimatedAttendance', 'estimatedAttendanceMax', parsed.fields.estimatedAttendanceMax);
+      }
+    }
+  }
+
   // --- Planning notes (APPEND-ONLY) -----------------------------------------
   // Sheet notes are added to the end of planning notes, never replacing them.
   // Only text the event doesn't already have is added, and text the app itself
@@ -922,7 +1066,7 @@ export function buildRowUpdatePlan(
     [event.planningNotes, event.message, event.nextAction].filter(Boolean).join('\n')
   );
   const newParts = sheetNoteParts(row).filter((part) => {
-    const body = squash(part.replace(/^(Notes|Additional Notes|Waiting On): /, ''));
+    const body = squash(part.replace(/^(Notes|Additional Notes|Waiting On|Planning\/Contact Notes): /, ''));
     return body && !already.includes(body);
   });
   if (newParts.length) {
@@ -978,14 +1122,17 @@ export function sheetNoteParts(row: {
     const t = clean(v);
     return isRowIdOnly(t) ? '' : t;
   };
-  const details = note(row['ALL DETAILS']);
+  // The app's own "Expected attendees:" line is read into the event above,
+  // not copied into planning notes.
+  const details = note(stripAttendeeLine(row['ALL DETAILS']));
   const notesCell = note(row.Notes);
   const addl = note(row["Add'l Notes"]);
   const waiting = note(row['Waiting On']);
   if (details) parts.push(details);
   if (notesCell) parts.push(`Notes: ${notesCell}`);
   if (addl) parts.push(`Additional Notes: ${addl}`);
-  if (waiting) parts.push(`Waiting On: ${waiting}`);
+  // Column AB, now "Planning/Contact Notes" (the script still sends it as "Waiting On").
+  if (waiting) parts.push(`Planning/Contact Notes: ${waiting}`);
   return parts;
 }
 
