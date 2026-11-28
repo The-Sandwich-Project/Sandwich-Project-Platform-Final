@@ -151,11 +151,15 @@ export function createPlanningSheetProposalsRouter(
       let existingSheetRow = null;
       let potentialMatches: any[] = [];
       let placement: SheetPlacement | null = null;
+      // Columns the push can write on this sheet (found by header); the
+      // dialog only compares these.
+      let writableColumns: number[] | null = null;
       try {
         // One read feeds matching, placement, and duplicate detection. Reading
         // per step would triple the API calls and let the three answers be
         // based on different versions of the sheet.
         const allSheetRows = await service.readPlanningSheet();
+        writableColumns = await service.getWritableColumns();
 
         // Try exact match first
         existingSheetRow = await service.findMatchingRow(parsedEventId, allSheetRows);
@@ -208,6 +212,7 @@ export function createPlanningSheetProposalsRouter(
       });
 
       res.json({
+        writableColumns,
         rawData: rowData,
         labeledData,
         columns: PLANNING_SHEET_COLUMNS,

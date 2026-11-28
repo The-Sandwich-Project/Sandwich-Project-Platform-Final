@@ -147,5 +147,12 @@ describe('reading sheet cells back (7b parsers)', () => {
     expect(splitContacts('Pat')).toEqual(['Pat', '']);
     expect(attendanceFromDetails('x\nExpected attendees: ~40–60')).toEqual({ text: '40–60' });
     expect(attendanceFromDetails('no line')).toBeNull();
+describe('#609 review fixes', () => {
+  it("a sheet without a 'TSP Shopping' header can't take TSP shopping (so the preview won't compare it)", () => {
+    const map = resolvePlanningHeaders(['Date', 'Day of the Week', 'Group Name', 'Toolkit Sent']);
+    const writable = Array.from(map.columns.keys()).filter((l) => APP_WRITTEN_COLUMNS.has(l));
+    expect(writable).toEqual(expect.arrayContaining([0, 1, 2]));
+    expect(writable).not.toContain(28); // TSP shopping
+    expect(writable).not.toContain(16); // Toolkit Sent is the sheet's
   });
 });
