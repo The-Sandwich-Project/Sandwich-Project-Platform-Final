@@ -4,7 +4,8 @@ jest.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: jest.fn() }) }
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TspShoppingCheckbox } from '../TspShopping';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TspShoppingBadge, TspShoppingCheckbox } from '../TspShopping';
 import { ExpectedAttendeesField } from '../form-sections/ExpectedAttendeesField';
 import { buildEventDataForServer, dropUnchangedFields, intelligentMergeFormData, normalizeDraftAttendance } from '../form-utils';
 
@@ -30,6 +31,23 @@ describe('TSP shopping checkbox', () => {
     expect(screen.getByText('Switch to the group shopping?')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Yes, the group is shopping' }));
     expect(onChange).toHaveBeenLastCalledWith(false);
+  });
+});
+
+describe('TSP shopping badge on cards', () => {
+  it('shows only once TSP shopping is ticked (no "Group shopping" badge)', () => {
+    const qc = new QueryClient();
+    const wrap = (v: boolean | null) => (
+      <QueryClientProvider client={qc}>
+        <TspShoppingBadge eventRequestId={1} isTspShopped={v} canEdit />
+      </QueryClientProvider>
+    );
+    const { container, rerender } = render(wrap(false));
+    expect(container.textContent).toBe('');
+    rerender(wrap(null));
+    expect(container.textContent).toBe('');
+    rerender(wrap(true));
+    expect(screen.getByTestId('badge-tsp-shopping').textContent).toMatch(/TSP shopping/);
   });
 });
 
