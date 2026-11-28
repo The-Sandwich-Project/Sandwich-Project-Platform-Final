@@ -1085,3 +1085,41 @@ describe('batch 7b: reading the new sheet columns back', () => {
     );
   });
 });
+
+describe('#610 review fixes', () => {
+  const plan = (eventOverrides: object, rowOverrides: object) =>
+    buildRowUpdatePlan(makeEvent(eventOverrides as any), makeRow(rowOverrides as any), USERS);
+
+  it("contacts: a backup-only email doesn't become the primary's", () => {
+    const p = plan({ email: null }, { 'Email Address': '; sam@example.com' });
+    expect(p.updates).toMatchObject({ backupContactEmail: 'sam@example.com' });
+    expect(p.updates).not.toHaveProperty('email');
+  });
+
+  it('a van time or purpose on the sheet also offers "van needed", and saving either marks it', () => {
+    const p = plan({ vanDriverNeeded: false, eventStartTime: '09:00', eventEndTime: '10:00' }, { 'Van Booked?': 'PM', 'Van Needed For': 'Event Refrigeration' });
+    expect(p.changes.map((c) => c.field)).toContain('vanDriverNeeded');
+    expect(selectUpdates(p, ['vanNeededFor']).updates).toMatchObject({ vanNeededFor: 'refrigeration', vanDriverNeeded: true });
+    expect(selectUpdates(p, ['vanTimeOverride']).updates).toMatchObject({ vanDriverNeeded: true });
+    // Already needed: nothing extra offered.
+    expect(plan({ vanDriverNeeded: true }, { 'Van Needed For': 'Just Transport' }).changes.map((c) => c.field)).not.toContain('vanDriverNeeded');
+  });
+
+  it('the van time override is worked out against the times actually saved', () => {
+    const event = makeEvent({ vanDriverNeeded: true, eventStartTime: '09:00', eventEndTime: '10:00' } as any); // AM today
+    const p = buildRowUpdatePlan(event, makeRow({ 'Event Start time (MUST when volunteer needed)': '3:00 PM', 'Event end time (MUST when volunteer needed)': '4:00 PM', 'Van Booked?': 'AM' } as any), USERS);
+    // With the new afternoon times, AM is an override, so it's offered.
+    expect(p.changes.map((c) => c.field)).toContain('vanTimeOverride');
+    // Times + van ticked: saved as an override (PM times, sheet says AM).
+    expect(selectUpdates(p, ['eventStartTime', 'eventEndTime', 'vanTimeOverride'], event).updates).toMatchObject({ vanTimeOverride: 'AM' });
+    // Van ticked but times not: the old morning times already give AM, so no override.
+    expect(selectUpdates(p, ['vanTimeOverride'], event).updates).toMatchObject({ vanTimeOverride: null });
+  });
+
+  it("an unreadable 'Expected attendees:' line stays in the notes", () => {
+    const p = plan({}, { 'ALL DETAILS': 'Bring labels\nExpected attendees: about 40' });
+    expect(p.updates).not.toHaveProperty('estimatedAttendance');
+    expect(String(p.updates.planningNotes)).toContain('Expected attendees: about 40');
+    expect(p.notes.join(' ')).toMatch(/Expected attendees "about 40"/);
+  });
+});

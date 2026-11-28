@@ -3,7 +3,7 @@
  * planning team). Pure functions, so each rule is unit tested.
  */
 import { effectiveNextDayPickup } from '@shared/next-day-pickup';
-import { formatAttendance } from '@shared/attendance-estimate';
+import { formatAttendance, parseAttendanceText } from '@shared/attendance-estimate';
 import { timeToMinutes, type VanTime } from '@shared/van-rules';
 
 /** "14:00" / "14:00:00" -> "2:00 PM"; anything else as-is; blank -> ''. */
@@ -81,10 +81,13 @@ export function formatVanNeededForSheet(value: string | null | undefined): strin
 
 /** Contact columns carry both contacts: "Primary; Backup" (blank parts dropped). */
 export function joinContacts(primary: string | null | undefined, backup: string | null | undefined): string {
-  return [primary, backup]
-    .map((v) => String(v ?? '').trim())
-    .filter(Boolean)
-    .join('; ');
+  const p = String(primary ?? '').trim();
+  const b = String(backup ?? '').trim();
+  if (p && b) return `${p}; ${b}`;
+  // Only the backup has this value: keep the separator ("; sam@x.org"), so
+  // reading the row back doesn't give the backup's value to the primary.
+  if (b) return `; ${b}`;
+  return p;
 }
 
 /** The app's own line in the Details column. */
@@ -157,7 +160,16 @@ export function attendanceFromDetails(details: unknown): { text: string } | null
   return m ? { text: m[1].trim() } : null;
 }
 
-/** Details without the app's own attendee line (so it isn't copied into planning notes). */
+/**
+ * Details without the app's attendee line, but only when its value could be
+ * read (it's then stored as attendance). An unreadable line ("about 40") stays,
+ * so the planner's text isn't lost.
+ */
 export function stripAttendeeLine(details: unknown): string {
-  return mergeAttendeeLine(String(details ?? ''), '');
+  const text = String(details ?? '');
+  const line = attendanceFromDetails(text);
+  if (!line) return text;
+  const parsed = parseAttendanceText(line.text);
+  if (parsed.error || !parsed.fields.estimatedAttendance) return text;
+  return mergeAttendeeLine(text, '');
 }

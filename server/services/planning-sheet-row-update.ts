@@ -183,6 +183,11 @@ export interface RowUpdatePlan {
   updatesByField: Record<string, Record<string, unknown>>;
   /** Things the person should know that we did NOT change. */
   notes: string[];
+  /**
+   * The van time of day the sheet picked (column I), so the override can be
+   * worked out against the times actually saved (selectUpdates).
+   */
+  sheetVanTime?: VanTime | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -998,6 +1003,7 @@ export function buildRowUpdatePlan(
   }
 
   // --- Van (I: time of day, J: what it's for) -------------------------------
+  let sheetVanTime: VanTime | null = null;
   {
     // I: a preset different from what the app works out from the times is
     // kept as an override (it clears when the times change in the app). The
@@ -1005,8 +1011,14 @@ export function buildRowUpdatePlan(
     // ignored.
     const iCell = clean(row['Van Booked?']);
     const sheetTime = parseVanTimeCell(iCell);
+    sheetVanTime = sheetTime;
     if (sheetTime) {
-      const computed = vanTimeOfDay(event.eventStartTime, event.eventEndTime);
+      // Compare with the times this row would save (the sheet's, when it
+      // changes them); selectUpdates recomputes for the changes actually ticked.
+      const computed = vanTimeOfDay(
+        (updates.eventStartTime as string | undefined) ?? event.eventStartTime,
+        (updates.eventEndTime as string | undefined) ?? event.eventEndTime,
+      );
       const current = isVanTime(event.vanTimeOverride) ? (event.vanTimeOverride as VanTime) : null;
       const nextOverride = sheetTime === computed ? null : sheetTime;
       if (nextOverride !== current) {
@@ -1031,6 +1043,17 @@ export function buildRowUpdatePlan(
         changes.push({ field: 'vanNeededFor', label: 'Van needed for', from: label(event.vanNeededFor), to: label(sheetFor), kind: event.vanNeededFor ? 'update' : 'fill' });
         set('vanNeededFor', 'vanNeededFor', sheetFor);
       }
+    }
+    // A van time or purpose on the sheet means the event needs the van. Offer
+    // that too, or the event wouldn't count as needing it (conflict checks
+    // skip it, and the next push would blank both cells).
+    const sheetWantsVan = !!sheetTime || (!!jCell && /refrig|transport/i.test(jCell));
+    if (sheetWantsVan && event.vanDriverNeeded !== true) {
+      changes.push({ field: 'vanDriverNeeded', label: 'Van needed', from: 'No', to: 'Yes', kind: 'update' });
+      set('vanDriverNeeded', 'vanDriverNeeded', true);
+      // Saving the van time or purpose alone also marks the van needed.
+      if (updatesByField.vanTimeOverride) updatesByField.vanTimeOverride.vanDriverNeeded = true;
+      if (updatesByField.vanNeededFor) updatesByField.vanNeededFor.vanDriverNeeded = true;
     }
   }
 
@@ -1082,7 +1105,7 @@ export function buildRowUpdatePlan(
     set('planningNotes', 'planningNotes', appNotes ? `${appNotes}\n\n${added}` : added);
   }
 
-  return { changes, updates, updatesByField, notes };
+  return { changes, updates, updatesByField, notes, sheetVanTime };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -1153,6 +1176,14 @@ export function selectUpdates(
   const chosen = new Set(fields);
   const updates: Record<string, unknown> = {};
   for (const f of chosen) Object.assign(updates, plan.updatesByField[f]);
+  // The van time override is worked out against the times actually being
+  // saved: the sheet's new times if those were ticked, else the app's.
+  if (chosen.has('vanTimeOverride') && plan.sheetVanTime && _event && typeof _event === 'object') {
+    const ev = _event as Partial<RowUpdateEvent>;
+    const start = chosen.has('eventStartTime') ? (updates.eventStartTime as string) : ev.eventStartTime;
+    const end = chosen.has('eventEndTime') ? (updates.eventEndTime as string) : ev.eventEndTime;
+    updates.vanTimeOverride = plan.sheetVanTime === vanTimeOfDay(start, end) ? null : plan.sheetVanTime;
+  }
   // Estimate fields that depend on each other (an estimate ticked without the
   // types, or the reverse) are reconciled by the shared estimate rule on save.
   return { changes: plan.changes.filter((c) => chosen.has(c.field)), updates };

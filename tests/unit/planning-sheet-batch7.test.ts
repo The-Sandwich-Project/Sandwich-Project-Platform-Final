@@ -117,7 +117,9 @@ describe('planning sheet cell values', () => {
   it('contacts carry both people: "Primary; Backup"', () => {
     expect(joinContacts('Pat Doe', 'Sam Lee')).toBe('Pat Doe; Sam Lee');
     expect(joinContacts('pat@x.org', '')).toBe('pat@x.org');
-    expect(joinContacts('', 'sam@x.org')).toBe('sam@x.org');
+    // Only the backup has an email: the separator stays, so it reads back as the backup's.
+    expect(joinContacts('', 'sam@x.org')).toBe('; sam@x.org');
+    expect(splitContacts('; sam@x.org')).toEqual(['', 'sam@x.org']);
   });
 
   it('Details keeps the planner\'s text and only manages the attendee line', () => {
